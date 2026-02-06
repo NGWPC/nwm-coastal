@@ -87,10 +87,25 @@ DATA_SOURCE_DATE_RANGES: dict[str, dict[str, DateRange]] = {
         ),
     },
     "nwm_ana": {
-        "_default": DateRange(
-            start=datetime(2018, 9, 17),
+        "conus": DateRange(
+            start=datetime(2018, 10, 1),
             end=None,
-            description="NWM Analysis (operational)",
+            description="NWM Analysis and Assimilation (CONUS)",
+        ),
+        "alaska": DateRange(
+            start=datetime(2023, 10, 1),
+            end=None,
+            description="NWM Analysis and Assimilation (ALASKA)",
+        ),
+        "hawaii": DateRange(
+            start=datetime(2019, 7, 1),
+            end=None,
+            description="NWM Analysis and Assimilation (HAWAII)",
+        ),
+        "prvi": DateRange(
+            start=datetime(2023, 10, 1),
+            end=None,
+            description="NWM Analysis and Assimilation (PUERTORICO)",
         ),
     },
     "stofs": {
@@ -295,6 +310,7 @@ _DOMAIN_MAP_ANA = {
     "pacific": ("", "conus"),
     "hawaii": ("_hawaii", "hawaii"),
     "prvi": ("_puertorico", "puertorico"),
+    "alaska": ("_alaska", "alaska"),
 }
 
 _GLOFS_MODEL_DIRS = {
@@ -415,30 +431,33 @@ def _build_nwm_ana_streamflow_urls(
         hour_str = f"{fetch_dt.hour:02d}"
 
         if domain == "hawaii":
-            # Main hourly file
-            url = (
-                f"{base_url}/nwm.{dt.strftime('%Y%m%d')}/"
-                f"analysis_assim_hawaii/"
-                f"nwm.t{hour_str}z.analysis_assim.channel_rt.tm0200.hawaii.nc"
-            )
-            urls.append(url)
-            paths.append(out_dir / f"{dt.strftime('%Y%m%d%H')}00.CHRTOUT_DOMAIN1")
-
-            # Sub-hourly files
-            for minutes in (15, 30, 45):
-                sub_dt = dt + timedelta(hours=1) - timedelta(minutes=minutes)
-                tm_offset = f"tm01{minutes:02d}"
+            # Hawaii sub-hourly naming changed on 2021-04-21:
+            #   Before: tm00, tm01, tm02 (3 hourly files)
+            #   After:  tm0000..tm0245 (12 fifteen-minute files)
+            _hawaii_name_change = datetime(2021, 4, 21)
+            if dt < _hawaii_name_change:
                 url = (
-                    f"{base_url}/nwm.{sub_dt.strftime('%Y%m%d')}/"
+                    f"{base_url}/nwm.{date_str}/"
                     f"analysis_assim_hawaii/"
-                    f"nwm.t{hour_str}z.analysis_assim.channel_rt.{tm_offset}.hawaii.nc"
+                    f"nwm.t{hour_str}z.analysis_assim.channel_rt.tm02.hawaii.nc"
                 )
-                out_minutes = (60 - minutes) % 60
                 urls.append(url)
-                paths.append(
-                    out_dir
-                    / f"{dt.strftime('%Y%m%d')}{sub_dt.hour:02d}{out_minutes:02d}.CHRTOUT_DOMAIN1"
-                )
+                paths.append(out_dir / f"{dt.strftime('%Y%m%d%H')}00.CHRTOUT_DOMAIN1")
+            else:
+                for quarter in range(4):
+                    minutes = quarter * 15
+                    tm_h = 2 - (1 if minutes > 0 else 0)
+                    tm_m = (60 - minutes) % 60
+                    tm_offset = f"tm{tm_h:02d}{tm_m:02d}"
+                    url = (
+                        f"{base_url}/nwm.{date_str}/"
+                        f"analysis_assim_hawaii/"
+                        f"nwm.t{hour_str}z.analysis_assim.channel_rt.{tm_offset}.hawaii.nc"
+                    )
+                    urls.append(url)
+                    paths.append(
+                        out_dir / f"{dt.strftime('%Y%m%d%H')}{minutes:02d}.CHRTOUT_DOMAIN1"
+                    )
         else:
             url = (
                 f"{base_url}/nwm.{date_str}/"
