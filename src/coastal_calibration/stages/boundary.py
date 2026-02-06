@@ -73,12 +73,22 @@ class STOFSBoundaryStage(WorkflowStage):
         if self.config.boundary.stofs_file:
             return self.config.boundary.stofs_file
 
-        # Auto-resolve from download directory
+        from coastal_calibration.downloader import get_stofs_path
+
+        expected = get_stofs_path(
+            self.config.simulation.start_date,
+            self.config.paths.download_dir,
+        )
+        if expected.exists():
+            self._log(f"Auto-resolved STOFS file: {expected}")
+            return expected
+
+        # Fallback: search for any STOFS file in the directory
         coastal_dir = self.config.paths.download_dir / "coastal" / "stofs"
         if coastal_dir.exists():
             stofs_files = sorted(coastal_dir.rglob("*.fields.cwl.nc"))
             if stofs_files:
-                self._log(f"Auto-resolved STOFS file: {stofs_files[0]}")
+                self._log(f"Auto-resolved STOFS file (fallback): {stofs_files[0]}")
                 return stofs_files[0]
 
         msg = f"No STOFS file found. Set boundary.stofs_file or ensure data exists in {coastal_dir}"
