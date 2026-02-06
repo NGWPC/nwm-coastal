@@ -186,6 +186,8 @@ lint.per-file-ignores."tests/*.py" = [
   "PGH003",
   # use of "assert"
   "S101",
+  # insecure use of path
+  "S108",
 ]
 lint.extend-safe-fixes = [
   # module level imports
