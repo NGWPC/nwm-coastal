@@ -4,10 +4,10 @@
 
 The `coastal-calibration` Python package is a complete redesign and rewrite of the
 original bash-based SCHISM model calibration workflow. This document details the
-architectural improvements, design decisions, and substantial enhancements made over
-the original implementation.
+architectural improvements, design decisions, and substantial enhancements made over the
+original implementation.
 
----
+______________________________________________________________________
 
 ## Executive Summary
 
@@ -22,9 +22,9 @@ The primary objectives of this rewrite are to create a workflow that is:
 
 1. **Intuitive and user-friendly** - Simple YAML configuration, clear CLI commands,
    helpful error messages
-2. **Less prone to errors** - Type-safe configuration, comprehensive validation,
+1. **Less prone to errors** - Type-safe configuration, comprehensive validation,
    structured logging
-3. **Extensible** - Clean stage-based architecture that allows adding new models
+1. **Extensible** - Clean stage-based architecture that allows adding new models
    (SFINCS) and features
 
 ### Architectural Strategy
@@ -54,7 +54,7 @@ proceeds.
 - **Configuration inheritance** for DRY multi-run setups
 - **Smart default paths** with variable interpolation
 
----
+______________________________________________________________________
 
 ## Original Implementation Analysis
 
@@ -153,7 +153,7 @@ singularity exec -B $BINDINGS --pwd ${work_dir} $SIF_PATH \
 # No error check here
 ```
 
----
+______________________________________________________________________
 
 ## New Architecture
 
@@ -249,7 +249,7 @@ slurm:
   user: your_username
 
 simulation:
-  start_date: "2021-06-11"
+  start_date: '2021-06-11'
   duration_hours: 24
   coastal_domain: hawaii
   meteo_source: nwm_ana
@@ -365,7 +365,7 @@ class CoastalCalibRunner:
         pass
 ```
 
----
+______________________________________________________________________
 
 ## Key Design Decisions
 
@@ -483,7 +483,7 @@ The architecture deliberately separates **public API** from **private implementa
 - Enables IDE features (autocomplete, refactoring)
 - Self-documents function signatures
 
----
+______________________________________________________________________
 
 ## Substantial Improvements
 
@@ -571,7 +571,7 @@ coastal-calibration stages
 | Skip existing     | None           | `skip_existing=True` option       |
 | Progress tracking | None           | Success/failure counts            |
 
----
+______________________________________________________________________
 
 ## API Reference
 
@@ -602,7 +602,7 @@ coastal-calibration stages
 | `schism_run`          | Execute `pschism` binary (MPI)           |
 | `post_schism`         | Validate and post-process outputs        |
 
----
+______________________________________________________________________
 
 ## Future Developments
 
@@ -612,24 +612,24 @@ The highest priority is incrementally replacing embedded bash scripts with pure 
 implementations:
 
 1. **Establish Testing Baseline** - Add integration tests capturing current behavior
-2. **Incremental Stage Rewriting** - Start with simpler stages
-3. **Performance Optimization** - Replace subprocess calls with native Python
-4. **Deprecate Bash Scripts** - Remove bash dependencies once Python replacements are
+1. **Incremental Stage Rewriting** - Start with simpler stages
+1. **Performance Optimization** - Replace subprocess calls with native Python
+1. **Deprecate Bash Scripts** - Remove bash dependencies once Python replacements are
    validated
 
 ### Medium-Term: Feature Expansion
 
 1. **SFINCS Model Support** - Infrastructure already in place (`stages/sfincs.py`)
-2. **Hot Start Chain Automation** - Automatic hot-start file discovery
-3. **Ensemble Runs** - Multiple configurations from single base
+1. **Hot Start Chain Automation** - Automatic hot-start file discovery
+1. **Ensemble Runs** - Multiple configurations from single base
 
 ### Long-Term: Platform Evolution
 
 1. **Result Analysis Integration** - Post-run validation against observations
-2. **Cloud-Native Deployment** - AWS Batch support
-3. **Multi-Model Coupling** - SCHISM + SFINCS workflows
+1. **Cloud-Native Deployment** - AWS Batch support
+1. **Multi-Model Coupling** - SCHISM + SFINCS workflows
 
----
+______________________________________________________________________
 
 ## Conclusion
 
