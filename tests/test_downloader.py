@@ -1,0 +1,373 @@
+"""Tests for coastal_calibration.downloader module."""
+
+from __future__ import annotations
+
+from datetime import datetime
+from pathlib import Path
+
+import pytest
+
+from coastal_calibration.downloader import (
+    DATA_SOURCE_DATE_RANGES,
+    DateRange,
+    DownloadResult,
+    DownloadResults,
+    _build_glofs_urls,
+    _build_nwm_ana_forcing_urls,
+    _build_nwm_ana_streamflow_urls,
+    _build_nwm_retro_forcing_urls,
+    _build_nwm_retro_streamflow_urls,
+    _build_stofs_urls,
+    _filter_existing,
+    _iter_hours,
+    _parse_datetime,
+    get_date_range,
+    get_default_sources,
+    get_overlapping_range,
+    validate_date_ranges,
+)
+
+
+class TestDateRange:
+    def test_validate_within_range(self):
+        dr = DateRange(
+            start=datetime(2020, 1, 1),
+            end=datetime(2023, 12, 31),
+            description="Test",
+        )
+        assert dr.validate(datetime(2021, 6, 1), datetime(2021, 7, 1)) is None
+
+    def test_validate_start_too_early(self):
+        dr = DateRange(
+            start=datetime(2020, 1, 1),
+            end=datetime(2023, 12, 31),
+            description="Test",
+        )
+        error = dr.validate(datetime(2019, 1, 1), datetime(2021, 7, 1))
+        assert error is not None
+        assert "before" in error
+
+    def test_validate_end_too_late(self):
+        dr = DateRange(
+            start=datetime(2020, 1, 1),
+            end=datetime(2023, 12, 31),
+            description="Test",
+        )
+        error = dr.validate(datetime(2021, 1, 1), datetime(2025, 1, 1))
+        assert error is not None
+        assert "after" in error
+
+    def test_validate_open_ended(self):
+        dr = DateRange(
+            start=datetime(2020, 1, 1),
+            end=None,
+            description="Test",
+        )
+        today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        # Past date should be fine
+        assert dr.validate(datetime(2021, 1, 1), datetime(2021, 2, 1)) is None
+
+    def test_validate_future_start_open_ended(self):
+        dr = DateRange(
+            start=datetime(2020, 1, 1),
+            end=None,
+            description="Test",
+        )
+        error = dr.validate(datetime(2099, 1, 1), datetime(2099, 2, 1))
+        assert error is not None
+        assert "future" in error
+
+
+class TestGetDateRange:
+    def test_retro_conus(self):
+        dr = get_date_range("nwm_retro", "conus")
+        assert dr is not None
+        assert dr.start == datetime(1979, 2, 1)
+
+    def test_retro_hawaii(self):
+        dr = get_date_range("nwm_retro", "hawaii")
+        assert dr is not None
+        assert dr.start == datetime(1994, 1, 1)
+
+    def test_retro_atlgulf_maps_to_conus(self):
+        dr = get_date_range("nwm_retro", "atlgulf")
+        assert dr is not None
+        assert dr.start == datetime(1979, 2, 1)  # same as CONUS
+
+    def test_retro_pacific_maps_to_conus(self):
+        dr = get_date_range("nwm_retro", "pacific")
+        assert dr is not None
+        assert dr.start == datetime(1979, 2, 1)  # same as CONUS
+
+    def test_ana_default(self):
+        dr = get_date_range("nwm_ana", "conus")
+        assert dr is not None
+        assert dr.end is None  # operational
+
+    def test_unknown_source(self):
+        assert get_date_range("unknown_source") is None
+
+    def test_stofs_default(self):
+        dr = get_date_range("stofs")
+        assert dr is not None
+        assert dr.end is None
+
+
+class TestGetOverlappingRange:
+    def test_retro_tpxo_returns_meteo_range(self):
+        overlap = get_overlapping_range("nwm_retro", "tpxo", "conus")
+        assert overlap is not None
+        # TPXO doesn't constrain range
+        meteo = get_date_range("nwm_retro", "conus")
+        assert overlap.start == meteo.start
+
+    def test_retro_stofs_overlap(self):
+        overlap = get_overlapping_range("nwm_retro", "stofs", "conus")
+        assert overlap is not None
+        # Overlap start should be the later of the two starts
+        meteo = get_date_range("nwm_retro", "conus")
+        stofs = get_date_range("stofs")
+        assert overlap.start == max(meteo.start, stofs.start)
+
+    def test_unknown_meteo_source(self):
+        assert get_overlapping_range("unknown", "stofs", "conus") is None
+
+    def test_unknown_coastal_source(self):
+        assert get_overlapping_range("nwm_retro", "unknown_coastal", "conus") is None
+
+    def test_ana_stofs_both_open_ended(self):
+        overlap = get_overlapping_range("nwm_ana", "stofs", "conus")
+        assert overlap is not None
+        assert overlap.end is None
+
+
+class TestGetDefaultSources:
+    def test_pacific(self):
+        meteo, boundary, start = get_default_sources("pacific")
+        assert meteo in ("nwm_retro", "nwm_ana")
+        assert boundary in ("stofs", "tpxo")
+        assert isinstance(start, datetime)
+
+    def test_hawaii(self):
+        meteo, boundary, start = get_default_sources("hawaii")
+        assert meteo in ("nwm_retro", "nwm_ana")
+
+    def test_prvi(self):
+        meteo, boundary, start = get_default_sources("prvi")
+        assert isinstance(start, datetime)
+
+
+class TestDownloadResult:
+    def test_default_values(self):
+        r = DownloadResult(source="test")
+        assert r.total_files == 0
+        assert r.successful == 0
+        assert r.failed == 0
+        assert r.file_paths == []
+        assert r.errors == []
+
+
+class TestDownloadResults:
+    def test_has_errors(self):
+        results = DownloadResults(
+            meteo=DownloadResult(source="meteo"),
+            hydro=DownloadResult(source="hydro"),
+            coastal=DownloadResult(source="coastal", errors=["fail"]),
+        )
+        assert results.has_errors is True
+
+    def test_no_errors(self):
+        results = DownloadResults(
+            meteo=DownloadResult(source="meteo"),
+            hydro=DownloadResult(source="hydro"),
+            coastal=DownloadResult(source="coastal"),
+        )
+        assert results.has_errors is False
+
+    def test_iter(self):
+        results = DownloadResults(
+            meteo=DownloadResult(source="meteo"),
+            hydro=DownloadResult(source="hydro"),
+            coastal=DownloadResult(source="coastal"),
+        )
+        items = list(results)
+        assert len(items) == 3
+
+
+class TestIterHours:
+    def test_basic(self):
+        start = datetime(2024, 1, 1, 0)
+        end = datetime(2024, 1, 1, 3)
+        hours = list(_iter_hours(start, end))
+        assert len(hours) == 3
+        assert hours[0] == start
+        assert hours[-1] == datetime(2024, 1, 1, 2)
+
+    def test_empty_range(self):
+        dt = datetime(2024, 1, 1)
+        assert list(_iter_hours(dt, dt)) == []
+
+
+class TestParseDatetime:
+    def test_datetime_passthrough(self):
+        dt = datetime(2021, 6, 11)
+        assert _parse_datetime(dt) == dt
+
+    def test_iso_string(self):
+        assert _parse_datetime("2021-06-11") == datetime(2021, 6, 11)
+
+    def test_invalid(self):
+        with pytest.raises(ValueError, match="Invalid datetime"):
+            _parse_datetime("bad")
+
+
+class TestBuildUrls:
+    def test_retro_forcing_urls_conus(self, tmp_path):
+        start = datetime(2021, 6, 11, 0)
+        end = datetime(2021, 6, 11, 2)
+        urls, paths = _build_nwm_retro_forcing_urls(start, end, tmp_path, "conus")
+        assert len(urls) == 2
+        assert len(paths) == 2
+        assert "noaa-nwm-retrospective-3-0-pds" in urls[0]
+        assert "CONUS" in urls[0]
+        assert "LDASIN_DOMAIN1" in urls[0]
+
+    def test_retro_forcing_urls_hawaii(self, tmp_path):
+        start = datetime(2010, 1, 1, 0)
+        end = datetime(2010, 1, 1, 1)
+        urls, paths = _build_nwm_retro_forcing_urls(start, end, tmp_path, "hawaii")
+        assert "Hawaii" in urls[0]
+
+    def test_retro_streamflow_urls(self, tmp_path):
+        start = datetime(2021, 6, 11, 0)
+        end = datetime(2021, 6, 11, 1)
+        urls, paths = _build_nwm_retro_streamflow_urls(start, end, tmp_path, "conus")
+        assert len(urls) == 1
+        assert "CHRTOUT" in urls[0]
+
+    def test_retro_streamflow_urls_hawaii_subhourly(self, tmp_path):
+        start = datetime(2010, 1, 1, 0)
+        end = datetime(2010, 1, 1, 1)
+        urls, paths = _build_nwm_retro_streamflow_urls(start, end, tmp_path, "hawaii")
+        # Hawaii has 4 files per hour (hourly + 15/30/45 min)
+        assert len(urls) == 4
+
+    def test_ana_forcing_urls(self, tmp_path):
+        start = datetime(2023, 1, 1, 0)
+        end = datetime(2023, 1, 1, 2)
+        urls, paths = _build_nwm_ana_forcing_urls(start, end, tmp_path, "conus")
+        assert len(urls) == 2
+        assert "storage.googleapis.com" in urls[0]
+        assert "analysis_assim" in urls[0]
+
+    def test_ana_forcing_urls_hawaii(self, tmp_path):
+        start = datetime(2023, 1, 1, 0)
+        end = datetime(2023, 1, 1, 1)
+        urls, paths = _build_nwm_ana_forcing_urls(start, end, tmp_path, "hawaii")
+        assert "hawaii" in urls[0]
+
+    def test_ana_streamflow_urls_conus(self, tmp_path):
+        start = datetime(2023, 1, 1, 0)
+        end = datetime(2023, 1, 1, 1)
+        urls, paths = _build_nwm_ana_streamflow_urls(start, end, tmp_path, "conus")
+        assert len(urls) == 1
+        assert "channel_rt" in urls[0]
+
+    def test_ana_streamflow_urls_hawaii(self, tmp_path):
+        start = datetime(2023, 1, 1, 0)
+        end = datetime(2023, 1, 1, 1)
+        urls, paths = _build_nwm_ana_streamflow_urls(start, end, tmp_path, "hawaii")
+        # Hawaii has subhourly files
+        assert len(urls) == 4
+
+    def test_stofs_urls_old_naming(self, tmp_path):
+        start = datetime(2022, 6, 1, 12)
+        urls, paths = _build_stofs_urls(start, tmp_path)
+        assert len(urls) == 1
+        assert "estofs" in urls[0]
+
+    def test_stofs_urls_new_naming(self, tmp_path):
+        start = datetime(2023, 6, 1, 12)
+        urls, paths = _build_stofs_urls(start, tmp_path)
+        assert len(urls) == 1
+        assert "stofs_2d_glo" in urls[0]
+
+    def test_stofs_cycle_rounding(self, tmp_path):
+        # 14:00 should round to t12z cycle
+        start = datetime(2023, 6, 1, 14)
+        urls, _ = _build_stofs_urls(start, tmp_path)
+        assert "t12z" in urls[0]
+
+    def test_glofs_urls(self, tmp_path):
+        start = datetime(2023, 1, 1, 0)
+        end = datetime(2023, 1, 1, 3)
+        urls, paths = _build_glofs_urls(start, end, tmp_path, "leofs")
+        assert len(urls) == 3
+        assert "leofs" in urls[0]
+        assert "lake-erie" in urls[0]
+
+    def test_glofs_urls_lmhofs(self, tmp_path):
+        start = datetime(2023, 1, 1, 0)
+        end = datetime(2023, 1, 1, 1)
+        urls, paths = _build_glofs_urls(start, end, tmp_path, "lmhofs")
+        assert "lake-michigan-huron" in urls[0]
+
+
+class TestFilterExisting:
+    def test_no_existing(self, tmp_path):
+        urls = ["http://a", "http://b"]
+        paths = [tmp_path / "a.nc", tmp_path / "b.nc"]
+        pending_urls, pending_paths, existing = _filter_existing(urls, paths)
+        assert len(pending_urls) == 2
+        assert existing == 0
+
+    def test_some_existing(self, tmp_path):
+        urls = ["http://a", "http://b"]
+        f = tmp_path / "a.nc"
+        f.write_text("data")
+        paths = [f, tmp_path / "b.nc"]
+        pending_urls, pending_paths, existing = _filter_existing(urls, paths)
+        assert len(pending_urls) == 1
+        assert existing == 1
+        assert pending_urls[0] == "http://b"
+
+    def test_empty_file_not_counted(self, tmp_path):
+        urls = ["http://a"]
+        f = tmp_path / "a.nc"
+        f.write_text("")
+        paths = [f]
+        pending_urls, pending_paths, existing = _filter_existing(urls, paths)
+        assert len(pending_urls) == 1
+        assert existing == 0
+
+
+class TestValidateDateRanges:
+    def test_valid_range(self):
+        errors = validate_date_ranges(
+            datetime(2021, 6, 11),
+            datetime(2021, 6, 12),
+            "nwm_retro",
+            "stofs",
+            "conus",
+        )
+        assert len(errors) == 0
+
+    def test_invalid_meteo_range(self):
+        errors = validate_date_ranges(
+            datetime(1970, 1, 1),
+            datetime(1970, 2, 1),
+            "nwm_retro",
+            "tpxo",
+            "conus",
+        )
+        assert len(errors) > 0
+
+    def test_tpxo_skips_coastal_validation(self):
+        errors = validate_date_ranges(
+            datetime(2021, 6, 11),
+            datetime(2021, 6, 12),
+            "nwm_retro",
+            "tpxo",
+            "conus",
+        )
+        assert len(errors) == 0

@@ -239,11 +239,15 @@ exclude_lines = [
 ignore_errors = true
 omit = [
   "**/__init__.py",
+  "*/scripts/*",
 ]
 
 [tool.coverage.run]
 branch = true
 parallel = true
+omit = [
+  "*/scripts/*",
+]
 source_pkgs = [
   "coastal_calibration",
 ]

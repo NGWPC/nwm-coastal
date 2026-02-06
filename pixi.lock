@@ -2683,7 +2683,7 @@ packages:
 - pypi: ./
   name: coastal-calibration
   version: 0.1.0
-  sha256: 19c50adb1944f58a838299310e8246c5bb384008efe13eba0e9520189fd87f6c
+  sha256: 12b84bfe9eb489959f45d31d8309ac11e5e2de9e847ed9de1b75708c4ebf843b
   requires_dist:
   - pyyaml>=6
   - rich-click
