@@ -336,21 +336,29 @@ class TestBuildUrls:
 
     def test_stofs_urls_old_naming(self, tmp_path):
         start = datetime(2022, 6, 1, 12)
-        urls, _paths = _build_stofs_urls(start, tmp_path)
+        urls, paths = _build_stofs_urls(start, tmp_path)
         assert len(urls) == 1
         assert "estofs" in urls[0]
+        assert "estofs.20220601" in str(paths[0])
 
     def test_stofs_urls_new_naming(self, tmp_path):
         start = datetime(2023, 6, 1, 12)
-        urls, _paths = _build_stofs_urls(start, tmp_path)
+        urls, paths = _build_stofs_urls(start, tmp_path)
         assert len(urls) == 1
         assert "stofs_2d_glo" in urls[0]
+        assert "stofs_2d_glo.20230601" in str(paths[0])
 
     def test_stofs_cycle_rounding(self, tmp_path):
         # 14:00 should round to t12z cycle
         start = datetime(2023, 6, 1, 14)
         urls, _ = _build_stofs_urls(start, tmp_path)
         assert "t12z" in urls[0]
+
+    def test_stofs_path_includes_date(self, tmp_path):
+        """Different dates produce different local paths to avoid skip_existing collisions."""
+        _, paths_a = _build_stofs_urls(datetime(2022, 6, 1, 0), tmp_path)
+        _, paths_b = _build_stofs_urls(datetime(2022, 7, 1, 0), tmp_path)
+        assert paths_a[0] != paths_b[0]
 
     def test_glofs_urls(self, tmp_path):
         start = datetime(2023, 1, 1, 0)
