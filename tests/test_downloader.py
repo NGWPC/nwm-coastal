@@ -97,10 +97,39 @@ class TestGetDateRange:
         assert dr is not None
         assert dr.start == datetime(1979, 2, 1)  # same as CONUS
 
-    def test_ana_default(self):
+    def test_ana_conus(self):
         dr = get_date_range("nwm_ana", "conus")
         assert dr is not None
-        assert dr.end is None  # operational
+        assert dr.start == datetime(2018, 10, 1)
+        assert dr.end is None
+
+    def test_ana_hawaii(self):
+        dr = get_date_range("nwm_ana", "hawaii")
+        assert dr is not None
+        assert dr.start == datetime(2019, 7, 1)
+        assert dr.end is None
+
+    def test_ana_prvi(self):
+        dr = get_date_range("nwm_ana", "prvi")
+        assert dr is not None
+        assert dr.start == datetime(2023, 10, 1)
+        assert dr.end is None
+
+    def test_ana_alaska(self):
+        dr = get_date_range("nwm_ana", "alaska")
+        assert dr is not None
+        assert dr.start == datetime(2023, 10, 1)
+        assert dr.end is None
+
+    def test_ana_atlgulf_maps_to_conus(self):
+        dr = get_date_range("nwm_ana", "atlgulf")
+        assert dr is not None
+        assert dr.start == datetime(2018, 10, 1)  # same as CONUS
+
+    def test_ana_pacific_maps_to_conus(self):
+        dr = get_date_range("nwm_ana", "pacific")
+        assert dr is not None
+        assert dr.start == datetime(2018, 10, 1)  # same as CONUS
 
     def test_unknown_source(self):
         assert get_date_range("unknown_source") is None
@@ -271,12 +300,39 @@ class TestBuildUrls:
         assert len(urls) == 1
         assert "channel_rt" in urls[0]
 
-    def test_ana_streamflow_urls_hawaii(self, tmp_path):
+    def test_ana_streamflow_urls_hawaii_old_naming(self, tmp_path):
+        """Before 2021-04-21: 1 hourly file with tm02 pattern."""
+        start = datetime(2021, 4, 1, 0)
+        end = datetime(2021, 4, 1, 1)
+        urls, _paths = _build_nwm_ana_streamflow_urls(start, end, tmp_path, "hawaii")
+        assert len(urls) == 1
+        assert "channel_rt.tm02.hawaii.nc" in urls[0]
+
+    def test_ana_streamflow_urls_hawaii_new_naming(self, tmp_path):
+        """From 2021-04-21: 4 sub-hourly files with tm0200/tm0145/tm0130/tm0115."""
         start = datetime(2023, 1, 1, 0)
         end = datetime(2023, 1, 1, 1)
         urls, _paths = _build_nwm_ana_streamflow_urls(start, end, tmp_path, "hawaii")
-        # Hawaii has subhourly files
         assert len(urls) == 4
+        assert "channel_rt.tm0200.hawaii.nc" in urls[0]
+        assert "channel_rt.tm0145.hawaii.nc" in urls[1]
+        assert "channel_rt.tm0130.hawaii.nc" in urls[2]
+        assert "channel_rt.tm0115.hawaii.nc" in urls[3]
+
+    def test_ana_streamflow_urls_alaska(self, tmp_path):
+        start = datetime(2024, 1, 15, 1)
+        end = datetime(2024, 1, 15, 2)
+        urls, _paths = _build_nwm_ana_streamflow_urls(start, end, tmp_path, "alaska")
+        assert len(urls) == 1
+        assert "analysis_assim_alaska" in urls[0]
+        assert "channel_rt.tm02.alaska.nc" in urls[0]
+
+    def test_ana_forcing_urls_alaska(self, tmp_path):
+        start = datetime(2024, 1, 15, 1)
+        end = datetime(2024, 1, 15, 2)
+        urls, _paths = _build_nwm_ana_forcing_urls(start, end, tmp_path, "alaska")
+        assert "forcing_analysis_assim_alaska" in urls[0]
+        assert "forcing.tm02.alaska.nc" in urls[0]
 
     def test_stofs_urls_old_naming(self, tmp_path):
         start = datetime(2022, 6, 1, 12)
