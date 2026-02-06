@@ -1,0 +1,140 @@
+# Quick Start
+
+This guide walks you through running your first SCHISM simulation using the
+`coastal-calibration` CLI.
+
+## Prerequisites
+
+Before starting, ensure you have:
+
+- `coastal-calibration` installed (see [Installation](installation.md))
+- Access to an HPC cluster with SLURM
+- The Singularity image at `/ngencerf-app/singularity/ngen-coastal.sif`
+- Access to the `/ngen-test` NFS mount
+
+## Step 1: Generate a Configuration File
+
+Create a new configuration file for your simulation:
+
+```bash
+coastal-calibration init config.yaml --domain hawaii
+```
+
+This generates a template configuration file with sensible defaults.
+
+## Step 2: Edit the Configuration
+
+Open `config.yaml` and set your SLURM username:
+
+```yaml
+slurm:
+  job_name: my_schism_run
+  user: your_username  # Replace with your SLURM username
+
+simulation:
+  start_date: 2021-06-11
+  duration_hours: 24
+  coastal_domain: hawaii
+  meteo_source: nwm_ana
+
+boundary:
+  source: stofs
+```
+
+!!! tip "Minimal Configuration"
+    The configuration above is all you need! Paths are automatically generated based on your
+    username, domain, and data sources.
+
+## Step 3: Validate the Configuration
+
+Before submitting, validate your configuration:
+
+```bash
+coastal-calibration validate config.yaml
+```
+
+This checks for:
+
+- Required fields
+- Valid date ranges for data sources
+- File and directory existence
+- SLURM configuration validity
+
+## Step 4: Submit the Job
+
+### Option A: Submit and Return Immediately (Default)
+
+```bash
+coastal-calibration submit config.yaml
+```
+
+This will:
+
+1. Download required NWM and STOFS data (on the login node)
+1. Generate SLURM job scripts
+1. Submit the job and return immediately
+
+```console
+INFO  Running download stage on login node...
+INFO  meteo/nwm_ana: 4/4 [OK]
+INFO  hydro/nwm: 16/16 [OK]
+INFO  coastal/stofs: 1/1 [OK]
+INFO  Total: 21/21 (failed: 0)
+INFO  Download stage completed
+INFO  Job 167 submitted.
+INFO  Check job status with: squeue -j 167
+```
+
+### Option B: Submit and Wait for Completion
+
+Use the `--interactive` flag to monitor the job until it completes:
+
+```bash
+coastal-calibration submit config.yaml --interactive
+```
+
+```console
+INFO  Running download stage on login node...
+INFO  Download stage completed
+INFO  Job submitted with ID: 167
+INFO  Waiting for job 167 to complete...
+INFO  Job 167 state: PENDING
+INFO  Job 167 state: CONFIGURING
+INFO  Job 167 state: RUNNING
+INFO  Job 167 state: COMPLETED
+INFO  Job 167 completed successfully.
+```
+
+## Step 5: Check Results
+
+After the job completes, find your outputs in the work directory:
+
+```bash
+ls /ngen-test/coastal/your_username/schism_hawaii_stofs_nwm_ana/schism_2021-06-11/
+```
+
+## Using the Python API
+
+You can also run workflows programmatically:
+
+```python
+from coastal_calibration import CoastalCalibConfig, CoastalCalibRunner
+
+# Load configuration
+config = CoastalCalibConfig.from_yaml("config.yaml")
+
+# Create runner and submit
+runner = CoastalCalibRunner(config)
+result = runner.submit(wait=True)
+
+if result.success:
+    print(f"Job completed in {result.duration_seconds:.1f}s")
+else:
+    print(f"Job failed: {result.errors}")
+```
+
+## Next Steps
+
+- Learn about [Configuration Options](../user-guide/configuration.md)
+- Explore [Workflow Stages](../user-guide/workflow-stages.md)
+- See the [CLI Reference](../user-guide/cli.md)
