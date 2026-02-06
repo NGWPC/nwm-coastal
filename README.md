@@ -1,0 +1,272 @@
+# Coastal Calibration: Coastal Model Calibration Workflow
+
+A Python package for running SCHISM coastal model calibration workflow on HPC clusters
+with Singularity containers and SLURM job scheduling.
+
+## Installation
+
+```bash
+pip install coastal-calibration
+```
+
+For development, use [Pixi](https://pixi.prefix.dev/latest/). First, install Pixi
+following the instructions on the Pixi website, or run the following command for
+Linux/macOS and restart your terminal:
+
+```bash
+curl -fsSL https://pixi.sh/install.sh | sh
+```
+
+Then, clone the repository and install the `dev` dependencies:
+
+```bash
+git clone https://github.com/NGWPC/nwm-coastal
+cd nwm-coastal
+pixi install -e dev
+```
+
+Requires Python >= 3.11.
+
+## Quick Start
+
+Note that for development, all commands need to be run with `pixi r -e dev` to activate
+the virtual environment. For example:
+
+```bash
+pixi r -e dev coastal-calibration submit config.yaml -i
+```
+
+For the rest of this section, we will omit the `pixi r -e dev` prefix for brevity, but
+it is required when running from the development environment.
+
+Generate a configuration file, adjust it, then submit:
+
+```bash
+coastal-calibration init config.yaml --domain hawaii
+```
+
+Edit `config.yaml` to set your simulation parameters. A minimal configuration only
+requires the following (paths are auto-generated based on user, domain, and source):
+
+```yaml
+slurm:
+  job_name: my_schism_run
+  user: your_username
+
+simulation:
+  start_date: 2021-06-11
+  duration_hours: 24
+  coastal_domain: hawaii
+  meteo_source: nwm_ana
+
+boundary:
+  source: stofs
+```
+
+Validate and submit:
+
+```bash
+coastal-calibration validate config.yaml
+coastal-calibration submit config.yaml
+```
+
+By default, the CLI submits the job and returns immediately after the download stage
+completes (the download runs on the login node before submission):
+
+```console
+INFO  Running download stage on login node...
+INFO  meteo/nwm_ana: 4/4 [OK]
+INFO  hydro/nwm: 16/16 [OK]
+INFO  coastal/stofs: 1/1 [OK]
+INFO  Total: 21/21 (failed: 0)
+INFO  Download stage completed
+INFO  Generated job script: .../submit_job.sh
+INFO  Generated runner script: .../sing_run_generated.bash
+INFO  Submitting job: .../submit_job.sh
+INFO  Job 167 submitted.
+INFO  Once the job starts running, SLURM logs will be written to: .../slurm-167.out
+INFO  Check job status with: squeue -j 167
+```
+
+Use the `--interactive` (or `-i`) flag to wait and monitor the job until completion:
+
+```bash
+coastal-calibration submit config.yaml --interactive
+```
+
+```console
+INFO  Running download stage on login node...
+INFO  meteo/nwm_ana: 4/4 [OK]
+INFO  hydro/nwm: 16/16 [OK]
+INFO  coastal/stofs: 1/1 [OK]
+INFO  Total: 21/21 (failed: 0)
+INFO  Download stage completed
+INFO  Generated job script: .../submit_job.sh
+INFO  Generated runner script: .../sing_run_generated.bash
+INFO  Submitting job: .../submit_job.sh
+INFO  Job submitted with ID: 167
+INFO  Waiting for job 167 to complete...
+INFO  Job 167 state: PENDING
+INFO  Job 167 state: CONFIGURING
+INFO  Job 167 state: RUNNING
+INFO  Job 167 state: COMPLETED
+INFO  Job 167 completed successfully.
+```
+
+## Python API
+
+```python
+from coastal_calibration import CoastalCalibConfig, CoastalCalibRunner
+
+config = CoastalCalibConfig.from_yaml("config.yaml")
+runner = CoastalCalibRunner(config)
+result = runner.submit()
+
+if result.success:
+    print(f"Job {result.job_id} completed in {result.duration_seconds:.1f}s")
+```
+
+### Running Partial Workflows
+
+```python
+result = runner.run(start_from="pre_forcing", stop_after="post_forcing")
+result = runner.run(start_from="pre_schism")
+```
+
+## Configuration Reference
+
+### SLURM Settings
+
+| Parameter         | Type | Default               | Description             |
+| ----------------- | ---- | --------------------- | ----------------------- |
+| `job_name`        | str  | `coastal_calibration` | SLURM job name          |
+| `nodes`           | int  | 2                     | Number of nodes         |
+| `ntasks_per_node` | int  | 18                    | Tasks per node          |
+| `partition`       | str  | `c5n-18xlarge`        | SLURM partition         |
+| `exclusive`       | bool | true                  | Request exclusive nodes |
+| `time_limit`      | str  | null                  | Time limit (HH:MM:SS)   |
+| `account`         | str  | null                  | SLURM account           |
+
+### Simulation Settings
+
+| Parameter          | Type     | Options                                | Description                   |
+| ------------------ | -------- | -------------------------------------- | ----------------------------- |
+| `start_date`       | datetime | -                                      | Simulation start (ISO format) |
+| `duration_hours`   | int      | -                                      | Simulation length in hours    |
+| `coastal_domain`   | str      | `prvi`, `hawaii`, `atlgulf`, `pacific` | Coastal domain                |
+| `meteo_source`     | str      | `nwm_retro`, `nwm_ana`                 | Meteorological data source    |
+| `timestep_seconds` | int      | 3600                                   | Forcing time step             |
+
+### Boundary Settings
+
+| Parameter    | Type | Options         | Description               |
+| ------------ | ---- | --------------- | ------------------------- |
+| `source`     | str  | `tpxo`, `stofs` | Boundary condition source |
+| `stofs_file` | path | -               | STOFS file path           |
+
+### Path Settings
+
+| Parameter           | Type | Default                                      | Description                        |
+| ------------------- | ---- | -------------------------------------------- | ---------------------------------- |
+| `work_dir`          | path | -                                            | Working directory for outputs      |
+| `raw_download_dir`  | path | null                                         | Directory with downloaded NWM data |
+| `nfs_mount`         | path | `/ngen-test`                                 | NFS mount point                    |
+| `singularity_image` | path | `/ngencerf-app/singularity/ngen-coastal.sif` | Singularity image                  |
+| `hot_start_file`    | path | null                                         | Hot restart file for warm start    |
+
+### MPI Settings
+
+| Parameter         | Type | Default                                     | Description                  |
+| ----------------- | ---- | ------------------------------------------- | ---------------------------- |
+| `nscribes`        | int  | 2                                           | Number of SCHISM I/O scribes |
+| `omp_num_threads` | int  | 2                                           | OpenMP threads               |
+| `schism_binary`   | str  | `pschism_wcoss2_NO_PARMETIS_TVD-VL.openmpi` | SCHISM executable name       |
+
+## Supported Domains and Data Sources
+
+**Domains**: `atlgulf`, `pacific`, `hawaii`, `prvi`
+
+| Source      | Date Range               | Description           |
+| ----------- | ------------------------ | --------------------- |
+| `nwm_retro` | 1979-02-01 to 2023-01-31 | NWM Retrospective 3.0 |
+| `nwm_ana`   | 2018-09-17 to present    | NWM Analysis          |
+| `stofs`     | 2020-12-30 to present    | STOFS water levels    |
+| `glofs`     | 2005-09-30 to present    | Great Lakes OFS       |
+| `tpxo`      | N/A (local installation) | TPXO tidal model      |
+
+## Workflow Stages
+
+1. **`download`** - Download NWM/STOFS data
+1. **`pre_forcing`** - Prepare NWM forcing data
+1. **`nwm_forcing`** - Generate atmospheric forcing (MPI)
+1. **`post_forcing`** - Post-process forcing data
+1. **`update_params`** - Create SCHISM `param.nml` file
+1. **`boundary_conditions`** - Generate boundary conditions
+1. **`pre_schism`** - Prepare SCHISM inputs
+1. **`schism_run`** - Run SCHISM model (MPI)
+1. **`post_schism`** - Post-process outputs
+
+## Configuration Inheritance
+
+Use `_base` to inherit from a shared configuration. This is useful for running the same
+simulation across different domains or time periods:
+
+```yaml
+# base.yaml - shared settings
+slurm:
+  job_name: coastal_sim
+  user: your_username
+
+simulation:
+  duration_hours: 24
+  meteo_source: nwm_ana
+
+boundary:
+  source: stofs
+```
+
+```yaml
+# hawaii_run.yaml - Hawaii-specific run
+_base: base.yaml
+
+simulation:
+  start_date: 2021-06-11
+  coastal_domain: hawaii
+```
+
+```yaml
+# prvi_run.yaml - Puerto Rico/Virgin Islands run
+_base: base.yaml
+
+simulation:
+  start_date: 2022-09-18
+  coastal_domain: prvi
+```
+
+## CLI Reference
+
+```bash
+# Generate a new configuration file
+coastal-calibration init config.yaml --domain pacific
+
+# Validate a configuration file
+coastal-calibration validate config.yaml
+
+# Submit job and return immediately (default)
+coastal-calibration submit config.yaml
+
+# Submit job and wait for completion with status updates
+coastal-calibration submit config.yaml --interactive
+coastal-calibration submit config.yaml -i
+
+# Run workflow locally (inside SLURM job or for testing)
+coastal-calibration run config.yaml
+coastal-calibration run config.yaml --start-from update_params
+
+# List available workflow stages
+coastal-calibration stages
+```
+
+## License
+
+BSD-2-Clause. See [LICENSE](LICENSE) for details.

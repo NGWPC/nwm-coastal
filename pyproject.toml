@@ -1,0 +1,331 @@
+[build-system]
+build-backend = "hatchling.build"
+requires = [ "hatchling" ]
+
+[project]
+name = "coastal-calibration"
+version = "0.1.0"
+description = "A coastal model (SCHISM, SFINCS) workflow on HPC clusters"
+readme = "README.md"
+keywords = [
+  "calibration",
+  "coastal",
+  "hpc",
+  "schism",
+  "sfincs",
+  "singularity",
+  "slurm",
+]
+license = { file = "LICENSE" }
+authors = [
+  { name = "Taher Chegini", email = "tchegini@dewberry.com" },
+]
+requires-python = ">=3.11"
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: BSD License",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Scientific/Engineering",
+]
+
+dependencies = [
+  "pyyaml>=6",
+  "rich-click",
+  "tiny-retriever>=0.2",
+]
+optional-dependencies.dev = [
+  "ipykernel",
+  "ipywidgets",
+]
+optional-dependencies.docs = [
+  "mkdocs>=1.6",
+  "mkdocs-material>=9.5",
+  "mkdocstrings[python]>=0.27",
+]
+
+optional-dependencies.lint = [
+  "codespell",
+  "pre-commit",
+]
+# Local development only - for reading/analyzing model outputs, not required for cluster execution
+optional-dependencies.schism = [
+  "netcdf4",
+  "numpy",
+  "pandas",
+  "xarray",
+]
+# Local development only - for building SFINCS models with HydroMT, not required for cluster execution
+optional-dependencies.sfincs = [
+  "hydromt>=1.3",
+  "hydromt-sfincs>=2.0.0rc1",
+]
+optional-dependencies.test = [
+  "coverage[toml]",
+  "pytest-cov",
+  "pytest-sugar",
+]
+optional-dependencies.typecheck = [
+  "pyright",
+  "types-pyyaml",
+]
+urls.Documentation = "https://ngwpc.github.io/nwm-coastal"
+urls.Source = "https://github.com/NGWPC/nwm-coastal"
+scripts.coastal-calibration = "coastal_calibration.cli:main"
+
+[tool.hatch.build]
+packages = [ "src/coastal_calibration" ]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+include = [ "src/coastal_calibration/**/*.py", "src/coastal_calibration/*.py" ]
+exclude = [ "src/coastal_calibration/scripts/**" ]
+lint.select = [
+  # flake8-bugbear
+  "B",
+  # flake8-comprehensions
+  "C4",
+  # pydocstyle
+  "D",
+  # Error
+  "E",
+  # pyflakes
+  "F",
+  # refurb
+  "FURB",
+  # isort
+  "I",
+  # flake8-gettext
+  "INT",
+  # flake8-implicit-str-concat
+  "ISC",
+  # pep8-naming
+  "N",
+  # compatibility with numpy 2.0
+  "NPY201",
+  # Perflint
+  "PERF",
+  # pygrep-hooks
+  "PGH",
+  # misc lints
+  "PIE",
+  # pylint
+  "PLC",
+  "PLE",
+  "PLR",
+  "PLW",
+  # flake8-pytest-style
+  "PT",
+  # flake8-use-pathlib
+  "PTH",
+  # flake8-pyi
+  "PYI",
+  # flake8-quotes
+  "Q",
+  # Ruff-specific rules
+  "RUF",
+  # bandit
+  "S",
+  # flake8-simplify
+  "SIM",
+  # flake8-debugger
+  "T10",
+  # flake8-print
+  "T20",
+  # type-checking imports
+  "TC",
+  # tidy imports
+  "TID",
+  # tryceratops
+  "TRY",
+  # pyupgrade
+  "UP",
+  # Warning
+  "W",
+  # flake8-2020
+  "YTT",
+]
+
+lint.ignore = [
+  "D103",
+  "D105",
+  "E501",
+  # conflict with ruff-formatter
+  "ISC001",
+  # specific type error ignored
+  "PGH003",
+  # top-level imports
+  "PLC0415",
+  "PLR0913",
+  "PLR2004",
+  # url schema
+  "S310",
+  "S603",
+  # shell command
+  "S605",
+  "S607",
+  # custom exception
+  "TRY003",
+]
+lint.per-file-ignores."tests/*.py" = [
+  "D100",
+  "D101",
+  "D102",
+  "D103",
+  "D104",
+  "D105",
+  "D106",
+  "D107",
+  # specific type error ignored
+  "PGH003",
+  # use of "assert"
+  "S101",
+]
+lint.extend-safe-fixes = [
+  # module level imports
+  "E402",
+  # break down assert
+  "PT018",
+  # Move imports
+  "TC",
+  # absolute imports
+  "TID252",
+]
+lint.isort.known-first-party = [
+  "coastal_calibration",
+]
+lint.isort.required-imports = [ "from __future__ import annotations" ]
+
+lint.pydocstyle.convention = "numpy"
+
+[tool.codespell]
+skip = "__pycache__,_build,.git,./htmlcov,pixi.lock"
+ignore-words-list = "parm,oce"
+
+[tool.pytest.ini_options]
+addopts = [
+  "--import-mode=importlib",
+  "--doctest-modules",
+  "-v",
+  "--durations=5",
+]
+doctest_optionflags = 'NORMALIZE_WHITESPACE IGNORE_EXCEPTION_DETAIL NUMBER'
+filterwarnings = [
+  "ignore:.*distutils.*",
+  "ignore:.*--rsyncdir command line argument.*",
+  "ignore:.*numpy.ndarray size changed.*",
+  "ignore:.*'cgi' is deprecated.*",
+  "ignore:.*Ensure you extract a single element.*",
+  "ignore:.*Deprecated in Pydantic V2.0.*",
+]
+testpaths = [
+  "tests",
+]
+
+[tool.coverage.paths]
+source = [ "src", "*/site-packages" ]
+
+[tool.coverage.report]
+exclude_lines = [
+  'raise ServiceUnavailableError',
+  "if TYPE_CHECKING:",
+]
+ignore_errors = true
+omit = [
+  "**/__init__.py",
+]
+
+[tool.coverage.run]
+branch = true
+parallel = true
+source_pkgs = [
+  "coastal_calibration",
+]
+
+[tool.pyright]
+exclude = [
+  "**/__pycache__",
+  "**/__init__.py",
+  "src/coastal_calibration/scripts/**",
+]
+include = [
+  "src/coastal_calibration",
+]
+reportMissingTypeStubs = false
+reportUnknownArgumentType = false
+reportUnknownLambdaType = false
+reportUnknownMemberType = false
+reportUnknownParameterType = false
+reportUnknownVariableType = false
+reportUnnecessaryIsInstance = false
+reportUntypedFunctionDecorator = false
+reportAttributeAccessIssue = false
+reportInvalidTypeForm = false
+typeCheckingMode = "strict"
+
+[tool.pixi.environments]
+test311 = { features = [ "test", "py311" ] }
+test314 = { features = [ "test", "py314" ] }
+dev = { features = [ "dev", "test", "py314" ] }
+schism = { features = [ "dev", "schism", "py314" ] }
+sfincs = { features = [ "dev", "sfincs", "py314" ] }
+typecheck = { features = [ "typecheck", "py314" ] }
+lint = { features = [ "lint", "py314" ], no-default-feature = true }
+docs = { features = [ "docs", "py314" ] }
+
+[tool.pixi.feature.docs.tasks]
+docs-build = "mkdocs build"
+docs-serve = "mkdocs serve"
+docs-deploy = "mkdocs gh-deploy --force"
+
+[tool.pixi.feature.lint.tasks]
+lint = "pre-commit run --all-files"
+pcupdate = "pre-commit autoupdate"
+spell = "codespell -w"
+
+[tool.pixi.feature.py311.dependencies]
+python = "~=3.11.0"
+proj = "*"
+libgdal-core = "*"
+hdf5 = "*"
+libnetcdf = "*"
+
+[tool.pixi.feature.py314.dependencies]
+python = "~=3.14.0"
+proj = "*"
+libgdal-core = "*"
+hdf5 = "*"
+libnetcdf = "*"
+
+[tool.pixi.feature.schism.dependencies]
+esmpy = "*"
+mpi4py = "*"
+openmpi = "*"
+
+[tool.pixi.feature.test.tasks]
+test = { cmd = [
+  "pytest",
+  "--cov",
+  "--cov-append",
+  "--cov-branch",
+  "--cov-report=xml",
+  "--junitxml=junit.xml",
+  "--durations=5",
+] }
+report = { cmd = [ "coverage", "report" ], depends-on = [ "test" ] }
+html = { cmd = [ "coverage", "html" ], depends-on = [ "report" ] }
+
+[tool.pixi.feature.typecheck.tasks]
+typecheck = "pyright"
+[tool.pixi.pypi-dependencies]
+coastal_calibration = { path = ".", editable = true }
+
+[tool.pixi.workspace]
+channels = [ "conda-forge" ]
+platforms = [ "linux-64", "osx-arm64" ]
