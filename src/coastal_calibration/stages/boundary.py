@@ -73,10 +73,10 @@ class STOFSBoundaryStage(WorkflowStage):
         if self.config.boundary.stofs_file:
             return self.config.boundary.stofs_file
 
-        # Auto-resolve from download directory (matching bash: ls -1 $RAW_DOWNLOAD_DIR/coastal/stofs/* | head -n 1)
+        # Auto-resolve from download directory
         coastal_dir = self.config.paths.download_dir / "coastal" / "stofs"
         if coastal_dir.exists():
-            stofs_files = sorted(coastal_dir.iterdir())
+            stofs_files = sorted(coastal_dir.rglob("*.fields.cwl.nc"))
             if stofs_files:
                 self._log(f"Auto-resolved STOFS file: {stofs_files[0]}")
                 return stofs_files[0]
