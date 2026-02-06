@@ -417,7 +417,7 @@ def _build_coastal_stofs_entry(
     """
     # URI is relative to the root (download_dir)
     # STOFS files have specific naming: estofs or stofs_2d_glo
-    uri = f"{PathConfig.COASTAL_SUBDIR}/stofs/*.fields.cwl.nc"
+    uri = f"{PathConfig.COASTAL_SUBDIR}/stofs/**/*.fields.cwl.nc"
 
     temporal_extent = _get_temporal_extent(sim)
 

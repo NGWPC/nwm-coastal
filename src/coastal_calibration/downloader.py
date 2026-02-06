@@ -486,7 +486,11 @@ def _build_stofs_urls(
 
     url = f"{base_url}/{product}.{date_str}/{product}.t{hour_str}z.fields.cwl.nc"
     filepath = (
-        output_dir / PathConfig.COASTAL_SUBDIR / "stofs" / f"{product}.t{hour_str}z.fields.cwl.nc"
+        output_dir
+        / PathConfig.COASTAL_SUBDIR
+        / "stofs"
+        / f"{product}.{date_str}"
+        / f"{product}.t{hour_str}z.fields.cwl.nc"
     )
 
     return [url], [filepath]
