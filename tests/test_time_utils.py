@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from coastal_calibration.time_utils import advance_time, format_forcing_date, parse_date_components
 
 

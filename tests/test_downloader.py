@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 from datetime import datetime
-from pathlib import Path
 
 import pytest
 
 from coastal_calibration.downloader import (
-    DATA_SOURCE_DATE_RANGES,
     DateRange,
     DownloadResult,
     DownloadResults,
@@ -63,7 +61,7 @@ class TestDateRange:
             end=None,
             description="Test",
         )
-        today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         # Past date should be fine
         assert dr.validate(datetime(2021, 1, 1), datetime(2021, 2, 1)) is None
 
@@ -149,11 +147,11 @@ class TestGetDefaultSources:
         assert isinstance(start, datetime)
 
     def test_hawaii(self):
-        meteo, boundary, start = get_default_sources("hawaii")
+        meteo, _boundary, _start = get_default_sources("hawaii")
         assert meteo in ("nwm_retro", "nwm_ana")
 
     def test_prvi(self):
-        meteo, boundary, start = get_default_sources("prvi")
+        _meteo, _boundary, start = get_default_sources("prvi")
         assert isinstance(start, datetime)
 
 
@@ -235,27 +233,27 @@ class TestBuildUrls:
     def test_retro_forcing_urls_hawaii(self, tmp_path):
         start = datetime(2010, 1, 1, 0)
         end = datetime(2010, 1, 1, 1)
-        urls, paths = _build_nwm_retro_forcing_urls(start, end, tmp_path, "hawaii")
+        urls, _paths = _build_nwm_retro_forcing_urls(start, end, tmp_path, "hawaii")
         assert "Hawaii" in urls[0]
 
     def test_retro_streamflow_urls(self, tmp_path):
         start = datetime(2021, 6, 11, 0)
         end = datetime(2021, 6, 11, 1)
-        urls, paths = _build_nwm_retro_streamflow_urls(start, end, tmp_path, "conus")
+        urls, _paths = _build_nwm_retro_streamflow_urls(start, end, tmp_path, "conus")
         assert len(urls) == 1
         assert "CHRTOUT" in urls[0]
 
     def test_retro_streamflow_urls_hawaii_subhourly(self, tmp_path):
         start = datetime(2010, 1, 1, 0)
         end = datetime(2010, 1, 1, 1)
-        urls, paths = _build_nwm_retro_streamflow_urls(start, end, tmp_path, "hawaii")
+        urls, _paths = _build_nwm_retro_streamflow_urls(start, end, tmp_path, "hawaii")
         # Hawaii has 4 files per hour (hourly + 15/30/45 min)
         assert len(urls) == 4
 
     def test_ana_forcing_urls(self, tmp_path):
         start = datetime(2023, 1, 1, 0)
         end = datetime(2023, 1, 1, 2)
-        urls, paths = _build_nwm_ana_forcing_urls(start, end, tmp_path, "conus")
+        urls, _paths = _build_nwm_ana_forcing_urls(start, end, tmp_path, "conus")
         assert len(urls) == 2
         assert "storage.googleapis.com" in urls[0]
         assert "analysis_assim" in urls[0]
@@ -263,32 +261,32 @@ class TestBuildUrls:
     def test_ana_forcing_urls_hawaii(self, tmp_path):
         start = datetime(2023, 1, 1, 0)
         end = datetime(2023, 1, 1, 1)
-        urls, paths = _build_nwm_ana_forcing_urls(start, end, tmp_path, "hawaii")
+        urls, _paths = _build_nwm_ana_forcing_urls(start, end, tmp_path, "hawaii")
         assert "hawaii" in urls[0]
 
     def test_ana_streamflow_urls_conus(self, tmp_path):
         start = datetime(2023, 1, 1, 0)
         end = datetime(2023, 1, 1, 1)
-        urls, paths = _build_nwm_ana_streamflow_urls(start, end, tmp_path, "conus")
+        urls, _paths = _build_nwm_ana_streamflow_urls(start, end, tmp_path, "conus")
         assert len(urls) == 1
         assert "channel_rt" in urls[0]
 
     def test_ana_streamflow_urls_hawaii(self, tmp_path):
         start = datetime(2023, 1, 1, 0)
         end = datetime(2023, 1, 1, 1)
-        urls, paths = _build_nwm_ana_streamflow_urls(start, end, tmp_path, "hawaii")
+        urls, _paths = _build_nwm_ana_streamflow_urls(start, end, tmp_path, "hawaii")
         # Hawaii has subhourly files
         assert len(urls) == 4
 
     def test_stofs_urls_old_naming(self, tmp_path):
         start = datetime(2022, 6, 1, 12)
-        urls, paths = _build_stofs_urls(start, tmp_path)
+        urls, _paths = _build_stofs_urls(start, tmp_path)
         assert len(urls) == 1
         assert "estofs" in urls[0]
 
     def test_stofs_urls_new_naming(self, tmp_path):
         start = datetime(2023, 6, 1, 12)
-        urls, paths = _build_stofs_urls(start, tmp_path)
+        urls, _paths = _build_stofs_urls(start, tmp_path)
         assert len(urls) == 1
         assert "stofs_2d_glo" in urls[0]
 
@@ -301,7 +299,7 @@ class TestBuildUrls:
     def test_glofs_urls(self, tmp_path):
         start = datetime(2023, 1, 1, 0)
         end = datetime(2023, 1, 1, 3)
-        urls, paths = _build_glofs_urls(start, end, tmp_path, "leofs")
+        urls, _paths = _build_glofs_urls(start, end, tmp_path, "leofs")
         assert len(urls) == 3
         assert "leofs" in urls[0]
         assert "lake-erie" in urls[0]
@@ -309,7 +307,7 @@ class TestBuildUrls:
     def test_glofs_urls_lmhofs(self, tmp_path):
         start = datetime(2023, 1, 1, 0)
         end = datetime(2023, 1, 1, 1)
-        urls, paths = _build_glofs_urls(start, end, tmp_path, "lmhofs")
+        urls, _paths = _build_glofs_urls(start, end, tmp_path, "lmhofs")
         assert "lake-michigan-huron" in urls[0]
 
 
@@ -317,7 +315,7 @@ class TestFilterExisting:
     def test_no_existing(self, tmp_path):
         urls = ["http://a", "http://b"]
         paths = [tmp_path / "a.nc", tmp_path / "b.nc"]
-        pending_urls, pending_paths, existing = _filter_existing(urls, paths)
+        pending_urls, _pending_paths, existing = _filter_existing(urls, paths)
         assert len(pending_urls) == 2
         assert existing == 0
 
@@ -326,7 +324,7 @@ class TestFilterExisting:
         f = tmp_path / "a.nc"
         f.write_text("data")
         paths = [f, tmp_path / "b.nc"]
-        pending_urls, pending_paths, existing = _filter_existing(urls, paths)
+        pending_urls, _pending_paths, existing = _filter_existing(urls, paths)
         assert len(pending_urls) == 1
         assert existing == 1
         assert pending_urls[0] == "http://b"
@@ -336,7 +334,7 @@ class TestFilterExisting:
         f = tmp_path / "a.nc"
         f.write_text("")
         paths = [f]
-        pending_urls, pending_paths, existing = _filter_existing(urls, paths)
+        pending_urls, _pending_paths, existing = _filter_existing(urls, paths)
         assert len(pending_urls) == 1
         assert existing == 0
 

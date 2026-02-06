@@ -7,7 +7,6 @@ NOT the SFINCS model build/run stages which require hydromt-sfincs.
 from __future__ import annotations
 
 from datetime import datetime
-from pathlib import Path
 
 import pytest
 import yaml
@@ -16,8 +15,6 @@ from coastal_calibration.config.schema import (
     BoundaryConfig,
     CoastalCalibConfig,
     DownloadConfig,
-    MPIConfig,
-    MonitoringConfig,
     PathConfig,
     SimulationConfig,
     SlurmConfig,

@@ -102,7 +102,7 @@ class TestCoastalCalibRunner:
             "schism_run",
             "post_schism",
         ]
-        assert CoastalCalibRunner.STAGE_ORDER == expected
+        assert expected == CoastalCalibRunner.STAGE_ORDER
 
     def test_init(self, sample_config):
         runner = CoastalCalibRunner(sample_config)

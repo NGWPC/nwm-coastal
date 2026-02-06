@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime, timedelta
-from pathlib import Path
 
 import pytest
 
@@ -18,8 +17,6 @@ from coastal_calibration.utils.logging import (
     _validate_level,
     configure_logger,
     generate_log_path,
-    get_log_file_path,
-    logger,
 )
 
 
@@ -217,9 +214,8 @@ class TestWorkflowMonitor:
         cfg = MonitoringConfig()
         mon = WorkflowMonitor(cfg)
         mon.register_stages(["test"])
-        with pytest.raises(RuntimeError):
-            with mon.stage_context("test"):
-                raise RuntimeError("fail")
+        with pytest.raises(RuntimeError), mon.stage_context("test"):
+            raise RuntimeError("fail")
         assert mon.stages["test"].status == StageStatus.FAILED
 
     def test_get_progress_dict(self):
