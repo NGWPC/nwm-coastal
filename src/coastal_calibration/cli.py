@@ -211,8 +211,11 @@ def init(output: Path, domain: CoastalDomain, force: bool) -> None:
     ):
         raise click.Abort()
 
+    import os
+
     meteo_source, boundary_source, start_date = get_default_sources(domain)
     start_date_str = start_date.strftime("%Y-%m-%d")
+    username = os.environ.get("USER", "YOUR_USERNAME")
 
     # Generate minimal config with comments
     config_content = f"""\
@@ -229,7 +232,7 @@ def init(output: Path, domain: CoastalDomain, force: bool) -> None:
 
 slurm:
   job_name: coastal_calibration
-  user: YOUR_USERNAME  # Required: replace with your username
+  user: {username}
 
 simulation:
   start_date: {start_date_str}
@@ -243,7 +246,6 @@ boundary:
 
     output_path.write_text(config_content)
     logger.info(f"Configuration written to: {output_path}")
-    logger.info("Edit the file to set 'slurm.user' to your username.")
 
 
 @cli.command()
