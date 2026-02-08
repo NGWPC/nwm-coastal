@@ -177,7 +177,6 @@ def validate(config: Path) -> None:
 @click.argument(
     "output",
     type=click.Path(path_type=Path),
-    default="coastal_calibration.yaml",
 )
 @click.option(
     "--domain",
@@ -194,8 +193,7 @@ def validate(config: Path) -> None:
 def init(output: Path, domain: CoastalDomain, force: bool) -> None:
     """Create a minimal configuration file.
 
-    OUTPUT is the path where the configuration will be written
-    (default: coastal_calibration.yaml).
+    OUTPUT is the path where the configuration will be written.
 
     The generated config includes only required fields. Paths are auto-generated
     based on user, domain, and source settings.
