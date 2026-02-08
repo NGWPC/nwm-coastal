@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from coastal_calibration.time_utils import advance_time, format_forcing_date, parse_date_components
+import pytest
+
+from coastal_calibration._time_utils import advance_time, format_forcing_date, parse_date_components
 
 
 class TestAdvanceTime:
@@ -35,9 +37,18 @@ class TestAdvanceTime:
         result = advance_time("2024010100", 8784)
         assert result == "2025010100"
 
-    def test_with_extra_characters_in_date(self):
-        """The function takes first 10 chars, so extra chars are ignored."""
-        assert advance_time("202401010099", 24) == "2024010200"
+    def test_rejects_extra_characters(self):
+        """Extra characters beyond 10 digits must raise ValueError."""
+        with pytest.raises(ValueError, match="YYYYMMDDHH"):
+            advance_time("202401010099", 24)
+
+    def test_rejects_too_short(self):
+        with pytest.raises(ValueError, match="YYYYMMDDHH"):
+            advance_time("20240101", 24)
+
+    def test_rejects_non_string(self):
+        with pytest.raises(ValueError, match="YYYYMMDDHH"):
+            advance_time(2024010100, 24)  # type: ignore[arg-type]
 
 
 class TestParseDateComponents:
@@ -70,5 +81,6 @@ class TestFormatForcingDate:
     def test_midnight(self):
         assert format_forcing_date("2024060100") == "202406010000"
 
-    def test_extra_characters(self):
-        assert format_forcing_date("202401011200") == "202401011200"
+    def test_rejects_extra_characters(self):
+        with pytest.raises(ValueError, match="YYYYMMDDHH"):
+            format_forcing_date("202401011200")
