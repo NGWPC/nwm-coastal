@@ -44,6 +44,7 @@ optional-dependencies.dev = [
   "ipywidgets",
 ]
 optional-dependencies.docs = [
+  "ruff",
   "mkdocs>=1.6",
   "mkdocs-material>=9.5",
   "mkdocstrings[python]>=0.27",
