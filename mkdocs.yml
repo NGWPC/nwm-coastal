@@ -5,6 +5,7 @@ site_url: https://ngwpc.github.io/nwm-coastal
 
 repo_name: NGWPC/nwm-coastal
 repo_url: https://github.com/NGWPC/nwm-coastal
+edit_uri: edit/main/docs/
 
 copyright: Copyright &copy; 2025 Raytheon Company. BSD-2-Clause License.
 
@@ -13,18 +14,21 @@ theme:
   palette:
   - media: '(prefers-color-scheme: light)'
     scheme: default
-    primary: blue
-    accent: indigo
+    primary: prefix-light
+    accent: prefix-light
     toggle:
       icon: material/brightness-7
       name: Switch to dark mode
   - media: '(prefers-color-scheme: dark)'
     scheme: slate
-    primary: blue
-    accent: indigo
+    primary: prefix
+    accent: prefix
     toggle:
       icon: material/brightness-4
       name: Switch to light mode
+  icon:
+    edit: material/pencil
+    view: material/eye
   font:
     text: Roboto
     code: Roboto Mono
