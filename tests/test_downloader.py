@@ -106,7 +106,7 @@ class TestGetDateRange:
     def test_ana_hawaii(self):
         dr = get_date_range("nwm_ana", "hawaii")
         assert dr is not None
-        assert dr.start == datetime(2019, 7, 1)
+        assert dr.start == datetime(2021, 4, 21)
         assert dr.end is None
 
     def test_ana_prvi(self):
