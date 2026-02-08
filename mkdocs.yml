@@ -11,7 +11,12 @@ copyright: Copyright &copy; 2025 Raytheon Company. BSD-2-Clause License.
 
 theme:
   name: material
+  custom_dir: docs/overrides
   palette:
+  - media: (prefers-color-scheme)
+    toggle:
+      icon: material/brightness-auto
+      name: Switch to light mode
   - media: '(prefers-color-scheme: light)'
     scheme: default
     primary: prefix-light
@@ -25,7 +30,7 @@ theme:
     accent: prefix
     toggle:
       icon: material/brightness-4
-      name: Switch to light mode
+      name: Switch to system preference
   icon:
     edit: material/pencil
     view: material/eye
@@ -34,12 +39,17 @@ theme:
     text: Roboto
     code: Roboto Mono
   features:
+  - content.action.edit
   - content.code.annotate
   - content.code.copy
   - content.tabs.link
+  - navigation.collapse
   - navigation.expand
+  - navigation.footer
   - navigation.indexes
   - navigation.instant
+  - navigation.instant.progress
+  - navigation.path
   - navigation.sections
   - navigation.tabs
   - navigation.tabs.sticky
@@ -49,6 +59,10 @@ theme:
   - search.share
   - search.suggest
   - toc.follow
+  - toc.integrate
+
+hooks:
+- docs/hooks.py
 
 plugins:
 - search
@@ -80,7 +94,8 @@ markdown_extensions:
 - md_in_html
 - tables
 - toc:
-    permalink: true
+    toc_depth: 3
+    permalink: '#'
 - pymdownx.arithmatex:
     generic: true
 - pymdownx.betterem:
@@ -94,7 +109,11 @@ markdown_extensions:
     pygments_lang_class: true
 - pymdownx.inlinehilite
 - pymdownx.keys
-- pymdownx.magiclink
+- pymdownx.magiclink:
+    normalize_issue_symbols: true
+    repo_url_shorthand: true
+    user: NGWPC
+    repo: nwm-coastal
 - pymdownx.mark
 - pymdownx.smartsymbols
 - pymdownx.snippets
@@ -114,6 +133,13 @@ extra:
   - icon: fontawesome/brands/github
     link: https://github.com/NGWPC/nwm-coastal
 
+extra_css:
+- stylesheets/extra.css
+
+extra_javascript:
+- javascripts/mathjax.js
+- https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+
 nav:
 - Home: index.md
 - Getting Started:
@@ -124,8 +150,8 @@ nav:
   - CLI Reference: user-guide/cli.md
   - Python API: user-guide/python-api.md
   - Workflow Stages: user-guide/workflow-stages.md
+- Design: DESIGN.md
 - Reference:
   - API Reference: reference/api.md
-  - Design: design.md
-- Contributing: contributing.md
-- Changelog: changelog.md
+- Contributing: CONTRIBUTING.md
+- Changelog: CHANGELOG.md
