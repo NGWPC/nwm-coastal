@@ -14,23 +14,24 @@ coastal-calibration --version
 
 ### init
 
-Generate a new configuration file with sensible defaults.
+Create a minimal configuration file.
 
 ```bash
-coastal-calibration init <config_path> [OPTIONS]
+coastal-calibration init OUTPUT [OPTIONS]
 ```
 
 **Arguments:**
 
-| Argument      | Description                         |
-| ------------- | ----------------------------------- |
-| `config_path` | Path for the new configuration file |
+| Argument | Description                                  |
+| -------- | -------------------------------------------- |
+| `OUTPUT` | Path where the configuration will be written |
 
 **Options:**
 
-| Option           | Description           | Default  |
-| ---------------- | --------------------- | -------- |
-| `--domain`, `-d` | Coastal domain to use | `hawaii` |
+| Option          | Description                            | Default   |
+| --------------- | -------------------------------------- | --------- |
+| `--domain`      | Coastal domain to use                  | `pacific` |
+| `--force`, `-f` | Overwrite existing file without prompt | False     |
 
 **Examples:**
 
@@ -38,8 +39,11 @@ coastal-calibration init <config_path> [OPTIONS]
 # Generate default configuration
 coastal-calibration init config.yaml
 
-# Generate configuration for Pacific domain
+# Generate configuration for a specific domain
 coastal-calibration init pacific_config.yaml --domain pacific
+
+# Overwrite existing file
+coastal-calibration init config.yaml --force
 ```
 
 ### validate
@@ -154,10 +158,11 @@ coastal-calibration run <config> [OPTIONS]
 
 **Options:**
 
-| Option         | Description         | Default |
-| -------------- | ------------------- | ------- |
-| `--start-from` | Stage to start from | First   |
-| `--stop-after` | Stage to stop after | Last    |
+| Option         | Description                              | Default |
+| -------------- | ---------------------------------------- | ------- |
+| `--start-from` | Stage to start from                      | First   |
+| `--stop-after` | Stage to stop after                      | Last    |
+| `--dry-run`    | Validate configuration without executing | False   |
 
 **Available Stages:**
 

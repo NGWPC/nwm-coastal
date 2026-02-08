@@ -199,7 +199,7 @@ src/coastal_calibration/
 ├── __init__.py                  # Package exports
 ├── cli.py                       # Command-line interface
 ├── runner.py                    # Main workflow orchestrator
-├── time_utils.py                # Python datetime utilities
+├── _time_utils.py               # Private datetime utilities
 ├── workflow_utils.py            # Workflow utility functions
 ├── downloader.py                # Async data downloading
 ├── scripts_path.py              # Script path management
@@ -466,19 +466,34 @@ ______________________________________________________________________
 - No external dependencies or shell spawning
 - Type-safe with IDE support
 
-**Implementation** (`time_utils.py`):
+**Implementation** (`_time_utils.py` — private module):
 
 ```python
+_DATE_RE = re.compile(r"^\d{10}$")
+
+
+def _parse_date(date_string: str) -> datetime:
+    """Parse a YYYYMMDDHH string into a datetime, with strict validation."""
+    if not isinstance(date_string, str) or not _DATE_RE.match(date_string):
+        raise ValueError(
+            f"date_string must be exactly 10 digits in YYYYMMDDHH format, got {date_string!r}"
+        )
+    return datetime.strptime(date_string, "%Y%m%d%H")
+
+
 def advance_time(date_string: str, hours: int) -> str:
     """Advance a date string by a specified number of hours.
 
     Replaces advance_time.sh and advance_cymdh.pl with native Python.
     Handles leap years, month boundaries, DST, etc.
     """
-    dt = datetime.strptime(date_string[:10], "%Y%m%d%H")
-    dt += timedelta(hours=hours)
+    dt = _parse_date(date_string) + timedelta(hours=hours)
     return dt.strftime("%Y%m%d%H")
 ```
+
+The module also consolidates `parse_datetime()` (flexible datetime parsing, previously
+duplicated in `config.schema` and `downloader`) and `iter_hours()` (hour-range
+iteration, previously in `downloader`).
 
 **Impact**: The `build_environment()` method precomputes all date-derived values:
 
