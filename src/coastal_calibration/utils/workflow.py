@@ -19,7 +19,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from coastal_calibration._time_utils import advance_time, format_forcing_date, parse_date_components
+from coastal_calibration.utils.time import advance_time, format_forcing_date, parse_date_components
 
 _DATE_RE = re.compile(r"^\d{10}$")
 
