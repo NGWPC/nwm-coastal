@@ -98,7 +98,7 @@ DATA_SOURCE_DATE_RANGES: dict[str, dict[str, DateRange]] = {
             description="NWM Analysis and Assimilation (ALASKA)",
         ),
         "hawaii": DateRange(
-            start=datetime(2019, 7, 1),
+            start=datetime(2021, 4, 21),
             end=None,
             description="NWM Analysis and Assimilation (HAWAII)",
         ),
