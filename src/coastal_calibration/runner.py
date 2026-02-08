@@ -187,7 +187,6 @@ class CoastalCalibRunner:
         start_from: str | None = None,
         stop_after: str | None = None,
         dry_run: bool = False,
-        inside_slurm: bool = False,
     ) -> WorkflowResult:
         """Execute the calibration workflow.
 
@@ -199,9 +198,6 @@ class CoastalCalibRunner:
             Stage name to stop after (skip later stages).
         dry_run : bool, default False
             If True, validate but don't execute.
-        inside_slurm : bool, default False
-            If True, indicates running inside a SLURM job. This can be used
-            to skip certain setup steps or change behavior accordingly.
 
         Returns
         -------
@@ -653,7 +649,6 @@ def run_workflow(
     start_from: str | None = None,
     stop_after: str | None = None,
     dry_run: bool = False,
-    inside_slurm: bool = False,
 ) -> WorkflowResult:
     """Run workflow from config file.
 
@@ -667,8 +662,6 @@ def run_workflow(
         Stage name to stop after.
     dry_run : bool, default False
         If True, validate but don't execute.
-    inside_slurm : bool, default False
-        If True, indicates running inside a SLURM job.
 
     Returns
     -------
@@ -681,7 +674,6 @@ def run_workflow(
         start_from=start_from,
         stop_after=stop_after,
         dry_run=dry_run,
-        inside_slurm=inside_slurm,
     )
 
 

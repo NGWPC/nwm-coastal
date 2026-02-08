@@ -47,18 +47,11 @@ def cli() -> None:
     is_flag=True,
     help="Validate configuration without executing.",
 )
-@click.option(
-    "--inside-slurm",
-    is_flag=True,
-    hidden=True,
-    help="Indicate running inside a SLURM job (internal use).",
-)
 def run(
     config: Path,
     start_from: str | None,
     stop_after: str | None,
     dry_run: bool,
-    inside_slurm: bool,
 ) -> None:
     """Run the calibration workflow.
 
@@ -77,7 +70,6 @@ def run(
             start_from=start_from,
             stop_after=stop_after,
             dry_run=dry_run,
-            inside_slurm=inside_slurm,
         )
 
         if result.success:
@@ -215,7 +207,6 @@ def init(output: Path, domain: CoastalDomain, force: bool) -> None:
     start_date_str = start_date.strftime("%Y-%m-%d")
     username = os.environ.get("USER", "YOUR_USERNAME")
 
-    # Generate minimal config with comments
     config_content = f"""\
 # Minimal SCHISM configuration for {domain} domain
 #
