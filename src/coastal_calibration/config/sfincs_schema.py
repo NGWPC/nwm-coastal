@@ -8,11 +8,11 @@ from typing import TYPE_CHECKING, Any
 
 import yaml
 
+from coastal_calibration._time_utils import parse_datetime as _parse_datetime
 from coastal_calibration.config.schema import (
     LogLevel,
     _deep_merge,  # pyright: ignore[reportPrivateUsage]
     _interpolate_config,  # pyright: ignore[reportPrivateUsage]
-    _parse_datetime,  # pyright: ignore[reportPrivateUsage]
 )
 
 if TYPE_CHECKING:

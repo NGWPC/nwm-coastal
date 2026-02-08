@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, ClassVar, Literal
 
 import yaml
+
+from coastal_calibration._time_utils import parse_datetime as _parse_datetime
 
 MeteoSource = Literal["nwm_retro", "nwm_ana"]
 CoastalDomain = Literal["prvi", "hawaii", "atlgulf", "pacific"]
@@ -256,69 +258,6 @@ def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any
         else:
             result[key] = value
     return result
-
-
-def _parse_datetime(value: str | datetime | date) -> datetime:
-    """Parse a datetime from various formats.
-
-    Supports:
-    - datetime objects (returned as-is)
-    - date objects (converted to datetime at midnight)
-    - ISO format strings: "2021-06-11T00:00:00", "2021-06-11"
-    - Date strings: "2021-06-11", "20210611"
-    - Date with time: "2021-06-11 00:00:00", "2021-06-11 00:00"
-
-    Parameters
-    ----------
-    value : str, datetime, or date
-        The value to parse.
-
-    Returns
-    -------
-    datetime
-        Parsed datetime object.
-
-    Raises
-    ------
-    ValueError
-        If the value cannot be parsed as a datetime.
-    """
-    if isinstance(value, datetime):
-        return value
-    if isinstance(value, date):
-        return datetime(value.year, value.month, value.day)
-
-    value_str = str(value).strip()
-
-    # Try ISO format first (handles both "2021-06-11T00:00:00" and "2021-06-11")
-    try:
-        return datetime.fromisoformat(value_str)
-    except ValueError:
-        pass
-
-    # Try date with space separator: "2021-06-11 00:00:00"
-    try:
-        return datetime.strptime(value_str, "%Y-%m-%d %H:%M:%S")
-    except ValueError:
-        pass
-
-    # Try date with space and no seconds: "2021-06-11 00:00"
-    try:
-        return datetime.strptime(value_str, "%Y-%m-%d %H:%M")
-    except ValueError:
-        pass
-
-    # Try compact date format: "20210611"
-    try:
-        return datetime.strptime(value_str, "%Y%m%d")
-    except ValueError:
-        pass
-
-    raise ValueError(
-        f"Cannot parse datetime from '{value}'. "
-        "Supported formats: '2021-06-11', '2021-06-11T00:00:00', "
-        "'2021-06-11 00:00:00', '20210611'"
-    )
 
 
 def _interpolate_value(value: Any, context: dict[str, Any]) -> Any:

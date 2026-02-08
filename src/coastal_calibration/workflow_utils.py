@@ -14,11 +14,23 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
 
-from coastal_calibration.time_utils import advance_time, format_forcing_date, parse_date_components
+from coastal_calibration._time_utils import advance_time, format_forcing_date, parse_date_components
+
+_DATE_RE = re.compile(r"^\d{10}$")
+
+
+def _validate_date_string(date_string: str) -> None:
+    """Validate that ``date_string`` is exactly 10 digits (YYYYMMDDHH)."""
+    if not isinstance(date_string, str) or not _DATE_RE.match(date_string):
+        raise ValueError(
+            f"date_string must be exactly 10 digits in YYYYMMDDHH format, got {date_string!r}"
+        )
+
 
 logger = logging.getLogger(__name__)
 
@@ -55,23 +67,21 @@ def pre_nwm_forcing_coastal(
     dict
         Environment variables that were set
     """
+    _validate_date_string(date_string)
+
     data_exec = Path(data_exec)
     coastal_forcing_output_dir = Path(coastal_forcing_output_dir)
     nwm_forcing_retro_dir = Path(nwm_forcing_retro_dir)
 
-    # Parse date components
     date_parts = parse_date_components(date_string)
 
-    # Calculate date strings
     forcing_begin_date = format_forcing_date(date_string)
     forcing_end_date = format_forcing_date(advance_time(date_string, length_hrs))
 
-    # Set up directories
     nwm_forcing_output_dir = data_exec / "forcing_input"
     forcing_input_subdir = nwm_forcing_output_dir / forcing_begin_date[:10]
     forcing_input_subdir.mkdir(parents=True, exist_ok=True)
 
-    # Create symlinks to LDASIN files
     current_date = date_string
     for i in range(length_hrs + 1):
         filename = f"{current_date}.LDASIN_DOMAIN1"
@@ -84,10 +94,8 @@ def pre_nwm_forcing_coastal(
 
         current_date = advance_time(date_string, i + 1)
 
-    # Create output directory
     coastal_forcing_output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Return environment variables that would be exported
     env_vars = {
         "FORCING_BEGIN_DATE": forcing_begin_date,
         "NWM_FORCING_OUTPUT_DIR": str(nwm_forcing_output_dir),
@@ -142,21 +150,20 @@ def post_nwm_forcing_coastal(
     dict
         Environment variables that were set
     """
+    _validate_date_string(date_string)
+
     data_exec = Path(data_exec)
     coastal_forcing_output_dir = Path(coastal_forcing_output_dir)
     data_logs = Path(data_logs)
     coastal_scripts_dir = Path(coastal_scripts_dir)
 
-    # Parse date components
     date_parts = parse_date_components(date_string)
     pdy = date_parts["pdy"]
     cyc = date_parts["cyc"]
 
-    # Calculate date strings
     forcing_begin_date = format_forcing_date(date_string)
     forcing_end_date = format_forcing_date(advance_time(date_string, length_hrs))
 
-    # Set up environment variables
     nwm_forcing_output_dir = data_exec / "forcing_input"
     env_vars = {
         "FORCING_BEGIN_DATE": forcing_begin_date,
@@ -172,7 +179,6 @@ def post_nwm_forcing_coastal(
         "LENGTH_HRS": str(length_hrs),
     }
 
-    # Create symlink to precip_source.nc
     precip_source = coastal_forcing_output_dir / "precip_source.nc"
     precip_link = data_exec / "precip_source.nc"
     if precip_source.exists():
@@ -180,11 +186,9 @@ def post_nwm_forcing_coastal(
             precip_link.unlink()
         precip_link.symlink_to(precip_source)
 
-    # Create sflux directory
     sflux_dir = data_exec / "sflux"
     sflux_dir.mkdir(parents=True, exist_ok=True)
 
-    # Run makeAtmo.py
     log_file = data_logs / f"nwm_forcing_{pdy}{cyc}.log"
     make_atmo_script = coastal_scripts_dir / "makeAtmo.py"
 
@@ -248,7 +252,6 @@ def nwm_coastal_merge_source_sink(
 
     cycle = nwm_cycle
 
-    # Create symlink if not base cycle
     if nwm_base_cycle != cycle:
         source_nc = parm_nwm / "coastal" / coastal_domain / "source.nc"
         target_nc = data_exec / "source.nc"
@@ -257,7 +260,6 @@ def nwm_coastal_merge_source_sink(
                 target_nc.unlink()
             target_nc.symlink_to(source_nc)
 
-    # Set up environment
     env_vars = {
         "COASTAL_ROOT_DIR": str(coastal_root_dir or data_exec),
         "COASTAL_WORK_DIR": str(data_exec),
@@ -266,7 +268,6 @@ def nwm_coastal_merge_source_sink(
     run_env = os.environ.copy()
     run_env.update(env_vars)
 
-    # Run merge_source_sink.py
     log_file = data_logs / "merge_source_sink.log"
     merge_script = coastal_scripts_dir / "merge_source_sink.py"
 
@@ -318,16 +319,11 @@ def post_nwm_coastal(
     data_exec = Path(data_exec)
     outputs_dir = data_exec / "outputs"
 
-    # Create outputs directory if needed
     outputs_dir.mkdir(parents=True, exist_ok=True)
 
-    # Check for fatal error
     fatal_error = outputs_dir / "fatal.error"
     if fatal_error.exists() and fatal_error.stat().st_size > 0:
-        raise RuntimeError(
-            f"pschism_wcoss2_NO_PARMETIS_TVD-VL program failed. "
-            f"See {fatal_error} file for more detail."
-        )
+        raise RuntimeError(f"SCHISM program failed. See {fatal_error} file for more detail.")
 
     # Combine hotstarts for analysis or chained reanalysis
     if (

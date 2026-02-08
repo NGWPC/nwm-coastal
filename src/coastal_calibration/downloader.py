@@ -7,8 +7,13 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
 from tiny_retriever import download
 
+from coastal_calibration._time_utils import iter_hours as _iter_hours
+from coastal_calibration._time_utils import parse_datetime as _parse_datetime
 from coastal_calibration.config.schema import (
     BoundarySource,
     CoastalDomain,
@@ -16,9 +21,6 @@ from coastal_calibration.config.schema import (
     PathConfig,
 )
 from coastal_calibration.utils.logging import logger
-
-if TYPE_CHECKING:
-    from collections.abc import Iterator
 
 HydroSource = Literal["nwm", "ngen"]
 CoastalSource = Literal["stofs", "tpxo", "glofs"]
@@ -277,22 +279,6 @@ class DownloadResults:
     def __iter__(self) -> Iterator[DownloadResult]:
         """Iterate over all download results."""
         return iter([self.meteo, self.hydro, self.coastal])
-
-
-def _iter_hours(start: datetime, end: datetime) -> Iterator[datetime]:
-    current = start
-    while current < end:
-        yield current
-        current += timedelta(hours=1)
-
-
-def _parse_datetime(value: datetime | str) -> datetime:
-    if isinstance(value, datetime):
-        return value
-    try:
-        return datetime.fromisoformat(value)
-    except (ValueError, TypeError) as e:
-        raise ValueError(f"Invalid datetime format: {value}") from e
 
 
 # Domain mappings for URL builders
