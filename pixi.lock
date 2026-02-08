@@ -2685,17 +2685,17 @@ packages:
 - pypi: ./
   name: coastal-calibration
   version: 0.1.0
-  sha256: b3735dbd99c6758e2683b029c15a98f08090144557c56afc9e00477d01940262
+  sha256: 0b74a69a29578f14e1dbcb285422ed399602e7b2aa425c83dbb2f6e3d7abb24c
   requires_dist:
   - pyyaml>=6
   - rich-click
   - tiny-retriever>=0.2
   - ipykernel ; extra == 'dev'
   - ipywidgets ; extra == 'dev'
-  - ruff ; extra == 'docs'
   - mkdocs>=1.6 ; extra == 'docs'
   - mkdocs-material>=9.5 ; extra == 'docs'
   - mkdocstrings[python]>=0.27 ; extra == 'docs'
+  - ruff ; extra == 'docs'
   - codespell ; extra == 'lint'
   - pre-commit ; extra == 'lint'
   - netcdf4 ; extra == 'schism'
