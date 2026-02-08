@@ -1,4 +1,4 @@
-"""Private time utilities for coastal calibration workflows.
+"""Time utilities for coastal calibration workflows.
 
 This module consolidates all date / time helpers used across the package:
 

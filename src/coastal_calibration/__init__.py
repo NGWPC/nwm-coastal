@@ -64,7 +64,7 @@ from coastal_calibration.stages.sfincs import (
     generate_data_catalog,
     remove_nc_symlinks,
 )
-from coastal_calibration.workflow_utils import (
+from coastal_calibration.utils.workflow import (
     nwm_coastal_merge_source_sink,
     post_nwm_coastal,
     post_nwm_forcing_coastal,

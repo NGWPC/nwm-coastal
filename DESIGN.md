@@ -64,6 +64,7 @@ proceeds.
 - **SLURM job management** with status monitoring
 - **Progress tracking** and structured logging
 - **Configuration inheritance** for DRY multi-run setups
+- **Smart default paths** with variable interpolation
 
 ______________________________________________________________________
 
@@ -199,8 +200,6 @@ src/coastal_calibration/
 ├── __init__.py                  # Package exports
 ├── cli.py                       # Command-line interface
 ├── runner.py                    # Main workflow orchestrator
-├── _time_utils.py               # Private datetime utilities
-├── workflow_utils.py            # Workflow utility functions
 ├── downloader.py                # Async data downloading
 ├── scripts_path.py              # Script path management
 │
@@ -224,7 +223,9 @@ src/coastal_calibration/
 └── utils/
     ├── __init__.py
     ├── logging.py               # Workflow monitoring
-    └── slurm.py                 # SLURM job management
+    ├── slurm.py                 # SLURM job management
+    ├── time.py                  # Datetime utilities
+    └── workflow.py              # Workflow helper functions
 ```
 
 ### Core Components
@@ -310,6 +311,23 @@ Features:
 - **Variable interpolation**: `${section.key}` syntax
 - **Inheritance**: `_base` field for configuration reuse
 - **Deep merging**: Override only what changes
+- **Smart defaults**: Minimal configuration required
+
+When paths are not specified, they are automatically generated using templates:
+
+```python
+DEFAULT_WORK_DIR_TEMPLATE = (
+    "/ngen-test/coastal/${slurm.user}/"
+    "schism_${simulation.coastal_domain}_${boundary.source}_${simulation.meteo_source}/"
+    "schism_${simulation.start_date}"
+)
+
+DEFAULT_RAW_DOWNLOAD_DIR_TEMPLATE = (
+    "/ngen-test/coastal/${slurm.user}/"
+    "schism_${simulation.coastal_domain}_${boundary.source}_${simulation.meteo_source}/"
+    "raw_data"
+)
+```
 
 ```console
                     ┌─────────────┐
@@ -324,17 +342,16 @@ Features:
 
 #### 3. Stage-Based Workflow Architecture
 
-```console
- Data Preparation        Model Setup           Execution
-┌──────────────────┐   ┌──────────────────┐   ┌──────────────────┐
-│    download      │   │  update_params   │   │    schism_run    │
-│        ▼         │   │        ▼         │   │        ▼         │
-│   pre_forcing    │   │    boundary      │   │   post_schism    │
-│        ▼         │   │        ▼         │   │                  │
-│   nwm_forcing    │──▶│   pre_schism     │──▶│                  │
-│        ▼         │   │                  │   │                  │
-│  post_forcing    │   │                  │   │                  │
-└──────────────────┘   └──────────────────┘   └──────────────────┘
+```mermaid
+flowchart TD
+    A[download] --> B[pre_forcing]
+    B --> C[nwm_forcing]
+    C --> D[post_forcing]
+    D --> E[update_params]
+    E --> F[boundary_conditions]
+    F --> G[pre_schism]
+    G --> H[schism_run]
+    H --> I[post_schism]
 ```
 
 Each stage is a Python class inheriting from `WorkflowStage`:
@@ -425,9 +442,15 @@ class CoastalCalibRunner:
         # Validation, stage sequencing, error handling, result collection
         pass
 
-    def submit(self) -> WorkflowResult:
-        """Submit workflow as a SLURM job."""
-        # Download on login node, generate scripts, submit, wait, return
+    def submit(self, wait: bool = False) -> WorkflowResult:
+        """Submit workflow as a SLURM job.
+
+        Parameters
+        ----------
+        wait : bool
+            If True, wait for job completion with status updates.
+            If False (default), return immediately after submission.
+        """
         pass
 ```
 
@@ -466,7 +489,7 @@ ______________________________________________________________________
 - No external dependencies or shell spawning
 - Type-safe with IDE support
 
-**Implementation** (`_time_utils.py` — private module):
+**Implementation** (`utils/time.py`):
 
 ```python
 _DATE_RE = re.compile(r"^\d{10}$")
@@ -602,7 +625,29 @@ download:
   skip_existing: true
 ```
 
-### 4. Stable Public API with Incremental Internal Rewrite
+### 4. Non-Interactive Default with Interactive Flag
+
+**Decision**: The `submit` command returns immediately by default, with an optional
+`--interactive` (`-i`) flag to wait for completion.
+
+**Rationale**:
+
+- Matches standard `sbatch` behavior that users expect
+- Allows users to submit jobs and continue working
+- Interactive mode available when monitoring is desired
+
+**CLI behavior**:
+
+```bash
+# Default: Submit and return immediately (like sbatch)
+coastal-calibration submit config.yaml
+
+# Interactive: Wait for completion with status updates
+coastal-calibration submit config.yaml --interactive
+coastal-calibration submit config.yaml -i
+```
+
+### 5. Stable Public API with Incremental Internal Rewrite
 
 **Decision**: Establish a clean, stable public API while embedding existing scripts as a
 transitional measure.
@@ -651,7 +696,7 @@ This allows:
 1. Deprecate bash scripts as Python replacements are validated
 1. Optimize performance-critical paths (file I/O, data processing)
 
-### 5. Strict Type Checking with `pyright`
+### 6. Strict Type Checking with `pyright`
 
 **Decision**: Use strict `pyright` mode for static type analysis.
 

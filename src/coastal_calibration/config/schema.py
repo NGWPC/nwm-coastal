@@ -9,7 +9,7 @@ from typing import Any, ClassVar, Literal
 
 import yaml
 
-from coastal_calibration._time_utils import parse_datetime as _parse_datetime
+from coastal_calibration.utils.time import parse_datetime as _parse_datetime
 
 MeteoSource = Literal["nwm_retro", "nwm_ana"]
 CoastalDomain = Literal["prvi", "hawaii", "atlgulf", "pacific"]

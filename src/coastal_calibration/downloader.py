@@ -12,8 +12,6 @@ if TYPE_CHECKING:
 
 from tiny_retriever import download
 
-from coastal_calibration._time_utils import iter_hours as _iter_hours
-from coastal_calibration._time_utils import parse_datetime as _parse_datetime
 from coastal_calibration.config.schema import (
     BoundarySource,
     CoastalDomain,
@@ -21,6 +19,8 @@ from coastal_calibration.config.schema import (
     PathConfig,
 )
 from coastal_calibration.utils.logging import logger
+from coastal_calibration.utils.time import iter_hours as _iter_hours
+from coastal_calibration.utils.time import parse_datetime as _parse_datetime
 
 HydroSource = Literal["nwm", "ngen"]
 CoastalSource = Literal["stofs", "tpxo", "glofs"]
