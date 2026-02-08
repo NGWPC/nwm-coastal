@@ -27,6 +27,17 @@ class PreSCHISMStage(WorkflowStage):
         )
 
         work_dir = self.config.paths.work_dir
+
+        # Verify critical files produced by earlier stages exist
+        required_files = ["source.nc", "param.nml", "hgrid.gr3"]
+        missing = [f for f in required_files if not (work_dir / f).exists()]
+        if missing:
+            raise RuntimeError(
+                f"pre_schism: required files missing from {work_dir}: {', '.join(missing)}. "
+                "Check logs from earlier stages (initial_discharge, combine_sink_source, "
+                "merge_source_sink, update_params) for errors."
+            )
+
         return {
             "partition_file": str(work_dir / "partition.prop"),
             "outputs_dir": str(work_dir / "outputs"),
@@ -86,7 +97,7 @@ class PostSCHISMStage(WorkflowStage):
         self._update_substep("Checking for errors")
         fatal_error = self.config.paths.work_dir / "outputs" / "fatal.error"
         if fatal_error.exists() and fatal_error.stat().st_size > 0:
-            error_content = fatal_error.read_text()[:500]
+            error_content = fatal_error.read_text()[-2000:]
             raise RuntimeError(f"SCHISM run failed: {error_content}")
 
         self._update_substep("Running post_schism")
