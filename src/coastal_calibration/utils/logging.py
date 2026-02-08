@@ -13,6 +13,9 @@ from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
+from rich.console import Console
+from rich.logging import RichHandler
+
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from typing import Self
@@ -40,11 +43,8 @@ _file_handler: logging.FileHandler | None = None
 _console_handler: logging.Handler | None = None
 
 if not logger.handlers:
-    from rich.console import Console  # pyright: ignore[reportMissingImports]
-    from rich.logging import RichHandler  # pyright: ignore[reportMissingImports]
-
     _console_handler = RichHandler(
-        console=Console(stderr=True, force_jupyter=False, width=120),
+        console=Console(stderr=True, force_jupyter=False, soft_wrap=True),
         show_time=True,
         show_level=True,
         show_path=False,
