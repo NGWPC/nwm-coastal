@@ -199,8 +199,6 @@ src/coastal_calibration/
 ├── __init__.py                  # Package exports
 ├── cli.py                       # Command-line interface
 ├── runner.py                    # Main workflow orchestrator
-├── _time_utils.py               # Private datetime utilities
-├── workflow_utils.py            # Workflow utility functions
 ├── downloader.py                # Async data downloading
 ├── scripts_path.py              # Script path management
 │
@@ -224,7 +222,9 @@ src/coastal_calibration/
 └── utils/
     ├── __init__.py
     ├── logging.py               # Workflow monitoring
-    └── slurm.py                 # SLURM job management
+    ├── slurm.py                 # SLURM job management
+    ├── time.py                  # Datetime utilities
+    └── workflow.py              # Workflow helper functions
 ```
 
 ### Core Components
@@ -466,7 +466,7 @@ ______________________________________________________________________
 - No external dependencies or shell spawning
 - Type-safe with IDE support
 
-**Implementation** (`_time_utils.py` — private module):
+**Implementation** (`utils/time.py`):
 
 ```python
 _DATE_RE = re.compile(r"^\d{10}$")
