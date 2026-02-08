@@ -1,32 +1,210 @@
-# Guidance on how to contribute
+# Contributing
 
-> All contributions to this project will be released to the public domain.
-> By submitting a pull request or filing a bug, issue, or
-> feature request, you are agreeing to comply with this waiver of copyright interest.
-> Details can be found in our [TERMS](TERMS.md) and [LICENSE](LICENSE).
+Thank you for your interest in contributing to NWM Coastal! This guide will help you get
+started.
 
+## Development Setup
 
-There are two primary ways to help:
- - Using the issue tracker, and
- - Changing the code-base.
+### Prerequisites
 
+- Python >= 3.11
+- [Pixi](https://pixi.prefix.dev/latest/) for environment management
+- Git
 
-## Using the issue tracker
+!!! tip "Installing Pixi"
+    If you don't have Pixi installed, see the
+    [Installation Guide](getting-started/installation.md#development-installation-with-pixi)
+    for setup instructions. Remember to restart your terminal after installing Pixi.
 
-Use the issue tracker to suggest feature requests, report bugs, and ask questions.
-This is also a great way to connect with the developers of the project as well
-as others who are interested in this solution.
+### Clone and Install
 
-Use the issue tracker to find ways to contribute. Find a bug or a feature, mention in
-the issue that you will take on that effort, then follow the _Changing the code-base_
-guidance below.
+```bash
+git clone https://github.com/NGWPC/nwm-coastal
+cd nwm-coastal
+pixi install -e dev
+```
 
+### Verify Installation
 
-## Changing the code-base
+```bash
+pixi r -e dev coastal-calibration --help
+```
 
-Generally speaking, you should fork this repository, make changes in your
-own fork, and then submit a pull request. All new code should have associated
-unit tests that validate implemented features and the presence or lack of defects.
-Additionally, the code should follow any stylistic and architectural guidelines
-prescribed by the project. In the absence of such guidelines, mimic the styles
-and patterns in the existing code-base.
+## Development Workflow
+
+### Running Tests
+
+```bash
+# Run all tests
+pixi r -e test314 test
+
+# Run with coverage report
+pixi r -e test314 report
+```
+
+### Type Checking
+
+```bash
+pixi r -e typecheck typecheck
+```
+
+### Linting
+
+```bash
+pixi r lint
+```
+
+This runs pre-commit hooks including:
+
+- Ruff (linting and formatting)
+- Codespell (spelling)
+- YAML/JSON formatting
+- Various file checks
+
+### Building Documentation
+
+```bash
+pixi r -e docs docs-serve
+```
+
+Then open [http://localhost:8000](http://localhost:8000) in your browser.
+
+## Code Style
+
+### Python
+
+- Follow [PEP 8](https://pep8.org/) style guide
+- Use [NumPy-style docstrings](https://numpydoc.readthedocs.io/en/latest/format.html)
+- Type hints are required for all public functions
+- Maximum line length: 100 characters
+
+### Docstring Example
+
+```python
+def validate_date_ranges(
+    start_time: datetime,
+    end_time: datetime,
+    meteo_source: str,
+    boundary_source: str,
+    coastal_domain: str,
+) -> list[str]:
+    """Validate simulation dates against available data source ranges.
+
+    Parameters
+    ----------
+    start_time : datetime
+        Simulation start time.
+    end_time : datetime
+        Simulation end time.
+    meteo_source : str
+        Meteorological data source ('nwm_ana' or 'nwm_retro').
+    boundary_source : str
+        Boundary condition source ('tpxo' or 'stofs').
+    coastal_domain : str
+        Coastal domain identifier.
+
+    Returns
+    -------
+    list[str]
+        List of validation error messages. Empty if valid.
+
+    Examples
+    --------
+    >>> errors = validate_date_ranges(
+    ...     datetime(2021, 6, 11),
+    ...     datetime(2021, 6, 12),
+    ...     "nwm_ana",
+    ...     "stofs",
+    ...     "hawaii"
+    ... )
+    >>> len(errors)
+    0
+    """
+```
+
+## Pull Request Process
+
+1. **Fork** the repository
+1. **Create a branch** for your feature/fix:
+   ```bash
+   git checkout -b feature/my-new-feature
+   ```
+1. **Make your changes** with tests
+1. **Run all checks**:
+   ```bash
+   pixi r lint
+   pixi r -e typecheck typecheck
+   pixi r -e test314 test
+   ```
+1. **Commit** with a descriptive message:
+   ```bash
+   git commit -m "Add feature X that does Y"
+   ```
+1. **Push** to your fork:
+   ```bash
+   git push origin feature/my-new-feature
+   ```
+1. **Open a Pull Request** against the `main` branch
+
+### Commit Messages
+
+- Use present tense ("Add feature" not "Added feature")
+- Use imperative mood ("Move cursor to..." not "Moves cursor to...")
+- Reference issues when applicable ("Fix #123")
+
+### PR Checklist
+
+- [ ] Tests pass locally
+- [ ] Type checking passes
+- [ ] Linting passes
+- [ ] Documentation updated (if applicable)
+- [ ] Changelog updated (for user-facing changes)
+
+## Reporting Issues
+
+### Bug Reports
+
+Include:
+
+- Python version
+- Operating system
+- Steps to reproduce
+- Expected vs actual behavior
+- Error messages/stack traces
+
+### Feature Requests
+
+Include:
+
+- Use case description
+- Proposed solution (if any)
+- Alternatives considered
+
+## Project Structure
+
+```
+nwm-coastal/
+├── src/coastal_calibration/    # Main package
+│   ├── config/                 # Configuration handling
+│   ├── stages/                 # Workflow stages
+│   ├── utils/                  # Utilities
+│   ├── scripts/                # Legacy scripts (excluded from linting)
+│   ├── cli.py                  # CLI entry point
+│   ├── runner.py               # Workflow runner
+│   └── downloader.py           # Data download
+├── docs/                       # Documentation
+├── examples/                   # Example configurations
+├── tests/                      # Test suite
+├── pyproject.toml              # Project configuration
+└── mkdocs.yml                  # Documentation configuration
+```
+
+## Getting Help
+
+- **GitHub Issues**: For bugs and feature requests
+- **Discussions**: For questions and general discussion
+
+## License
+
+By contributing, you agree that your contributions will be licensed under the
+BSD-2-Clause License.
