@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from coastal_calibration.workflow_utils import (
+from coastal_calibration.utils.workflow import (
     post_nwm_coastal,
     pre_nwm_forcing_coastal,
 )
@@ -22,7 +22,7 @@ class TestPreNwmForcingCoastal:
 
         # Create mock LDASIN files
         for i in range(4):
-            from coastal_calibration._time_utils import advance_time
+            from coastal_calibration.utils.time import advance_time
 
             fname = f"{advance_time(date_string, i)}.LDASIN_DOMAIN1"
             (nwm_dir / fname).write_text("data")

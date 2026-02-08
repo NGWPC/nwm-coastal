@@ -6,8 +6,6 @@ from datetime import datetime
 
 import pytest
 
-from coastal_calibration._time_utils import iter_hours as _iter_hours
-from coastal_calibration._time_utils import parse_datetime as _parse_datetime
 from coastal_calibration.downloader import (
     DateRange,
     DownloadResult,
@@ -24,6 +22,8 @@ from coastal_calibration.downloader import (
     get_overlapping_range,
     validate_date_ranges,
 )
+from coastal_calibration.utils.time import iter_hours as _iter_hours
+from coastal_calibration.utils.time import parse_datetime as _parse_datetime
 
 
 class TestDateRange:

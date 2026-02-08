@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from coastal_calibration._time_utils import advance_time, format_forcing_date, parse_date_components
+from coastal_calibration.utils.time import advance_time, format_forcing_date, parse_date_components
 
 
 class TestAdvanceTime:
