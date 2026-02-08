@@ -29,11 +29,10 @@ theme:
   icon:
     edit: material/pencil
     view: material/eye
+    repo: fontawesome/brands/github
   font:
     text: Roboto
     code: Roboto Mono
-  icon:
-    repo: fontawesome/brands/github
   features:
   - content.code.annotate
   - content.code.copy
