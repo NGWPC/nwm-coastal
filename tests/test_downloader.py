@@ -6,6 +6,8 @@ from datetime import datetime
 
 import pytest
 
+from coastal_calibration._time_utils import iter_hours as _iter_hours
+from coastal_calibration._time_utils import parse_datetime as _parse_datetime
 from coastal_calibration.downloader import (
     DateRange,
     DownloadResult,
@@ -17,8 +19,6 @@ from coastal_calibration.downloader import (
     _build_nwm_retro_streamflow_urls,
     _build_stofs_urls,
     _filter_existing,
-    _iter_hours,
-    _parse_datetime,
     get_date_range,
     get_default_sources,
     get_overlapping_range,
@@ -244,7 +244,7 @@ class TestParseDatetime:
         assert _parse_datetime("2021-06-11") == datetime(2021, 6, 11)
 
     def test_invalid(self):
-        with pytest.raises(ValueError, match="Invalid datetime"):
+        with pytest.raises(ValueError, match="Cannot parse datetime"):
             _parse_datetime("bad")
 
 

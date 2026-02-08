@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from coastal_calibration._time_utils import parse_datetime as _parse_datetime
 from coastal_calibration.config.schema import (
     BoundaryConfig,
     CoastalCalibConfig,
@@ -21,7 +22,6 @@ from coastal_calibration.config.schema import (
     _deep_merge,
     _interpolate_config,
     _interpolate_value,
-    _parse_datetime,
 )
 
 
