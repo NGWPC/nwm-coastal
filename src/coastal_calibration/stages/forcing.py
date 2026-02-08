@@ -127,4 +127,12 @@ class PostForcingStage(WorkflowStage):
             env=env,
         )
 
+        # Verify sflux output was produced
+        sflux_dir = self.config.paths.work_dir / "sflux"
+        if not sflux_dir.exists() or not any(sflux_dir.iterdir()):
+            raise RuntimeError(
+                f"post_forcing: no sflux files produced in {sflux_dir}. "
+                "Check makeAtmo.py log for errors."
+            )
+
         return {"status": "completed"}

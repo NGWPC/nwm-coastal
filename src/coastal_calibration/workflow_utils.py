@@ -207,7 +207,13 @@ def post_nwm_forcing_coastal(
         )
 
     if result.returncode != 0:
-        logger.warning(f"makeAtmo.py returned non-zero exit code: {result.returncode}")
+        log_tail = ""
+        if log_file.exists():
+            lines = log_file.read_text().splitlines()
+            log_tail = "\n".join(lines[-20:])
+        raise RuntimeError(
+            f"makeAtmo.py failed (exit code {result.returncode}).\nLog file: {log_file}\n{log_tail}"
+        )
 
     return env_vars
 
@@ -282,7 +288,14 @@ def nwm_coastal_merge_source_sink(
         )
 
     if result.returncode != 0:
-        logger.warning(f"merge_source_sink.py returned non-zero exit code: {result.returncode}")
+        log_tail = ""
+        if log_file.exists():
+            lines = log_file.read_text().splitlines()
+            log_tail = "\n".join(lines[-20:])
+        raise RuntimeError(
+            f"merge_source_sink.py failed (exit code {result.returncode}).\n"
+            f"Log file: {log_file}\n{log_tail}"
+        )
 
 
 def post_nwm_coastal(

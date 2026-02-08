@@ -175,7 +175,7 @@ class WorkflowStage(ABC):
         if result.returncode != 0:
             self._log(f"Script failed with return code {result.returncode}", "error")
             if result.stderr:
-                self._log(f"STDERR: {result.stderr[:500]}", "error")
+                self._log(f"STDERR: {result.stderr[-2000:]}", "error")
             raise RuntimeError(f"Script {script_path} failed: {result.stderr}")
 
         return result
@@ -272,7 +272,7 @@ class WorkflowStage(ABC):
         )
 
         if result.returncode != 0:
-            self._log(f"Singularity command failed: {result.stderr[:500]}", "error")
+            self._log(f"Singularity command failed: {result.stderr[-2000:]}", "error")
             raise RuntimeError(f"Singularity command failed: {result.stderr}")
 
         return result
