@@ -90,7 +90,7 @@ class TestWorkflowResult:
 
 
 class TestCoastalCalibRunner:
-    def test_stage_order(self):
+    def test_schism_stage_order(self):
         expected = [
             "download",
             "pre_forcing",
@@ -102,7 +102,28 @@ class TestCoastalCalibRunner:
             "schism_run",
             "post_schism",
         ]
-        assert expected == CoastalCalibRunner.STAGE_ORDER
+        assert expected == CoastalCalibRunner.SCHISM_STAGE_ORDER
+
+    def test_sfincs_stage_order(self):
+        expected = [
+            "download",
+            "sfincs_symlinks",
+            "sfincs_data_catalog",
+            "sfincs_init",
+            "sfincs_timing",
+            "sfincs_forcing",
+            "sfincs_obs",
+            "sfincs_discharge",
+            "sfincs_precip",
+            "sfincs_write",
+            "sfincs_run",
+        ]
+        assert expected == CoastalCalibRunner.SFINCS_STAGE_ORDER
+
+    def test_stage_order_property(self, sample_config):
+        runner = CoastalCalibRunner(sample_config)
+        # Default model is "schism"
+        assert runner.STAGE_ORDER == CoastalCalibRunner.SCHISM_STAGE_ORDER
 
     def test_init(self, sample_config):
         runner = CoastalCalibRunner(sample_config)
