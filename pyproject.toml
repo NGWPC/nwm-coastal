@@ -318,7 +318,7 @@ hdf5 = "*"
 libnetcdf = "*"
 
 [tool.pixi.feature.sfincs.pypi-dependencies]
-hydromt-sfincs = { git = "https://github.com/Deltares/hydromt_sfincs"}
+hydromt-sfincs = { git = "https://github.com/Deltares/hydromt_sfincs" }
 
 [tool.pixi.feature.test.tasks]
 test = { cmd = [
