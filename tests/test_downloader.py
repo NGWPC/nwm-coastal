@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from unittest.mock import patch
 
 import pytest
 
@@ -376,8 +377,7 @@ class TestBuildUrls:
 
 
 class TestFilterExisting:
-    # Valid HDF5 magic header (8 bytes) + enough non-null padding to
-    # pass the tail check in ``_is_valid_netcdf``.
+    # Valid HDF5 magic header (8 bytes) + padding.
     _HDF5_HEADER = b"\x89HDF\r\n\x1a\n" + b"\x01" * 1024
 
     def test_no_existing(self, tmp_path):
@@ -387,7 +387,9 @@ class TestFilterExisting:
         assert len(pending_urls) == 2
         assert existing == 0
 
-    def test_some_existing(self, tmp_path):
+    @patch("coastal_calibration.downloader.check_downloads", return_value={})
+    def test_some_existing(self, mock_check, tmp_path):
+        """Valid .nc file passes magic-byte + remote-size check."""
         urls = ["http://a", "http://b"]
         f = tmp_path / "a.nc"
         f.write_bytes(self._HDF5_HEADER)
@@ -407,7 +409,7 @@ class TestFilterExisting:
         assert existing == 0
 
     def test_corrupt_nc_requeued(self, tmp_path):
-        """A .nc file with invalid content is deleted and re-queued."""
+        """A .nc file with invalid magic bytes is deleted and re-queued."""
         urls = ["http://a"]
         f = tmp_path / "a.nc"
         f.write_text("not-a-netcdf-file")
@@ -416,6 +418,19 @@ class TestFilterExisting:
         assert len(pending_urls) == 1
         assert existing == 0
         assert not f.exists(), "corrupt file should be deleted"
+
+    @patch("coastal_calibration.downloader.check_downloads")
+    def test_truncated_nc_requeued(self, mock_check, tmp_path):
+        """A .nc file that passes magic-byte check but fails size check is re-queued."""
+        f = tmp_path / "a.nc"
+        f.write_bytes(self._HDF5_HEADER)
+        mock_check.return_value = {f: 99999}
+        urls = ["http://a"]
+        paths = [f]
+        pending_urls, _pending_paths, existing = _filter_existing(urls, paths)
+        assert len(pending_urls) == 1
+        assert existing == 0
+        assert not f.exists(), "truncated file should be deleted"
 
     def test_non_nc_file_skipped_by_size(self, tmp_path):
         """Non-.nc files are accepted with a simple size > 0 check."""
