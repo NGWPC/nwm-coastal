@@ -64,7 +64,7 @@ optional-dependencies.schism = [
 # Local development only - for building SFINCS models with HydroMT, not required for cluster execution
 optional-dependencies.sfincs = [
   "hydromt>=1.3",
-  "hydromt-sfincs>=2.0.0rc1",
+  # "hydromt-sfincs>=2.0.0rc1",
 ]
 optional-dependencies.test = [
   "coverage[toml]",
@@ -298,22 +298,27 @@ spell = "codespell -w"
 
 [tool.pixi.feature.py311.dependencies]
 python = "~=3.11.0"
-proj = "*"
-libgdal-core = "*"
-hdf5 = "*"
-libnetcdf = "*"
 
 [tool.pixi.feature.py314.dependencies]
 python = "~=3.14.0"
+
+[tool.pixi.feature.schism.dependencies]
+proj = "*"
+libgdal-core = "*"
+hdf5 = "*"
+libnetcdf = "*"
+esmpy = "*"
+mpi4py = "*"
+openmpi = "*"
+
+[tool.pixi.feature.sfincs.dependencies]
 proj = "*"
 libgdal-core = "*"
 hdf5 = "*"
 libnetcdf = "*"
 
-[tool.pixi.feature.schism.dependencies]
-esmpy = "*"
-mpi4py = "*"
-openmpi = "*"
+[tool.pixi.feature.sfincs.pypi-dependencies]
+hydromt-sfincs = { git = "https://github.com/Deltares/hydromt_sfincs"}
 
 [tool.pixi.feature.test.tasks]
 test = { cmd = [
