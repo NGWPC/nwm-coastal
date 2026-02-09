@@ -24,6 +24,18 @@ from coastal_calibration.stages.schism import (
     PreSCHISMStage,
     SCHISMRunStage,
 )
+from coastal_calibration.stages.sfincs_build import (
+    SfincsDataCatalogStage,
+    SfincsDischargeStage,
+    SfincsForcingStage,
+    SfincsInitStage,
+    SfincsObservationPointsStage,
+    SfincsPrecipitationStage,
+    SfincsRunStage,
+    SfincsSymlinksStage,
+    SfincsTimingStage,
+    SfincsWriteStage,
+)
 from coastal_calibration.utils.logging import WorkflowMonitor
 from coastal_calibration.utils.slurm import JobState, SlurmManager
 
@@ -85,11 +97,12 @@ class CoastalCalibRunner:
     This class orchestrates the entire calibration workflow, managing
     stage execution, SLURM job submission, and progress monitoring.
 
-    Currently supports SCHISM model calibration. SFINCS support will be
-    added in future versions.
+    Supports both SCHISM (``model="schism"``, default) and SFINCS
+    (``model="sfincs"``) pipelines.  The model type is selected via
+    ``config.model``.
     """
 
-    STAGE_ORDER: ClassVar[list[str]] = [
+    SCHISM_STAGE_ORDER: ClassVar[list[str]] = [
         "download",
         "pre_forcing",
         "nwm_forcing",
@@ -99,6 +112,20 @@ class CoastalCalibRunner:
         "pre_schism",
         "schism_run",
         "post_schism",
+    ]
+
+    SFINCS_STAGE_ORDER: ClassVar[list[str]] = [
+        "download",
+        "sfincs_symlinks",
+        "sfincs_data_catalog",
+        "sfincs_init",
+        "sfincs_timing",
+        "sfincs_forcing",
+        "sfincs_obs",
+        "sfincs_discharge",
+        "sfincs_precip",
+        "sfincs_write",
+        "sfincs_run",
     ]
 
     def __init__(self, config: CoastalCalibConfig) -> None:
@@ -116,6 +143,13 @@ class CoastalCalibRunner:
         self._results: dict[str, Any] = {}
 
     @property
+    def STAGE_ORDER(self) -> list[str]:  # noqa: N802
+        """Active stage order based on config.model."""
+        if self.config.model == "sfincs":
+            return self.SFINCS_STAGE_ORDER
+        return self.SCHISM_STAGE_ORDER
+
+    @property
     def slurm(self) -> SlurmManager:
         """Lazily initialize SLURM manager (only needed for submit)."""
         if self._slurm is None:
@@ -123,18 +157,33 @@ class CoastalCalibRunner:
         return self._slurm
 
     def _init_stages(self) -> None:
-        """Initialize all workflow stages."""
-        self._stages = {
-            "download": DownloadStage(self.config, self.monitor),
-            "pre_forcing": PreForcingStage(self.config, self.monitor),
-            "nwm_forcing": NWMForcingStage(self.config, self.monitor),
-            "post_forcing": PostForcingStage(self.config, self.monitor),
-            "update_params": UpdateParamsStage(self.config, self.monitor),
-            "boundary_conditions": BoundaryConditionStage(self.config, self.monitor),
-            "pre_schism": PreSCHISMStage(self.config, self.monitor),
-            "schism_run": SCHISMRunStage(self.config, self.monitor),
-            "post_schism": PostSCHISMStage(self.config, self.monitor),
-        }
+        """Initialize all workflow stages based on config.model."""
+        if self.config.model == "sfincs":
+            self._stages = {
+                "download": DownloadStage(self.config, self.monitor),
+                "sfincs_symlinks": SfincsSymlinksStage(self.config, self.monitor),
+                "sfincs_data_catalog": SfincsDataCatalogStage(self.config, self.monitor),
+                "sfincs_init": SfincsInitStage(self.config, self.monitor),
+                "sfincs_timing": SfincsTimingStage(self.config, self.monitor),
+                "sfincs_forcing": SfincsForcingStage(self.config, self.monitor),
+                "sfincs_obs": SfincsObservationPointsStage(self.config, self.monitor),
+                "sfincs_discharge": SfincsDischargeStage(self.config, self.monitor),
+                "sfincs_precip": SfincsPrecipitationStage(self.config, self.monitor),
+                "sfincs_write": SfincsWriteStage(self.config, self.monitor),
+                "sfincs_run": SfincsRunStage(self.config, self.monitor),
+            }
+        else:
+            self._stages = {
+                "download": DownloadStage(self.config, self.monitor),
+                "pre_forcing": PreForcingStage(self.config, self.monitor),
+                "nwm_forcing": NWMForcingStage(self.config, self.monitor),
+                "post_forcing": PostForcingStage(self.config, self.monitor),
+                "update_params": UpdateParamsStage(self.config, self.monitor),
+                "boundary_conditions": BoundaryConditionStage(self.config, self.monitor),
+                "pre_schism": PreSCHISMStage(self.config, self.monitor),
+                "schism_run": SCHISMRunStage(self.config, self.monitor),
+                "post_schism": PostSCHISMStage(self.config, self.monitor),
+            }
 
     def validate(self) -> list[str]:
         """Validate configuration and prerequisites.

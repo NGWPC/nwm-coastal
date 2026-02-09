@@ -14,6 +14,7 @@ from coastal_calibration.utils.time import parse_datetime as _parse_datetime
 MeteoSource = Literal["nwm_retro", "nwm_ana"]
 CoastalDomain = Literal["prvi", "hawaii", "atlgulf", "pacific"]
 BoundarySource = Literal["tpxo", "stofs"]
+ModelType = Literal["schism", "sfincs"]
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 DEFAULT_SING_IMAGE_PATH = Path("/ngencerf-app/singularity/ngen-coastal.sif")
@@ -249,6 +250,67 @@ class DownloadConfig:
     limit_per_host: int = 4
 
 
+@dataclass
+class SfincsModelConfig:
+    """SFINCS model configuration for use within :class:`CoastalCalibConfig`.
+
+    When ``model = "sfincs"`` in the main config, this section specifies the
+    pre-built SFINCS model directory and model-specific settings (observation
+    points, discharge sources, etc.).  Simulation timing, domain, download,
+    and boundary settings are inherited from the parent
+    :class:`CoastalCalibConfig`.
+
+    Parameters
+    ----------
+    model_dir : Path
+        Path to the directory containing the pre-built model files
+        (``sfincs.inp``, ``sfincs.nc``, ``region.geojson``, etc.).
+    model_root : Path, optional
+        Output directory for the built model.  Defaults to
+        ``{work_dir}/sfincs_model``.
+    obs_points : list, optional
+        Observation point specifications as list of dicts with
+        ``x``, ``y``, ``name`` keys (coordinates in model CRS).
+    obs_locations : Path, optional
+        Path to a GeoJSON file with observation point locations.
+    obs_merge : bool
+        Whether to merge with pre-existing observation points.
+    src_locations : Path, optional
+        Path to a SFINCS ``.src`` or GeoJSON with discharge source point
+        locations.
+    src_merge : bool
+        Whether to merge with pre-existing discharge source points.
+    precip_dataset : str, optional
+        Precipitation dataset name in the data catalog.
+    docker_tag : str
+        Tag for the ``deltares/sfincs-cpu`` Docker image.
+    sif_path : Path, optional
+        Path to a pre-pulled Singularity SIF file.
+    """
+
+    model_dir: Path
+    model_root: Path | None = None
+    obs_points: list[dict[str, Any]] = field(default_factory=list)
+    obs_locations: Path | None = None
+    obs_merge: bool = False
+    src_locations: Path | None = None
+    src_merge: bool = False
+    precip_dataset: str | None = None
+    docker_tag: str = "latest"
+    sif_path: Path | None = None
+
+    def __post_init__(self) -> None:
+        self.model_dir = Path(self.model_dir)
+        if self.model_root is not None:
+            self.model_root = Path(self.model_root)
+        if self.obs_locations is not None:
+            self.obs_locations = Path(self.obs_locations)
+        if self.src_locations is not None:
+            self.src_locations = Path(self.src_locations)
+        if self.sif_path is not None:
+            self.sif_path = Path(self.sif_path)
+
+
 def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
     """Deep merge two dictionaries, with override taking precedence."""
     result = base.copy()
@@ -350,17 +412,20 @@ def _interpolate_config(data: dict[str, Any]) -> dict[str, Any]:
 class CoastalCalibConfig:
     """Complete coastal calibration workflow configuration.
 
-    Currently supports SCHISM model calibration. SFINCS support will be added
-    in future versions.
+    Supports both SCHISM and SFINCS models.  Set ``model`` to ``"sfincs"``
+    and provide the ``sfincs`` section to use the SFINCS pipeline.  The
+    default is ``"schism"`` for backward compatibility.
     """
 
     slurm: SlurmConfig
     simulation: SimulationConfig
     boundary: BoundaryConfig
     paths: PathConfig
+    model: ModelType = "schism"
     mpi: MPIConfig = field(default_factory=MPIConfig)
     monitoring: MonitoringConfig = field(default_factory=MonitoringConfig)
     download: DownloadConfig = field(default_factory=DownloadConfig)
+    sfincs: SfincsModelConfig | None = None
     _base_config: Path | None = field(default=None, repr=False)
 
     @classmethod
@@ -397,14 +462,23 @@ class CoastalCalibConfig:
         download_data = data.get("download", {})
         download = DownloadConfig(**download_data)
 
+        model = data.get("model", "schism")
+
+        sfincs = None
+        sfincs_data = data.get("sfincs")
+        if sfincs_data is not None:
+            sfincs = SfincsModelConfig(**sfincs_data)
+
         return cls(
             slurm=slurm,
             simulation=simulation,
             boundary=boundary,
             paths=paths,
+            model=model,
             mpi=mpi,
             monitoring=monitoring,
             download=download,
+            sfincs=sfincs,
             _base_config=base_config_path,
         )
 
@@ -481,7 +555,7 @@ class CoastalCalibConfig:
 
     def to_dict(self) -> dict[str, Any]:
         """Convert config to dictionary."""
-        return {
+        result: dict[str, Any] = {
             "slurm": {
                 "job_name": self.slurm.job_name,
                 "nodes": self.slurm.nodes,
@@ -506,15 +580,15 @@ class CoastalCalibConfig:
             },
             "paths": {
                 "work_dir": str(self.paths.work_dir),
-                "raw_download_dir": str(self.paths.raw_download_dir)
-                if self.paths.raw_download_dir
-                else None,
+                "raw_download_dir": (
+                    str(self.paths.raw_download_dir) if self.paths.raw_download_dir else None
+                ),
                 "nfs_mount": str(self.paths.nfs_mount),
                 "singularity_image": str(self.paths.singularity_image),
                 "ngen_app_dir": str(self.paths.ngen_app_dir),
-                "hot_start_file": str(self.paths.hot_start_file)
-                if self.paths.hot_start_file
-                else None,
+                "hot_start_file": (
+                    str(self.paths.hot_start_file) if self.paths.hot_start_file else None
+                ),
                 "conda_env_name": self.paths.conda_env_name,
                 "parm_dir": str(self.paths.parm_dir),
             },
@@ -530,6 +604,7 @@ class CoastalCalibConfig:
                 "enable_progress_tracking": self.monitoring.enable_progress_tracking,
                 "enable_timing": self.monitoring.enable_timing,
             },
+            "model": self.model,
             "download": {
                 "enabled": self.download.enabled,
                 "skip_existing": self.download.skip_existing,
@@ -538,6 +613,24 @@ class CoastalCalibConfig:
                 "limit_per_host": self.download.limit_per_host,
             },
         }
+        if self.sfincs is not None:
+            result["sfincs"] = {
+                "model_dir": str(self.sfincs.model_dir),
+                "model_root": str(self.sfincs.model_root) if self.sfincs.model_root else None,
+                "obs_points": self.sfincs.obs_points,
+                "obs_locations": (
+                    str(self.sfincs.obs_locations) if self.sfincs.obs_locations else None
+                ),
+                "obs_merge": self.sfincs.obs_merge,
+                "src_locations": (
+                    str(self.sfincs.src_locations) if self.sfincs.src_locations else None
+                ),
+                "src_merge": self.sfincs.src_merge,
+                "precip_dataset": self.sfincs.precip_dataset,
+                "docker_tag": self.sfincs.docker_tag,
+                "sif_path": str(self.sfincs.sif_path) if self.sfincs.sif_path else None,
+            }
+        return result
 
     def to_yaml(self, path: Path | str) -> None:
         """Write configuration to YAML file.
@@ -578,6 +671,36 @@ class CoastalCalibConfig:
 
         return errors
 
+    def _validate_sfincs(self) -> list[str]:
+        """Validate SFINCS-specific configuration."""
+        errors: list[str] = []
+
+        if self.sfincs is None:
+            errors.append("sfincs section is required when model='sfincs'")
+            return errors
+
+        if not self.sfincs.model_dir.exists():
+            errors.append(f"sfincs.model_dir not found: {self.sfincs.model_dir}")
+        else:
+            # Check for essential pre-built model files
+            required = ["sfincs.inp"]
+            errors.extend(
+                f"Required file missing in sfincs.model_dir: {fname}"
+                for fname in required
+                if not (self.sfincs.model_dir / fname).exists()
+            )
+
+        if self.sfincs.obs_locations and not self.sfincs.obs_locations.exists():
+            errors.append(f"sfincs.obs_locations not found: {self.sfincs.obs_locations}")
+
+        if self.sfincs.src_locations and not self.sfincs.src_locations.exists():
+            errors.append(f"sfincs.src_locations not found: {self.sfincs.src_locations}")
+
+        if self.sfincs.sif_path and not self.sfincs.sif_path.exists():
+            errors.append(f"sfincs.sif_path not found: {self.sfincs.sif_path}")
+
+        return errors
+
     def validate(self) -> list[str]:
         """Validate configuration and return list of errors."""
         from coastal_calibration.downloader import validate_date_ranges
@@ -587,6 +710,29 @@ class CoastalCalibConfig:
         if self.simulation.duration_hours <= 0:
             errors.append("simulation.duration_hours must be positive")
 
+        # SFINCS-specific validation — skip SCHISM-only checks
+        if self.model == "sfincs":
+            errors.extend(self._validate_sfincs())
+
+            # Only validate date ranges when download is enabled — if the
+            # user is supplying their own data files, the dates don't need
+            # to match the remote data source availability windows.
+            if self.download.enabled:
+                sim = self.simulation
+                start_time = sim.start_date
+                end_time = start_time + timedelta(hours=sim.duration_hours)
+                date_errors = validate_date_ranges(
+                    start_time,
+                    end_time,
+                    sim.meteo_source,
+                    self.boundary.source,
+                    sim.coastal_domain,
+                )
+                errors.extend(date_errors)
+
+            return errors
+
+        # --- SCHISM-specific validation below ---
         if not self.slurm.user:
             errors.append("slurm.user is required")
 
