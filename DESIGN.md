@@ -329,15 +329,11 @@ DEFAULT_RAW_DOWNLOAD_DIR_TEMPLATE = (
 )
 ```
 
-```console
-                    ┌─────────────┐
-                    │  base.yaml  │
-                    └──────┬──────┘
-           ┌───────────────┼───────────────┐
-           ▼               ▼               ▼
-  ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
-  │ hawaii_run.yaml │ │ pacific_run.yaml│ │  prvi_run.yaml  │
-  └─────────────────┘ └─────────────────┘ └─────────────────┘
+```mermaid
+flowchart TD
+    base[base.yaml] --> hawaii[hawaii_run.yaml]
+    base --> pacific[pacific_run.yaml]
+    base --> prvi[prvi_run.yaml]
 ```
 
 #### 3. Stage-Based Workflow Architecture
@@ -356,20 +352,17 @@ flowchart TD
 
 Each stage is a Python class inheriting from `WorkflowStage`:
 
-```console
-                    ┌───────────────────────┐
-                    │   WorkflowStage       │
-                    │   <<abstract>>        │
-                    ├───────────────────────┤
-                    │ + run() -> dict       │
-                    │ + validate() -> list  │
-                    └───────────┬───────────┘
-                                │
-        ┌───────────────┬───────┴───────┬─────────────┐
-        ▼               ▼               ▼             ▼
- ┌─────────────┐ ┌────────────┐ ┌─────────────┐ ┌────────────┐
- │DownloadStage│ │ForcingStage│ │BoundaryStage│ │ SCHISMStage│
- └─────────────┘ └────────────┘ └─────────────┘ └────────────┘
+```mermaid
+classDiagram
+    class WorkflowStage {
+        <<abstract>>
+        +run() dict
+        +validate() list
+    }
+    WorkflowStage <|-- DownloadStage
+    WorkflowStage <|-- ForcingStage
+    WorkflowStage <|-- BoundaryStage
+    WorkflowStage <|-- SCHISMStage
 ```
 
 The base class implementation:
@@ -454,25 +447,19 @@ class CoastalCalibRunner:
         pass
 ```
 
-The `submit()` method execution flow:
+The `submit()` method execution flow is shown in the sequence diagram below:
 
-```console
-  User                Runner              Slurm
-   │                    │                   │
-   │  submit(config)    │                   │
-   │───────────────────▶│                   │
-   │                    │  validate()       │
-   │                    │───────┐           │
-   │                    │◀──────┘           │
-   │                    │                   │
-   │                    │  submit_job()     │
-   │                    │──────────────────▶│
-   │                    │       job_id      │
-   │                    │◀──────────────────│
-   │                    │                   │
-   │  WorkflowResult    │                   │
-   │◀───────────────────│                   │
-   │                    │                   │
+```mermaid
+sequenceDiagram
+    participant User
+    participant Runner
+    participant Slurm
+
+    User->>Runner: submit(config)
+    Runner->>Runner: validate()
+    Runner->>Slurm: submit_job()
+    Slurm-->>Runner: job_id
+    Runner-->>User: WorkflowResult
 ```
 
 ______________________________________________________________________
