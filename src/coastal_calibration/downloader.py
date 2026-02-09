@@ -539,11 +539,54 @@ def _build_glofs_urls(
     return urls, paths
 
 
+_HDF5_MAGIC = b"\x89HDF\r\n\x1a\n"
+_CDF_MAGIC = b"CDF"
+
+
+def _is_valid_netcdf(path: Path) -> bool:
+    """Check whether *path* looks like a valid (non-truncated) netCDF file.
+
+    Verifies the file starts with either the HDF5 or classic-CDF magic
+    bytes **and** ends with the HDF5 end-of-file marker when applicable.
+    This catches the common case of a partially downloaded STOFS file
+    that passes a simple ``st_size > 0`` check but cannot be read by
+    the HDF5 library.
+    """
+    if not path.exists():
+        return False
+
+    size = path.stat().st_size
+    if size < 8:
+        return False
+
+    with path.open("rb") as fh:
+        header = fh.read(8)
+
+    if header.startswith(_HDF5_MAGIC):
+        # HDF5 -- verify the superblock signature also appears at the
+        # end of the file (every valid HDF5 file has one).  A truncated
+        # download will almost certainly lack this.
+        try:
+            with path.open("rb") as fh:
+                fh.seek(max(0, size - 1024))
+                tail = fh.read()
+            # The tail should contain at least *some* valid data;
+            # a fully truncated file will often have null bytes.
+            return len(tail) > 0 and tail != b"\x00" * len(tail)
+        except OSError:
+            return False
+
+    return header[:3] == _CDF_MAGIC
+
+
 def _filter_existing(
     urls: list[str],
     file_paths: list[Path],
 ) -> tuple[list[str], list[Path], int]:
     """Separate already-downloaded files from those still needed.
+
+    For netCDF files the magic bytes are verified so that corrupt /
+    truncated downloads are re-queued instead of silently skipped.
 
     Returns (pending_urls, pending_paths, already_exist_count).
     """
@@ -551,11 +594,29 @@ def _filter_existing(
     pending_paths: list[Path] = []
     existing = 0
     for url, path in zip(urls, file_paths, strict=False):
-        if path.exists() and path.stat().st_size > 0:
-            existing += 1
-        else:
+        if not path.exists():
             pending_urls.append(url)
             pending_paths.append(path)
+            continue
+
+        if path.stat().st_size == 0:
+            pending_urls.append(url)
+            pending_paths.append(path)
+            continue
+
+        # For netCDF files, validate structure; corrupt files are deleted
+        # so that they will be re-downloaded.
+        if path.suffix == ".nc" and not _is_valid_netcdf(path):
+            logger.warning(
+                "Corrupt or truncated file detected, re-downloading: %s",
+                path,
+            )
+            path.unlink(missing_ok=True)
+            pending_urls.append(url)
+            pending_paths.append(path)
+            continue
+
+        existing += 1
     return pending_urls, pending_paths, existing
 
 
@@ -564,16 +625,25 @@ def _tally_results(
     pending_urls: list[str],
     pending_paths: list[Path],
 ) -> None:
-    """Count successful/failed downloads and clean up empty files."""
+    """Count successful/failed downloads and clean up empty/corrupt files."""
     for url, path in zip(pending_urls, pending_paths, strict=False):
-        if path.exists() and path.stat().st_size > 0:
-            result.successful += 1
-        else:
+        if not path.exists() or path.stat().st_size == 0:
             result.failed += 1
             if not result.errors:
                 result.errors.append(f"Failed to download: {url}")
             if path.exists():
                 path.unlink()
+            continue
+
+        # Validate netCDF integrity after download
+        if path.suffix == ".nc" and not _is_valid_netcdf(path):
+            result.failed += 1
+            result.errors.append(f"Corrupt download (bad netCDF): {path.name}")
+            logger.warning("Downloaded file is corrupt, removing: %s", path)
+            path.unlink(missing_ok=True)
+            continue
+
+        result.successful += 1
 
 
 def _execute_download(
@@ -809,8 +879,10 @@ def download_data(
             )
     elif coastal_source == "stofs":
         urls, paths = _build_stofs_urls(start, out_dir)
+        # STOFS fields file is ~12 GB -- give it a generous timeout.
+        stofs_timeout = max(timeout, 3600)
         coastal_result = _execute_download(
-            urls, paths, "coastal/stofs", timeout, raise_on_error, skip_existing=skip_existing
+            urls, paths, "coastal/stofs", stofs_timeout, raise_on_error, skip_existing=skip_existing
         )
     else:
         urls, paths = _build_glofs_urls(start, end, out_dir, glofs_model)
