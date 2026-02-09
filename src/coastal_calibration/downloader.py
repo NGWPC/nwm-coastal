@@ -543,14 +543,27 @@ _HDF5_MAGIC = b"\x89HDF\r\n\x1a\n"
 _CDF_MAGIC = b"CDF"
 
 
-def _is_valid_netcdf(path: Path) -> bool:
+def _head_content_length(url: str) -> int | None:
+    """Return the ``Content-Length`` from an HTTP HEAD request, or *None*."""
+    try:
+        import urllib.request
+
+        req = urllib.request.Request(url, method="HEAD")
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            cl = resp.headers.get("Content-Length")
+            return int(cl) if cl else None
+    except Exception:
+        return None
+
+
+def _is_valid_netcdf(path: Path, *, expected_size: int | None = None) -> bool:
     """Check whether *path* looks like a valid (non-truncated) netCDF file.
 
     Verifies the file starts with either the HDF5 or classic-CDF magic
-    bytes **and** ends with the HDF5 end-of-file marker when applicable.
-    This catches the common case of a partially downloaded STOFS file
-    that passes a simple ``st_size > 0`` check but cannot be read by
-    the HDF5 library.
+    bytes.  When *expected_size* is given the local file size is compared
+    against it to detect truncated downloads.  This catches the common
+    case of a partially downloaded STOFS file that passes a simple
+    ``st_size > 0`` check but cannot be read by the HDF5 library.
     """
     if not path.exists():
         return False
@@ -559,22 +572,23 @@ def _is_valid_netcdf(path: Path) -> bool:
     if size < 8:
         return False
 
+    # If the caller tells us exactly how big the file should be we can
+    # catch truncated downloads without having to inspect the binary
+    # contents at all.
+    if expected_size is not None and size != expected_size:
+        logger.debug(
+            "File size mismatch for %s: expected %d, got %d",
+            path.name,
+            expected_size,
+            size,
+        )
+        return False
+
     with path.open("rb") as fh:
         header = fh.read(8)
 
     if header.startswith(_HDF5_MAGIC):
-        # HDF5 -- verify the superblock signature also appears at the
-        # end of the file (every valid HDF5 file has one).  A truncated
-        # download will almost certainly lack this.
-        try:
-            with path.open("rb") as fh:
-                fh.seek(max(0, size - 1024))
-                tail = fh.read()
-            # The tail should contain at least *some* valid data;
-            # a fully truncated file will often have null bytes.
-            return len(tail) > 0 and tail != b"\x00" * len(tail)
-        except OSError:
-            return False
+        return True
 
     return header[:3] == _CDF_MAGIC
 
@@ -585,8 +599,9 @@ def _filter_existing(
 ) -> tuple[list[str], list[Path], int]:
     """Separate already-downloaded files from those still needed.
 
-    For netCDF files the magic bytes are verified so that corrupt /
-    truncated downloads are re-queued instead of silently skipped.
+    For netCDF files the magic bytes and file size (via an HTTP HEAD
+    request) are verified so that corrupt / truncated downloads are
+    re-queued instead of silently skipped.
 
     Returns (pending_urls, pending_paths, already_exist_count).
     """
@@ -604,17 +619,18 @@ def _filter_existing(
             pending_paths.append(path)
             continue
 
-        # For netCDF files, validate structure; corrupt files are deleted
-        # so that they will be re-downloaded.
-        if path.suffix == ".nc" and not _is_valid_netcdf(path):
-            logger.warning(
-                "Corrupt or truncated file detected, re-downloading: %s",
-                path,
-            )
-            path.unlink(missing_ok=True)
-            pending_urls.append(url)
-            pending_paths.append(path)
-            continue
+        # For netCDF files, validate magic bytes + file size.
+        if path.suffix == ".nc":
+            expected = _head_content_length(url)
+            if not _is_valid_netcdf(path, expected_size=expected):
+                logger.warning(
+                    "Corrupt or truncated file detected, re-downloading: %s",
+                    path,
+                )
+                path.unlink(missing_ok=True)
+                pending_urls.append(url)
+                pending_paths.append(path)
+                continue
 
         existing += 1
     return pending_urls, pending_paths, existing
@@ -636,12 +652,14 @@ def _tally_results(
             continue
 
         # Validate netCDF integrity after download
-        if path.suffix == ".nc" and not _is_valid_netcdf(path):
-            result.failed += 1
-            result.errors.append(f"Corrupt download (bad netCDF): {path.name}")
-            logger.warning("Downloaded file is corrupt, removing: %s", path)
-            path.unlink(missing_ok=True)
-            continue
+        if path.suffix == ".nc":
+            expected = _head_content_length(url)
+            if not _is_valid_netcdf(path, expected_size=expected):
+                result.failed += 1
+                result.errors.append(f"Corrupt download (bad netCDF): {path.name}")
+                logger.warning("Downloaded file is corrupt, removing: %s", path)
+                path.unlink(missing_ok=True)
+                continue
 
         result.successful += 1
 

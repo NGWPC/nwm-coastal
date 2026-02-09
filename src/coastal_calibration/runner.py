@@ -36,7 +36,12 @@ from coastal_calibration.stages.sfincs_build import (
     SfincsTimingStage,
     SfincsWriteStage,
 )
-from coastal_calibration.utils.logging import WorkflowMonitor
+from coastal_calibration.utils.logging import (
+    WorkflowMonitor,
+    configure_logger,
+    generate_log_path,
+    silence_third_party_loggers,
+)
 from coastal_calibration.utils.slurm import JobState, SlurmManager
 
 if TYPE_CHECKING:
@@ -137,6 +142,19 @@ class CoastalCalibRunner:
             Coastal calibration configuration.
         """
         self.config = config
+
+        # Ensure log directory exists early so file logging can start.
+        config.paths.work_dir.mkdir(parents=True, exist_ok=True)
+
+        # Set up file logging *before* creating the monitor so that
+        # every message (including third-party) is captured on disk.
+        if not config.monitoring.log_file:
+            log_path = generate_log_path(config.paths.work_dir)
+            configure_logger(file=str(log_path), file_level="DEBUG")
+
+        # Silence noisy third-party loggers (HydroMT, xarray, ...)
+        silence_third_party_loggers()
+
         self.monitor = WorkflowMonitor(config.monitoring)
         self._slurm: SlurmManager | None = None
         self._stages: dict[str, WorkflowStage] = {}

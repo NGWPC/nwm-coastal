@@ -32,6 +32,7 @@ __all__ = [
     "generate_log_path",
     "get_log_file_path",
     "logger",
+    "silence_third_party_loggers",
 ]
 
 # Module-level logger
@@ -243,6 +244,73 @@ def configure_logger(
         _file_handler = None
 
 
+# ---------------------------------------------------------------------------
+# Third-party logger isolation
+# ---------------------------------------------------------------------------
+
+#: Logger names whose console output should be suppressed.  Messages from
+#: these loggers are still written to the log **file** (if configured) via
+#: propagation to the root logger.
+_NOISY_LOGGERS: tuple[str, ...] = (
+    "hydromt",
+    "hydromt_sfincs",
+    "xarray",
+    "matplotlib",
+    "numba",
+    "pyproj",
+    "rasterio",
+    "pyogrio",
+    "fsspec",
+    "dask",
+    "botocore",
+    "boto3",
+    "s3transfer",
+    "urllib3",
+    "requests",
+)
+
+
+def silence_third_party_loggers(*, file_level: int = logging.DEBUG) -> None:
+    """Prevent third-party loggers from printing to the console.
+
+    * Removes any existing handlers (e.g. the ``StreamHandler`` that
+      HydroMT attaches to its ``hydromt`` logger).
+    * Adds a ``NullHandler`` so the library's own "no handler found"
+      warning is silenced.
+    * If a file handler has been configured on **our** logger we also
+      attach it to the root logger so that third-party DEBUG/INFO
+      messages still end up in the log file for diagnosis.
+
+    Parameters
+    ----------
+    file_level : int, optional
+        Level at which third-party messages are written to the log
+        file.  Defaults to ``logging.DEBUG``.
+    """
+    for name in _NOISY_LOGGERS:
+        lg = logging.getLogger(name)
+        # Remove any existing handlers (e.g. StreamHandler from hydromt)
+        for handler in lg.handlers[:]:
+            lg.removeHandler(handler)
+        lg.addHandler(logging.NullHandler())
+        lg.propagate = True  # allow file capture via root
+
+    # Configure the root logger so propagated messages reach the log
+    # file (but never the console).
+    root = logging.getLogger()
+    # Remove any pre-existing root console handlers
+    for handler in root.handlers[:]:
+        if isinstance(handler, (logging.StreamHandler, RichHandler)):
+            root.removeHandler(handler)
+    root.addHandler(logging.NullHandler())
+
+    # If we already have file logging, let root propagate into it.
+    if _file_handler is not None:
+        if _file_handler not in root.handlers:
+            root.addHandler(_file_handler)
+        root.setLevel(file_level)
+
+
 class StageStatus(StrEnum):
     """Workflow stage status."""
 
@@ -296,17 +364,29 @@ class WorkflowMonitor:
     def _setup_logger(self) -> logging.Logger:
         """Configure logging based on monitoring config.
 
-        Note: If file logging is already configured (e.g., by CLI),
-        we don't override it. We only set the console level if a
-        console handler is still attached.
+        * The console handler is kept at WARNING so only problems
+          are shown on screen.
+        * A log file is always created (either the one specified in
+          ``config.log_file`` or an auto-generated one under
+          ``config.work_dir``).  All DEBUG-level messages from both
+          our own code and third-party libraries end up there.
+        * Third-party loggers (HydroMT, xarray, ...) are silenced
+          on the console but still write to the log file.
         """
-        # Only configure console level if console handler is still attached
+        # Console: only warnings and errors
         if _console_handler is not None and _console_handler in logger.handlers:
-            configure_logger(level=self.config.log_level)
+            _console_handler.setLevel(logging.WARNING)
 
-        # Only configure file logging if not already configured and config specifies a file
-        if self.config.log_file and _file_handler is None:
-            configure_logger(file=self.config.log_file, file_level="DEBUG")
+        # File: full detail
+        if _file_handler is None:
+            log_file = self.config.log_file
+            if not log_file and hasattr(self, "_work_dir") and self._work_dir:
+                log_file = str(generate_log_path(self._work_dir))
+            if log_file:
+                configure_logger(file=log_file, file_level="DEBUG")
+
+        # Mute noisy third-party console output
+        silence_third_party_loggers()
 
         return logger
 

@@ -141,6 +141,8 @@ def _run_singularity(
     cmd = ["singularity", "run", f"-B{model_root}:/data", str(sif_path)]
 
     log_path = model_root / "sfincs_log.txt"
+    stdout_lines: list[str] = []
+    stderr_lines: list[str] = []
     with subprocess.Popen(
         cmd,
         cwd=model_root,
@@ -152,21 +154,34 @@ def _run_singularity(
             assert proc.stdout is not None  # noqa: S101
             assert proc.stderr is not None  # noqa: S101
             for line in proc.stdout:
+                stdout_lines.append(line)
                 f.write(line)
             for line in proc.stderr:
+                stderr_lines.append(line)
                 f.write(line)
         proc.wait()
 
     if proc.returncode == 127:
         raise RuntimeError("singularity not found. Make sure it is installed and on PATH.")
     if proc.returncode != 0:
-        raise RuntimeError(f"SFINCS run failed with return code {proc.returncode}")
+        # Include the last portion of stdout/stderr so the caller can
+        # see what went wrong without having to open the log file.
+        tail_stdout = "".join(stdout_lines[-20:]).rstrip()
+        tail_stderr = "".join(stderr_lines[-20:]).rstrip()
+        detail = ""
+        if tail_stderr:
+            detail += f"\n--- stderr (last 20 lines) ---\n{tail_stderr}"
+        if tail_stdout:
+            detail += f"\n--- stdout (last 20 lines) ---\n{tail_stdout}"
+        if not detail:
+            detail = f"\n(no output captured -- check {log_path})"
+        raise RuntimeError(f"SFINCS run failed with return code {proc.returncode}{detail}")
 
     return subprocess.CompletedProcess(
         args=cmd,
         returncode=proc.returncode,
-        stdout="",
-        stderr="",
+        stdout="".join(stdout_lines),
+        stderr="".join(stderr_lines),
     )
 
 
