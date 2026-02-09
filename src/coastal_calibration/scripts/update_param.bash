@@ -86,6 +86,14 @@ nwm_coastal_update_params() {
   # rnday is fractional day, convert from hours
   sed -i "s|^  rnday .*|  rnday = $(echo "scale=8;$rnhours/24.0" | bc -l)|;" ${coastal_param}
 
+  # For cold starts, enable ramping to avoid shock from sudden boundary forcing.
+  # Ramp period is the lesser of 1 day or the full simulation length.
+  if [[ "$_cold_restart" == "1" ]]; then
+      local _ramp_days=$(echo "scale=8; d=$rnhours/24.0; if (d > 1) 1 else d" | bc -l)
+      sed -i "s|^  dramp .*|  dramp = ${_ramp_days}|;" ${coastal_param}
+      sed -i "s|^  drampbc .*|  drampbc = ${_ramp_days}|;" ${coastal_param}
+  fi
+
   # use 200 second model timestep and 10 minute atmospheric timestep
   sed -i "s|^  dt .*|  dt = 200 |;" ${coastal_param}
   sed -i "s|^  wtiminc .*|  wtiminc = 600 |;" ${coastal_param}
