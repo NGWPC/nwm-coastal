@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Literal
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-from tiny_retriever import download
+from tiny_retriever import check_downloads, download
 
 from coastal_calibration.config.schema import (
     BoundarySource,
@@ -543,45 +543,16 @@ _HDF5_MAGIC = b"\x89HDF\r\n\x1a\n"
 _CDF_MAGIC = b"CDF"
 
 
-def _head_content_length(url: str) -> int | None:
-    """Return the ``Content-Length`` from an HTTP HEAD request, or *None*."""
-    try:
-        import urllib.request
-
-        req = urllib.request.Request(url, method="HEAD")
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            cl = resp.headers.get("Content-Length")
-            return int(cl) if cl else None
-    except Exception:
-        return None
-
-
-def _is_valid_netcdf(path: Path, *, expected_size: int | None = None) -> bool:
-    """Check whether *path* looks like a valid (non-truncated) netCDF file.
+def _is_valid_netcdf(path: Path) -> bool:
+    """Check whether *path* looks like a valid netCDF file.
 
     Verifies the file starts with either the HDF5 or classic-CDF magic
-    bytes.  When *expected_size* is given the local file size is compared
-    against it to detect truncated downloads.  This catches the common
-    case of a partially downloaded STOFS file that passes a simple
-    ``st_size > 0`` check but cannot be read by the HDF5 library.
+    bytes.
     """
     if not path.exists():
         return False
 
-    size = path.stat().st_size
-    if size < 8:
-        return False
-
-    # If the caller tells us exactly how big the file should be we can
-    # catch truncated downloads without having to inspect the binary
-    # contents at all.
-    if expected_size is not None and size != expected_size:
-        logger.debug(
-            "File size mismatch for %s: expected %d, got %d",
-            path.name,
-            expected_size,
-            size,
-        )
+    if path.stat().st_size < 8:
         return False
 
     with path.open("rb") as fh:
@@ -599,40 +570,60 @@ def _filter_existing(
 ) -> tuple[list[str], list[Path], int]:
     """Separate already-downloaded files from those still needed.
 
-    For netCDF files the magic bytes and file size (via an HTTP HEAD
-    request) are verified so that corrupt / truncated downloads are
-    re-queued instead of silently skipped.
+    For netCDF files the magic bytes are checked and
+    ``tiny_retriever.check_downloads`` compares local sizes against
+    the remote ``Content-Length`` so that corrupt / truncated downloads
+    are re-queued instead of silently skipped.
 
     Returns (pending_urls, pending_paths, already_exist_count).
     """
     pending_urls: list[str] = []
     pending_paths: list[Path] = []
     existing = 0
+
+    # Collect .nc files that exist on disk for a bulk size check.
+    nc_urls: list[str] = []
+    nc_paths: list[Path] = []
+
     for url, path in zip(urls, file_paths, strict=False):
-        if not path.exists():
+        if not path.exists() or path.stat().st_size == 0:
             pending_urls.append(url)
             pending_paths.append(path)
             continue
 
-        if path.stat().st_size == 0:
-            pending_urls.append(url)
-            pending_paths.append(path)
-            continue
-
-        # For netCDF files, validate magic bytes + file size.
         if path.suffix == ".nc":
-            expected = _head_content_length(url)
-            if not _is_valid_netcdf(path, expected_size=expected):
+            # Quick magic-bytes check first.
+            if not _is_valid_netcdf(path):
                 logger.warning(
-                    "Corrupt or truncated file detected, re-downloading: %s",
+                    "Corrupt file (bad magic bytes), re-downloading: %s",
                     path,
                 )
                 path.unlink(missing_ok=True)
                 pending_urls.append(url)
                 pending_paths.append(path)
                 continue
+            nc_urls.append(url)
+            nc_paths.append(path)
+        else:
+            existing += 1
 
-        existing += 1
+    # Bulk remote-size check for surviving .nc files.
+    if nc_urls:
+        invalid = check_downloads(nc_urls, nc_paths)
+        for url, path in zip(nc_urls, nc_paths, strict=False):
+            if path in invalid:
+                logger.warning(
+                    "Truncated file detected (expected %d bytes, got %d), re-downloading: %s",
+                    invalid[path],
+                    path.stat().st_size,
+                    path,
+                )
+                path.unlink(missing_ok=True)
+                pending_urls.append(url)
+                pending_paths.append(path)
+            else:
+                existing += 1
+
     return pending_urls, pending_paths, existing
 
 
@@ -651,17 +642,31 @@ def _tally_results(
                 path.unlink()
             continue
 
-        # Validate netCDF integrity after download
-        if path.suffix == ".nc":
-            expected = _head_content_length(url)
-            if not _is_valid_netcdf(path, expected_size=expected):
-                result.failed += 1
-                result.errors.append(f"Corrupt download (bad netCDF): {path.name}")
-                logger.warning("Downloaded file is corrupt, removing: %s", path)
-                path.unlink(missing_ok=True)
-                continue
+        # Quick magic-bytes sanity check for netCDF files.
+        if path.suffix == ".nc" and not _is_valid_netcdf(path):
+            result.failed += 1
+            result.errors.append(f"Corrupt download (bad netCDF): {path.name}")
+            logger.warning("Downloaded file is corrupt, removing: %s", path)
+            path.unlink(missing_ok=True)
+            continue
 
         result.successful += 1
+
+    # Bulk remote-size check for all freshly downloaded .nc files.
+    nc_urls = [
+        u
+        for u, p in zip(pending_urls, pending_paths, strict=False)
+        if p.exists() and p.suffix == ".nc"
+    ]
+    nc_paths = [p for p in pending_paths if p.exists() and p.suffix == ".nc"]
+    if nc_urls:
+        invalid = check_downloads(nc_urls, nc_paths)
+        for path in invalid:
+            result.successful -= 1
+            result.failed += 1
+            result.errors.append(f"Truncated download: {path.name}")
+            logger.warning("Truncated file detected, removing: %s", path)
+            path.unlink(missing_ok=True)
 
 
 def _execute_download(
