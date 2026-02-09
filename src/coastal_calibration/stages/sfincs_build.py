@@ -1,450 +1,582 @@
-"""SFINCS model build stages using HydroMT-SFINCS Python API."""
+"""SFINCS model build stages using HydroMT-SFINCS Python API.
+
+All stages subclass :class:`~coastal_calibration.stages.base.WorkflowStage`
+and accept a :class:`~coastal_calibration.config.schema.CoastalCalibConfig`.
+SFINCS-specific settings are read from ``config.sfincs``
+(:class:`~coastal_calibration.config.schema.SfincsModelConfig`).
+
+The HydroMT ``SfincsModel`` instance is shared between stages via a
+module-level registry keyed by config ``id``.
+"""
 
 from __future__ import annotations
 
+import shutil
 import subprocess
-from abc import ABC, abstractmethod
+from datetime import timedelta
 from typing import TYPE_CHECKING, Any
+
+from coastal_calibration.stages.base import WorkflowStage
+from coastal_calibration.stages.sfincs import create_nc_symlinks, generate_data_catalog
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     from hydromt_sfincs import SfincsModel  # pyright: ignore[reportMissingImports]
 
-    from coastal_calibration.config.sfincs_schema import SfincsConfig
-    from coastal_calibration.utils.logging import WorkflowMonitor
+    from coastal_calibration.config.schema import CoastalCalibConfig, SfincsModelConfig
 
 SFINCS_DOCKER_IMAGE = "deltares/sfincs-cpu"
 
+# ---------------------------------------------------------------------------
+# Shared model instance management
+# ---------------------------------------------------------------------------
+# The SFINCS build stages share a HydroMT ``SfincsModel`` between them.
+# We use a module-level dictionary keyed by the ``CoastalCalibConfig`` id to
+# store the model instance across stages within a single runner invocation.
+_MODEL_REGISTRY: dict[int, SfincsModel] = {}
 
-class SfincsStageBase(ABC):
-    """Abstract base class for SFINCS workflow stages.
 
-    Parameters
-    ----------
-    config : SfincsConfig
-        SFINCS workflow configuration.
-    monitor : WorkflowMonitor, optional
-        Workflow monitor for logging and progress tracking.
-    """
+def _set_model(config: CoastalCalibConfig, model: SfincsModel) -> None:
+    """Store the SfincsModel instance for the given config."""
+    _MODEL_REGISTRY[id(config)] = model
 
-    name: str = "base"
-    description: str = "Base SFINCS stage"
 
-    def __init__(
-        self,
-        config: SfincsConfig,
-        monitor: WorkflowMonitor | None = None,
-    ) -> None:
-        self.config = config
-        self.monitor = monitor
-        self._model: SfincsModel | None = None
+def _get_model(config: CoastalCalibConfig) -> SfincsModel:
+    """Retrieve the SfincsModel instance for the given config."""
+    try:
+        return _MODEL_REGISTRY[id(config)]
+    except KeyError:
+        raise RuntimeError(
+            "SFINCS model not initialised. "
+            "Ensure the 'sfincs_init' stage runs before other SFINCS stages."
+        ) from None
 
-    @property
-    def model(self) -> SfincsModel:
-        """The ``hydromt_sfincs.SfincsModel`` instance shared across build stages.
 
-        Set by :class:`SfincsInitStage` and propagated to other stages by
-        the runner.
+def _clear_model(config: CoastalCalibConfig) -> None:
+    """Remove the SfincsModel instance for the given config."""
+    _MODEL_REGISTRY.pop(id(config), None)
 
-        Raises
-        ------
-        RuntimeError
-            If accessed before the model has been initialised.
-        """
-        if self._model is None:
-            raise RuntimeError(
-                f"Stage '{self.name}' requires a SfincsModel instance but none has been set. "
-                "Make sure the 'init' stage runs first."
-            )
-        return self._model
 
-    @model.setter
-    def model(self, value: SfincsModel) -> None:
-        self._model = value
+# ---------------------------------------------------------------------------
+# Helper — resolve paths from CoastalCalibConfig
+# ---------------------------------------------------------------------------
 
-    @property
-    def has_model(self) -> bool:
-        """Whether a :class:`SfincsModel` instance has been set."""
-        return self._model is not None
 
-    def _log(self, message: str, level: str = "info") -> None:
-        """Log message if monitor is available."""
-        if self.monitor:
-            getattr(self.monitor, level)(message)
+def _sfincs_cfg(config: CoastalCalibConfig) -> SfincsModelConfig:
+    """Return the ``config.sfincs`` section, raising if absent."""
+    if config.sfincs is None:
+        raise ValueError("config.sfincs must be set when model='sfincs'")
+    return config.sfincs
 
-    def _update_substep(self, substep: str) -> None:
-        """Update current substep."""
-        if self.monitor:
-            self.monitor.update_substep(self.name, substep)
 
-    def _resolve_sif_path(self) -> Path:
-        """Resolve the Singularity SIF path from configuration.
+def _model_root(config: CoastalCalibConfig) -> Path:
+    """Effective model output directory."""
+    sfincs = _sfincs_cfg(config)
+    return sfincs.model_root or (config.paths.work_dir / "sfincs_model")
 
-        If ``container.sif_path`` is set, returns it directly.
-        Otherwise returns a default path under ``model_root``.
-        """
-        container = self.config.container
-        if container.sif_path is not None:
-            return container.sif_path
-        return self.config.paths.model_root / f"sfincs-cpu_{container.docker_tag}.sif"
 
-    def pull_singularity_image(self, sif_path: Path | None = None) -> Path:
-        """Pull the SFINCS Docker image as a Singularity SIF file.
+def _data_catalog_path(config: CoastalCalibConfig) -> Path | None:
+    """Return catalog path if it exists on disk, else None."""
+    candidate = config.paths.work_dir / "data_catalog.yml"
+    return candidate if candidate.exists() else None
 
-        Equivalent to::
 
-            singularity pull sfincs-cpu.sif docker://deltares/sfincs-cpu:<tag>
+def _waterlevel_geodataset(config: CoastalCalibConfig) -> str | None:
+    """Return the geodataset name for water-level forcing, or None."""
+    catalog_path = _data_catalog_path(config)
+    if catalog_path is None:
+        return None
+    coastal_source = config.boundary.source
+    return f"{coastal_source}_waterlevel" if coastal_source != "tpxo" else "tpxo_tidal"
 
-        If the SIF file already exists the pull is skipped.
 
-        Parameters
-        ----------
-        sif_path : Path, optional
-            Destination for the SIF file. When *None*, resolved via
-            :meth:`_resolve_sif_path`.
+# ---------------------------------------------------------------------------
+# Singularity helpers (used by the run stage)
+# ---------------------------------------------------------------------------
 
-        Returns
-        -------
-        Path
-            Path to the (existing or newly pulled) SIF file.
-        """
-        if sif_path is None:
-            sif_path = self._resolve_sif_path()
 
-        if sif_path.exists():
-            self._log(f"SIF already exists: {sif_path}")
-            return sif_path
+def _resolve_sif_path(config: CoastalCalibConfig) -> Path:
+    """Resolve the Singularity SIF path from configuration."""
+    sfincs = _sfincs_cfg(config)
+    if sfincs.sif_path is not None:
+        return sfincs.sif_path
+    return _model_root(config) / f"sfincs-cpu_{sfincs.docker_tag}.sif"
 
-        sif_path.parent.mkdir(parents=True, exist_ok=True)
-        docker_tag = self.config.container.docker_tag
-        docker_uri = f"docker://{SFINCS_DOCKER_IMAGE}:{docker_tag}"
-        cmd = ["singularity", "pull", str(sif_path), docker_uri]
-        self._log(f"Pulling Singularity image: {docker_uri} -> {sif_path}")
 
-        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-        if result.returncode != 0:
-            self._log(f"singularity pull failed: {result.stderr[-2000:]}", "error")
-            raise RuntimeError(f"singularity pull failed: {result.stderr}")
+def _pull_singularity_image(
+    config: CoastalCalibConfig,
+    sif_path: Path | None = None,
+    *,
+    _log: Any = None,
+) -> Path:
+    """Pull the SFINCS Docker image as a Singularity SIF file."""
+    if sif_path is None:
+        sif_path = _resolve_sif_path(config)
 
+    if sif_path.exists():
         return sif_path
 
-    def run_singularity_command(
-        self,
-        sif_path: Path,
-        model_root: Path | None = None,
-    ) -> subprocess.CompletedProcess[str]:
-        """Run SFINCS inside a Singularity container.
+    sif_path.parent.mkdir(parents=True, exist_ok=True)
+    sfincs = _sfincs_cfg(config)
+    docker_uri = f"docker://{SFINCS_DOCKER_IMAGE}:{sfincs.docker_tag}"
+    cmd = ["singularity", "pull", str(sif_path), docker_uri]
 
-        Equivalent to::
+    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        raise RuntimeError(f"singularity pull failed: {result.stderr}")
 
-            singularity run -B<model_root>:/data <sif_path>
-
-        Stdout and stderr are streamed to the console and written to
-        ``sfincs_log.txt`` inside *model_root*.
-
-        Parameters
-        ----------
-        sif_path : Path
-            Path to the Singularity SIF image.
-        model_root : Path, optional
-            Model root directory (must contain ``sfincs.inp``).
-            Defaults to ``config.paths.model_root``.
-
-        Returns
-        -------
-        subprocess.CompletedProcess
-            Completed process result.
-
-        Raises
-        ------
-        RuntimeError
-            If ``singularity`` is not found or SFINCS exits with a
-            non-zero return code.
-        """
-        if model_root is None:
-            model_root = self.config.paths.model_root
-
-        cmd = ["singularity", "run", f"-B{model_root}:/data", str(sif_path)]
-        self._log(f"Running: {' '.join(cmd)}")
-
-        log_path = model_root / "sfincs_log.txt"
-        with subprocess.Popen(
-            cmd,
-            cwd=model_root,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        ) as proc:
-            with log_path.open("w") as f:
-                assert proc.stdout is not None  # noqa: S101
-                assert proc.stderr is not None  # noqa: S101
-                for line in proc.stdout:
-                    f.write(line)
-                for line in proc.stderr:
-                    f.write(line)
-            proc.wait()
-
-        if proc.returncode == 127:
-            raise RuntimeError("singularity not found. Make sure it is installed and on PATH.")
-        if proc.returncode != 0:
-            raise RuntimeError(f"SFINCS run failed with return code {proc.returncode}")
-
-        return subprocess.CompletedProcess(
-            args=cmd,
-            returncode=proc.returncode,
-            stdout="",
-            stderr="",
-        )
-
-    @abstractmethod
-    def run(self) -> None:
-        """Execute the stage."""
-
-    def validate(self) -> list[str]:
-        """Validate stage prerequisites.
-
-        Returns
-        -------
-        list of str
-            List of validation error messages (empty if valid).
-        """
-        return []
+    return sif_path
 
 
-class SfincsInitStage(SfincsStageBase):
-    """Initialize a new SfincsModel instance."""
+def _run_singularity(
+    config: CoastalCalibConfig,
+    sif_path: Path,
+    model_root: Path | None = None,
+) -> subprocess.CompletedProcess[str]:
+    """Run SFINCS inside a Singularity container."""
+    if model_root is None:
+        model_root = _model_root(config)
 
-    name = "init"
-    description = "Initialize SFINCS model"
+    cmd = ["singularity", "run", f"-B{model_root}:/data", str(sif_path)]
 
-    def run(self) -> None:
-        """Create a SfincsModel with the configured data libraries and root."""
+    log_path = model_root / "sfincs_log.txt"
+    with subprocess.Popen(
+        cmd,
+        cwd=model_root,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    ) as proc:
+        with log_path.open("w") as f:
+            assert proc.stdout is not None  # noqa: S101
+            assert proc.stderr is not None  # noqa: S101
+            for line in proc.stdout:
+                f.write(line)
+            for line in proc.stderr:
+                f.write(line)
+        proc.wait()
+
+    if proc.returncode == 127:
+        raise RuntimeError("singularity not found. Make sure it is installed and on PATH.")
+    if proc.returncode != 0:
+        raise RuntimeError(f"SFINCS run failed with return code {proc.returncode}")
+
+    return subprocess.CompletedProcess(
+        args=cmd,
+        returncode=proc.returncode,
+        stdout="",
+        stderr="",
+    )
+
+
+# ---------------------------------------------------------------------------
+# SFINCS workflow stages  (all subclass WorkflowStage)
+# ---------------------------------------------------------------------------
+
+
+class SfincsInitStage(WorkflowStage):
+    """Initialise the SFINCS model (pre-built mode).
+
+    Copies pre-built model files to the output directory, opens the model
+    in ``r+`` mode, reads it, and clears missing file references.
+    """
+
+    name = "sfincs_init"
+    description = "Initialise SFINCS model (pre-built)"
+
+    #: Config attributes that reference external files.  When a pre-built
+    #: ``sfincs.inp`` lists placeholder names for files that haven't been
+    #: generated yet, we clear them so HydroMT won't fail on read/write.
+    _FILE_REF_ATTRS: tuple[str, ...] = (
+        "sbgfile",
+        "srcfile",
+        "disfile",
+        "bzsfile",
+        "bzifile",
+        "precipfile",
+        "prcfile",
+        "wndfile",
+        "spwfile",
+        "inifile",
+        "rstfile",
+        "ncinifile",
+        "weirfile",
+        "thdfile",
+        "drnfile",
+        "scsfile",
+        "netspwfile",
+        "netsrcdisfile",
+        "netbndbzsbzifile",
+    )
+
+    def _clear_missing_file_refs(self, model: SfincsModel) -> None:
+        """Clear config references to files that do not exist on disk."""
+        model_root = model.root.path
+        cfg_data = model.config.data
+        cleared: list[str] = []
+        for attr in self._FILE_REF_ATTRS:
+            val = getattr(cfg_data, attr, None)
+            if val and not (model_root / val).exists():
+                setattr(cfg_data, attr, None)
+                cleared.append(f"{attr}={val}")
+        if cleared:
+            self._log(f"Cleared missing file references: {', '.join(cleared)}")
+
+    def run(self) -> dict[str, Any]:
+        """Load a pre-built SFINCS model and register it for subsequent stages."""
         from hydromt_sfincs import SfincsModel  # pyright: ignore[reportMissingImports]
 
-        self._update_substep("Initializing SfincsModel")
+        sfincs = _sfincs_cfg(self.config)
+        root = _model_root(self.config)
 
-        data_libs = list(self.config.data_libs)
-        if self.config.paths.data_catalog_path is not None:
-            data_libs.append(str(self.config.paths.data_catalog_path))
+        data_libs: list[str] = []
+        catalog_path = _data_catalog_path(self.config)
+        if catalog_path is not None:
+            data_libs.append(str(catalog_path))
 
-        model_root = str(self.config.paths.model_root)
+        self._update_substep("Loading pre-built SFINCS model")
 
-        self.model = SfincsModel(
+        # Copy pre-built files to model_root if source is different
+        source_dir = sfincs.model_dir
+        if source_dir.resolve() != root.resolve():
+            root.mkdir(parents=True, exist_ok=True)
+            for src_file in source_dir.iterdir():
+                if src_file.is_file():
+                    dst_file = root / src_file.name
+                    if not dst_file.exists():
+                        shutil.copy2(src_file, dst_file)
+            self._log(f"Copied pre-built model from {source_dir} to {root}")
+
+        model = SfincsModel(
             data_libs=data_libs,
-            root=model_root,
-            mode="w+",
+            root=str(root),
+            mode="r+",
             write_gis=True,
         )
 
-        self._log(f"SfincsModel initialized at {model_root}")
+        # Read existing model to detect grid type and load components
+        model.read()
+
+        # Clear config references to missing files
+        self._clear_missing_file_refs(model)
+
+        _set_model(self.config, model)
+
+        self._log(f"SFINCS model initialised (grid_type={model.grid_type}) at {root}")
+
+        return {
+            "model_root": str(root),
+            "grid_type": model.grid_type,
+            "status": "completed",
+        }
 
 
-class SfincsGridStage(SfincsStageBase):
-    """Create the SFINCS computational grid from a region geometry."""
+class SfincsTimingStage(WorkflowStage):
+    """Set simulation timing on the SFINCS model."""
 
-    name = "grid"
-    description = "Create computational grid"
+    name = "sfincs_timing"
+    description = "Set SFINCS timing"
 
-    def run(self) -> None:
-        """Generate grid from region GeoJSON."""
-        cfg = self.config.grid
-
-        self._update_substep("Creating grid from region")
-
-        self.model.grid.create_from_region(
-            region={"geom": str(cfg.region_geojson)},
-            res=cfg.resolution,
-            rotated=cfg.rotated,
-            crs=cfg.crs,
-        )
-
-        self._log(f"Grid created: res={cfg.resolution}, crs={cfg.crs}, rotated={cfg.rotated}")
-
-    def validate(self) -> list[str]:
-        """Validate that the region GeoJSON exists."""
-        errors = super().validate()
-        if not self.config.grid.region_geojson.exists():
-            errors.append(f"Region GeoJSON not found: {self.config.grid.region_geojson}")
-        return errors
-
-
-class SfincsElevationStage(SfincsStageBase):
-    """Add elevation data to the SFINCS model."""
-
-    name = "elevation"
-    description = "Add elevation data"
-
-    def run(self) -> None:
-        """Load and merge elevation datasets onto the model grid."""
-        cfg = self.config.elevation
-
-        self._update_substep("Adding elevation data")
-
-        elevation_list = [entry.to_dict() for entry in cfg.datasets]
-
-        self.model.elevation.create(
-            elevation_list=elevation_list,
-            buffer_cells=cfg.buffer_cells,
-        )
-
-        self._log(f"Elevation created from {len(cfg.datasets)} dataset(s)")
-
-
-class SfincsMaskStage(SfincsStageBase):
-    """Create the mask of active, water level, and outflow boundary cells."""
-
-    name = "mask"
-    description = "Create cell mask and boundaries"
-
-    def run(self) -> None:
-        """Generate active cell mask and boundary conditions."""
-        cfg = self.config.mask
-
-        self._update_substep("Creating active cell mask")
-
-        mask_kwargs: dict[str, Any] = {"zmin": cfg.active_zmin}
-        if cfg.active_fill_area is not None:
-            mask_kwargs["fill_area"] = cfg.active_fill_area
-        if cfg.active_drop_area is not None:
-            mask_kwargs["drop_area"] = cfg.active_drop_area
-
-        self.model.mask.create_active(**mask_kwargs)
-
-        self._update_substep("Adding water level boundary")
-        self.model.mask.create_boundary(
-            btype="waterlevel",
-            zmax=cfg.waterlevel_zmax,
-            reset_bounds=cfg.reset_bounds,
-        )
-
-        if cfg.outflow_polygon is not None:
-            self._update_substep("Adding outflow boundary")
-            gdf_include = self.model.data_catalog.get_geodataframe(str(cfg.outflow_polygon))
-            if gdf_include is None:
-                raise RuntimeError(f"Outflow polygon geodataset not found: {cfg.outflow_polygon}")
-            self.model.mask.create_boundary(
-                btype="outflow",
-                include_polygon=gdf_include,
-                reset_bounds=cfg.reset_bounds,
-            )
-
-        self._log("Mask and boundaries created")
-
-
-class SfincsRoughnessStage(SfincsStageBase):
-    """Add spatially varying roughness data."""
-
-    name = "roughness"
-    description = "Add roughness data"
-
-    def run(self) -> None:
-        """Derive Manning's n roughness from land use data."""
-        cfg = self.config.roughness
-
-        if not cfg.datasets:
-            self._log("No roughness datasets configured, skipping")
-            return
-
-        self._update_substep("Adding roughness data")
-
-        roughness_list = [entry.to_dict() for entry in cfg.datasets]
-
-        self.model.roughness.create(
-            roughness_list=roughness_list,
-            manning_land=cfg.manning_land,
-            manning_sea=cfg.manning_sea,
-            rgh_lev_land=cfg.rgh_lev_land,  # pyright: ignore[reportArgumentType]
-        )
-
-        self._log(f"Roughness created from {len(cfg.datasets)} dataset(s)")
-
-
-class SfincsSubgridStage(SfincsStageBase):
-    """Create subgrid-derived tables for improved accuracy."""
-
-    name = "subgrid"
-    description = "Create subgrid tables"
-
-    def run(self) -> None:
-        """Generate subgrid tables from elevation and roughness data."""
-        cfg = self.config.subgrid
-
-        if not cfg.enabled:
-            self._log("Subgrid tables disabled, skipping")
-            return
-
-        self._update_substep("Creating subgrid tables")
-
-        elevation_list = [entry.to_dict() for entry in self.config.elevation.datasets]
-        roughness_list = [entry.to_dict() for entry in self.config.roughness.datasets]
-
-        self.model.subgrid.create(
-            elevation_list=elevation_list,
-            roughness_list=roughness_list,
-            nr_subgrid_pixels=cfg.nr_subgrid_pixels,
-            write_dep_tif=cfg.write_dep_tif,
-            write_man_tif=cfg.write_man_tif,
-        )
-
-        self._log(f"Subgrid tables created with {cfg.nr_subgrid_pixels} pixels/cell")
-
-
-class SfincsTimingStage(SfincsStageBase):
-    """Set simulation timing parameters."""
-
-    name = "timing"
-    description = "Set simulation timing"
-
-    def run(self) -> None:
-        """Configure tref, tstart, and tstop."""
-        cfg = self.config.timing
+    def run(self) -> dict[str, Any]:
+        """Configure tref, tstart, and tstop on the model."""
+        model = _get_model(self.config)
+        sim = self.config.simulation
+        start = sim.start_date
+        stop = start + timedelta(hours=sim.duration_hours)
 
         self._update_substep("Setting simulation timing")
 
-        self.model.config.update(
+        model.config.update(
             {
-                "tref": cfg.tref,
-                "tstart": cfg.tstart,
-                "tstop": cfg.tstop,
+                "tref": start,
+                "tstart": start,
+                "tstop": stop,
             }
         )
 
-        self._log(f"Timing set: {cfg.tstart} to {cfg.tstop}")
+        self._log(f"Timing set: {start} to {stop}")
+
+        return {"status": "completed"}
 
 
-class SfincsForcingStage(SfincsStageBase):
-    """Add water level forcing to the model."""
+class SfincsForcingStage(WorkflowStage):
+    """Add water level boundary forcing."""
 
-    name = "forcing"
+    name = "sfincs_forcing"
     description = "Add water level forcing"
 
-    def run(self) -> None:
+    def run(self) -> dict[str, Any]:
         """Add water level boundary forcing from a geodataset."""
-        cfg = self.config.forcing
+        wl_geodataset = _waterlevel_geodataset(self.config)
 
-        if cfg.waterlevel_geodataset is None:
+        if wl_geodataset is None:
             self._log("No water level geodataset configured, skipping")
-            return
+            return {"status": "skipped"}
+
+        model = _get_model(self.config)
 
         self._update_substep("Adding water level forcing")
+        model.water_level.create(geodataset=wl_geodataset)
+        self._log(f"Water level forcing added from {wl_geodataset}")
 
-        self.model.water_level.create(geodataset=cfg.waterlevel_geodataset)
-
-        self._log(f"Water level forcing added from {cfg.waterlevel_geodataset}")
+        return {"status": "completed"}
 
 
-class SfincsWriteStage(SfincsStageBase):
-    """Write the SFINCS model to disk."""
+class SfincsObservationPointsStage(WorkflowStage):
+    """Add observation points to the model."""
 
-    name = "write"
-    description = "Write model to disk"
+    name = "sfincs_obs"
+    description = "Add observation points"
 
-    def run(self) -> None:
+    def run(self) -> dict[str, Any]:
+        """Add observation points from config or file."""
+        sfincs = _sfincs_cfg(self.config)
+        model = _get_model(self.config)
+
+        if sfincs.obs_locations is None and not sfincs.obs_points:
+            self._log("No observation points configured, skipping")
+            return {"status": "skipped"}
+
+        self._update_substep("Adding observation points")
+
+        # When merge=False, clear existing observation points first
+        if not sfincs.obs_merge:
+            try:
+                existing = model.observation_points.nr_points
+                if existing > 0:
+                    model.observation_points.clear()
+                    self._log(f"Cleared {existing} existing observation point(s)")
+            except Exception:  # noqa: S110
+                pass  # No existing points to clear
+
+        if sfincs.obs_locations is not None:
+            model.observation_points.create(
+                locations=str(sfincs.obs_locations),
+                merge=sfincs.obs_merge,
+            )
+            self._log(f"Observation points added from {sfincs.obs_locations}")
+        elif sfincs.obs_points:
+            for pt in sfincs.obs_points:
+                model.observation_points.add_point(
+                    x=pt["x"],
+                    y=pt["y"],
+                    name=pt.get("name", f"obs_{sfincs.obs_points.index(pt)}"),
+                )
+            self._log(f"Added {len(sfincs.obs_points)} observation point(s)")
+
+        return {"status": "completed"}
+
+
+class SfincsDischargeStage(WorkflowStage):
+    """Add discharge source points to the model."""
+
+    name = "sfincs_discharge"
+    description = "Add discharge sources"
+
+    @staticmethod
+    def _parse_src_file(path: Path) -> list[tuple[float, float, str]]:
+        """Parse a SFINCS ``.src`` file into (x, y, name) tuples."""
+        from pathlib import Path as _Path
+
+        points: list[tuple[float, float, str]] = []
+        for raw_line in _Path(path).read_text().splitlines():
+            stripped = raw_line.strip()
+            if not stripped:
+                continue
+            parts = stripped.split('"')
+            coords = parts[0].strip().split()
+            name = parts[1].strip() if len(parts) > 1 else f"src_{len(points)}"
+            x, y = float(coords[0]), float(coords[1])
+            points.append((x, y, name))
+        return points
+
+    def run(self) -> dict[str, Any]:
+        """Add discharge source points from a ``.src`` or GeoJSON file."""
+        sfincs = _sfincs_cfg(self.config)
+        model = _get_model(self.config)
+
+        if sfincs.src_locations is None:
+            self._log("No discharge configuration, skipping")
+            return {"status": "skipped"}
+
+        self._update_substep("Adding discharge source points")
+
+        # When merge=False, clear existing discharge points first
+        if not sfincs.src_merge:
+            try:
+                existing = model.discharge_points.nr_points
+                if existing > 0:
+                    model.discharge_points.clear()
+                    self._log(f"Cleared {existing} existing discharge point(s)")
+            except Exception:  # noqa: S110
+                pass  # No existing points to clear
+
+        src_path = sfincs.src_locations
+        suffix = src_path.suffix.lower()
+
+        if suffix == ".src":
+            parsed = self._parse_src_file(src_path)
+            for x, y, name in parsed:
+                model.discharge_points.add_point(x=x, y=y, name=name)
+            self._log(f"Added {len(parsed)} discharge source point(s) from {src_path}")
+        else:
+            model.discharge_points.create(
+                locations=str(src_path),
+                merge=sfincs.src_merge,
+            )
+            self._log(f"Discharge source points added from {src_path}")
+
+        return {"status": "completed"}
+
+
+class SfincsPrecipitationStage(WorkflowStage):
+    """Add precipitation forcing."""
+
+    name = "sfincs_precip"
+    description = "Add precipitation forcing"
+
+    def run(self) -> dict[str, Any]:
+        """Add precipitation from a dataset in the data catalog."""
+        sfincs = _sfincs_cfg(self.config)
+
+        if sfincs.precip_dataset is None:
+            self._log("No precipitation configured, skipping")
+            return {"status": "skipped"}
+
+        model = _get_model(self.config)
+
+        self._update_substep("Adding precipitation forcing")
+        model.precipitation.create(precip=sfincs.precip_dataset)
+        self._log(f"Precipitation forcing added from {sfincs.precip_dataset}")
+
+        return {"status": "completed"}
+
+
+class SfincsWriteStage(WorkflowStage):
+    """Write the SFINCS model files to disk."""
+
+    name = "sfincs_write"
+    description = "Write SFINCS model"
+
+    def run(self) -> dict[str, Any]:
         """Write all model files to the model root directory."""
+        model = _get_model(self.config)
+
         self._update_substep("Writing model to disk")
+        model.write()
 
-        self.model.write()
+        root = _model_root(self.config)
+        self._log(f"SFINCS model written to {root}")
 
-        model_root = str(self.config.paths.model_root)
-        self._log(f"Model written to {model_root}")
+        return {
+            "model_root": str(root),
+            "status": "completed",
+        }
+
+
+class SfincsRunStage(WorkflowStage):
+    """Run the SFINCS model via Singularity container."""
+
+    name = "sfincs_run"
+    description = "Run SFINCS model (Singularity)"
+
+    def run(self) -> dict[str, Any]:
+        """Execute SFINCS via Singularity."""
+        self._update_substep("Pulling Singularity image")
+        sif_path = _pull_singularity_image(self.config, _log=self._log)
+
+        self._update_substep("Running SFINCS model")
+        _run_singularity(self.config, sif_path)
+
+        self._log("SFINCS run completed")
+
+        # Clean up model registry
+        _clear_model(self.config)
+
+        return {"status": "completed"}
+
+
+# ---------------------------------------------------------------------------
+# Infrastructure stages (symlinks, data catalog)
+# ---------------------------------------------------------------------------
+
+
+class SfincsSymlinksStage(WorkflowStage):
+    """Create ``.nc`` symlinks for NWM files in the download directory.
+
+    NWM LDASIN and CHRTOUT files lack a ``.nc`` extension, which confuses
+    HydroMT's dataset readers.  This stage creates symlinks with the
+    ``.nc`` suffix so the data catalog entries resolve correctly.
+
+    If the download directory does not exist, this stage is a no-op.
+    """
+
+    name = "sfincs_symlinks"
+    description = "Create .nc symlinks for NWM data"
+
+    def run(self) -> dict[str, Any]:
+        """Create ``.nc`` symlinks for NWM LDASIN and CHRTOUT files."""
+        download_dir = self.config.paths.download_dir
+        if not download_dir.exists():
+            self._log(f"Download dir {download_dir} does not exist — skipping symlinks")
+            return {"meteo_symlinks": 0, "streamflow_symlinks": 0, "status": "skipped"}
+
+        self._update_substep("Creating .nc symlinks")
+        meteo_source = self.config.simulation.meteo_source
+
+        created = create_nc_symlinks(
+            download_dir,
+            meteo_source=meteo_source,
+            include_meteo=True,
+            include_streamflow=True,
+        )
+
+        n_meteo = len(created["meteo"])
+        n_stream = len(created["streamflow"])
+        self._log(f"Created {n_meteo} meteo + {n_stream} streamflow symlinks in {download_dir}")
+
+        return {
+            "meteo_symlinks": n_meteo,
+            "streamflow_symlinks": n_stream,
+            "status": "completed",
+        }
+
+
+class SfincsDataCatalogStage(WorkflowStage):
+    """Generate HydroMT data catalog for the SFINCS pipeline.
+
+    Delegates to :func:`generate_data_catalog` which already accepts a
+    :class:`CoastalCalibConfig`.
+
+    If the download directory does not exist (e.g. download is disabled),
+    the catalog is skipped — there are no data files to reference.
+    """
+
+    name = "sfincs_data_catalog"
+    description = "Generate HydroMT data catalog for SFINCS"
+
+    def run(self) -> dict[str, Any]:
+        """Generate a HydroMT data catalog YAML for downloaded data."""
+        download_dir = self.config.paths.download_dir
+        if not download_dir.exists():
+            self._log(f"Download dir {download_dir} does not exist — skipping catalog generation")
+            return {"catalog_path": None, "entries": [], "status": "skipped"}
+
+        self._update_substep("Generating data catalog")
+
+        catalog_path = self.config.paths.work_dir / "data_catalog.yml"
+
+        catalog = generate_data_catalog(
+            self.config,
+            output_path=catalog_path,
+            catalog_name=f"sfincs_{self.config.simulation.coastal_domain}",
+        )
+
+        self._log(f"Data catalog written to {catalog_path}")
+
+        return {
+            "catalog_path": str(catalog_path),
+            "entries": [e.name for e in catalog.entries],
+            "status": "completed",
+        }

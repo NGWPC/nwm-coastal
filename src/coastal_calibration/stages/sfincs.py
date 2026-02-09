@@ -438,10 +438,20 @@ def _build_coastal_stofs_entry(
         },
     )
 
+    # Use a dict driver to pass ``drop_variables`` — the STOFS netCDF has
+    # a scalar variable called ``nvel`` that clashes with the ``nvel``
+    # dimension, causing ``xr.open_mfdataset`` to raise a ``ValueError``.
+    driver: dict[str, Any] = {
+        "name": "geodataset_xarray",
+        "options": {
+            "drop_variables": ["nvel"],
+        },
+    }
+
     return CatalogEntry(
         name="stofs_waterlevel",
         data_type="GeoDataset",
-        driver="geodataset_xarray",
+        driver=driver,
         uri=uri,
         metadata=metadata,
         data_adapter=data_adapter,

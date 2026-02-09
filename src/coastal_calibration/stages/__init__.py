@@ -26,6 +26,18 @@ from coastal_calibration.stages.sfincs import (
     generate_data_catalog,
     remove_nc_symlinks,
 )
+from coastal_calibration.stages.sfincs_build import (
+    SfincsDataCatalogStage,
+    SfincsDischargeStage,
+    SfincsForcingStage,
+    SfincsInitStage,
+    SfincsObservationPointsStage,
+    SfincsPrecipitationStage,
+    SfincsRunStage,
+    SfincsSymlinksStage,
+    SfincsTimingStage,
+    SfincsWriteStage,
+)
 
 __all__ = [
     "BoundaryConditionStage",
@@ -38,6 +50,16 @@ __all__ = [
     "SCHISMRunStage",
     "SFINCSDataCatalogStage",
     "STOFSBoundaryStage",
+    "SfincsDataCatalogStage",
+    "SfincsDischargeStage",
+    "SfincsForcingStage",
+    "SfincsInitStage",
+    "SfincsObservationPointsStage",
+    "SfincsPrecipitationStage",
+    "SfincsRunStage",
+    "SfincsSymlinksStage",
+    "SfincsTimingStage",
+    "SfincsWriteStage",
     "TPXOBoundaryStage",
     "UpdateParamsStage",
     "WorkflowStage",
