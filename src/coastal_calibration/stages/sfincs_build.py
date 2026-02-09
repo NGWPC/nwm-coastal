@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import subprocess
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from coastal_calibration.config.sfincs_schema import SfincsConfig
     from coastal_calibration.utils.logging import WorkflowMonitor
+
+SFINCS_DOCKER_IMAGE = "deltares/sfincs-cpu"
 
 
 class SfincsStageBase(ABC):
@@ -41,6 +46,125 @@ class SfincsStageBase(ABC):
         """Update current substep."""
         if self.monitor:
             self.monitor.update_substep(self.name, substep)
+
+    def _resolve_sif_path(self) -> Path:
+        """Resolve the Singularity SIF path from configuration.
+
+        If ``container.sif_path`` is set, returns it directly.
+        Otherwise returns a default path under ``model_root``.
+        """
+        container = self.config.container
+        if container.sif_path is not None:
+            return container.sif_path
+        return self.config.paths.model_root / f"sfincs-cpu_{container.docker_tag}.sif"
+
+    def pull_singularity_image(self, sif_path: Path | None = None) -> Path:
+        """Pull the SFINCS Docker image as a Singularity SIF file.
+
+        Equivalent to::
+
+            singularity pull sfincs-cpu.sif docker://deltares/sfincs-cpu:<tag>
+
+        If the SIF file already exists the pull is skipped.
+
+        Parameters
+        ----------
+        sif_path : Path, optional
+            Destination for the SIF file. When *None*, resolved via
+            :meth:`_resolve_sif_path`.
+
+        Returns
+        -------
+        Path
+            Path to the (existing or newly pulled) SIF file.
+        """
+        if sif_path is None:
+            sif_path = self._resolve_sif_path()
+
+        if sif_path.exists():
+            self._log(f"SIF already exists: {sif_path}")
+            return sif_path
+
+        sif_path.parent.mkdir(parents=True, exist_ok=True)
+        docker_tag = self.config.container.docker_tag
+        docker_uri = f"docker://{SFINCS_DOCKER_IMAGE}:{docker_tag}"
+        cmd = ["singularity", "pull", str(sif_path), docker_uri]
+        self._log(f"Pulling Singularity image: {docker_uri} -> {sif_path}")
+
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        if result.returncode != 0:
+            self._log(f"singularity pull failed: {result.stderr[-2000:]}", "error")
+            raise RuntimeError(f"singularity pull failed: {result.stderr}")
+
+        return sif_path
+
+    def run_singularity_command(
+        self,
+        sif_path: Path,
+        model_root: Path | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        """Run SFINCS inside a Singularity container.
+
+        Equivalent to::
+
+            singularity run -B<model_root>:/data <sif_path>
+
+        Stdout and stderr are streamed to the console and written to
+        ``sfincs_log.txt`` inside *model_root*.
+
+        Parameters
+        ----------
+        sif_path : Path
+            Path to the Singularity SIF image.
+        model_root : Path, optional
+            Model root directory (must contain ``sfincs.inp``).
+            Defaults to ``config.paths.model_root``.
+
+        Returns
+        -------
+        subprocess.CompletedProcess
+            Completed process result.
+
+        Raises
+        ------
+        RuntimeError
+            If ``singularity`` is not found or SFINCS exits with a
+            non-zero return code.
+        """
+        if model_root is None:
+            model_root = self.config.paths.model_root
+
+        cmd = ["singularity", "run", f"-B{model_root}:/data", str(sif_path)]
+        self._log(f"Running: {' '.join(cmd)}")
+
+        log_path = model_root / "sfincs_log.txt"
+        with subprocess.Popen(
+            cmd,
+            cwd=model_root,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        ) as proc:
+            with log_path.open("w") as f:
+                assert proc.stdout is not None  # noqa: S101
+                assert proc.stderr is not None  # noqa: S101
+                for line in proc.stdout:
+                    f.write(line)
+                for line in proc.stderr:
+                    f.write(line)
+            proc.wait()
+
+        if proc.returncode == 127:
+            raise RuntimeError("singularity not found. Make sure it is installed and on PATH.")
+        if proc.returncode != 0:
+            raise RuntimeError(f"SFINCS run failed with return code {proc.returncode}")
+
+        return subprocess.CompletedProcess(
+            args=cmd,
+            returncode=proc.returncode,
+            stdout="",
+            stderr="",
+        )
 
     @abstractmethod
     def run(self, context: dict[str, Any]) -> dict[str, Any]:
