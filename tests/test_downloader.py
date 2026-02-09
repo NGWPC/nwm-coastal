@@ -376,6 +376,10 @@ class TestBuildUrls:
 
 
 class TestFilterExisting:
+    # Valid HDF5 magic header (8 bytes) + enough non-null padding to
+    # pass the tail check in ``_is_valid_netcdf``.
+    _HDF5_HEADER = b"\x89HDF\r\n\x1a\n" + b"\x01" * 1024
+
     def test_no_existing(self, tmp_path):
         urls = ["http://a", "http://b"]
         paths = [tmp_path / "a.nc", tmp_path / "b.nc"]
@@ -386,7 +390,7 @@ class TestFilterExisting:
     def test_some_existing(self, tmp_path):
         urls = ["http://a", "http://b"]
         f = tmp_path / "a.nc"
-        f.write_text("data")
+        f.write_bytes(self._HDF5_HEADER)
         paths = [f, tmp_path / "b.nc"]
         pending_urls, _pending_paths, existing = _filter_existing(urls, paths)
         assert len(pending_urls) == 1
@@ -401,6 +405,27 @@ class TestFilterExisting:
         pending_urls, _pending_paths, existing = _filter_existing(urls, paths)
         assert len(pending_urls) == 1
         assert existing == 0
+
+    def test_corrupt_nc_requeued(self, tmp_path):
+        """A .nc file with invalid content is deleted and re-queued."""
+        urls = ["http://a"]
+        f = tmp_path / "a.nc"
+        f.write_text("not-a-netcdf-file")
+        paths = [f]
+        pending_urls, _pending_paths, existing = _filter_existing(urls, paths)
+        assert len(pending_urls) == 1
+        assert existing == 0
+        assert not f.exists(), "corrupt file should be deleted"
+
+    def test_non_nc_file_skipped_by_size(self, tmp_path):
+        """Non-.nc files are accepted with a simple size > 0 check."""
+        urls = ["http://a"]
+        f = tmp_path / "a.txt"
+        f.write_text("data")
+        paths = [f]
+        pending_urls, _pending_paths, existing = _filter_existing(urls, paths)
+        assert len(pending_urls) == 0
+        assert existing == 1
 
 
 class TestValidateDateRanges:
