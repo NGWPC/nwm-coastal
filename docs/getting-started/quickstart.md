@@ -42,6 +42,7 @@ boundary:
 ```
 
 !!! tip "Minimal Configuration"
+
     The configuration above is all you need! Paths are automatically generated based on your
     username, domain, and data sources.
 

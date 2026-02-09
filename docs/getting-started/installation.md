@@ -8,6 +8,7 @@
 - Singularity image with SCHISM and dependencies pre-compiled
 
 !!! note "Model Executables"
+
     This package orchestrates SCHISM and SFINCS workflows on HPC clusters where the models
     are **already compiled and available** (typically inside a Singularity container). You
     do not need to install SCHISM or SFINCS locally to use this package for job submission.
@@ -41,6 +42,7 @@ curl -fsSL https://pixi.sh/install.sh | sh
 ```
 
 !!! tip "Restart Terminal"
+
     After installing Pixi, restart your terminal or run `source ~/.bashrc` (or
     `source ~/.zshrc` for Zsh) to make the `pixi` command available.
 
@@ -74,6 +76,7 @@ useful for:
 - Building SFINCS models with HydroMT
 
 !!! warning "Not Required for Cluster Execution"
+
     These optional dependencies are **not required** to submit and run jobs on the cluster.
     The actual SCHISM and SFINCS executables must be pre-compiled and available on the HPC
     cluster (inside the Singularity container).

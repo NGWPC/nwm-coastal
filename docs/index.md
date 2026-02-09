@@ -6,11 +6,11 @@ with Singularity containers and SLURM job scheduling.
 ## Features
 
 - **YAML Configuration**: Simple, human-readable configuration files with variable
-  interpolation
+    interpolation
 - **SLURM Integration**: Automatic job script generation and submission
 - **Data Download**: Automated download of NWM and STOFS boundary data
 - **Multiple Domains**: Support for Hawaii, Puerto Rico/Virgin Islands, Atlantic/Gulf,
-  and Pacific
+    and Pacific
 - **Boundary Conditions**: TPXO tidal model and STOFS water level support
 - **Workflow Control**: Run complete workflows or specific stages
 - **Configuration Inheritance**: Share common settings across multiple runs

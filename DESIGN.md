@@ -33,11 +33,11 @@ improvements.
 The primary objectives of this rewrite are to create a workflow that is:
 
 1. **Intuitive and user-friendly** - Simple YAML configuration, clear CLI commands,
-   helpful error messages
+    helpful error messages
 1. **Less prone to errors** - Type-safe configuration, comprehensive validation,
-   structured logging
+    structured logging
 1. **Extensible** - Clean stage-based architecture that allows adding new models
-   (SFINCS) and features
+    (SFINCS) and features
 
 ### Architectural Strategy
 
@@ -45,9 +45,9 @@ The package is designed with a **stable public API** that shields users from int
 changes. This enables:
 
 - **Immediate usability** - Users get a clean interface today, even while internals are
-  being improved
+    being improved
 - **Incremental rewriting** - Embedded bash scripts can be replaced with pure Python one
-  stage at a time
+    stage at a time
 - **Safe evolution** - Internal rewrites don't break user-facing code or configurations
 
 The long-term goal is to **completely rewrite** all embedded bash scripts in Python, but
@@ -662,13 +662,13 @@ The architecture deliberately separates **public API** from **private implementa
 This allows:
 
 1. **Users get a stable interface today** - The CLI and Python API won't change as
-   internals evolve
+    internals evolve
 1. **Incremental rewriting** - Each stage can be rewritten independently without
-   affecting others
+    affecting others
 1. **Testing baseline first** - Establish test coverage against current behavior before
-   changes
+    changes
 1. **Performance optimization** - Replace bash subprocess calls with native Python as
-   needed
+    needed
 
 **Current State**:
 
