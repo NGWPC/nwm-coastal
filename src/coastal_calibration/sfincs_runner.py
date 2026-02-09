@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from coastal_calibration.config.schema import MonitoringConfig
 from coastal_calibration.config.sfincs_schema import SfincsConfig
@@ -81,7 +81,6 @@ class SfincsRunner:
             )
         )
         self._stages: dict[str, SfincsStageBase] = {}
-        self._context: dict[str, Any] = {}
 
     def _init_stages(self) -> None:
         """Initialize all workflow stages."""
@@ -213,7 +212,11 @@ class SfincsRunner:
                 stage = self._stages[current_stage]
 
                 with self.monitor.stage_context(current_stage, stage.description):
-                    self._context = stage.run(self._context)
+                    stage.run()
+                    # Propagate the model instance to subsequent stages
+                    if stage.has_model:
+                        for s in self._stages.values():
+                            s.model = stage.model
                     stages_completed.append(current_stage)
 
             self.monitor.end_workflow(success=True)

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from coastal_calibration.stages.sfincs_build import SfincsStageBase
 
 
@@ -18,19 +16,8 @@ class SfincsRunStage(SfincsStageBase):
     name = "sfincs_run"
     description = "Run SFINCS model (Singularity)"
 
-    def run(self, context: dict[str, Any]) -> dict[str, Any]:
-        """Execute SFINCS via Singularity.
-
-        Parameters
-        ----------
-        context : dict[str, Any]
-            Shared context dictionary (model instance not required for run).
-
-        Returns
-        -------
-        dict[str, Any]
-            Updated context with run status.
-        """
+    def run(self) -> None:
+        """Execute SFINCS via Singularity."""
         self._update_substep("Pulling Singularity image")
         sif_path = self.pull_singularity_image()
 
@@ -38,8 +25,6 @@ class SfincsRunStage(SfincsStageBase):
         self.run_singularity_command(sif_path)
 
         self._log("SFINCS run completed")
-        context["run_status"] = "completed"
-        return context
 
     def validate(self) -> list[str]:
         """Validate that model inputs exist for running."""

@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from hydromt_sfincs import SfincsModel  # pyright: ignore[reportMissingImports]
+
     from coastal_calibration.config.sfincs_schema import SfincsConfig
     from coastal_calibration.utils.logging import WorkflowMonitor
 
@@ -36,6 +38,35 @@ class SfincsStageBase(ABC):
     ) -> None:
         self.config = config
         self.monitor = monitor
+        self._model: SfincsModel | None = None
+
+    @property
+    def model(self) -> SfincsModel:
+        """The ``hydromt_sfincs.SfincsModel`` instance shared across build stages.
+
+        Set by :class:`SfincsInitStage` and propagated to other stages by
+        the runner.
+
+        Raises
+        ------
+        RuntimeError
+            If accessed before the model has been initialised.
+        """
+        if self._model is None:
+            raise RuntimeError(
+                f"Stage '{self.name}' requires a SfincsModel instance but none has been set. "
+                "Make sure the 'init' stage runs first."
+            )
+        return self._model
+
+    @model.setter
+    def model(self, value: SfincsModel) -> None:
+        self._model = value
+
+    @property
+    def has_model(self) -> bool:
+        """Whether a :class:`SfincsModel` instance has been set."""
+        return self._model is not None
 
     def _log(self, message: str, level: str = "info") -> None:
         """Log message if monitor is available."""
@@ -167,20 +198,8 @@ class SfincsStageBase(ABC):
         )
 
     @abstractmethod
-    def run(self, context: dict[str, Any]) -> dict[str, Any]:
-        """Execute the stage.
-
-        Parameters
-        ----------
-        context : dict[str, Any]
-            Shared context dictionary carrying the SfincsModel instance
-            (key ``"model"``) and other state between stages.
-
-        Returns
-        -------
-        dict[str, Any]
-            Updated context dictionary.
-        """
+    def run(self) -> None:
+        """Execute the stage."""
 
     def validate(self) -> list[str]:
         """Validate stage prerequisites.
@@ -199,7 +218,7 @@ class SfincsInitStage(SfincsStageBase):
     name = "init"
     description = "Initialize SFINCS model"
 
-    def run(self, context: dict[str, Any]) -> dict[str, Any]:
+    def run(self) -> None:
         """Create a SfincsModel with the configured data libraries and root."""
         from hydromt_sfincs import SfincsModel  # pyright: ignore[reportMissingImports]
 
@@ -211,7 +230,7 @@ class SfincsInitStage(SfincsStageBase):
 
         model_root = str(self.config.paths.model_root)
 
-        sf = SfincsModel(
+        self.model = SfincsModel(
             data_libs=data_libs,
             root=model_root,
             mode="w+",
@@ -219,8 +238,6 @@ class SfincsInitStage(SfincsStageBase):
         )
 
         self._log(f"SfincsModel initialized at {model_root}")
-        context["model"] = sf
-        return context
 
 
 class SfincsGridStage(SfincsStageBase):
@@ -229,14 +246,13 @@ class SfincsGridStage(SfincsStageBase):
     name = "grid"
     description = "Create computational grid"
 
-    def run(self, context: dict[str, Any]) -> dict[str, Any]:
+    def run(self) -> None:
         """Generate grid from region GeoJSON."""
-        sf = context["model"]
         cfg = self.config.grid
 
         self._update_substep("Creating grid from region")
 
-        sf.grid.create_from_region(
+        self.model.grid.create_from_region(
             region={"geom": str(cfg.region_geojson)},
             res=cfg.resolution,
             rotated=cfg.rotated,
@@ -244,7 +260,6 @@ class SfincsGridStage(SfincsStageBase):
         )
 
         self._log(f"Grid created: res={cfg.resolution}, crs={cfg.crs}, rotated={cfg.rotated}")
-        return context
 
     def validate(self) -> list[str]:
         """Validate that the region GeoJSON exists."""
@@ -260,22 +275,20 @@ class SfincsElevationStage(SfincsStageBase):
     name = "elevation"
     description = "Add elevation data"
 
-    def run(self, context: dict[str, Any]) -> dict[str, Any]:
+    def run(self) -> None:
         """Load and merge elevation datasets onto the model grid."""
-        sf = context["model"]
         cfg = self.config.elevation
 
         self._update_substep("Adding elevation data")
 
         elevation_list = [entry.to_dict() for entry in cfg.datasets]
 
-        sf.elevation.create(
+        self.model.elevation.create(
             elevation_list=elevation_list,
             buffer_cells=cfg.buffer_cells,
         )
 
         self._log(f"Elevation created from {len(cfg.datasets)} dataset(s)")
-        return context
 
 
 class SfincsMaskStage(SfincsStageBase):
@@ -284,9 +297,8 @@ class SfincsMaskStage(SfincsStageBase):
     name = "mask"
     description = "Create cell mask and boundaries"
 
-    def run(self, context: dict[str, Any]) -> dict[str, Any]:
+    def run(self) -> None:
         """Generate active cell mask and boundary conditions."""
-        sf = context["model"]
         cfg = self.config.mask
 
         self._update_substep("Creating active cell mask")
@@ -297,10 +309,10 @@ class SfincsMaskStage(SfincsStageBase):
         if cfg.active_drop_area is not None:
             mask_kwargs["drop_area"] = cfg.active_drop_area
 
-        sf.mask.create_active(**mask_kwargs)
+        self.model.mask.create_active(**mask_kwargs)
 
         self._update_substep("Adding water level boundary")
-        sf.mask.create_boundary(
+        self.model.mask.create_boundary(
             btype="waterlevel",
             zmax=cfg.waterlevel_zmax,
             reset_bounds=cfg.reset_bounds,
@@ -308,15 +320,16 @@ class SfincsMaskStage(SfincsStageBase):
 
         if cfg.outflow_polygon is not None:
             self._update_substep("Adding outflow boundary")
-            gdf_include = sf.data_catalog.get_geodataframe(str(cfg.outflow_polygon))
-            sf.mask.create_boundary(
+            gdf_include = self.model.data_catalog.get_geodataframe(str(cfg.outflow_polygon))
+            if gdf_include is None:
+                raise RuntimeError(f"Outflow polygon geodataset not found: {cfg.outflow_polygon}")
+            self.model.mask.create_boundary(
                 btype="outflow",
                 include_polygon=gdf_include,
                 reset_bounds=cfg.reset_bounds,
             )
 
         self._log("Mask and boundaries created")
-        return context
 
 
 class SfincsRoughnessStage(SfincsStageBase):
@@ -325,28 +338,26 @@ class SfincsRoughnessStage(SfincsStageBase):
     name = "roughness"
     description = "Add roughness data"
 
-    def run(self, context: dict[str, Any]) -> dict[str, Any]:
+    def run(self) -> None:
         """Derive Manning's n roughness from land use data."""
-        sf = context["model"]
         cfg = self.config.roughness
 
         if not cfg.datasets:
             self._log("No roughness datasets configured, skipping")
-            return context
+            return
 
         self._update_substep("Adding roughness data")
 
         roughness_list = [entry.to_dict() for entry in cfg.datasets]
 
-        sf.roughness.create(
+        self.model.roughness.create(
             roughness_list=roughness_list,
             manning_land=cfg.manning_land,
             manning_sea=cfg.manning_sea,
-            rgh_lev_land=cfg.rgh_lev_land,
+            rgh_lev_land=cfg.rgh_lev_land,  # pyright: ignore[reportArgumentType]
         )
 
         self._log(f"Roughness created from {len(cfg.datasets)} dataset(s)")
-        return context
 
 
 class SfincsSubgridStage(SfincsStageBase):
@@ -355,21 +366,20 @@ class SfincsSubgridStage(SfincsStageBase):
     name = "subgrid"
     description = "Create subgrid tables"
 
-    def run(self, context: dict[str, Any]) -> dict[str, Any]:
+    def run(self) -> None:
         """Generate subgrid tables from elevation and roughness data."""
-        sf = context["model"]
         cfg = self.config.subgrid
 
         if not cfg.enabled:
             self._log("Subgrid tables disabled, skipping")
-            return context
+            return
 
         self._update_substep("Creating subgrid tables")
 
         elevation_list = [entry.to_dict() for entry in self.config.elevation.datasets]
         roughness_list = [entry.to_dict() for entry in self.config.roughness.datasets]
 
-        sf.subgrid.create(
+        self.model.subgrid.create(
             elevation_list=elevation_list,
             roughness_list=roughness_list,
             nr_subgrid_pixels=cfg.nr_subgrid_pixels,
@@ -378,7 +388,6 @@ class SfincsSubgridStage(SfincsStageBase):
         )
 
         self._log(f"Subgrid tables created with {cfg.nr_subgrid_pixels} pixels/cell")
-        return context
 
 
 class SfincsTimingStage(SfincsStageBase):
@@ -387,14 +396,13 @@ class SfincsTimingStage(SfincsStageBase):
     name = "timing"
     description = "Set simulation timing"
 
-    def run(self, context: dict[str, Any]) -> dict[str, Any]:
+    def run(self) -> None:
         """Configure tref, tstart, and tstop."""
-        sf = context["model"]
         cfg = self.config.timing
 
         self._update_substep("Setting simulation timing")
 
-        sf.config.update(
+        self.model.config.update(
             {
                 "tref": cfg.tref,
                 "tstart": cfg.tstart,
@@ -403,7 +411,6 @@ class SfincsTimingStage(SfincsStageBase):
         )
 
         self._log(f"Timing set: {cfg.tstart} to {cfg.tstop}")
-        return context
 
 
 class SfincsForcingStage(SfincsStageBase):
@@ -412,21 +419,19 @@ class SfincsForcingStage(SfincsStageBase):
     name = "forcing"
     description = "Add water level forcing"
 
-    def run(self, context: dict[str, Any]) -> dict[str, Any]:
+    def run(self) -> None:
         """Add water level boundary forcing from a geodataset."""
-        sf = context["model"]
         cfg = self.config.forcing
 
         if cfg.waterlevel_geodataset is None:
             self._log("No water level geodataset configured, skipping")
-            return context
+            return
 
         self._update_substep("Adding water level forcing")
 
-        sf.water_level.create(geodataset=cfg.waterlevel_geodataset)
+        self.model.water_level.create(geodataset=cfg.waterlevel_geodataset)
 
         self._log(f"Water level forcing added from {cfg.waterlevel_geodataset}")
-        return context
 
 
 class SfincsWriteStage(SfincsStageBase):
@@ -435,14 +440,11 @@ class SfincsWriteStage(SfincsStageBase):
     name = "write"
     description = "Write model to disk"
 
-    def run(self, context: dict[str, Any]) -> dict[str, Any]:
+    def run(self) -> None:
         """Write all model files to the model root directory."""
-        sf = context["model"]
-
         self._update_substep("Writing model to disk")
 
-        sf.write()
+        self.model.write()
 
         model_root = str(self.config.paths.model_root)
         self._log(f"Model written to {model_root}")
-        return context
