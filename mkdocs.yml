@@ -1,10 +1,10 @@
 site_name: NWM Coastal
 site_description: Coastal model (SCHISM, SFINCS) workflow on HPC clusters
 site_author: Taher Chegini
-site_url: https://ngwpc.github.io/nwm-coastal
+site_url: https://cheginit.github.io/nwm-coastal
 
-repo_name: NGWPC/nwm-coastal
-repo_url: https://github.com/NGWPC/nwm-coastal
+repo_name: cheginit/nwm-coastal
+repo_url: https://github.com/cheginit/nwm-coastal
 edit_uri: edit/main/docs/
 
 copyright: Copyright &copy; 2025 Raytheon Company. BSD-2-Clause License.
@@ -112,7 +112,7 @@ markdown_extensions:
 - pymdownx.magiclink:
     normalize_issue_symbols: true
     repo_url_shorthand: true
-    user: NGWPC
+    user: cheginit
     repo: nwm-coastal
 - pymdownx.mark
 - pymdownx.smartsymbols
@@ -131,7 +131,7 @@ markdown_extensions:
 extra:
   social:
   - icon: fontawesome/brands/github
-    link: https://github.com/NGWPC/nwm-coastal
+    link: https://github.com/cheginit/nwm-coastal
 
 extra_css:
 - stylesheets/extra.css
