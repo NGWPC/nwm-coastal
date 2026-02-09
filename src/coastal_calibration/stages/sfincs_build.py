@@ -204,6 +204,12 @@ class SfincsInitStage(WorkflowStage):
     #: ``sfincs.inp`` lists placeholder names for files that haven't been
     #: generated yet, we clear them so HydroMT won't fail on read/write.
     _FILE_REF_ATTRS: tuple[str, ...] = (
+        # Meteorological ASCII forcing files
+        "amufile",
+        "amvfile",
+        "ampfile",
+        "amprfile",
+        # Other optional file references
         "sbgfile",
         "srcfile",
         "disfile",
