@@ -84,11 +84,11 @@ repos:
   hooks:
   - id: mdformat
     additional_dependencies:
-    - mdformat-gfm
+    - mdformat-mkdocs
     - mdformat-ruff
     - ruff
     - mdformat-config
     - mdformat-toc
-    - mdformat-admon
+    # - mdformat-admon
     args: [--wrap, '88']
     exclude: ^docs/reference/
