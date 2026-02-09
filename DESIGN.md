@@ -912,64 +912,64 @@ implementations:
 
 1. **Establish Testing Baseline**
 
-   - Add integration tests that capture current workflow behavior
-   - Create reference outputs for regression testing
-   - Measure performance benchmarks for comparison
+    - Add integration tests that capture current workflow behavior
+    - Create reference outputs for regression testing
+    - Measure performance benchmarks for comparison
 
 1. **Incremental Stage Rewriting**
 
-   - Start with simpler stages (`pre_forcing`, `post_forcing`, `update_params`)
-   - Replace bash file operations with Python `pathlib` and `shutil`
-   - Convert `sed`-based `param.nml` editing to Python template/parsing
-   - Rewrite forcing symlink creation in native Python
+    - Start with simpler stages (`pre_forcing`, `post_forcing`, `update_params`)
+    - Replace bash file operations with Python `pathlib` and `shutil`
+    - Convert `sed`-based `param.nml` editing to Python template/parsing
+    - Rewrite forcing symlink creation in native Python
 
 1. **Performance Optimization**
 
-   - Profile current workflow to identify bottlenecks
-   - Replace subprocess calls with direct Python implementations
-   - Optimize file I/O patterns (batch operations, memory mapping)
-   - Consider parallel processing for independent operations
+    - Profile current workflow to identify bottlenecks
+    - Replace subprocess calls with direct Python implementations
+    - Optimize file I/O patterns (batch operations, memory mapping)
+    - Consider parallel processing for independent operations
 
 1. **Deprecate Bash Scripts**
 
-   - Once Python replacements are validated, remove bash dependencies
-   - Simplify Singularity container requirements
-   - Reduce external tool dependencies
+    - Once Python replacements are validated, remove bash dependencies
+    - Simplify Singularity container requirements
+    - Reduce external tool dependencies
 
 ### Medium-Term: Feature Expansion
 
 1. **SFINCS Model Support**
 
-   - Infrastructure already in place (`stages/sfincs.py`)
-   - HydroMT data catalog generation implemented
-   - Needs: Stage implementations for SFINCS execution
+    - Infrastructure already in place (`stages/sfincs.py`)
+    - HydroMT data catalog generation implemented
+    - Needs: Stage implementations for SFINCS execution
 
 1. **Hot Start Chain Automation**
 
-   - Automatic hot-start file discovery
-   - Multi-run chaining for long simulations
+    - Automatic hot-start file discovery
+    - Multi-run chaining for long simulations
 
 1. **Ensemble Runs**
 
-   - Multiple configurations from single base
-   - Parallel SLURM array jobs
+    - Multiple configurations from single base
+    - Parallel SLURM array jobs
 
 ### Long-Term: Platform Evolution
 
 1. **Result Analysis Integration**
 
-   - Post-run validation against observations
-   - Time series extraction and plotting
+    - Post-run validation against observations
+    - Time series extraction and plotting
 
 1. **Cloud-Native Deployment**
 
-   - AWS Batch support
-   - Container-native execution (no Singularity)
+    - AWS Batch support
+    - Container-native execution (no Singularity)
 
 1. **Multi-Model Coupling**
 
-   - SCHISM + SFINCS workflows
-   - Nesting support
+    - SCHISM + SFINCS workflows
+    - Nesting support
 
 ______________________________________________________________________
 
