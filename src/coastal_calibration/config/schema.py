@@ -317,6 +317,7 @@ class SchismModelConfig(ModelConfig):
     omp_num_threads: int = 2
     oversubscribe: bool = False
     binary: str = _DEFAULT_SCHISM_BINARY
+    include_noaa_gages: bool = False
 
     @property
     def model_name(self) -> str:  # noqa: D102
@@ -451,6 +452,7 @@ class SchismModelConfig(ModelConfig):
             "omp_num_threads": self.omp_num_threads,
             "oversubscribe": self.oversubscribe,
             "binary": self.binary,
+            "include_noaa_gages": self.include_noaa_gages,
         }
 
 
@@ -469,6 +471,10 @@ class SfincsModelConfig(ModelConfig):
     model_root : Path, optional
         Output directory for the built model.  Defaults to
         ``{work_dir}/sfincs_model``.
+    include_noaa_gages : bool
+        When True, automatically query NOAA CO-OPS for water level
+        stations within the model domain and add them as observation
+        points.  Requires the ``plot`` optional dependencies.
     observation_points : list, optional
         Observation point specifications as list of dicts with
         ``x``, ``y``, ``name`` keys (coordinates in model CRS).
@@ -496,6 +502,7 @@ class SfincsModelConfig(ModelConfig):
 
     prebuilt_dir: Path
     model_root: Path | None = None
+    include_noaa_gages: bool = False
     observation_points: list[dict[str, Any]] = field(default_factory=list)
     observation_locations_file: Path | None = None
     merge_observations: bool = False
@@ -621,6 +628,7 @@ class SfincsModelConfig(ModelConfig):
         return {
             "prebuilt_dir": str(self.prebuilt_dir),
             "model_root": str(self.model_root) if self.model_root else None,
+            "include_noaa_gages": self.include_noaa_gages,
             "observation_points": self.observation_points,
             "observation_locations_file": (
                 str(self.observation_locations_file) if self.observation_locations_file else None

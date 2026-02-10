@@ -21,7 +21,6 @@ from coastal_calibration.stages.schism import (
     SCHISMRunStage,
 )
 from coastal_calibration.stages.sfincs import (
-    SFINCSDataCatalogStage,
     create_nc_symlinks,
     generate_data_catalog,
     remove_nc_symlinks,
@@ -48,7 +47,6 @@ __all__ = [
     "PreForcingStage",
     "PreSCHISMStage",
     "SCHISMRunStage",
-    "SFINCSDataCatalogStage",
     "STOFSBoundaryStage",
     "SfincsDataCatalogStage",
     "SfincsDischargeStage",

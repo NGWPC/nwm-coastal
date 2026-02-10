@@ -1,4 +1,4 @@
-"""SFINCS workflow stages including HydroMT data catalog generation."""
+"""HydroMT data catalog generation and NC symlink helpers for SFINCS."""
 
 from __future__ import annotations
 
@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Any, Literal
 import yaml
 
 from coastal_calibration.config.schema import MeteoSource, PathConfig
-from coastal_calibration.stages.base import WorkflowStage
 
 if TYPE_CHECKING:
     from coastal_calibration.config.schema import CoastalCalibConfig, SimulationConfig
@@ -649,45 +648,6 @@ def generate_data_catalog(
         catalog.to_yaml(output_path)
 
     return catalog
-
-
-class SFINCSDataCatalogStage(WorkflowStage):
-    """Generate HydroMT data catalog for SFINCS model setup."""
-
-    name = "sfincs_data_catalog"
-    description = "Generate HydroMT data catalog for SFINCS"
-
-    def run(self) -> dict[str, Any]:
-        """Execute data catalog generation."""
-        self._update_substep("Generating data catalog")
-
-        cfg = self.config
-        output_dir = cfg.paths.work_dir
-        catalog_path = output_dir / "data_catalog.yml"
-
-        catalog = generate_data_catalog(
-            cfg,
-            output_path=catalog_path,
-            catalog_name=f"coastal_calibration_{cfg.simulation.coastal_domain}",
-        )
-
-        self._update_substep("Data catalog generated")
-
-        return {
-            "catalog_path": str(catalog_path),
-            "entries": [entry.name for entry in catalog.entries],
-            "status": "completed",
-        }
-
-    def validate(self) -> list[str]:
-        """Validate that required data exists."""
-        errors = super().validate()
-
-        download_dir = self.config.paths.download_dir
-        if not download_dir.exists():
-            errors.append(f"Download directory does not exist: {download_dir}")
-
-        return errors
 
 
 def create_nc_symlinks(
