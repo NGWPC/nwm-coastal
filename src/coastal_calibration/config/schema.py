@@ -124,6 +124,10 @@ class BoundaryConfig:
     source: BoundarySource = "tpxo"
     stofs_file: Path | None = None
 
+    def __post_init__(self) -> None:
+        if self.stofs_file is not None:
+            self.stofs_file = Path(self.stofs_file).resolve()
+
 
 @dataclass
 class PathConfig:
@@ -144,16 +148,18 @@ class PathConfig:
     parm_dir: Path = field(default_factory=lambda: DEFAULT_PARM_DIR)
 
     def __post_init__(self) -> None:
-        # Convert all path fields to Path objects first
-        self.work_dir = Path(self.work_dir)
-        self.parm_dir = Path(self.parm_dir)
-        self.nfs_mount = Path(self.nfs_mount)
-        self.singularity_image = Path(self.singularity_image)
-        self.ngen_app_dir = Path(self.ngen_app_dir)
+        # Resolve all path fields to absolute so that downstream paths
+        # (model_root, sif_path, Singularity bind mounts, etc.) never
+        # contain relative components that can double up when cwd changes.
+        self.work_dir = Path(self.work_dir).resolve()
+        self.parm_dir = Path(self.parm_dir).resolve()
+        self.nfs_mount = Path(self.nfs_mount).resolve()
+        self.singularity_image = Path(self.singularity_image).resolve()
+        self.ngen_app_dir = Path(self.ngen_app_dir).resolve()
         if self.raw_download_dir:
-            self.raw_download_dir = Path(self.raw_download_dir)
+            self.raw_download_dir = Path(self.raw_download_dir).resolve()
         if self.hot_start_file:
-            self.hot_start_file = Path(self.hot_start_file)
+            self.hot_start_file = Path(self.hot_start_file).resolve()
 
     @property
     def otps_dir(self) -> Path:
@@ -222,6 +228,10 @@ class MonitoringConfig:
     log_file: Path | None = None
     enable_progress_tracking: bool = True
     enable_timing: bool = True
+
+    def __post_init__(self) -> None:
+        if self.log_file is not None:
+            self.log_file = Path(self.log_file).resolve()
 
 
 @dataclass
@@ -514,15 +524,15 @@ class SfincsModelConfig(ModelConfig):
     omp_num_threads: int = field(default=0)
 
     def __post_init__(self) -> None:
-        self.prebuilt_dir = Path(self.prebuilt_dir)
+        self.prebuilt_dir = Path(self.prebuilt_dir).resolve()
         if self.model_root is not None:
-            self.model_root = Path(self.model_root)
+            self.model_root = Path(self.model_root).resolve()
         if self.observation_locations_file is not None:
-            self.observation_locations_file = Path(self.observation_locations_file)
+            self.observation_locations_file = Path(self.observation_locations_file).resolve()
         if self.discharge_locations_file is not None:
-            self.discharge_locations_file = Path(self.discharge_locations_file)
+            self.discharge_locations_file = Path(self.discharge_locations_file).resolve()
         if self.container_image is not None:
-            self.container_image = Path(self.container_image)
+            self.container_image = Path(self.container_image).resolve()
         if self.omp_num_threads <= 0:
             from coastal_calibration.utils.system import get_cpu_count
 
