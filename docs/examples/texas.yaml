@@ -1,0 +1,65 @@
+# Texas coastal SFINCS — full pipeline configuration
+#
+# Pre-built quadtree mesh (~378K cells, 4 refinement levels)
+# EPSG:32614 (UTM zone 14N), domain ~140 x 90 km at 1024 m base resolution
+# 15 water level boundary points, 7 NOAA tide gauges, 48 NWM discharge sources
+#
+# Usage:
+#   coastal-calibration run texas.yaml
+#   coastal-calibration run texas.yaml --stop-after sfincs_write   # skip Singularity run
+#   coastal-calibration run texas.yaml --start-from sfincs_run     # re-run model only
+
+model: sfincs
+
+slurm:
+  user: test
+
+simulation:
+  start_date: 2025-06-01
+  duration_hours: 168  # 7 days
+  coastal_domain: atlgulf
+  meteo_source: nwm_ana  # nwm_retro ends 2023-01-31; nwm_ana covers 2018-10-01 to present
+
+boundary:
+  source: stofs
+
+paths:
+  work_dir: ./tmp_texas_run
+  raw_download_dir: ./tmp_texas_run/downloads
+
+download:
+  enabled: true
+  skip_existing: true
+  raise_on_error: false  # don't abort on partial download failures
+
+monitoring:
+  log_level: INFO
+
+model_config:
+  prebuilt_dir: ./texas
+  discharge_locations_file: ./texas/sfincs_nwm.src
+  merge_observations: false
+  merge_discharge: false
+  include_noaa_gages: true
+  # observation_points:
+  #   - x: 830344.95
+  #     y: 3187383.41
+  #     name: Sargent (8772985)
+  #   - x: 801500.14
+  #     y: 3179759.77
+  #     name: Matagorda City (8773146)
+  #   - x: 733642.95
+  #     y: 3170505.01
+  #     name: Port Lavaca (8773259)
+  #   - x: 755758.90
+  #     y: 3150019.47
+  #     name: Port O'Connor (8773701)
+  #   - x: 761521.61
+  #     y: 3147395.72
+  #     name: Matagorda Bay Entrance Channel (8773767)
+  #   - x: 758914.37
+  #     y: 3149643.75
+  #     name: Matagorda Ship Channel Marker 19 (mg0101)
+  #   - x: 761531.97
+  #     y: 3147370.44
+  #     name: Matagorda Entrance Channel (mg0201)
