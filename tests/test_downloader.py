@@ -283,16 +283,20 @@ class TestBuildUrls:
     def test_ana_forcing_urls(self, tmp_path):
         start = datetime(2023, 1, 1, 0)
         end = datetime(2023, 1, 1, 2)
-        urls, _paths = _build_nwm_ana_forcing_urls(start, end, tmp_path, "conus")
+        urls, paths = _build_nwm_ana_forcing_urls(start, end, tmp_path, "conus")
         assert len(urls) == 2
         assert "storage.googleapis.com" in urls[0]
         assert "analysis_assim" in urls[0]
+        # Local paths use native .nc names (no LDASIN renaming)
+        assert paths[0].suffix == ".nc"
+        assert "analysis_assim.forcing" in paths[0].name
 
     def test_ana_forcing_urls_hawaii(self, tmp_path):
         start = datetime(2023, 1, 1, 0)
         end = datetime(2023, 1, 1, 1)
-        urls, _paths = _build_nwm_ana_forcing_urls(start, end, tmp_path, "hawaii")
+        urls, paths = _build_nwm_ana_forcing_urls(start, end, tmp_path, "hawaii")
         assert "hawaii" in urls[0]
+        assert paths[0].suffix == ".nc"
 
     def test_ana_streamflow_urls_conus(self, tmp_path):
         start = datetime(2023, 1, 1, 0)

@@ -235,6 +235,37 @@ class TestGenerateDataCatalog:
         assert catalog.name == "custom"
         assert catalog.version == "3.0"
 
+    def test_nwm_ana_meteo_uri_uses_nc_glob(self, tmp_path):
+        """nwm_ana meteo entry should use *.nc glob (no LDASIN symlinks)."""
+        work_dir = tmp_path / "work"
+        work_dir.mkdir()
+        dl_dir = tmp_path / "downloads"
+        dl_dir.mkdir()
+
+        cfg = CoastalCalibConfig(
+            slurm=SlurmConfig(user="test"),
+            simulation=SimulationConfig(
+                start_date=datetime(2021, 6, 11),
+                duration_hours=3,
+                coastal_domain="atlgulf",
+                meteo_source="nwm_ana",
+            ),
+            boundary=BoundaryConfig(source="stofs"),
+            paths=PathConfig(work_dir=work_dir, raw_download_dir=dl_dir),
+            model_config=SchismModelConfig(),
+            download=DownloadConfig(enabled=False),
+        )
+        catalog = generate_data_catalog(
+            cfg,
+            include_meteo=True,
+            include_streamflow=False,
+            include_coastal=False,
+        )
+        entry = catalog.entries[0]
+        assert entry.name == "nwm_ana_meteo"
+        assert entry.uri.endswith("*.nc")
+        assert "LDASIN" not in entry.uri
+
 
 class TestCreateNcSymlinks:
     def test_creates_meteo_symlinks(self, tmp_path):
@@ -280,6 +311,19 @@ class TestCreateNcSymlinks:
 
         result = create_nc_symlinks(tmp_path, include_streamflow=False)
         assert len(result["meteo"]) == 0  # Already existed
+
+    def test_skips_meteo_symlinks_for_nwm_ana(self, tmp_path):
+        """nwm_ana forcing files are already .nc — no meteo symlinks needed."""
+        meteo_dir = tmp_path / "meteo" / "nwm_ana"
+        meteo_dir.mkdir(parents=True)
+        (meteo_dir / "nwm.t00z.analysis_assim.forcing.tm02.conus.nc").write_text("data")
+
+        result = create_nc_symlinks(
+            tmp_path,
+            meteo_source="nwm_ana",
+            include_streamflow=False,
+        )
+        assert len(result["meteo"]) == 0  # No symlinks created
 
     def test_nonexistent_dir(self, tmp_path):
         result = create_nc_symlinks(tmp_path)
