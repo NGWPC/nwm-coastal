@@ -856,7 +856,9 @@ class CoastalCalibConfig:
         cls, data: dict[str, Any], base_config_path: Path | None = None
     ) -> CoastalCalibConfig:
         """Create config from dictionary."""
-        model_type: str = data.get("model", "schism")
+        if "model" not in data:
+            raise ValueError("'model' is required (e.g., model: schism or model: sfincs)")
+        model_type: str = data["model"]
 
         # Migrate legacy keys into model_config
         model_config_data = _migrate_model_config_data(model_type, data)
