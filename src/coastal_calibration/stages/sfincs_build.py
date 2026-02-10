@@ -605,6 +605,221 @@ class SfincsRunStage(WorkflowStage):
         return {"status": "completed"}
 
 
+class SfincsPlotStage(WorkflowStage):
+    """Plot simulated water levels against NOAA CO-OPS observations.
+
+    After the SFINCS run, this stage reads ``point_h`` from the model
+    output (``sfincs_his.nc``), identifies observation points whose names
+    start with ``noaa_`` (added by :class:`SfincsObservationPointsStage`),
+    fetches observed water levels from the NOAA CO-OPS API, and produces
+    a comparison time-series figure saved to ``<model_root>/figs/``.
+
+    The stage is a no-op when:
+
+    * The model output file (``sfincs_his.nc``) does not exist.
+    * No ``point_h`` variable is present in the output.
+    * No observation points with the ``noaa_`` prefix are found.
+    """
+
+    name = "sfincs_plot"
+    description = "Plot simulated vs observed water levels"
+
+    def __init__(
+        self,
+        config: CoastalCalibConfig,
+        monitor: WorkflowMonitor | None = None,
+    ) -> None:
+        super().__init__(config, monitor)
+        assert isinstance(config.model_config, SfincsModelConfig)  # noqa: S101
+        self.sfincs: SfincsModelConfig = config.model_config
+
+    @staticmethod
+    def _station_dim(point_h: Any) -> str:
+        """Detect the station dimension name in the ``point_h`` DataArray."""
+        for candidate in ("stations", "station_id"):
+            if candidate in point_h.dims:
+                return candidate
+        for dim_name in point_h.dims:
+            if "station" in str(dim_name).lower():
+                return str(dim_name)
+        raise ValueError("Cannot determine station dimension in point_h")
+
+    @staticmethod
+    def _parse_obs_names(obs_file: Path) -> list[str]:
+        """Parse observation point names from a ``sfincs.obs`` file.
+
+        The file format has lines like::
+
+            x y "name"
+
+        Returns the list of names in order.
+        """
+        names: list[str] = []
+        for raw_line in obs_file.read_text().splitlines():
+            stripped = raw_line.strip()
+            if not stripped:
+                continue
+            parts = stripped.split('"')
+            if len(parts) >= 2:
+                names.append(parts[1].strip())
+            else:
+                names.append(f"obs_{len(names)}")
+        return names
+
+    @staticmethod
+    def _plot_comparison(
+        point_h: Any,
+        station_dim: str,
+        noaa_indices: list[int],
+        obs_ds: Any,
+        model_root: Path,
+    ) -> Path:
+        """Create a comparison figure and save it.
+
+        Parameters
+        ----------
+        point_h : xr.DataArray
+            Simulated water depths at observation points.
+        station_dim : str
+            Name of the station dimension in ``point_h``.
+        noaa_indices : list[int]
+            Indices into ``point_h`` for NOAA stations.
+        obs_ds : xr.Dataset
+            NOAA observed water level dataset.
+        model_root : Path
+            SFINCS model root directory.
+
+        Returns
+        -------
+        Path
+            Path to the saved figure.
+        """
+        import matplotlib.pyplot as plt
+        import numpy as np
+
+        n_stations = len(noaa_indices)
+        ncols = min(2, n_stations)
+        nrows = (n_stations + ncols - 1) // ncols
+
+        fig, axes = plt.subplots(
+            nrows,
+            ncols,
+            figsize=(8 * ncols, 3 * nrows),
+            sharex=True,
+            squeeze=False,
+        )
+        axes_flat = np.atleast_1d(axes).ravel()
+
+        for i, idx in enumerate(noaa_indices):
+            ax = axes_flat[i]
+            sim_ts = point_h.isel({station_dim: idx})
+            station_id = obs_ds.station_id.isel(station=i).item()
+
+            # Observed
+            obs_wl = obs_ds.water_level.isel(station=i)
+            ax.plot(obs_wl.time, obs_wl, label="Observed", color="k", linewidth=0.8)
+
+            # Simulated
+            ax.plot(sim_ts.time, sim_ts, color="r", ls="--", alpha=0.5)
+            ax.scatter(sim_ts.time, sim_ts, label="Simulated", color="r", marker="x", s=15)
+
+            ax.set_title(f"NOAA {station_id}", fontsize=10)
+            ax.set_ylabel("Water Level (m)")
+            ax.legend(fontsize="small")
+
+        # Remove unused axes
+        for j in range(n_stations, len(axes_flat)):
+            axes_flat[j].remove()
+
+        fig.tight_layout()
+
+        figs_dir = model_root / "figs"
+        figs_dir.mkdir(parents=True, exist_ok=True)
+        fig_path = figs_dir / "stations_comparison.png"
+        fig.savefig(fig_path, dpi=300, bbox_inches="tight")
+        plt.close(fig)
+
+        return fig_path
+
+    def run(self) -> dict[str, Any]:
+        """Read SFINCS output, fetch NOAA observations, and plot comparison."""
+        from hydromt_sfincs import SfincsModel  # pyright: ignore[reportMissingImports]
+
+        model_root = get_model_root(self.config)
+        his_file = model_root / "sfincs_his.nc"
+
+        if not his_file.exists():
+            self._log("sfincs_his.nc not found, skipping plot stage")
+            return {"status": "skipped", "reason": "no output"}
+
+        self._update_substep("Reading SFINCS output")
+        mod = SfincsModel(str(model_root), mode="r")
+        mod.read()
+        mod.output.read()
+
+        if "point_h" not in mod.output.data:
+            self._log("No point_h in output, skipping plot stage")
+            return {"status": "skipped", "reason": "no point_h"}
+
+        point_h = mod.output.data["point_h"]
+        station_dim = self._station_dim(point_h)
+
+        # Read observation point names written by HydroMT
+        obs_names: list[str] = []
+        if hasattr(mod, "observation_points") and hasattr(mod.observation_points, "geodataframe"):
+            gdf = mod.observation_points.geodataframe
+            if gdf is not None and not gdf.empty:
+                obs_names = gdf.index.tolist()
+
+        if not obs_names:
+            # Fallback: read the sfincs.obs file directly
+            obs_file = model_root / "sfincs.obs"
+            if obs_file.exists():
+                obs_names = self._parse_obs_names(obs_file)
+
+        # Identify NOAA stations by the "noaa_" prefix
+        noaa_indices: list[int] = []
+        noaa_station_ids: list[str] = []
+        for i, name in enumerate(obs_names):
+            if str(name).startswith("noaa_"):
+                noaa_indices.append(i)
+                noaa_station_ids.append(str(name).removeprefix("noaa_"))
+
+        if not noaa_station_ids:
+            self._log("No NOAA observation points found, skipping plot stage")
+            return {"status": "skipped", "reason": "no noaa stations"}
+
+        # Fetch observed water levels from NOAA CO-OPS
+        self._update_substep("Fetching NOAA CO-OPS observations")
+        sim = self.config.simulation
+        begin_date = sim.start_date.strftime("%Y%m%d %H:%M")
+        end_dt = sim.start_date + timedelta(hours=sim.duration_hours)
+        end_date = end_dt.strftime("%Y%m%d %H:%M")
+
+        from coastal_calibration.coops_api import query_coops_byids
+
+        try:
+            obs_ds = query_coops_byids(
+                noaa_station_ids,
+                begin_date,
+                end_date,
+                product="water_level",
+                datum="NAVD",
+                units="metric",
+                time_zone="gmt",
+            )
+        except Exception as exc:
+            self._log(f"Failed to fetch NOAA observations: {exc}", "warning")
+            return {"status": "skipped", "reason": f"coops fetch failed: {exc}"}
+
+        # Plot comparison
+        self._update_substep("Generating comparison plot")
+        fig_path = self._plot_comparison(point_h, station_dim, noaa_indices, obs_ds, model_root)
+
+        self._log(f"Comparison plot saved to {fig_path}")
+        return {"status": "completed", "figure": str(fig_path)}
+
+
 # ---------------------------------------------------------------------------
 # Infrastructure stages (symlinks, data catalog)
 # ---------------------------------------------------------------------------
