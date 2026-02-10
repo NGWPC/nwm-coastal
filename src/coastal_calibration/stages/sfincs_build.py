@@ -615,9 +615,10 @@ class SfincsPlotStage(WorkflowStage):
     from the NOAA CO-OPS API, and produces a comparison time-series
     figure saved to ``<model_root>/figs/``.
 
-    Observations are requested in NAVD88.  When a station does not
-    support NAVD, the stage falls back to MLLW and converts using the
-    station's datum offsets from the CO-OPS metadata API.
+    Observations are fetched in MLLW (universally supported by all
+    CO-OPS stations) and then converted to MSL using per-station datum
+    offsets from the CO-OPS metadata API, matching the STOFS boundary
+    condition vertical reference used by SFINCS.
 
     The stage is a no-op when:
 
@@ -811,7 +812,9 @@ class SfincsPlotStage(WorkflowStage):
             self._log("No NOAA observation points found, skipping plot stage")
             return {"status": "skipped", "reason": "no noaa stations"}
 
-        # Fetch observed water levels from NOAA CO-OPS
+        # Fetch observed water levels from NOAA CO-OPS in MLLW (universally
+        # supported) then convert to MSL to match SFINCS output (STOFS boundary
+        # conditions are in MSL).
         self._update_substep("Fetching NOAA CO-OPS observations")
         sim = self.config.simulation
         begin_date = sim.start_date.strftime("%Y%m%d %H:%M")
@@ -826,7 +829,7 @@ class SfincsPlotStage(WorkflowStage):
                 begin_date,
                 end_date,
                 product="water_level",
-                datum="NAVD",
+                datum="MLLW",
                 units="metric",
                 time_zone="gmt",
             )
@@ -834,9 +837,8 @@ class SfincsPlotStage(WorkflowStage):
             self._log(f"Failed to fetch NOAA observations: {exc}", "warning")
             return {"status": "skipped", "reason": f"coops fetch failed: {exc}"}
 
-        # For stations that don't support NAVD, fall back to MLLW and convert.
-        # Fetch datums once and correct any all-NaN stations.
-        self._update_substep("Applying datum corrections")
+        # Convert MLLW → MSL using per-station datum offsets.
+        self._update_substep("Converting observations from MLLW to MSL")
         client = COOPSAPIClient()
         try:
             datums = client.get_datums(noaa_station_ids)
@@ -845,42 +847,21 @@ class SfincsPlotStage(WorkflowStage):
 
         datum_map = {d.station_id: d for d in datums}
         for sid in noaa_station_ids:
-            wl = obs_ds.water_level.sel(station=sid)
-            if wl.isnull().all():
-                # Station had no NAVD data, try MLLW and convert
-                self._log(f"Station {sid}: no NAVD data, fetching in MLLW and converting")
-                try:
-                    fallback = query_coops_byids(
-                        [sid],
-                        begin_date,
-                        end_date,
-                        product="water_level",
-                        datum="MLLW",
-                        units="metric",
-                        time_zone="gmt",
-                    )
-                    d = datum_map.get(sid)
-                    if d is not None:
-                        navd = d.get_datum_value("NAVD")
-                        mllw = d.get_datum_value("MLLW")
-                        if navd is not None and mllw is not None:
-                            offset = navd - mllw
-                            if d.units == "feet":
-                                offset *= 0.3048
-                            obs_ds.water_level.loc[{"station": sid}] = (
-                                fallback.water_level.sel(station=sid).reindex(time=obs_ds.time)
-                                - offset
-                            )
-                            self._log(f"Station {sid}: MLLW→NAVD offset = {offset:.4f} m")
-                        else:
-                            self._log(
-                                f"Station {sid}: missing NAVD/MLLW datum values, skipping",
-                                "warning",
-                            )
-                    else:
-                        self._log(f"Station {sid}: no datum info, skipping conversion", "warning")
-                except Exception as exc:
-                    self._log(f"Station {sid}: MLLW fallback failed: {exc}", "warning")
+            d = datum_map.get(sid)
+            if d is None:
+                self._log(f"Station {sid}: no datum info, skipping MLLW→MSL conversion", "warning")
+                continue
+            msl = d.get_datum_value("MSL")
+            mllw = d.get_datum_value("MLLW")
+            if msl is None or mllw is None:
+                self._log(f"Station {sid}: missing MSL/MLLW datum values, skipping", "warning")
+                continue
+            offset = msl - mllw
+            if d.units == "feet":
+                offset *= 0.3048
+            obs_ds.water_level.loc[{"station": sid}] -= offset
+            self._log(f"Station {sid}: MLLW→MSL offset = {offset:.4f} m")
+        obs_ds.attrs["datum"] = "MSL"
 
         # Plot comparison
         self._update_substep("Generating comparison plot")
