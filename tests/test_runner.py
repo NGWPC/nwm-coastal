@@ -120,6 +120,7 @@ class TestCoastalCalibRunner:
             "sfincs_precip",
             "sfincs_write",
             "sfincs_run",
+            "sfincs_plot",
         ]
         assert expected == SfincsModelConfig(prebuilt_dir=tmp_path).stage_order
 

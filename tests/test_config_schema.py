@@ -278,6 +278,7 @@ class TestSfincsModelConfig:
             "sfincs_precip",
             "sfincs_write",
             "sfincs_run",
+            "sfincs_plot",
         ]
         assert cfg.stage_order == expected
 
