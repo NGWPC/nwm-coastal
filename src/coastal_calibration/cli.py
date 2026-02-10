@@ -257,6 +257,8 @@ model_config:
 #   coastal-calibration submit {output_path.name}
 #   coastal-calibration submit {output_path.name} -i  # wait for completion
 
+model: schism
+
 slurm:
   job_name: coastal_calibration
   user: {username}
