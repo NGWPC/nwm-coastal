@@ -31,15 +31,13 @@ def get_cpu_count() -> int:
     if system == "Darwin" and machine == "arm64":
         try:
             cmd = ["sysctl", "-n", "hw.perflevel0.logicalcpu_max"]
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)  # noqa: S603
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
             perf_cores = int(result.stdout.strip())
         except (subprocess.SubprocessError, ValueError):
             # Fallback to checking sysctl hw.topology output for older macOS versions
             with contextlib.suppress(subprocess.SubprocessError, ValueError):
                 cmd = ["sysctl", "hw.topology"]
-                result = subprocess.run(  # noqa: S603
-                    cmd, capture_output=True, text=True, check=True
-                )
+                result = subprocess.run(cmd, capture_output=True, text=True, check=True)
                 match = re.search(r"perfcores:\s*(\d+)", result.stdout)
                 if match:
                     return int(match.group(1))
