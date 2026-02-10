@@ -868,11 +868,15 @@ class SfincsPlotStage(WorkflowStage):
                             if d.units == "feet":
                                 offset *= 0.3048
                             obs_ds.water_level.loc[{"station": sid}] = (
-                                fallback.water_level.sel(station=sid).reindex(time=obs_ds.time) - offset
+                                fallback.water_level.sel(station=sid).reindex(time=obs_ds.time)
+                                - offset
                             )
                             self._log(f"Station {sid}: MLLW→NAVD offset = {offset:.4f} m")
                         else:
-                            self._log(f"Station {sid}: missing NAVD/MLLW datum values, skipping", "warning")
+                            self._log(
+                                f"Station {sid}: missing NAVD/MLLW datum values, skipping",
+                                "warning",
+                            )
                     else:
                         self._log(f"Station {sid}: no datum info, skipping conversion", "warning")
                 except Exception as exc:
