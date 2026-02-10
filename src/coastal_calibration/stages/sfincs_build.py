@@ -548,15 +548,16 @@ class SfincsPrecipitationStage(WorkflowStage):
 
     def run(self) -> dict[str, Any]:
         """Add precipitation from a dataset in the data catalog."""
-        if self.sfincs.precip_dataset is None:
-            self._log("No precipitation configured, skipping")
+        if not self.sfincs.include_precip:
+            self._log("Precipitation forcing disabled, skipping")
             return {"status": "skipped"}
 
         model = _get_model(self.config)
+        meteo_dataset = f"{self.config.simulation.meteo_source}_meteo"
 
         self._update_substep("Adding precipitation forcing")
-        model.precipitation.create(precip=self.sfincs.precip_dataset)
-        self._log(f"Precipitation forcing added from {self.sfincs.precip_dataset}")
+        model.precipitation.create(precip=meteo_dataset)
+        self._log(f"Precipitation forcing added from {meteo_dataset}")
 
         return {"status": "completed"}
 
@@ -578,15 +579,16 @@ class SfincsWindStage(WorkflowStage):
 
     def run(self) -> dict[str, Any]:
         """Add wind forcing from a dataset in the data catalog."""
-        if self.sfincs.wind_dataset is None:
-            self._log("No wind dataset configured, skipping")
+        if not self.sfincs.include_wind:
+            self._log("Wind forcing disabled, skipping")
             return {"status": "skipped"}
 
         model = _get_model(self.config)
+        meteo_dataset = f"{self.config.simulation.meteo_source}_meteo"
 
         self._update_substep("Adding wind forcing")
-        model.wind.create(wind=self.sfincs.wind_dataset)
-        self._log(f"Wind forcing added from {self.sfincs.wind_dataset}")
+        model.wind.create(wind=meteo_dataset)
+        self._log(f"Wind forcing added from {meteo_dataset}")
 
         return {"status": "completed"}
 
@@ -608,21 +610,19 @@ class SfincsPressureStage(WorkflowStage):
 
     def run(self) -> dict[str, Any]:
         """Add atmospheric pressure from a dataset in the data catalog."""
-        if self.sfincs.pressure_dataset is None:
-            self._log("No pressure dataset configured, skipping")
+        if not self.sfincs.include_pressure:
+            self._log("Pressure forcing disabled, skipping")
             return {"status": "skipped"}
 
         model = _get_model(self.config)
+        meteo_dataset = f"{self.config.simulation.meteo_source}_meteo"
 
         self._update_substep("Adding atmospheric pressure forcing")
-        model.pressure.create(press=self.sfincs.pressure_dataset)
+        model.pressure.create(press=meteo_dataset)
 
         # Enable barometric pressure correction so SFINCS uses the forcing
         model.config.set("baro", 1)
-        self._log(
-            f"Atmospheric pressure forcing added from {self.sfincs.pressure_dataset} "
-            "(baro=1 enabled)"
-        )
+        self._log(f"Atmospheric pressure forcing added from {meteo_dataset} (baro=1 enabled)")
 
         return {"status": "completed"}
 

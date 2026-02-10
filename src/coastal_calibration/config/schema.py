@@ -497,14 +497,15 @@ class SfincsModelConfig(ModelConfig):
         locations.
     merge_discharge : bool
         Whether to merge with pre-existing discharge source points.
-    precip_dataset : str, optional
-        Precipitation dataset name in the data catalog.
-    wind_dataset : str, optional
-        Wind dataset name in the data catalog.  The dataset must contain
-        ``wind10_u`` and ``wind10_v`` variables (m/s).
-    pressure_dataset : str, optional
-        Atmospheric pressure dataset name in the data catalog.  The
-        dataset must contain a ``press_msl`` variable (Pa).
+    include_precip : bool
+        When True, add precipitation forcing from the meteorological
+        data catalog entry (derived from ``simulation.meteo_source``).
+    include_wind : bool
+        When True, add spatially-varying wind forcing (``wind10_u``,
+        ``wind10_v``) from the meteorological data catalog entry.
+    include_pressure : bool
+        When True, add spatially-varying atmospheric pressure forcing
+        (``press_msl``) and enable barometric correction (``baro=1``).
     container_tag : str
         Tag for the ``deltares/sfincs-cpu`` Docker/Singularity image.
     container_image : Path, optional
@@ -524,9 +525,9 @@ class SfincsModelConfig(ModelConfig):
     merge_observations: bool = False
     discharge_locations_file: Path | None = None
     merge_discharge: bool = False
-    precip_dataset: str | None = None
-    wind_dataset: str | None = None
-    pressure_dataset: str | None = None
+    include_precip: bool = False
+    include_wind: bool = False
+    include_pressure: bool = False
     container_tag: str = "latest"
     container_image: Path | None = None
     omp_num_threads: int = field(default=0)
@@ -665,9 +666,9 @@ class SfincsModelConfig(ModelConfig):
                 str(self.discharge_locations_file) if self.discharge_locations_file else None
             ),
             "merge_discharge": self.merge_discharge,
-            "precip_dataset": self.precip_dataset,
-            "wind_dataset": self.wind_dataset,
-            "pressure_dataset": self.pressure_dataset,
+            "include_precip": self.include_precip,
+            "include_wind": self.include_wind,
+            "include_pressure": self.include_pressure,
             "container_tag": self.container_tag,
             "container_image": (str(self.container_image) if self.container_image else None),
             "omp_num_threads": self.omp_num_threads,
