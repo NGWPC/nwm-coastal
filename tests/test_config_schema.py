@@ -276,6 +276,8 @@ class TestSfincsModelConfig:
             "sfincs_obs",
             "sfincs_discharge",
             "sfincs_precip",
+            "sfincs_wind",
+            "sfincs_pressure",
             "sfincs_write",
             "sfincs_run",
             "sfincs_plot",
