@@ -54,6 +54,15 @@ optional-dependencies.lint = [
   "codespell",
   "pre-commit",
 ]
+# Local development only - for plotting results and fetching NOAA CO-OPS observation data
+optional-dependencies.plot = [
+  "geopandas>=1",
+  "matplotlib>=3.9",
+  "numpy>=2",
+  "pandas>=2.2",
+  "shapely>=2",
+  "xarray>=2024.1",
+]
 # Local development only - for reading/analyzing model outputs, not required for cluster execution
 optional-dependencies.schism = [
   "netcdf4",
@@ -209,7 +218,7 @@ lint.pydocstyle.convention = "numpy"
 
 [tool.codespell]
 skip = "__pycache__,_build,.git,./htmlcov,pixi.lock"
-ignore-words-list = "parm,oce"
+ignore-words-list = "gages,parm,oce"
 
 [tool.pytest.ini_options]
 addopts = [
@@ -259,6 +268,7 @@ source_pkgs = [
 exclude = [
   "**/__pycache__",
   "**/__init__.py",
+  "src/coastal_calibration/coops_api.py",
   "src/coastal_calibration/scripts/**",
 ]
 include = [
@@ -277,11 +287,12 @@ reportInvalidTypeForm = false
 typeCheckingMode = "strict"
 
 [tool.pixi.environments]
-test311 = { features = [ "test", "py311" ] }
-test314 = { features = [ "test", "py314" ] }
+test311 = { features = [ "test", "plot", "py311" ] }
+test314 = { features = [ "test", "plot", "py314" ] }
 dev = { features = [ "dev", "test", "py314" ] }
 schism = { features = [ "dev", "schism", "py314" ] }
 sfincs = { features = [ "dev", "sfincs", "py314" ] }
+plot = { features = [ "dev", "plot", "py314" ] }
 typecheck = { features = [ "typecheck", "py314" ] }
 lint = { features = [ "lint", "py314" ], no-default-feature = true }
 docs = { features = [ "docs", "py314" ] }
@@ -295,6 +306,12 @@ docs-deploy = "mkdocs gh-deploy --force"
 lint = "pre-commit run --all-files"
 pcupdate = "pre-commit autoupdate"
 spell = "codespell -w"
+
+[tool.pixi.feature.plot.dependencies]
+proj = "*"
+libgdal-core = "*"
+hdf5 = "*"
+libnetcdf = "*"
 
 [tool.pixi.feature.py311.dependencies]
 python = "~=3.11.0"
