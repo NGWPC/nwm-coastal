@@ -369,11 +369,59 @@ class SfincsObservationPointsStage(WorkflowStage):
         assert isinstance(config.model_config, SfincsModelConfig)  # noqa: S101
         self.sfincs: SfincsModelConfig = config.model_config
 
+    def _add_noaa_gages(self, model: SfincsModel) -> int:
+        """Query NOAA CO-OPS and add water-level stations as observation points.
+
+        Parameters
+        ----------
+        model : SfincsModel
+            Initialised SFINCS model with a region and CRS.
+
+        Returns
+        -------
+        int
+            Number of NOAA stations added.
+        """
+        from coastal_calibration.coops_api import COOPSAPIClient
+
+        model_crs = model.crs
+        if model_crs is None:
+            self._log("Model CRS is undefined, cannot add NOAA CO-OPS stations")
+            return 0
+
+        # Get domain boundary in EPSG:4326 (lon/lat) for the COOPS query
+        region_4326 = model.region.to_crs(4326)
+        domain_geom = region_4326.union_all()
+
+        client = COOPSAPIClient()
+        stations_gdf = client.stations_metadata
+        selected = stations_gdf[stations_gdf.within(domain_geom)]
+
+        if selected.empty:
+            self._log("No NOAA CO-OPS stations found within model domain")
+            return 0
+
+        # Project selected stations into the model CRS
+        selected_projected = selected.to_crs(model_crs)
+
+        for _, row in selected_projected.iterrows():
+            model.observation_points.add_point(
+                x=row.geometry.x,
+                y=row.geometry.y,
+                name=f"noaa_{row['station_id']}",
+            )
+
+        return len(selected_projected)
+
     def run(self) -> dict[str, Any]:
-        """Add observation points from config or file."""
+        """Add observation points from config, file, and/or NOAA gages."""
         model = _get_model(self.config)
 
-        if self.sfincs.observation_locations_file is None and not self.sfincs.observation_points:
+        has_file = self.sfincs.observation_locations_file is not None
+        has_points = bool(self.sfincs.observation_points)
+        has_noaa = self.sfincs.include_noaa_gages
+
+        if not has_file and not has_points and not has_noaa:
             self._log("No observation points configured, skipping")
             return {"status": "skipped"}
 
@@ -389,13 +437,13 @@ class SfincsObservationPointsStage(WorkflowStage):
             except Exception:  # noqa: S110
                 pass  # No existing points to clear
 
-        if self.sfincs.observation_locations_file is not None:
+        if has_file:
             model.observation_points.create(
                 locations=str(self.sfincs.observation_locations_file),
                 merge=self.sfincs.merge_observations,
             )
             self._log(f"Observation points added from {self.sfincs.observation_locations_file}")
-        elif self.sfincs.observation_points:
+        elif has_points:
             for pt in self.sfincs.observation_points:
                 model.observation_points.add_point(
                     x=pt["x"],
@@ -404,7 +452,13 @@ class SfincsObservationPointsStage(WorkflowStage):
                 )
             self._log(f"Added {len(self.sfincs.observation_points)} observation point(s)")
 
-        return {"status": "completed"}
+        noaa_count = 0
+        if has_noaa:
+            self._update_substep("Querying NOAA CO-OPS stations")
+            noaa_count = self._add_noaa_gages(model)
+            self._log(f"Added {noaa_count} NOAA CO-OPS observation point(s)")
+
+        return {"status": "completed", "noaa_stations": noaa_count}
 
 
 class SfincsDischargeStage(WorkflowStage):
@@ -634,3 +688,11 @@ class SfincsDataCatalogStage(WorkflowStage):
             "entries": [e.name for e in catalog.entries],
             "status": "completed",
         }
+
+    def validate(self) -> list[str]:
+        """Check that the download directory exists."""
+        errors = super().validate()
+        download_dir = self.config.paths.download_dir
+        if not download_dir.exists():
+            errors.append(f"Download directory does not exist: {download_dir}")
+        return errors
