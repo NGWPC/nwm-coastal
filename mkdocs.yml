@@ -66,6 +66,9 @@ hooks:
 
 plugins:
 - search
+- mike:
+    alias_type: symlink
+    canonical_version: latest
 - mkdocstrings:
     default_handler: python
     handlers:
@@ -129,6 +132,8 @@ markdown_extensions:
 - pymdownx.tilde
 
 extra:
+  version:
+    provider: mike
   social:
   - icon: fontawesome/brands/github
     link: https://github.com/cheginit/nwm-coastal

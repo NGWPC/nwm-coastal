@@ -44,6 +44,7 @@ optional-dependencies.dev = [
   "ipywidgets",
 ]
 optional-dependencies.docs = [
+  "mike>=2",
   "mkdocs>=1.6",
   "mkdocs-material>=9.5",
   "mkdocstrings[python]>=0.27",
@@ -299,8 +300,8 @@ docs = { features = [ "docs", "py314" ] }
 
 [tool.pixi.feature.docs.tasks]
 docs-build = "mkdocs build"
-docs-serve = "mkdocs serve"
-docs-deploy = "mkdocs gh-deploy --force"
+docs-serve = "mike serve"
+docs-deploy = "mike deploy --push dev"
 
 [tool.pixi.feature.lint.tasks]
 lint = "pre-commit run --all-files"
