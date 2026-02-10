@@ -32,9 +32,11 @@ from coastal_calibration.stages.sfincs_build import (
     SfincsInitStage,
     SfincsObservationPointsStage,
     SfincsPrecipitationStage,
+    SfincsPressureStage,
     SfincsRunStage,
     SfincsSymlinksStage,
     SfincsTimingStage,
+    SfincsWindStage,
     SfincsWriteStage,
 )
 
@@ -54,9 +56,11 @@ __all__ = [
     "SfincsInitStage",
     "SfincsObservationPointsStage",
     "SfincsPrecipitationStage",
+    "SfincsPressureStage",
     "SfincsRunStage",
     "SfincsSymlinksStage",
     "SfincsTimingStage",
+    "SfincsWindStage",
     "SfincsWriteStage",
     "TPXOBoundaryStage",
     "UpdateParamsStage",

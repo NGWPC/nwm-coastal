@@ -561,6 +561,72 @@ class SfincsPrecipitationStage(WorkflowStage):
         return {"status": "completed"}
 
 
+class SfincsWindStage(WorkflowStage):
+    """Add spatially varying wind forcing (u10 / v10)."""
+
+    name = "sfincs_wind"
+    description = "Add wind forcing"
+
+    def __init__(
+        self,
+        config: CoastalCalibConfig,
+        monitor: WorkflowMonitor | None = None,
+    ) -> None:
+        super().__init__(config, monitor)
+        assert isinstance(config.model_config, SfincsModelConfig)  # noqa: S101
+        self.sfincs: SfincsModelConfig = config.model_config
+
+    def run(self) -> dict[str, Any]:
+        """Add wind forcing from a dataset in the data catalog."""
+        if self.sfincs.wind_dataset is None:
+            self._log("No wind dataset configured, skipping")
+            return {"status": "skipped"}
+
+        model = _get_model(self.config)
+
+        self._update_substep("Adding wind forcing")
+        model.wind.create(wind=self.sfincs.wind_dataset)
+        self._log(f"Wind forcing added from {self.sfincs.wind_dataset}")
+
+        return {"status": "completed"}
+
+
+class SfincsPressureStage(WorkflowStage):
+    """Add spatially varying atmospheric pressure forcing."""
+
+    name = "sfincs_pressure"
+    description = "Add atmospheric pressure forcing"
+
+    def __init__(
+        self,
+        config: CoastalCalibConfig,
+        monitor: WorkflowMonitor | None = None,
+    ) -> None:
+        super().__init__(config, monitor)
+        assert isinstance(config.model_config, SfincsModelConfig)  # noqa: S101
+        self.sfincs: SfincsModelConfig = config.model_config
+
+    def run(self) -> dict[str, Any]:
+        """Add atmospheric pressure from a dataset in the data catalog."""
+        if self.sfincs.pressure_dataset is None:
+            self._log("No pressure dataset configured, skipping")
+            return {"status": "skipped"}
+
+        model = _get_model(self.config)
+
+        self._update_substep("Adding atmospheric pressure forcing")
+        model.pressure.create(press=self.sfincs.pressure_dataset)
+
+        # Enable barometric pressure correction so SFINCS uses the forcing
+        model.config.set("baro", 1)
+        self._log(
+            f"Atmospheric pressure forcing added from {self.sfincs.pressure_dataset} "
+            "(baro=1 enabled)"
+        )
+
+        return {"status": "completed"}
+
+
 class SfincsWriteStage(WorkflowStage):
     """Write the SFINCS model files to disk."""
 
@@ -700,8 +766,8 @@ class SfincsPlotStage(WorkflowStage):
         Path
             Path to the saved figure.
         """
-        import matplotlib.pyplot as plt
-        import numpy as np
+        import matplotlib.pyplot as plt  # pyright: ignore[reportMissingImports]
+        import numpy as np  # pyright: ignore[reportMissingImports]
 
         n_stations = len(noaa_indices)
         ncols = min(2, n_stations)
@@ -759,6 +825,78 @@ class SfincsPlotStage(WorkflowStage):
 
         return fig_path
 
+    def _fetch_observations_msl(
+        self,
+        station_ids: list[str],
+        begin_date: str,
+        end_date: str,
+    ) -> Any:
+        """Fetch CO-OPS observations in MLLW and convert to MSL.
+
+        Parameters
+        ----------
+        station_ids : list[str]
+            NOAA CO-OPS station IDs.
+        begin_date, end_date : str
+            Query window formatted as ``%Y%m%d %H:%M``.
+
+        Returns
+        -------
+        xr.Dataset
+            Observed water levels with ``datum`` attribute set to ``MSL``.
+        """
+        from coastal_calibration.coops_api import COOPSAPIClient, query_coops_byids
+
+        obs_ds = query_coops_byids(
+            station_ids,
+            begin_date,
+            end_date,
+            product="water_level",
+            datum="MLLW",
+            units="metric",
+            time_zone="gmt",
+        )
+
+        # Convert MLLW → MSL using per-station datum offsets.
+        client = COOPSAPIClient()
+        try:
+            datums = client.get_datums(station_ids)
+        except ValueError:
+            datums = []
+
+        datum_map = {d.station_id: d for d in datums}
+        for sid in station_ids:
+            d = datum_map.get(sid)
+            if d is None:
+                self._log(f"Station {sid}: no datum info, skipping MLLW→MSL", "warning")
+                continue
+            msl = d.get_datum_value("MSL")
+            mllw = d.get_datum_value("MLLW")
+            if msl is None or mllw is None:
+                self._log(f"Station {sid}: missing MSL/MLLW datum values", "warning")
+                continue
+            offset = msl - mllw
+            if d.units == "feet":
+                offset *= 0.3048
+            obs_ds.water_level.loc[{"station": sid}] -= offset
+            self._log(f"Station {sid}: MLLW→MSL offset = {offset:.4f} m")
+
+        obs_ds.attrs["datum"] = "MSL"
+        return obs_ds
+
+    @staticmethod
+    def _read_obs_names(mod: Any, model_root: Path) -> list[str]:
+        """Read observation point names from HydroMT model or sfincs.obs."""
+        if hasattr(mod, "observation_points") and hasattr(mod.observation_points, "geodataframe"):
+            gdf = mod.observation_points.geodataframe
+            if gdf is not None and not gdf.empty:
+                return gdf.index.tolist()
+
+        obs_file = model_root / "sfincs.obs"
+        if obs_file.exists():
+            return SfincsPlotStage._parse_obs_names(obs_file)
+        return []
+
     def run(self) -> dict[str, Any]:
         """Read SFINCS output, fetch NOAA observations, and plot comparison."""
         from hydromt_sfincs import SfincsModel  # pyright: ignore[reportMissingImports]
@@ -786,19 +924,7 @@ class SfincsPlotStage(WorkflowStage):
             return {"status": "skipped", "reason": "no point_zs"}
 
         station_dim = self._station_dim(point_zs)
-
-        # Read observation point names written by HydroMT
-        obs_names: list[str] = []
-        if hasattr(mod, "observation_points") and hasattr(mod.observation_points, "geodataframe"):
-            gdf = mod.observation_points.geodataframe
-            if gdf is not None and not gdf.empty:
-                obs_names = gdf.index.tolist()
-
-        if not obs_names:
-            # Fallback: read the sfincs.obs file directly
-            obs_file = model_root / "sfincs.obs"
-            if obs_file.exists():
-                obs_names = self._parse_obs_names(obs_file)
+        obs_names = self._read_obs_names(mod, model_root)
 
         # Identify NOAA stations by the "noaa_" prefix
         noaa_indices: list[int] = []
@@ -812,56 +938,18 @@ class SfincsPlotStage(WorkflowStage):
             self._log("No NOAA observation points found, skipping plot stage")
             return {"status": "skipped", "reason": "no noaa stations"}
 
-        # Fetch observed water levels from NOAA CO-OPS in MLLW (universally
-        # supported) then convert to MSL to match SFINCS output (STOFS boundary
-        # conditions are in MSL).
+        # Fetch observed water levels (MLLW → MSL)
         self._update_substep("Fetching NOAA CO-OPS observations")
         sim = self.config.simulation
         begin_date = sim.start_date.strftime("%Y%m%d %H:%M")
         end_dt = sim.start_date + timedelta(hours=sim.duration_hours)
         end_date = end_dt.strftime("%Y%m%d %H:%M")
 
-        from coastal_calibration.coops_api import COOPSAPIClient, query_coops_byids
-
         try:
-            obs_ds = query_coops_byids(
-                noaa_station_ids,
-                begin_date,
-                end_date,
-                product="water_level",
-                datum="MLLW",
-                units="metric",
-                time_zone="gmt",
-            )
+            obs_ds = self._fetch_observations_msl(noaa_station_ids, begin_date, end_date)
         except Exception as exc:
             self._log(f"Failed to fetch NOAA observations: {exc}", "warning")
             return {"status": "skipped", "reason": f"coops fetch failed: {exc}"}
-
-        # Convert MLLW → MSL using per-station datum offsets.
-        self._update_substep("Converting observations from MLLW to MSL")
-        client = COOPSAPIClient()
-        try:
-            datums = client.get_datums(noaa_station_ids)
-        except ValueError:
-            datums = []
-
-        datum_map = {d.station_id: d for d in datums}
-        for sid in noaa_station_ids:
-            d = datum_map.get(sid)
-            if d is None:
-                self._log(f"Station {sid}: no datum info, skipping MLLW→MSL conversion", "warning")
-                continue
-            msl = d.get_datum_value("MSL")
-            mllw = d.get_datum_value("MLLW")
-            if msl is None or mllw is None:
-                self._log(f"Station {sid}: missing MSL/MLLW datum values, skipping", "warning")
-                continue
-            offset = msl - mllw
-            if d.units == "feet":
-                offset *= 0.3048
-            obs_ds.water_level.loc[{"station": sid}] -= offset
-            self._log(f"Station {sid}: MLLW→MSL offset = {offset:.4f} m")
-        obs_ds.attrs["datum"] = "MSL"
 
         # Plot comparison
         self._update_substep("Generating comparison plot")

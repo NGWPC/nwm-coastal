@@ -499,6 +499,12 @@ class SfincsModelConfig(ModelConfig):
         Whether to merge with pre-existing discharge source points.
     precip_dataset : str, optional
         Precipitation dataset name in the data catalog.
+    wind_dataset : str, optional
+        Wind dataset name in the data catalog.  The dataset must contain
+        ``wind10_u`` and ``wind10_v`` variables (m/s).
+    pressure_dataset : str, optional
+        Atmospheric pressure dataset name in the data catalog.  The
+        dataset must contain a ``press_msl`` variable (Pa).
     container_tag : str
         Tag for the ``deltares/sfincs-cpu`` Docker/Singularity image.
     container_image : Path, optional
@@ -519,6 +525,8 @@ class SfincsModelConfig(ModelConfig):
     discharge_locations_file: Path | None = None
     merge_discharge: bool = False
     precip_dataset: str | None = None
+    wind_dataset: str | None = None
+    pressure_dataset: str | None = None
     container_tag: str = "latest"
     container_image: Path | None = None
     omp_num_threads: int = field(default=0)
@@ -554,6 +562,8 @@ class SfincsModelConfig(ModelConfig):
             "sfincs_obs",
             "sfincs_discharge",
             "sfincs_precip",
+            "sfincs_wind",
+            "sfincs_pressure",
             "sfincs_write",
             "sfincs_run",
             "sfincs_plot",
@@ -606,9 +616,11 @@ class SfincsModelConfig(ModelConfig):
             SfincsObservationPointsStage,
             SfincsPlotStage,
             SfincsPrecipitationStage,
+            SfincsPressureStage,
             SfincsRunStage,
             SfincsSymlinksStage,
             SfincsTimingStage,
+            SfincsWindStage,
             SfincsWriteStage,
         )
 
@@ -622,6 +634,8 @@ class SfincsModelConfig(ModelConfig):
             "sfincs_obs": SfincsObservationPointsStage(config, monitor),
             "sfincs_discharge": SfincsDischargeStage(config, monitor),
             "sfincs_precip": SfincsPrecipitationStage(config, monitor),
+            "sfincs_wind": SfincsWindStage(config, monitor),
+            "sfincs_pressure": SfincsPressureStage(config, monitor),
             "sfincs_write": SfincsWriteStage(config, monitor),
             "sfincs_run": SfincsRunStage(config, monitor),
             "sfincs_plot": SfincsPlotStage(config, monitor),
@@ -652,6 +666,8 @@ class SfincsModelConfig(ModelConfig):
             ),
             "merge_discharge": self.merge_discharge,
             "precip_dataset": self.precip_dataset,
+            "wind_dataset": self.wind_dataset,
+            "pressure_dataset": self.pressure_dataset,
             "container_tag": self.container_tag,
             "container_image": (str(self.container_image) if self.container_image else None),
             "omp_num_threads": self.omp_num_threads,
