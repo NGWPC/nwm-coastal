@@ -556,6 +556,7 @@ class SfincsModelConfig(ModelConfig):
             "sfincs_precip",
             "sfincs_write",
             "sfincs_run",
+            "sfincs_plot",
         ]
 
     def build_environment(  # noqa: D102
@@ -603,6 +604,7 @@ class SfincsModelConfig(ModelConfig):
             SfincsForcingStage,
             SfincsInitStage,
             SfincsObservationPointsStage,
+            SfincsPlotStage,
             SfincsPrecipitationStage,
             SfincsRunStage,
             SfincsSymlinksStage,
@@ -622,6 +624,7 @@ class SfincsModelConfig(ModelConfig):
             "sfincs_precip": SfincsPrecipitationStage(config, monitor),
             "sfincs_write": SfincsWriteStage(config, monitor),
             "sfincs_run": SfincsRunStage(config, monitor),
+            "sfincs_plot": SfincsPlotStage(config, monitor),
         }
 
     def generate_job_script_lines(  # noqa: D102
