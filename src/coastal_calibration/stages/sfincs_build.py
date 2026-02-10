@@ -608,16 +608,21 @@ class SfincsRunStage(WorkflowStage):
 class SfincsPlotStage(WorkflowStage):
     """Plot simulated water levels against NOAA CO-OPS observations.
 
-    After the SFINCS run, this stage reads ``point_h`` from the model
-    output (``sfincs_his.nc``), identifies observation points whose names
-    start with ``noaa_`` (added by :class:`SfincsObservationPointsStage`),
-    fetches observed water levels from the NOAA CO-OPS API, and produces
-    a comparison time-series figure saved to ``<model_root>/figs/``.
+    After the SFINCS run, this stage reads ``point_zs`` (water surface
+    elevation) from the model output (``sfincs_his.nc``), identifies
+    observation points whose names start with ``noaa_`` (added by
+    :class:`SfincsObservationPointsStage`), fetches observed water levels
+    from the NOAA CO-OPS API, and produces a comparison time-series
+    figure saved to ``<model_root>/figs/``.
+
+    Observations are requested in NAVD88.  When a station does not
+    support NAVD, the stage falls back to MLLW and converts using the
+    station's datum offsets from the CO-OPS metadata API.
 
     The stage is a no-op when:
 
     * The model output file (``sfincs_his.nc``) does not exist.
-    * No ``point_h`` variable is present in the output.
+    * No ``point_zs`` (or ``point_h``) variable is present in the output.
     * No observation points with the ``noaa_`` prefix are found.
     """
 
@@ -679,7 +684,7 @@ class SfincsPlotStage(WorkflowStage):
         Parameters
         ----------
         point_h : xr.DataArray
-            Simulated water depths at observation points.
+            Simulated water surface elevation at observation points.
         station_dim : str
             Name of the station dimension in ``point_h``.
         noaa_indices : list[int]
@@ -769,12 +774,17 @@ class SfincsPlotStage(WorkflowStage):
         mod.read()
         mod.output.read()
 
-        if "point_h" not in mod.output.data:
-            self._log("No point_h in output, skipping plot stage")
-            return {"status": "skipped", "reason": "no point_h"}
+        # Prefer point_zs (water surface elevation) over point_h (water depth)
+        if "point_zs" in mod.output.data:
+            point_zs = mod.output.data["point_zs"]
+        elif "point_h" in mod.output.data:
+            self._log("point_zs not found, falling back to point_h (water depth)")
+            point_zs = mod.output.data["point_h"]
+        else:
+            self._log("No point_zs or point_h in output, skipping plot stage")
+            return {"status": "skipped", "reason": "no point_zs"}
 
-        point_h = mod.output.data["point_h"]
-        station_dim = self._station_dim(point_h)
+        station_dim = self._station_dim(point_zs)
 
         # Read observation point names written by HydroMT
         obs_names: list[str] = []
@@ -808,7 +818,7 @@ class SfincsPlotStage(WorkflowStage):
         end_dt = sim.start_date + timedelta(hours=sim.duration_hours)
         end_date = end_dt.strftime("%Y%m%d %H:%M")
 
-        from coastal_calibration.coops_api import query_coops_byids
+        from coastal_calibration.coops_api import COOPSAPIClient, query_coops_byids
 
         try:
             obs_ds = query_coops_byids(
@@ -816,7 +826,7 @@ class SfincsPlotStage(WorkflowStage):
                 begin_date,
                 end_date,
                 product="water_level",
-                datum="MSL",
+                datum="NAVD",
                 units="metric",
                 time_zone="gmt",
             )
@@ -824,9 +834,53 @@ class SfincsPlotStage(WorkflowStage):
             self._log(f"Failed to fetch NOAA observations: {exc}", "warning")
             return {"status": "skipped", "reason": f"coops fetch failed: {exc}"}
 
+        # For stations that don't support NAVD, fall back to MLLW and convert.
+        # Fetch datums once and correct any all-NaN stations.
+        self._update_substep("Applying datum corrections")
+        client = COOPSAPIClient()
+        try:
+            datums = client.get_datums(noaa_station_ids)
+        except ValueError:
+            datums = []
+
+        datum_map = {d.station_id: d for d in datums}
+        for sid in noaa_station_ids:
+            wl = obs_ds.water_level.sel(station=sid)
+            if wl.isnull().all():
+                # Station had no NAVD data, try MLLW and convert
+                self._log(f"Station {sid}: no NAVD data, fetching in MLLW and converting")
+                try:
+                    fallback = query_coops_byids(
+                        [sid],
+                        begin_date,
+                        end_date,
+                        product="water_level",
+                        datum="MLLW",
+                        units="metric",
+                        time_zone="gmt",
+                    )
+                    d = datum_map.get(sid)
+                    if d is not None:
+                        navd = d.get_datum_value("NAVD")
+                        mllw = d.get_datum_value("MLLW")
+                        if navd is not None and mllw is not None:
+                            offset = navd - mllw
+                            if d.units == "feet":
+                                offset *= 0.3048
+                            obs_ds.water_level.loc[{"station": sid}] = (
+                                fallback.water_level.sel(station=sid).reindex(time=obs_ds.time) - offset
+                            )
+                            self._log(f"Station {sid}: MLLW→NAVD offset = {offset:.4f} m")
+                        else:
+                            self._log(f"Station {sid}: missing NAVD/MLLW datum values, skipping", "warning")
+                    else:
+                        self._log(f"Station {sid}: no datum info, skipping conversion", "warning")
+                except Exception as exc:
+                    self._log(f"Station {sid}: MLLW fallback failed: {exc}", "warning")
+
         # Plot comparison
         self._update_substep("Generating comparison plot")
-        fig_path = self._plot_comparison(point_h, station_dim, noaa_indices, obs_ds, model_root)
+        fig_path = self._plot_comparison(point_zs, station_dim, noaa_indices, obs_ds, model_root)
 
         self._log(f"Comparison plot saved to {fig_path}")
         return {"status": "completed", "figure": str(fig_path)}
