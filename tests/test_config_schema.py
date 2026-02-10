@@ -116,7 +116,11 @@ class TestBoundaryConfig:
     def test_stofs_source(self):
         cfg = BoundaryConfig(source="stofs", stofs_file=Path("/tmp/stofs.nc"))
         assert cfg.source == "stofs"
-        assert cfg.stofs_file == Path("/tmp/stofs.nc")
+        assert cfg.stofs_file == Path("/tmp/stofs.nc").resolve()
+
+    def test_relative_stofs_file_resolved_to_absolute(self):
+        cfg = BoundaryConfig(source="stofs", stofs_file=Path("./data/stofs.nc"))
+        assert cfg.stofs_file.is_absolute()
 
 
 class TestPathConfig:
@@ -163,6 +167,30 @@ class TestPathConfig:
         cfg = PathConfig(work_dir=tmp_work_dir)
         geogrid = cfg.geogrid_file(sample_simulation_config)
         assert "geo_em_CONUS.nc" in str(geogrid)
+
+    def test_relative_work_dir_resolved_to_absolute(self):
+        cfg = PathConfig(work_dir="./relative_work")
+        assert cfg.work_dir.is_absolute()
+
+    def test_relative_download_dir_resolved_to_absolute(self):
+        cfg = PathConfig(work_dir="/tmp/work", raw_download_dir="./relative_dl")
+        assert cfg.raw_download_dir.is_absolute()
+
+    def test_relative_infra_paths_resolved_to_absolute(self):
+        """All infrastructure paths must be absolute even when given relative."""
+        cfg = PathConfig(
+            work_dir="/tmp/work",
+            parm_dir="./parm",
+            nfs_mount="./nfs",
+            singularity_image="./images/coastal.sif",
+            ngen_app_dir="./ngen",
+            hot_start_file="./hotstart.nc",
+        )
+        assert cfg.parm_dir.is_absolute()
+        assert cfg.nfs_mount.is_absolute()
+        assert cfg.singularity_image.is_absolute()
+        assert cfg.ngen_app_dir.is_absolute()
+        assert cfg.hot_start_file.is_absolute()
 
 
 class TestSchismModelConfig:
@@ -273,6 +301,21 @@ class TestSfincsModelConfig:
         assert any("ntasks=1" in line for line in lines)
         assert any("cpus-per-task" in line for line in lines)
 
+    def test_relative_paths_resolved_to_absolute(self):
+        """Regression: relative paths must be resolved to prevent doubled paths."""
+        cfg = SfincsModelConfig(
+            prebuilt_dir="./texas",
+            model_root="./tmp_run/sfincs_model",
+            discharge_locations_file="./texas/sfincs_nwm.src",
+            observation_locations_file="./texas/obs.geojson",
+            container_image="./images/sfincs.sif",
+        )
+        assert cfg.prebuilt_dir.is_absolute()
+        assert cfg.model_root.is_absolute()
+        assert cfg.discharge_locations_file.is_absolute()
+        assert cfg.observation_locations_file.is_absolute()
+        assert cfg.container_image.is_absolute()
+
 
 class TestMonitoringConfig:
     def test_defaults(self):
@@ -281,6 +324,10 @@ class TestMonitoringConfig:
         assert cfg.log_file is None
         assert cfg.enable_progress_tracking is True
         assert cfg.enable_timing is True
+
+    def test_relative_log_file_resolved_to_absolute(self):
+        cfg = MonitoringConfig(log_file=Path("./logs/run.log"))
+        assert cfg.log_file.is_absolute()
 
 
 class TestDownloadConfig:
@@ -522,6 +569,64 @@ class TestCoastalCalibConfig:
         cfg = CoastalCalibConfig.from_yaml(config_path)
         assert isinstance(cfg.model_config, SfincsModelConfig)
         assert cfg.model == "sfincs"
+
+    def test_relative_yaml_paths_resolve_to_absolute(self, tmp_path, monkeypatch):
+        """Regression: relative paths in YAML must resolve to absolute.
+
+        When users specify ``work_dir: ./tmp_run`` or
+        ``prebuilt_dir: ./texas`` in YAML, all derived paths (model root,
+        SIF path, etc.) must be absolute.  Previously relative paths were
+        kept as-is, which caused Singularity to double the model root when
+        ``cwd`` was set to ``model_root``.
+        """
+        from coastal_calibration.stages.sfincs_build import get_model_root, resolve_sif_path
+
+        # Simulate running from a subdirectory with relative paths in YAML
+        run_dir = tmp_path / "project" / "examples"
+        run_dir.mkdir(parents=True)
+        prebuilt = run_dir / "texas"
+        prebuilt.mkdir()
+        monkeypatch.chdir(run_dir)
+
+        config_dict = {
+            "model": "sfincs",
+            "slurm": {"user": "test"},
+            "simulation": {
+                "start_date": "2021-06-11",
+                "duration_hours": 3,
+                "coastal_domain": "atlgulf",
+                "meteo_source": "nwm_ana",
+            },
+            "boundary": {"source": "stofs"},
+            "paths": {
+                "work_dir": "./tmp_texas_run",
+                "raw_download_dir": "./tmp_texas_run/downloads",
+            },
+            "model_config": {
+                "prebuilt_dir": "./texas",
+            },
+        }
+        config_path = run_dir / "texas.yaml"
+        config_path.write_text(yaml.dump(config_dict))
+
+        cfg = CoastalCalibConfig.from_yaml(config_path)
+
+        # All path fields must be absolute
+        assert cfg.paths.work_dir.is_absolute()
+        assert cfg.paths.raw_download_dir.is_absolute()
+        assert cfg.model_config.prebuilt_dir.is_absolute()
+
+        # get_model_root and resolve_sif_path must also be absolute
+        model_root = get_model_root(cfg)
+        sif_path = resolve_sif_path(cfg)
+        assert model_root.is_absolute()
+        assert sif_path.is_absolute()
+
+        # The SIF path must live directly inside model_root, not in a
+        # doubled "model_root / model_root" subtree.
+        sif_relative = sif_path.relative_to(model_root)
+        assert ".." not in sif_relative.parts
+        assert sif_relative == Path(f"sfincs-cpu_{cfg.model_config.container_tag}.sif")
 
     def test_unknown_model_type(self, tmp_path):
         """Unknown model type raises ValueError."""
