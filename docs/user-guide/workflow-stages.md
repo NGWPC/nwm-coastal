@@ -1,9 +1,10 @@
 # Workflow Stages
 
-The SCHISM coastal calibration workflow consists of sequential stages, each performing a
-specific task in the simulation pipeline.
+The coastal calibration workflow consists of sequential stages, each performing a
+specific task in the simulation pipeline. The stage order depends on the selected model
+(SCHISM or SFINCS).
 
-## Stage Overview
+## SCHISM Stage Overview
 
 ```mermaid
 flowchart TD
@@ -17,7 +18,23 @@ flowchart TD
     H --> I[post_schism]
 ```
 
-## Stage Details
+## SFINCS Stage Overview
+
+```mermaid
+flowchart TD
+    A[download] --> B[sfincs_symlinks]
+    B --> C[sfincs_data_catalog]
+    C --> D[sfincs_init]
+    D --> E[sfincs_timing]
+    E --> F[sfincs_forcing]
+    F --> G[sfincs_obs]
+    G --> H[sfincs_discharge]
+    H --> I[sfincs_precip]
+    I --> J[sfincs_write]
+    J --> K[sfincs_run]
+```
+
+## SCHISM Stage Details
 
 ### 1. download
 
@@ -126,20 +143,6 @@ work_dir/
 
 **Runs On:** Compute node (inside Singularity)
 
-**Outputs (TPXO):**
-
-```
-work_dir/
-└── bctides.in
-```
-
-**Outputs (STOFS):**
-
-```
-work_dir/
-└── elev2D.th.nc
-```
-
 ### 7. pre_schism
 
 **Purpose:** Final preparation before SCHISM execution.
@@ -166,19 +169,9 @@ work_dir/
 
 **Configuration:**
 
-- Uses `nscribes` I/O processes from MPI config
+- Uses `nscribes` I/O processes from model config
 - OpenMP threads configured via `omp_num_threads`
-- Total processes = `nodes × ntasks_per_node`
-
-**Outputs:**
-
-```
-work_dir/outputs/
-├── out2d_*.nc
-├── horizontalVelX_*.nc
-├── horizontalVelY_*.nc
-└── ...
-```
+- Total processes = `nodes * ntasks_per_node`
 
 ### 9. post_schism
 
@@ -192,19 +185,117 @@ work_dir/outputs/
 
 **Runs On:** Compute node (inside Singularity)
 
+## SFINCS Stage Details
+
+### 1. download
+
+Same as SCHISM download stage. Downloads NWM meteorological forcing, streamflow, and
+STOFS water level data.
+
+### 2. sfincs_symlinks
+
+**Purpose:** Create .nc symlinks for NWM data.
+
+**Tasks:**
+
+- Create symlinks in the working directory pointing to downloaded NWM files
+- Organize files by type (meteo, hydro)
+
+### 3. sfincs_data_catalog
+
+**Purpose:** Generate a HydroMT data catalog.
+
+**Tasks:**
+
+- Build YAML data catalog for HydroMT-SFINCS
+- Register NWM meteo, streamflow, and STOFS data sources
+
+### 4. sfincs_init
+
+**Purpose:** Initialise the SFINCS model from a pre-built template.
+
+**Tasks:**
+
+- Load pre-built SFINCS model from `prebuilt_dir`
+- Set up model directory structure
+
+### 5. sfincs_timing
+
+**Purpose:** Set SFINCS model timing.
+
+**Tasks:**
+
+- Configure simulation start/end times
+- Set output intervals
+
+### 6. sfincs_forcing
+
+**Purpose:** Add water level forcing.
+
+**Tasks:**
+
+- Interpolate STOFS water levels to SFINCS boundary points
+- Generate boundary forcing files
+
+### 7. sfincs_obs
+
+**Purpose:** Add observation points.
+
+**Tasks:**
+
+- Add tide gauge locations from `observation_points`
+- Configure observation output
+
+### 8. sfincs_discharge
+
+**Purpose:** Add discharge sources.
+
+**Tasks:**
+
+- Add NWM streamflow discharge points from `discharge_locations_file`
+- Generate discharge forcing time series
+
+### 9. sfincs_precip
+
+**Purpose:** Add precipitation forcing.
+
+**Tasks:**
+
+- Add NWM precipitation data as spatially distributed forcing
+
+### 10. sfincs_write
+
+**Purpose:** Write the final SFINCS model.
+
+**Tasks:**
+
+- Write all SFINCS input files (`sfincs.inp`, `sfincs.bnd`, etc.)
+- Generate boundary and forcing NetCDF files
+
+### 11. sfincs_run
+
+**Purpose:** Execute the SFINCS model.
+
+**Tasks:**
+
+- Run SFINCS inside Singularity container
+- Uses single-node OpenMP parallelism (`omp_num_threads`)
+
+**Runs On:** Compute node (OpenMP, inside Singularity)
+
 ## Running Partial Workflows
 
 ### CLI
 
 ```bash
-# Run only download stage
+# SCHISM examples
 coastal-calibration run config.yaml --stop-after download
-
-# Run forcing stages only
 coastal-calibration run config.yaml --start-from pre_forcing --stop-after post_forcing
-
-# Run from boundary conditions to end
 coastal-calibration run config.yaml --start-from boundary_conditions
+
+# SFINCS examples
+coastal-calibration run config.yaml --stop-after sfincs_write
+coastal-calibration run config.yaml --start-from sfincs_run
 ```
 
 ### Python API
@@ -218,22 +309,6 @@ runner = CoastalCalibRunner(config)
 # Run specific stages
 result = runner.run(start_from="pre_forcing", stop_after="post_forcing")
 ```
-
-## Stage Dependencies
-
-Each stage depends on outputs from previous stages:
-
-| Stage                 | Requires                      |
-| --------------------- | ----------------------------- |
-| `download`            | Network access, valid config  |
-| `pre_forcing`         | Downloaded NWM data           |
-| `nwm_forcing`         | Prepared forcing inputs       |
-| `post_forcing`        | Generated forcing files       |
-| `update_params`       | Simulation configuration      |
-| `boundary_conditions` | TPXO data or downloaded STOFS |
-| `pre_schism`          | Forcing, params, boundaries   |
-| `schism_run`          | All SCHISM inputs prepared    |
-| `post_schism`         | SCHISM output files           |
 
 ## Error Handling
 

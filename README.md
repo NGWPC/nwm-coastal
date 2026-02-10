@@ -1,7 +1,7 @@
 # Coastal Calibration: Coastal Model Calibration Workflow
 
-A Python package for running SCHISM coastal model calibration workflow on HPC clusters
-with Singularity containers and SLURM job scheduling.
+A Python package for running SCHISM and SFINCS coastal model calibration workflows on
+HPC clusters with Singularity containers and SLURM job scheduling.
 
 ## Installation
 
@@ -42,11 +42,16 @@ it is required when running from the development environment.
 Generate a configuration file, adjust it, then submit:
 
 ```bash
+# SCHISM (default)
 coastal-calibration init config.yaml --domain hawaii
+
+# SFINCS
+coastal-calibration init config.yaml --domain atlgulf --model sfincs
 ```
 
-Edit `config.yaml` to set your simulation parameters. A minimal configuration only
-requires the following (paths are auto-generated based on user, domain, and source):
+Edit `config.yaml` to set your simulation parameters. A minimal SCHISM configuration
+only requires the following (paths are auto-generated based on user, domain, and
+source):
 
 ```yaml
 slurm:
@@ -61,6 +66,29 @@ simulation:
 
 boundary:
   source: stofs
+```
+
+A minimal SFINCS configuration requires a `model` key and a `model_config` section
+pointing to a pre-built SFINCS model:
+
+```yaml
+model: sfincs
+
+slurm:
+  job_name: my_sfincs_run
+  user: your_username
+
+simulation:
+  start_date: 2025-06-01
+  duration_hours: 168
+  coastal_domain: atlgulf
+  meteo_source: nwm_ana
+
+boundary:
+  source: stofs
+
+model_config:
+  prebuilt_dir: /path/to/prebuilt/sfincs/model
 ```
 
 Validate and submit:
@@ -137,15 +165,46 @@ result = runner.run(start_from="pre_schism")
 
 ### SLURM Settings
 
-| Parameter         | Type | Default               | Description             |
-| ----------------- | ---- | --------------------- | ----------------------- |
-| `job_name`        | str  | `coastal_calibration` | SLURM job name          |
-| `nodes`           | int  | 2                     | Number of nodes         |
-| `ntasks_per_node` | int  | 18                    | Tasks per node          |
-| `partition`       | str  | `c5n-18xlarge`        | SLURM partition         |
-| `exclusive`       | bool | true                  | Request exclusive nodes |
-| `time_limit`      | str  | null                  | Time limit (HH:MM:SS)   |
-| `account`         | str  | null                  | SLURM account           |
+| Parameter    | Type | Default               | Description        |
+| ------------ | ---- | --------------------- | ------------------ |
+| `job_name`   | str  | `coastal_calibration` | SLURM job name     |
+| `partition`  | str  | `c5n-18xlarge`        | SLURM partition    |
+| `time_limit` | str  | null                  | Time limit         |
+| `account`    | str  | null                  | SLURM account      |
+| `qos`        | str  | null                  | Quality of Service |
+| `user`       | str  | null                  | SLURM username     |
+
+### Model Configuration
+
+Model-specific parameters live in `model_config`. The `model` key selects which model
+type to use (`schism` or `sfincs`). SCHISM is the default when no `model` key is
+present.
+
+#### SCHISM (`SchismModelConfig`)
+
+| Parameter         | Type | Default                                     | Description                  |
+| ----------------- | ---- | ------------------------------------------- | ---------------------------- |
+| `nodes`           | int  | 2                                           | Number of compute nodes      |
+| `ntasks_per_node` | int  | 18                                          | MPI tasks per node           |
+| `exclusive`       | bool | true                                        | Request exclusive nodes      |
+| `nscribes`        | int  | 2                                           | Number of SCHISM I/O scribes |
+| `omp_num_threads` | int  | 2                                           | OpenMP threads               |
+| `oversubscribe`   | bool | false                                       | Allow MPI oversubscription   |
+| `binary`          | str  | `pschism_wcoss2_NO_PARMETIS_TVD-VL.openmpi` | SCHISM executable name       |
+
+#### SFINCS (`SfincsModelConfig`)
+
+| Parameter                    | Type | Default  | Description                     |
+| ---------------------------- | ---- | -------- | ------------------------------- |
+| `prebuilt_dir`               | path | required | Path to pre-built SFINCS model  |
+| `observation_points`         | list | `[]`     | Observation point coordinates   |
+| `observation_locations_file` | path | null     | Observation locations file      |
+| `merge_observations`         | bool | false    | Merge observations into model   |
+| `discharge_locations_file`   | path | null     | Discharge source locations file |
+| `merge_discharge`            | bool | false    | Merge discharge into model      |
+| `omp_num_threads`            | int  | 36       | OpenMP threads                  |
+| `container_tag`              | str  | latest   | SFINCS container tag            |
+| `container_image`            | path | null     | Singularity image path          |
 
 ### Simulation Settings
 
@@ -174,14 +233,6 @@ result = runner.run(start_from="pre_schism")
 | `singularity_image` | path | `/ngencerf-app/singularity/ngen-coastal.sif` | Singularity image                  |
 | `hot_start_file`    | path | null                                         | Hot restart file for warm start    |
 
-### MPI Settings
-
-| Parameter         | Type | Default                                     | Description                  |
-| ----------------- | ---- | ------------------------------------------- | ---------------------------- |
-| `nscribes`        | int  | 2                                           | Number of SCHISM I/O scribes |
-| `omp_num_threads` | int  | 2                                           | OpenMP threads               |
-| `schism_binary`   | str  | `pschism_wcoss2_NO_PARMETIS_TVD-VL.openmpi` | SCHISM executable name       |
-
 ## Supported Domains and Data Sources
 
 **Domains**: `atlgulf`, `pacific`, `hawaii`, `prvi`
@@ -196,6 +247,8 @@ result = runner.run(start_from="pre_schism")
 
 ## Workflow Stages
 
+### SCHISM Stages
+
 1. **`download`** - Download NWM/STOFS data
 1. **`pre_forcing`** - Prepare NWM forcing data
 1. **`nwm_forcing`** - Generate atmospheric forcing (MPI)
@@ -205,6 +258,20 @@ result = runner.run(start_from="pre_schism")
 1. **`pre_schism`** - Prepare SCHISM inputs
 1. **`schism_run`** - Run SCHISM model (MPI)
 1. **`post_schism`** - Post-process outputs
+
+### SFINCS Stages
+
+1. **`download`** - Download NWM/STOFS data
+1. **`sfincs_symlinks`** - Create `.nc` symlinks for NWM data
+1. **`sfincs_data_catalog`** - Generate HydroMT data catalog
+1. **`sfincs_init`** - Initialize SFINCS model (pre-built)
+1. **`sfincs_timing`** - Set SFINCS timing
+1. **`sfincs_forcing`** - Add water level forcing
+1. **`sfincs_obs`** - Add observation points
+1. **`sfincs_discharge`** - Add discharge sources
+1. **`sfincs_precip`** - Add precipitation forcing
+1. **`sfincs_write`** - Write SFINCS model
+1. **`sfincs_run`** - Run SFINCS model (Singularity)
 
 ## Configuration Inheritance
 
@@ -248,6 +315,7 @@ simulation:
 ```bash
 # Generate a new configuration file
 coastal-calibration init config.yaml --domain pacific
+coastal-calibration init config.yaml --domain atlgulf --model sfincs
 
 # Validate a configuration file
 coastal-calibration validate config.yaml
@@ -265,6 +333,8 @@ coastal-calibration run config.yaml --start-from update_params
 
 # List available workflow stages
 coastal-calibration stages
+coastal-calibration stages --model schism
+coastal-calibration stages --model sfincs
 ```
 
 ## License

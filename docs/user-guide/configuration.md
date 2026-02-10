@@ -5,7 +5,9 @@ documents all available configuration options.
 
 ## Minimal Configuration
 
-The simplest valid configuration only requires:
+### SCHISM (default)
+
+The simplest valid SCHISM configuration only requires:
 
 ```yaml
 slurm:
@@ -22,7 +24,32 @@ boundary:
   source: stofs
 ```
 
-All other parameters have sensible defaults.
+All other parameters have sensible defaults. When no `model` key is present, SCHISM is
+assumed.
+
+### SFINCS
+
+A minimal SFINCS configuration requires a `model` key and a `model_config` section:
+
+```yaml
+model: sfincs
+
+slurm:
+  job_name: my_sfincs_run
+  user: your_username
+
+simulation:
+  start_date: 2025-06-01
+  duration_hours: 168
+  coastal_domain: atlgulf
+  meteo_source: nwm_ana
+
+boundary:
+  source: stofs
+
+model_config:
+  prebuilt_dir: /path/to/prebuilt/sfincs/model
+```
 
 ## Variable Interpolation
 
@@ -42,43 +69,48 @@ paths:
 
 ### Default Path Templates
 
-If not specified, paths are automatically generated:
+If not specified, paths are automatically generated using model-aware templates:
 
-| Path               | Default Template                                                                                                                                     |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `work_dir`         | `/ngen-test/coastal/${slurm.user}/schism_${simulation.coastal_domain}_${boundary.source}_${simulation.meteo_source}/schism_${simulation.start_date}` |
-| `raw_download_dir` | `/ngen-test/coastal/${slurm.user}/schism_${simulation.coastal_domain}_${boundary.source}_${simulation.meteo_source}/raw_data`                        |
+| Path               | Default Template                                                                                                                                         |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `work_dir`         | `/ngen-test/coastal/${slurm.user}/${model}_${simulation.coastal_domain}_${boundary.source}_${simulation.meteo_source}/${model}_${simulation.start_date}` |
+| `raw_download_dir` | `/ngen-test/coastal/${slurm.user}/${model}_${simulation.coastal_domain}_${boundary.source}_${simulation.meteo_source}/raw_data`                          |
+
+The `${model}` variable resolves to `schism` or `sfincs` based on the `model` key.
 
 ## Configuration Sections
 
+### Model Selection
+
+The top-level `model` key selects the model type. It defaults to `schism` if omitted.
+
+```yaml
+model: sfincs  # or "schism" (default)
+```
+
 ### SLURM Settings
 
-Configure SLURM job submission:
+Configure SLURM job scheduling. Compute resources (nodes, tasks) are model-specific and
+live in the `model_config` section.
 
 ```yaml
 slurm:
   job_name: coastal_calibration  # Job name shown in squeue
   user: your_username            # Required: your SLURM username
-  nodes: 2                       # Number of compute nodes
-  ntasks_per_node: 18            # MPI tasks per node
   partition: c5n-18xlarge        # SLURM partition
-  exclusive: true                # Request exclusive node access
   time_limit:                    # Time limit (HH:MM:SS), null for no limit
   account:                       # SLURM account for billing
   qos:                           # Quality of Service
 ```
 
-| Parameter         | Type   | Default               | Description             |
-| ----------------- | ------ | --------------------- | ----------------------- |
-| `job_name`        | string | `coastal_calibration` | SLURM job name          |
-| `user`            | string | **required**          | Your SLURM username     |
-| `nodes`           | int    | 2                     | Number of nodes         |
-| `ntasks_per_node` | int    | 18                    | Tasks per node          |
-| `partition`       | string | `c5n-18xlarge`        | SLURM partition         |
-| `exclusive`       | bool   | true                  | Request exclusive nodes |
-| `time_limit`      | string | null                  | Time limit (HH:MM:SS)   |
-| `account`         | string | null                  | SLURM account           |
-| `qos`             | string | null                  | Quality of Service      |
+| Parameter    | Type   | Default               | Description         |
+| ------------ | ------ | --------------------- | ------------------- |
+| `job_name`   | string | `coastal_calibration` | SLURM job name      |
+| `user`       | string | **required**          | Your SLURM username |
+| `partition`  | string | `c5n-18xlarge`        | SLURM partition     |
+| `time_limit` | string | null                  | Time limit          |
+| `account`    | string | null                  | SLURM account       |
+| `qos`        | string | null                  | Quality of Service  |
 
 ### Simulation Settings
 
@@ -154,24 +186,63 @@ paths:
 | `conda_env_name`    | string | `ngen_forcing_coastal`                       |
 | `parm_dir`          | path   | `/ngen-test/coastal/ngwpc-coastal`           |
 
-### MPI Settings
+### Model Configuration
 
-Configure MPI execution:
+Model-specific parameters live in the `model_config` section. The contents depend on the
+`model` key.
+
+#### SCHISM Model Configuration
 
 ```yaml
-mpi:
+# model: schism (default, can be omitted)
+model_config:
+  nodes: 2                        # Number of compute nodes
+  ntasks_per_node: 18             # MPI tasks per node
+  exclusive: true                 # Request exclusive node access
   nscribes: 2                     # SCHISM I/O scribes
   omp_num_threads: 2              # OpenMP threads
   oversubscribe: false            # Allow MPI oversubscription
-  schism_binary: pschism_wcoss2_NO_PARMETIS_TVD-VL.openmpi
+  binary: pschism_wcoss2_NO_PARMETIS_TVD-VL.openmpi
 ```
 
 | Parameter         | Type   | Default                                     |
 | ----------------- | ------ | ------------------------------------------- |
+| `nodes`           | int    | 2                                           |
+| `ntasks_per_node` | int    | 18                                          |
+| `exclusive`       | bool   | true                                        |
 | `nscribes`        | int    | 2                                           |
 | `omp_num_threads` | int    | 2                                           |
 | `oversubscribe`   | bool   | false                                       |
-| `schism_binary`   | string | `pschism_wcoss2_NO_PARMETIS_TVD-VL.openmpi` |
+| `binary`          | string | `pschism_wcoss2_NO_PARMETIS_TVD-VL.openmpi` |
+
+#### SFINCS Model Configuration
+
+```yaml
+model: sfincs
+
+model_config:
+  prebuilt_dir: /path/to/model    # Required: pre-built SFINCS model directory
+  observation_points: []          # Observation point coordinates
+  observation_locations_file:     # Observation locations file
+  merge_observations: false       # Merge observations into model
+  discharge_locations_file:       # Discharge source locations file
+  merge_discharge: false          # Merge discharge into model
+  omp_num_threads: 36             # OpenMP threads
+  container_tag: latest           # SFINCS container tag
+  container_image:                # Singularity image path
+```
+
+| Parameter                    | Type   | Default  |
+| ---------------------------- | ------ | -------- |
+| `prebuilt_dir`               | path   | required |
+| `observation_points`         | list   | `[]`     |
+| `observation_locations_file` | path   | null     |
+| `merge_observations`         | bool   | false    |
+| `discharge_locations_file`   | path   | null     |
+| `merge_discharge`            | bool   | false    |
+| `omp_num_threads`            | int    | 36       |
+| `container_tag`              | string | latest   |
+| `container_image`            | path   | null     |
 
 ### Monitoring Settings
 
@@ -222,7 +293,6 @@ Use `_base` to inherit settings from another configuration file:
 slurm:
   job_name: coastal_sim
   user: your_username
-  nodes: 2
 
 simulation:
   duration_hours: 24
@@ -270,4 +340,5 @@ The validation checks:
 - Date ranges are valid for selected data sources
 - File paths exist (for required files)
 - SLURM parameters are valid
-- MPI configuration is consistent
+- Model-specific configuration is consistent (e.g., nscribes < total MPI tasks for
+    SCHISM)

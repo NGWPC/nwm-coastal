@@ -5,7 +5,7 @@
 - Python >= 3.11
 - Access to an HPC cluster with SLURM and Singularity
 - NFS mount point (default: `/ngen-test`)
-- Singularity image with SCHISM and dependencies pre-compiled
+- Singularity image with SCHISM and/or SFINCS and dependencies pre-compiled
 
 !!! note "Model Executables"
 

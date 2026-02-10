@@ -43,9 +43,10 @@ config = CoastalCalibConfig.from_yaml("config.yaml")
 print(config.slurm.job_name)
 print(config.simulation.coastal_domain)
 print(config.paths.work_dir)
+print(config.model)  # "schism" or "sfincs"
 ```
 
-### Creating Configuration Programmatically
+### Creating SCHISM Configuration Programmatically
 
 ```python
 from datetime import datetime
@@ -56,43 +57,76 @@ from coastal_calibration import (
     SimulationConfig,
     BoundaryConfig,
     PathConfig,
-    MPIConfig,
+    SchismModelConfig,
     MonitoringConfig,
     DownloadConfig,
 )
 
-# Create configuration components
-slurm = SlurmConfig(
-    job_name="my_simulation",
-    user="your_username",
-    nodes=2,
-    ntasks_per_node=18,
-)
-
-simulation = SimulationConfig(
-    start_date=datetime(2021, 6, 11),
-    duration_hours=24,
-    coastal_domain="hawaii",
-    meteo_source="nwm_ana",
-)
-
-boundary = BoundaryConfig(source="stofs")
-
-paths = PathConfig(
-    work_dir=Path("/ngen-test/coastal/your_username/my_run"),
-    raw_download_dir=Path("/ngen-test/coastal/your_username/downloads"),
-)
-
-# Combine into full configuration
 config = CoastalCalibConfig(
-    slurm=slurm,
-    simulation=simulation,
-    boundary=boundary,
-    paths=paths,
+    slurm=SlurmConfig(
+        job_name="my_simulation",
+        user="your_username",
+    ),
+    simulation=SimulationConfig(
+        start_date=datetime(2021, 6, 11),
+        duration_hours=24,
+        coastal_domain="hawaii",
+        meteo_source="nwm_ana",
+    ),
+    boundary=BoundaryConfig(source="stofs"),
+    paths=PathConfig(
+        work_dir=Path("/ngen-test/coastal/your_username/my_run"),
+        raw_download_dir=Path("/ngen-test/coastal/your_username/downloads"),
+    ),
+    model_config=SchismModelConfig(
+        nodes=2,
+        ntasks_per_node=18,
+    ),
 )
 
 # Save to YAML
 config.to_yaml("generated_config.yaml")
+```
+
+### Creating SFINCS Configuration Programmatically
+
+```python
+from datetime import datetime
+from pathlib import Path
+from coastal_calibration import (
+    CoastalCalibConfig,
+    SlurmConfig,
+    SimulationConfig,
+    BoundaryConfig,
+    PathConfig,
+    SfincsModelConfig,
+)
+
+TEXAS_DIR = Path("/path/to/texas/model")
+
+config = CoastalCalibConfig(
+    slurm=SlurmConfig(user="your_username"),
+    simulation=SimulationConfig(
+        start_date=datetime(2025, 6, 1),
+        duration_hours=168,
+        coastal_domain="atlgulf",
+        meteo_source="nwm_ana",
+    ),
+    boundary=BoundaryConfig(source="stofs"),
+    paths=PathConfig(
+        work_dir=Path("/tmp/sfincs_run"),
+        raw_download_dir=Path("/tmp/sfincs_downloads"),
+    ),
+    model_config=SfincsModelConfig(
+        prebuilt_dir=TEXAS_DIR,
+        discharge_locations_file=TEXAS_DIR / "sfincs_nwm.src",
+        observation_points=[
+            {"x": 830344.95, "y": 3187383.41, "name": "Sargent"},
+        ],
+        merge_observations=False,
+        merge_discharge=False,
+    ),
+)
 ```
 
 ### Configuration Validation

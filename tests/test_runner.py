@@ -7,6 +7,7 @@ from datetime import datetime
 
 import pytest
 
+from coastal_calibration.config.schema import SchismModelConfig, SfincsModelConfig
 from coastal_calibration.runner import CoastalCalibRunner, WorkflowResult
 
 
@@ -91,6 +92,7 @@ class TestWorkflowResult:
 
 class TestCoastalCalibRunner:
     def test_schism_stage_order(self):
+        """SchismModelConfig.stage_order returns the correct SCHISM stages."""
         expected = [
             "download",
             "pre_forcing",
@@ -102,9 +104,10 @@ class TestCoastalCalibRunner:
             "schism_run",
             "post_schism",
         ]
-        assert expected == CoastalCalibRunner.SCHISM_STAGE_ORDER
+        assert expected == SchismModelConfig().stage_order
 
-    def test_sfincs_stage_order(self):
+    def test_sfincs_stage_order(self, tmp_path):
+        """SfincsModelConfig.stage_order returns the correct SFINCS stages."""
         expected = [
             "download",
             "sfincs_symlinks",
@@ -118,12 +121,12 @@ class TestCoastalCalibRunner:
             "sfincs_write",
             "sfincs_run",
         ]
-        assert expected == CoastalCalibRunner.SFINCS_STAGE_ORDER
+        assert expected == SfincsModelConfig(prebuilt_dir=tmp_path).stage_order
 
     def test_stage_order_property(self, sample_config):
         runner = CoastalCalibRunner(sample_config)
-        # Default model is "schism"
-        assert runner.STAGE_ORDER == CoastalCalibRunner.SCHISM_STAGE_ORDER
+        # Default model is "schism" -> stage_order comes from SchismModelConfig
+        assert SchismModelConfig().stage_order == runner.STAGE_ORDER
 
     def test_init(self, sample_config):
         runner = CoastalCalibRunner(sample_config)

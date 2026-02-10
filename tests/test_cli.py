@@ -17,9 +17,23 @@ class TestCLIStages:
     def test_stages_command(self, runner):
         result = runner.invoke(cli, ["stages"])
         assert result.exit_code == 0
+        # Both SCHISM and SFINCS stages shown by default
         assert "download" in result.output
         assert "schism_run" in result.output
         assert "boundary_conditions" in result.output
+        assert "sfincs_run" in result.output
+
+    def test_stages_schism_only(self, runner):
+        result = runner.invoke(cli, ["stages", "--model", "schism"])
+        assert result.exit_code == 0
+        assert "schism_run" in result.output
+        assert "sfincs_run" not in result.output
+
+    def test_stages_sfincs_only(self, runner):
+        result = runner.invoke(cli, ["stages", "--model", "sfincs"])
+        assert result.exit_code == 0
+        assert "sfincs_run" in result.output
+        assert "schism_run" not in result.output
 
 
 class TestCLIInit:
@@ -52,6 +66,14 @@ class TestCLIInit:
         output_path.write_text("existing")
         result = runner.invoke(cli, ["init", str(output_path)], input="n\n")
         assert result.exit_code != 0  # Abort
+
+    def test_init_sfincs(self, runner, tmp_path):
+        output_path = tmp_path / "config.yaml"
+        result = runner.invoke(cli, ["init", str(output_path), "--model", "sfincs"])
+        assert result.exit_code == 0
+        content = output_path.read_text()
+        assert "model: sfincs" in content
+        assert "prebuilt_dir" in content
 
 
 class TestCLIValidate:

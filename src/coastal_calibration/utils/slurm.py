@@ -259,13 +259,12 @@ class SlurmManager:
         script_lines = [
             "#!/usr/bin/env bash",
             f"#SBATCH --job-name={slurm.job_name}",
-            f"#SBATCH -N {slurm.nodes}",
             f"#SBATCH --partition={slurm.partition}",
-            f"#SBATCH --ntasks-per-node={slurm.ntasks_per_node}",
         ]
 
-        if slurm.exclusive:
-            script_lines.append("#SBATCH --exclusive")
+        # Model-specific compute directives (nodes, tasks, exclusive, etc.)
+        script_lines.extend(self.config.model_config.generate_job_script_lines(self.config))
+
         if slurm.time_limit:
             script_lines.append(f"#SBATCH --time={slurm.time_limit}")
         if slurm.account:
@@ -284,10 +283,6 @@ class SlurmManager:
 
         script_lines.extend(
             [
-                "",
-                f"export NODES={slurm.nodes}",
-                f"export NCORES={slurm.ntasks_per_node}",
-                "export NPROCS=$((NODES*NCORES))",
                 "",
                 "set -euox pipefail",
                 "",

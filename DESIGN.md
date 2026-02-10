@@ -24,9 +24,9 @@ ______________________________________________________________________
 ## Executive Summary
 
 The `coastal-calibration` package provides a modern Python interface for running SCHISM
-model calibration workflows on HPC clusters. It wraps the existing operational workflow
-scripts with a clean, type-safe API while establishing the foundation for incremental
-improvements.
+and SFINCS coastal model calibration workflows on HPC clusters. It wraps the existing
+operational workflow scripts with a clean, type-safe API while establishing the
+foundation for incremental improvements.
 
 ### Design Goals
 
@@ -36,8 +36,8 @@ The primary objectives of this rewrite are to create a workflow that is:
     helpful error messages
 1. **Less prone to errors** - Type-safe configuration, comprehensive validation,
     structured logging
-1. **Extensible** - Clean stage-based architecture that allows adding new models
-    (SFINCS) and features
+1. **Extensible** - Polymorphic model architecture that supports SCHISM, SFINCS, and
+    future models via a common `ModelConfig` ABC
 
 ### Architectural Strategy
 
@@ -205,7 +205,7 @@ src/coastal_calibration/
 │
 ├── config/
 │   ├── __init__.py
-│   └── schema.py                # YAML config dataclasses (613 lines)
+│   └── schema.py                # YAML config dataclasses + ModelConfig ABC
 │
 ├── stages/                      # Workflow stages
 │   ├── __init__.py
@@ -214,7 +214,8 @@ src/coastal_calibration/
 │   ├── forcing.py               # NWM forcing stages
 │   ├── boundary.py              # Boundary condition stages
 │   ├── schism.py                # SCHISM execution stages
-│   └── sfincs.py                # SFINCS infrastructure (future)
+│   ├── sfincs.py                # SFINCS data catalog & symlinks
+│   └── sfincs_build.py          # SFINCS model build stages (HydroMT)
 │
 ├── scripts/                     # Embedded bash scripts
 │   ├── tpxo_to_open_bnds_hgrid/ # TPXO Python utilities
@@ -284,8 +285,6 @@ Benefits:
 ```yaml
 # base.yaml - Shared defaults
 slurm:
-  nodes: 2
-  ntasks_per_node: 18
   partition: c5n-18xlarge
 
 paths:
@@ -313,18 +312,19 @@ Features:
 - **Deep merging**: Override only what changes
 - **Smart defaults**: Minimal configuration required
 
-When paths are not specified, they are automatically generated using templates:
+When paths are not specified, they are automatically generated using templates that
+include the `${model}` variable for model-aware directory naming:
 
 ```python
 DEFAULT_WORK_DIR_TEMPLATE = (
     "/ngen-test/coastal/${slurm.user}/"
-    "schism_${simulation.coastal_domain}_${boundary.source}_${simulation.meteo_source}/"
-    "schism_${simulation.start_date}"
+    "${model}_${simulation.coastal_domain}_${boundary.source}_${simulation.meteo_source}/"
+    "${model}_${simulation.start_date}"
 )
 
 DEFAULT_RAW_DOWNLOAD_DIR_TEMPLATE = (
     "/ngen-test/coastal/${slurm.user}/"
-    "schism_${simulation.coastal_domain}_${boundary.source}_${simulation.meteo_source}/"
+    "${model}_${simulation.coastal_domain}_${boundary.source}_${simulation.meteo_source}/"
     "raw_data"
 )
 ```
@@ -338,6 +338,11 @@ flowchart TD
 
 #### 3. Stage-Based Workflow Architecture
 
+The stage pipeline is model-specific. Each `ModelConfig` subclass defines its own
+`stage_order` and `create_stages()`.
+
+**SCHISM pipeline:**
+
 ```mermaid
 flowchart TD
     A[download] --> B[pre_forcing]
@@ -348,6 +353,22 @@ flowchart TD
     F --> G[pre_schism]
     G --> H[schism_run]
     H --> I[post_schism]
+```
+
+**SFINCS pipeline:**
+
+```mermaid
+flowchart TD
+    A[download] --> B[sfincs_symlinks]
+    B --> C[sfincs_data_catalog]
+    C --> D[sfincs_init]
+    D --> E[sfincs_timing]
+    E --> F[sfincs_forcing]
+    F --> G[sfincs_obs]
+    G --> H[sfincs_discharge]
+    H --> I[sfincs_precip]
+    I --> J[sfincs_write]
+    J --> K[sfincs_run]
 ```
 
 Each stage is a Python class inheriting from `WorkflowStage`:
@@ -363,6 +384,7 @@ classDiagram
     WorkflowStage <|-- ForcingStage
     WorkflowStage <|-- BoundaryStage
     WorkflowStage <|-- SCHISMStage
+    WorkflowStage <|-- SFINCSBuildStage
 ```
 
 The base class implementation:
@@ -413,17 +435,10 @@ class WorkflowStage(ABC):
 class CoastalCalibRunner:
     """Main workflow runner for coastal model calibration."""
 
-    STAGE_ORDER: ClassVar[list[str]] = [
-        "download",
-        "pre_forcing",
-        "nwm_forcing",
-        "post_forcing",
-        "update_params",
-        "boundary_conditions",
-        "pre_schism",
-        "schism_run",
-        "post_schism",
-    ]
+    @property
+    def STAGE_ORDER(self) -> list[str]:
+        """Stage order is delegated to the model config."""
+        return self.config.model_config.stage_order
 
     def run(
         self,
@@ -505,14 +520,17 @@ The module also consolidates `parse_datetime()` (flexible datetime parsing, prev
 duplicated in `config.schema` and `downloader`) and `iter_hours()` (hour-range
 iteration, previously in `downloader`).
 
-**Impact**: The `build_environment()` method precomputes all date-derived values:
+**Impact**: The `build_environment()` method precomputes shared date-derived values,
+then delegates model-specific env vars to `model_config.build_environment()`:
 
 ```python
-# All dates computed once in Python, passed to bash scripts
+# Shared dates computed once in Python, passed to bash scripts
 env["FORCING_BEGIN_DATE"] = f"{pdycyc}00"
 env["FORCING_END_DATE"] = forcing_end_dt.strftime("%Y%m%d%H00")
-env["SCHISM_BEGIN_DATE"] = schism_begin_dt.strftime("%Y%m%d%H00")
 env["END_DATETIME"] = forcing_end_dt.strftime("%Y%m%d%H")
+
+# Model-specific env vars (e.g., SCHISM_BEGIN_DATE, OMP_NUM_THREADS)
+env = self.config.model_config.build_environment(env, self.config)
 ```
 
 ### 2. Integrated Data Downloading with Validation
@@ -581,13 +599,11 @@ def download_data(
 - Explicit configuration is self-documenting
 - Easier to version control and share
 
-**Example configuration**:
+**Example SCHISM configuration**:
 
 ```yaml
 slurm:
   job_name: coastal_calibration
-  nodes: 2
-  ntasks_per_node: 18
   partition: c5n-18xlarge
 
 simulation:
@@ -603,9 +619,39 @@ paths:
   work_dir: /ngen-test/coastal_runs/my_run
   raw_download_dir: /ngen-test/data/downloads
 
-mpi:
+# SCHISM compute parameters (model_config defaults to SchismModelConfig)
+model_config:
+  nodes: 2
+  ntasks_per_node: 18
   nscribes: 2
   omp_num_threads: 2
+
+download:
+  enabled: true
+  skip_existing: true
+```
+
+**Example SFINCS configuration**:
+
+```yaml
+model: sfincs
+
+slurm:
+  job_name: sfincs_texas
+  user: your_username
+
+simulation:
+  start_date: 2025-06-01
+  duration_hours: 168
+  coastal_domain: atlgulf
+  meteo_source: nwm_ana
+
+boundary:
+  source: stofs
+
+model_config:
+  prebuilt_dir: /path/to/texas/model
+  omp_num_threads: 36
 
 download:
   enabled: true
@@ -720,11 +766,9 @@ ______________________________________________________________________
 def validate(self) -> list[str]:
     errors = []
 
+    # Shared validation
     if self.simulation.duration_hours <= 0:
         errors.append("simulation.duration_hours must be positive")
-
-    if self.mpi.nscribes >= self.slurm.total_tasks:
-        errors.append("mpi.nscribes must be less than total MPI tasks")
 
     if (
         self.boundary.source == "stofs"
@@ -735,8 +779,8 @@ def validate(self) -> list[str]:
             "boundary.stofs_file required when using STOFS source and download is disabled"
         )
 
-    if not self.paths.singularity_image.exists():
-        errors.append(f"Singularity image not found: {self.paths.singularity_image}")
+    # Model-specific validation (delegated to ModelConfig subclass)
+    errors.extend(self.model_config.validate(self))
 
     return errors
 ```
@@ -876,18 +920,20 @@ ______________________________________________________________________
 
 ### Configuration Classes
 
-| Class                | Purpose                           |
-| -------------------- | --------------------------------- |
-| `CoastalCalibConfig` | Root configuration container      |
-| `SlurmConfig`        | SLURM job parameters              |
-| `SimulationConfig`   | Time, domain, and source settings |
-| `BoundaryConfig`     | TPXO vs STOFS selection           |
-| `PathConfig`         | All file and directory paths      |
-| `MPIConfig`          | MPI task and threading settings   |
-| `MonitoringConfig`   | Logging and progress tracking     |
-| `DownloadConfig`     | Data download settings            |
+| Class                | Purpose                                        |
+| -------------------- | ---------------------------------------------- |
+| `CoastalCalibConfig` | Root configuration container                   |
+| `SlurmConfig`        | SLURM scheduling parameters                    |
+| `SimulationConfig`   | Time, domain, and source settings              |
+| `BoundaryConfig`     | TPXO vs STOFS selection                        |
+| `PathConfig`         | All file and directory paths                   |
+| `ModelConfig`        | ABC for model-specific configuration           |
+| `SchismModelConfig`  | SCHISM compute, MPI, and stage settings        |
+| `SfincsModelConfig`  | SFINCS model paths, OpenMP, and stage settings |
+| `MonitoringConfig`   | Logging and progress tracking                  |
+| `DownloadConfig`     | Data download settings                         |
 
-### Workflow Stages
+### SCHISM Workflow Stages
 
 | Stage                 | Class                    | Description                              |
 | --------------------- | ------------------------ | ---------------------------------------- |
@@ -900,6 +946,22 @@ ______________________________________________________________________
 | `pre_schism`          | `PreSCHISMStage`         | Prepare SCHISM inputs                    |
 | `schism_run`          | `SCHISMRunStage`         | Execute `pschism` binary (MPI)           |
 | `post_schism`         | `PostSCHISMStage`        | Validate and post-process outputs        |
+
+### SFINCS Workflow Stages
+
+| Stage                 | Class                    | Description                        |
+| --------------------- | ------------------------ | ---------------------------------- |
+| `download`            | `DownloadStage`          | Download NWM/STOFS data            |
+| `sfincs_symlinks`     | `SFINCSSymlinksStage`    | Create `.nc` symlinks for NWM data |
+| `sfincs_data_catalog` | `SFINCSDataCatalogStage` | Generate HydroMT data catalog      |
+| `sfincs_init`         | `SFINCSInitStage`        | Initialize SFINCS model            |
+| `sfincs_timing`       | `SFINCSTimingStage`      | Set SFINCS timing                  |
+| `sfincs_forcing`      | `SFINCSForcingStage`     | Add water level forcing            |
+| `sfincs_obs`          | `SFINCSObsStage`         | Add observation points             |
+| `sfincs_discharge`    | `SFINCSDischargeStage`   | Add discharge sources              |
+| `sfincs_precip`       | `SFINCSPrecipStage`      | Add precipitation forcing          |
+| `sfincs_write`        | `SFINCSWriteStage`       | Write SFINCS model                 |
+| `sfincs_run`          | `SFINCSRunStage`         | Run SFINCS (Singularity/OpenMP)    |
 
 ______________________________________________________________________
 
@@ -937,12 +999,6 @@ implementations:
     - Reduce external tool dependencies
 
 ### Medium-Term: Feature Expansion
-
-1. **SFINCS Model Support**
-
-    - Infrastructure already in place (`stages/sfincs.py`)
-    - HydroMT data catalog generation implemented
-    - Needs: Stage implementations for SFINCS execution
 
 1. **Hot Start Chain Automation**
 
@@ -987,6 +1043,8 @@ bash-based workflow:
 | Testing         | None                  | `pytest` + `pyright`    | CI-ready         |
 | Documentation   | Comments only         | Docstrings + types      | Self-documenting |
 | Extensibility   | Copy & modify scripts | Inherit `WorkflowStage` | Object-oriented  |
+| Model support   | SCHISM only           | SCHISM + SFINCS         | Polymorphic      |
 
 The architecture is designed for maintainability, extensibility, and correctness while
-preserving compatibility with the existing SCHISM HPC infrastructure.
+supporting multiple coastal models (SCHISM and SFINCS) through a polymorphic
+`ModelConfig` ABC and preserving compatibility with the existing HPC infrastructure.

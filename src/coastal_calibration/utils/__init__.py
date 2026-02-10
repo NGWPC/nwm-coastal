@@ -1,4 +1,4 @@
-"""Utility modules for logging, SLURM, and monitoring."""
+"""Utility modules for logging, SLURM, monitoring, and system info."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from coastal_calibration.utils.slurm import (
     SlurmManager,
     get_node_info,
 )
+from coastal_calibration.utils.system import get_cpu_count
 
 __all__ = [
     "JobState",
@@ -23,5 +24,6 @@ __all__ = [
     "StageProgress",
     "StageStatus",
     "WorkflowMonitor",
+    "get_cpu_count",
     "get_node_info",
 ]

@@ -1,7 +1,7 @@
 # CLI Reference
 
 The `coastal-calibration` command-line interface provides commands for managing SCHISM
-coastal model workflows.
+and SFINCS coastal model workflows.
 
 ## Global Options
 
@@ -32,15 +32,19 @@ coastal-calibration init OUTPUT [OPTIONS]
 | --------------- | -------------------------------------- | --------- |
 | `--domain`      | Coastal domain to use                  | `pacific` |
 | `--force`, `-f` | Overwrite existing file without prompt | False     |
+| `--model`       | Model type (`schism` or `sfincs`)      | `schism`  |
 
 **Examples:**
 
 ```bash
-# Generate default configuration
+# Generate default SCHISM configuration
 coastal-calibration init config.yaml
 
 # Generate configuration for a specific domain
 coastal-calibration init pacific_config.yaml --domain pacific
+
+# Generate SFINCS configuration
+coastal-calibration init sfincs_config.yaml --domain atlgulf --model sfincs
 
 # Overwrite existing file
 coastal-calibration init config.yaml --force
@@ -111,37 +115,6 @@ coastal-calibration submit config.yaml --interactive
 coastal-calibration submit config.yaml -i
 ```
 
-**Default Behavior (Non-Interactive):**
-
-```console
-INFO  Running download stage on login node...
-INFO  meteo/nwm_ana: 4/4 [OK]
-INFO  hydro/nwm: 16/16 [OK]
-INFO  coastal/stofs: 1/1 [OK]
-INFO  Total: 21/21 (failed: 0)
-INFO  Download stage completed
-INFO  Generated job script: .../submit_job.sh
-INFO  Generated runner script: .../sing_run_generated.bash
-INFO  Submitting job: .../submit_job.sh
-INFO  Job 167 submitted.
-INFO  Once the job starts running, SLURM logs will be written to: .../slurm-167.out
-INFO  Check job status with: squeue -j 167
-```
-
-**Interactive Mode:**
-
-```console
-INFO  Running download stage on login node...
-INFO  Download stage completed
-INFO  Job submitted with ID: 167
-INFO  Waiting for job 167 to complete...
-INFO  Job 167 state: PENDING
-INFO  Job 167 state: CONFIGURING
-INFO  Job 167 state: RUNNING
-INFO  Job 167 state: COMPLETED
-INFO  Job 167 completed successfully.
-```
-
 ### run
 
 Run the workflow directly (for testing or inside a SLURM job).
@@ -164,7 +137,7 @@ coastal-calibration run <config> [OPTIONS]
 | `--stop-after` | Stage to stop after                      | Last    |
 | `--dry-run`    | Validate configuration without executing | False   |
 
-**Available Stages:**
+**Available Stages (SCHISM):**
 
 - `download`
 - `pre_forcing`
@@ -176,20 +149,34 @@ coastal-calibration run <config> [OPTIONS]
 - `schism_run`
 - `post_schism`
 
+**Available Stages (SFINCS):**
+
+- `download`
+- `sfincs_symlinks`
+- `sfincs_data_catalog`
+- `sfincs_init`
+- `sfincs_timing`
+- `sfincs_forcing`
+- `sfincs_obs`
+- `sfincs_discharge`
+- `sfincs_precip`
+- `sfincs_write`
+- `sfincs_run`
+
 **Examples:**
 
 ```bash
 # Run entire workflow
 coastal-calibration run config.yaml
 
-# Run only forcing stages
+# Run only forcing stages (SCHISM)
 coastal-calibration run config.yaml --start-from pre_forcing --stop-after post_forcing
 
-# Run from SCHISM preparation onwards
-coastal-calibration run config.yaml --start-from pre_schism
+# Run only the model build (SFINCS)
+coastal-calibration run config.yaml --stop-after sfincs_write
 
-# Run only download stage
-coastal-calibration run config.yaml --stop-after download
+# Run only the model execution (SFINCS)
+coastal-calibration run config.yaml --start-from sfincs_run
 ```
 
 ### stages
@@ -197,22 +184,54 @@ coastal-calibration run config.yaml --stop-after download
 List all available workflow stages.
 
 ```bash
-coastal-calibration stages
+coastal-calibration stages [OPTIONS]
 ```
 
-**Output:**
+**Options:**
+
+| Option    | Description                      | Default  |
+| --------- | -------------------------------- | -------- |
+| `--model` | Show stages for a specific model | Show all |
+
+**Examples:**
+
+```bash
+# List all stages for both models
+coastal-calibration stages
+
+# List only SCHISM stages
+coastal-calibration stages --model schism
+
+# List only SFINCS stages
+coastal-calibration stages --model sfincs
+```
+
+**Output (all):**
 
 ```console
-Available workflow stages:
-  1. download            - Download NWM/STOFS data
-  2. pre_forcing         - Prepare NWM forcing data
-  3. nwm_forcing         - Generate atmospheric forcing (MPI)
-  4. post_forcing        - Post-process forcing data
-  5. update_params       - Create SCHISM param.nml file
-  6. boundary_conditions - Generate boundary conditions
-  7. pre_schism          - Prepare SCHISM inputs
-  8. schism_run          - Run SCHISM model (MPI)
-  9. post_schism         - Post-process outputs
+SCHISM workflow stages:
+  1. download: Download NWM/STOFS data
+  2. pre_forcing: Prepare NWM forcing data
+  3. nwm_forcing: Generate atmospheric forcing (MPI)
+  4. post_forcing: Post-process forcing data
+  5. update_params: Create SCHISM param.nml
+  6. boundary_conditions: Generate boundary conditions
+  7. pre_schism: Prepare SCHISM inputs
+  8. schism_run: Run SCHISM model (MPI)
+  9. post_schism: Post-process SCHISM outputs
+
+SFINCS workflow stages:
+  1. download: Download NWM/STOFS data (optional)
+  2. sfincs_symlinks: Create .nc symlinks for NWM data
+  3. sfincs_data_catalog: Generate HydroMT data catalog
+  4. sfincs_init: Initialise SFINCS model (pre-built)
+  5. sfincs_timing: Set SFINCS timing
+  6. sfincs_forcing: Add water level forcing
+  7. sfincs_obs: Add observation points
+  8. sfincs_discharge: Add discharge sources
+  9. sfincs_precip: Add precipitation forcing
+  10. sfincs_write: Write SFINCS model
+  11. sfincs_run: Run SFINCS model (Singularity)
 ```
 
 ## Exit Codes

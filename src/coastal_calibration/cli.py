@@ -6,7 +6,7 @@ from pathlib import Path
 
 import rich_click as click
 
-from coastal_calibration.config.schema import CoastalCalibConfig, CoastalDomain
+from coastal_calibration.config.schema import CoastalCalibConfig, CoastalDomain, ModelType
 from coastal_calibration.runner import CoastalCalibRunner
 from coastal_calibration.utils.logging import configure_logger, logger
 
@@ -182,7 +182,13 @@ def validate(config: Path) -> None:
     is_flag=True,
     help="Overwrite existing file without prompting.",
 )
-def init(output: Path, domain: CoastalDomain, force: bool) -> None:
+@click.option(
+    "--model",
+    type=click.Choice(["schism", "sfincs"]),
+    default="schism",
+    help="Model type (default: schism).",
+)
+def init(output: Path, domain: CoastalDomain, force: bool, model: ModelType) -> None:
     """Create a minimal configuration file.
 
     OUTPUT is the path where the configuration will be written.
@@ -207,7 +213,39 @@ def init(output: Path, domain: CoastalDomain, force: bool) -> None:
     start_date_str = start_date.strftime("%Y-%m-%d")
     username = os.environ.get("USER", "YOUR_USERNAME")
 
-    config_content = f"""\
+    if model == "sfincs":
+        config_content = f"""\
+# Minimal SFINCS configuration for {domain} domain
+#
+# Paths are auto-generated based on user, domain, and source:
+#   work_dir: /ngen-test/coastal/${{slurm.user}}/sfincs_${{simulation.coastal_domain}}_${{boundary.source}}_${{simulation.meteo_source}}/sfincs_${{simulation.start_date}}
+#   raw_download_dir: /ngen-test/coastal/${{slurm.user}}/sfincs_${{simulation.coastal_domain}}_${{boundary.source}}_${{simulation.meteo_source}}/raw_data
+#
+# Usage:
+#   coastal-calibration validate {output_path.name}
+#   coastal-calibration submit {output_path.name}
+#   coastal-calibration submit {output_path.name} -i  # wait for completion
+
+model: sfincs
+
+slurm:
+  job_name: coastal_calibration
+  user: {username}
+
+simulation:
+  start_date: {start_date_str}
+  duration_hours: 3
+  coastal_domain: {domain}
+  meteo_source: {meteo_source}
+
+boundary:
+  source: {boundary_source}
+
+model_config:
+  prebuilt_dir: /path/to/prebuilt/sfincs/model
+"""
+    else:
+        config_content = f"""\
 # Minimal SCHISM configuration for {domain} domain
 #
 # Paths are auto-generated based on user, domain, and source:
@@ -238,9 +276,15 @@ boundary:
 
 
 @cli.command()
-def stages() -> None:
+@click.option(
+    "--model",
+    type=click.Choice(["schism", "sfincs"]),
+    default=None,
+    help="Show stages for a specific model (default: show all).",
+)
+def stages(model: str | None) -> None:
     """List available workflow stages."""
-    stage_list = [
+    schism_stages = [
         ("download", "Download NWM/STOFS data (optional)"),
         ("pre_forcing", "Prepare NWM forcing data"),
         ("nwm_forcing", "Generate atmospheric forcing (MPI)"),
@@ -252,9 +296,33 @@ def stages() -> None:
         ("post_schism", "Post-process SCHISM outputs"),
     ]
 
-    click.echo("Workflow stages:")
-    for i, (name, desc) in enumerate(stage_list, 1):
-        click.echo(f"  {i}. {name}: {desc}")
+    sfincs_stages = [
+        ("download", "Download NWM/STOFS data (optional)"),
+        ("sfincs_symlinks", "Create .nc symlinks for NWM data"),
+        ("sfincs_data_catalog", "Generate HydroMT data catalog"),
+        ("sfincs_init", "Initialise SFINCS model (pre-built)"),
+        ("sfincs_timing", "Set SFINCS timing"),
+        ("sfincs_forcing", "Add water level forcing"),
+        ("sfincs_obs", "Add observation points"),
+        ("sfincs_discharge", "Add discharge sources"),
+        ("sfincs_precip", "Add precipitation forcing"),
+        ("sfincs_write", "Write SFINCS model"),
+        ("sfincs_run", "Run SFINCS model (Singularity)"),
+    ]
+
+    def _print_stages(title: str, stage_list: list[tuple[str, str]]) -> None:
+        click.echo(f"{title}:")
+        for i, (name, desc) in enumerate(stage_list, 1):
+            click.echo(f"  {i}. {name}: {desc}")
+
+    if model == "schism":
+        _print_stages("SCHISM workflow stages", schism_stages)
+    elif model == "sfincs":
+        _print_stages("SFINCS workflow stages", sfincs_stages)
+    else:
+        _print_stages("SCHISM workflow stages", schism_stages)
+        click.echo()
+        _print_stages("SFINCS workflow stages", sfincs_stages)
 
 
 def main() -> None:

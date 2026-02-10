@@ -12,6 +12,7 @@ from coastal_calibration.config.schema import (
     DownloadConfig,
     MonitoringConfig,
     PathConfig,
+    SchismModelConfig,
     SimulationConfig,
     SlurmConfig,
 )
@@ -41,9 +42,12 @@ class TestWorkflowStageBase:
             WorkflowStage(None, None)
 
     def test_build_date_env(self, sample_config):
-        """Test that _build_date_env sets correct environment variables."""
+        """Test that _build_date_env sets correct environment variables.
 
-        # Create a concrete subclass for testing
+        SCHISM_BEGIN_DATE and SCHISM_END_DATE are now set by
+        SchismModelConfig.build_environment(), not by _build_date_env().
+        """
+
         class ConcreteStage(WorkflowStage):
             name = "test"
             description = "test stage"
@@ -57,8 +61,6 @@ class TestWorkflowStageBase:
 
         assert "FORCING_BEGIN_DATE" in env
         assert "FORCING_END_DATE" in env
-        assert "SCHISM_BEGIN_DATE" in env
-        assert "SCHISM_END_DATE" in env
         assert "END_DATETIME" in env
         assert "PDY" in env
         assert "cyc" in env
@@ -68,6 +70,10 @@ class TestWorkflowStageBase:
         assert "FORCING_START_MONTH" in env
         assert "FORCING_START_DAY" in env
         assert "FORCING_START_HOUR" in env
+
+        # SCHISM date vars are NOT set by _build_date_env anymore
+        assert "SCHISM_BEGIN_DATE" not in env
+        assert "SCHISM_END_DATE" not in env
 
     def test_build_environment(self, sample_config):
         class ConcreteStage(WorkflowStage):
@@ -85,6 +91,29 @@ class TestWorkflowStageBase:
         assert env["COASTAL_DOMAIN"] == "pacific"
         assert env["METEO_SOURCE"] == "NWM_RETRO"
         assert env["USE_TPXO"] == "YES"
+
+    def test_build_environment_schism_vars(self, sample_config):
+        """SchismModelConfig.build_environment() sets SCHISM-specific vars."""
+
+        class ConcreteStage(WorkflowStage):
+            name = "test"
+            description = "test stage"
+
+            def run(self):
+                return {}
+
+        stage = ConcreteStage(sample_config, None)
+        env = stage.build_environment()
+
+        # SCHISM vars are set via model_config.build_environment delegation
+        assert "SCHISM_BEGIN_DATE" in env
+        assert "SCHISM_END_DATE" in env
+        assert "NODES" in env
+        assert "NCORES" in env
+        assert "NPROCS" in env
+        assert "NSCRIBES" in env
+        assert "OMP_NUM_THREADS" in env
+        assert "SCHISM_ESMFMESH" in env
 
     def test_validate_default_returns_empty(self, sample_config):
         class ConcreteStage(WorkflowStage):
@@ -236,6 +265,7 @@ class TestBuildDateEnvNegativeDuration:
             ),
             boundary=BoundaryConfig(source="tpxo"),
             paths=PathConfig(work_dir=tmp_path, raw_download_dir=tmp_path / "dl"),
+            model_config=SchismModelConfig(),
             download=DownloadConfig(enabled=False),
         )
 
@@ -247,7 +277,9 @@ class TestBuildDateEnvNegativeDuration:
                 return {}
 
         stage = ConcreteStage(config, None)
-        env = {}
-        stage._build_date_env(env)
+
+        # SCHISM date env is now set by model_config.build_environment,
+        # not _build_date_env. Use full build_environment to test.
+        env = stage.build_environment()
         # With negative duration, SCHISM_BEGIN_DATE should be before SCHISM_END_DATE
         assert env["SCHISM_END_DATE"] == "202106110000"

@@ -28,6 +28,34 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Added
+
+- SFINCS coastal model workflow with full pipeline (download through sfincs_run)
+- Polymorphic `ModelConfig` ABC with `SchismModelConfig` and `SfincsModelConfig`
+    concrete implementations
+- `MODEL_REGISTRY` for automatic model dispatch from YAML `model:` key
+- `--model` option for `init` and `stages` CLI commands
+- Model-specific compute parameters (SCHISM: multi-node MPI; SFINCS: single-node OpenMP)
+- `${model}` variable in default path templates for model-aware directory naming
+
+### Changed
+
+- `CoastalCalibConfig` now takes `model_config: ModelConfig` instead of separate
+    `model`, `mpi`, and `sfincs` parameters
+- `SlurmConfig` now contains only scheduling parameters (`job_name`, `partition`,
+    `time_limit`, `account`, `qos`, `user`); compute resources (`nodes`,
+    `ntasks_per_node`, `exclusive`) moved to `SchismModelConfig`
+- Default path templates use `${model}_` prefix instead of hardcoded `schism_`
+- Stage order and stage creation delegated to `ModelConfig` subclasses
+- SFINCS field renames: `model_dir` -> `prebuilt_dir`, `obs_points` ->
+    `observation_points`, `obs_merge` -> `merge_observations`, `src_locations` ->
+    `discharge_locations_file`, `src_merge` -> `merge_discharge`, `docker_tag` ->
+    `container_tag`, `sif_path` -> `container_image`
+
+### Removed
+
+- `MPIConfig` class (fields absorbed into `SchismModelConfig`)
+
 ## [0.1.0] - 2026-02-06
 
 ### Added

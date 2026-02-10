@@ -13,8 +13,9 @@ from coastal_calibration.config.schema import (
     CoastalCalibConfig,
     DownloadConfig,
     MonitoringConfig,
-    MPIConfig,
     PathConfig,
+    SchismModelConfig,
+    SfincsModelConfig,
     SimulationConfig,
     SlurmConfig,
     _build_interpolation_context,
@@ -22,6 +23,7 @@ from coastal_calibration.config.schema import (
     _interpolate_config,
     _interpolate_value,
 )
+from coastal_calibration.utils.system import get_cpu_count
 from coastal_calibration.utils.time import parse_datetime as _parse_datetime
 
 
@@ -29,28 +31,19 @@ class TestSlurmConfig:
     def test_defaults(self):
         cfg = SlurmConfig()
         assert cfg.job_name == "coastal_calibration"
-        assert cfg.nodes == 2
-        assert cfg.ntasks_per_node == 18
-        assert cfg.exclusive is True
         assert cfg.user is None
-
-    def test_total_tasks(self):
-        cfg = SlurmConfig(nodes=3, ntasks_per_node=10)
-        assert cfg.total_tasks == 30
 
     def test_custom_values(self):
         cfg = SlurmConfig(
             job_name="my_job",
-            nodes=4,
-            ntasks_per_node=36,
             partition="gpu",
             user="alice",
             time_limit="12:00:00",
             account="my_account",
             qos="normal",
         )
-        assert cfg.total_tasks == 144
         assert cfg.time_limit == "12:00:00"
+        assert cfg.user == "alice"
 
 
 class TestSimulationConfig:
@@ -166,24 +159,115 @@ class TestPathConfig:
         assert "exec" in str(cfg.exec_nwm)
         assert "parm" in str(cfg.parm_nwm)
 
-    def test_schism_mesh(self, tmp_work_dir, sample_simulation_config):
-        cfg = PathConfig(work_dir=tmp_work_dir)
-        mesh = cfg.schism_mesh(sample_simulation_config)
-        assert "hgrid.nc" in str(mesh)
-        assert "pacific" in str(mesh)
-
     def test_geogrid_file(self, tmp_work_dir, sample_simulation_config):
         cfg = PathConfig(work_dir=tmp_work_dir)
         geogrid = cfg.geogrid_file(sample_simulation_config)
         assert "geo_em_CONUS.nc" in str(geogrid)
 
 
-class TestMPIConfig:
+class TestSchismModelConfig:
     def test_defaults(self):
-        cfg = MPIConfig()
+        cfg = SchismModelConfig()
+        assert cfg.nodes == 2
+        assert cfg.ntasks_per_node == 18
+        assert cfg.exclusive is True
         assert cfg.nscribes == 2
         assert cfg.omp_num_threads == 2
         assert cfg.oversubscribe is False
+
+    def test_total_tasks(self):
+        cfg = SchismModelConfig(nodes=3, ntasks_per_node=10)
+        assert cfg.total_tasks == 30
+
+    def test_model_name(self):
+        cfg = SchismModelConfig()
+        assert cfg.model_name == "schism"
+
+    def test_stage_order(self):
+        cfg = SchismModelConfig()
+        expected = [
+            "download",
+            "pre_forcing",
+            "nwm_forcing",
+            "post_forcing",
+            "update_params",
+            "boundary_conditions",
+            "pre_schism",
+            "schism_run",
+            "post_schism",
+        ]
+        assert cfg.stage_order == expected
+
+    def test_schism_mesh(self, sample_simulation_config, tmp_work_dir):
+        cfg = SchismModelConfig()
+        paths = PathConfig(work_dir=tmp_work_dir)
+        mesh = cfg.schism_mesh(sample_simulation_config, paths)
+        assert "hgrid.nc" in str(mesh)
+        assert "pacific" in str(mesh)
+
+    def test_to_dict(self):
+        cfg = SchismModelConfig()
+        d = cfg.to_dict()
+        assert d["nodes"] == 2
+        assert d["ntasks_per_node"] == 18
+        assert d["nscribes"] == 2
+        assert "binary" in d
+
+    def test_generate_job_script_lines(self, sample_config):
+        cfg = SchismModelConfig()
+        lines = cfg.generate_job_script_lines(sample_config)
+        assert any("-N 2" in line for line in lines)
+        assert any("ntasks-per-node=18" in line for line in lines)
+        assert any("exclusive" in line for line in lines)
+
+
+class TestSfincsModelConfig:
+    def test_defaults(self, tmp_path):
+        cfg = SfincsModelConfig(prebuilt_dir=tmp_path)
+        assert cfg.omp_num_threads == get_cpu_count()
+        assert cfg.container_tag == "latest"
+        assert cfg.merge_observations is False
+        assert cfg.merge_discharge is False
+
+    def test_model_name(self, tmp_path):
+        cfg = SfincsModelConfig(prebuilt_dir=tmp_path)
+        assert cfg.model_name == "sfincs"
+
+    def test_stage_order(self, tmp_path):
+        cfg = SfincsModelConfig(prebuilt_dir=tmp_path)
+        expected = [
+            "download",
+            "sfincs_symlinks",
+            "sfincs_data_catalog",
+            "sfincs_init",
+            "sfincs_timing",
+            "sfincs_forcing",
+            "sfincs_obs",
+            "sfincs_discharge",
+            "sfincs_precip",
+            "sfincs_write",
+            "sfincs_run",
+        ]
+        assert cfg.stage_order == expected
+
+    def test_to_dict(self, tmp_path):
+        cfg = SfincsModelConfig(prebuilt_dir=tmp_path)
+        d = cfg.to_dict()
+        assert d["prebuilt_dir"] == str(tmp_path)
+        assert d["omp_num_threads"] == get_cpu_count()
+        assert "container_tag" in d
+
+    def test_explicit_omp_num_threads(self, tmp_path):
+        """Explicit omp_num_threads is preserved (e.g., cluster YAML)."""
+        cfg = SfincsModelConfig(prebuilt_dir=tmp_path, omp_num_threads=36)
+        assert cfg.omp_num_threads == 36
+
+    def test_generate_job_script_lines(self, tmp_path, sample_config):
+        cfg = SfincsModelConfig(prebuilt_dir=tmp_path)
+        lines = cfg.generate_job_script_lines(sample_config)
+        assert any("-N 1" in line for line in lines)
+        assert any("ntasks=1" in line for line in lines)
+        assert any("cpus-per-task" in line for line in lines)
 
 
 class TestMonitoringConfig:
@@ -265,12 +349,11 @@ class TestInterpolation:
 
     def test_build_interpolation_context(self):
         data = {
-            "slurm": {"user": "john", "nodes": 2},
+            "slurm": {"user": "john", "partition": "default"},
             "simulation": {"coastal_domain": "hawaii"},
         }
         ctx = _build_interpolation_context(data)
         assert ctx["slurm.user"] == "john"
-        assert ctx["slurm.nodes"] == 2
         assert ctx["simulation.coastal_domain"] == "hawaii"
 
     def test_interpolate_config(self):
@@ -281,6 +364,16 @@ class TestInterpolation:
         }
         result = _interpolate_config(data)
         assert result["paths"]["work_dir"] == "/data/john/hawaii"
+
+    def test_model_variable_interpolation(self):
+        data = {
+            "model": "sfincs",
+            "slurm": {"user": "john"},
+            "simulation": {"coastal_domain": "hawaii"},
+            "paths": {"work_dir": "/data/${model}/${slurm.user}"},
+        }
+        result = _interpolate_config(data)
+        assert result["paths"]["work_dir"] == "/data/sfincs/john"
 
 
 class TestCoastalCalibConfig:
@@ -306,9 +399,13 @@ class TestCoastalCalibConfig:
         assert "simulation" in d
         assert "boundary" in d
         assert "paths" in d
-        assert "mpi" in d
+        assert "model_config" in d
+        assert "model" in d
         assert "monitoring" in d
         assert "download" in d
+
+    def test_model_property(self, sample_config):
+        assert sample_config.model == "schism"
 
     def test_to_yaml_and_back(self, sample_config, tmp_path):
         yaml_path = tmp_path / "roundtrip.yaml"
@@ -347,12 +444,15 @@ class TestCoastalCalibConfig:
         assert any("user" in e for e in errors)
 
     def test_validate_nodes_positive(self, sample_config):
-        sample_config.slurm.nodes = 0
+        """SchismModelConfig validates nodes must be at least 1."""
+        assert isinstance(sample_config.model_config, SchismModelConfig)
+        sample_config.model_config.nodes = 0
         errors = sample_config.validate()
         assert any("nodes" in e for e in errors)
 
     def test_validate_nscribes_less_than_total(self, sample_config):
-        sample_config.mpi.nscribes = sample_config.slurm.total_tasks
+        assert isinstance(sample_config.model_config, SchismModelConfig)
+        sample_config.model_config.nscribes = sample_config.model_config.total_tasks
         errors = sample_config.validate()
         assert any("nscribes" in e for e in errors)
 
@@ -369,3 +469,74 @@ class TestCoastalCalibConfig:
     def test_to_dict_boundary_stofs_file_none(self, sample_config):
         d = sample_config.to_dict()
         assert d["boundary"]["stofs_file"] is None
+
+    def test_model_registry_dispatch_schism(self, tmp_path):
+        """YAML with model: schism creates SchismModelConfig."""
+        config_dict = {
+            "model": "schism",
+            "slurm": {"user": "test"},
+            "simulation": {
+                "start_date": "2021-06-11",
+                "duration_hours": 3,
+                "coastal_domain": "pacific",
+                "meteo_source": "nwm_retro",
+            },
+            "boundary": {"source": "tpxo"},
+            "paths": {
+                "work_dir": str(tmp_path / "work"),
+                "raw_download_dir": str(tmp_path / "dl"),
+            },
+        }
+        config_path = tmp_path / "schism.yaml"
+        config_path.write_text(yaml.dump(config_dict))
+        cfg = CoastalCalibConfig.from_yaml(config_path)
+        assert isinstance(cfg.model_config, SchismModelConfig)
+        assert cfg.model == "schism"
+
+    def test_model_registry_dispatch_sfincs(self, tmp_path):
+        """YAML with model: sfincs creates SfincsModelConfig."""
+        config_dict = {
+            "model": "sfincs",
+            "slurm": {"user": "test"},
+            "simulation": {
+                "start_date": "2021-06-11",
+                "duration_hours": 3,
+                "coastal_domain": "pacific",
+                "meteo_source": "nwm_retro",
+            },
+            "boundary": {"source": "tpxo"},
+            "paths": {
+                "work_dir": str(tmp_path / "work"),
+                "raw_download_dir": str(tmp_path / "dl"),
+            },
+            "model_config": {
+                "prebuilt_dir": str(tmp_path / "prebuilt"),
+            },
+        }
+        config_path = tmp_path / "sfincs.yaml"
+        config_path.write_text(yaml.dump(config_dict))
+        cfg = CoastalCalibConfig.from_yaml(config_path)
+        assert isinstance(cfg.model_config, SfincsModelConfig)
+        assert cfg.model == "sfincs"
+
+    def test_unknown_model_type(self, tmp_path):
+        """Unknown model type raises ValueError."""
+        config_dict = {
+            "model": "unknown_model",
+            "slurm": {"user": "test"},
+            "simulation": {
+                "start_date": "2021-06-11",
+                "duration_hours": 3,
+                "coastal_domain": "pacific",
+                "meteo_source": "nwm_retro",
+            },
+            "boundary": {"source": "tpxo"},
+            "paths": {
+                "work_dir": str(tmp_path / "work"),
+                "raw_download_dir": str(tmp_path / "dl"),
+            },
+        }
+        config_path = tmp_path / "bad.yaml"
+        config_path.write_text(yaml.dump(config_dict))
+        with pytest.raises(ValueError, match="Unknown model type"):
+            CoastalCalibConfig.from_yaml(config_path)

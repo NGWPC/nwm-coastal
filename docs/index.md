@@ -1,10 +1,12 @@
 # NWM Coastal
 
-A Python package for running SCHISM coastal model calibration workflow on HPC clusters
-with Singularity containers and SLURM job scheduling.
+A Python package for running SCHISM and SFINCS coastal model calibration workflows on
+HPC clusters with Singularity containers and SLURM job scheduling.
 
 ## Features
 
+- **Multi-Model Support**: SCHISM (multi-node MPI) and SFINCS (single-node OpenMP) via a
+    polymorphic `ModelConfig` architecture
 - **YAML Configuration**: Simple, human-readable configuration files with variable
     interpolation
 - **SLURM Integration**: Automatic job script generation and submission
@@ -18,7 +20,7 @@ with Singularity containers and SLURM job scheduling.
 ## Quick Example
 
 ```yaml
-# config.yaml - minimal configuration
+# config.yaml - minimal SCHISM configuration
 slurm:
   job_name: my_schism_run
   user: your_username
@@ -40,10 +42,10 @@ coastal-calibration submit config.yaml --interactive
 
 ## Supported Models
 
-| Model  | Status       | Description                                                    |
-| ------ | ------------ | -------------------------------------------------------------- |
-| SCHISM | ✅ Supported | Semi-implicit Cross-scale Hydroscience Integrated System Model |
-| SFINCS | 🚧 Planned   | Super-Fast INundation of CoastS                                |
+| Model  | Status    | Description                                                    |
+| ------ | --------- | -------------------------------------------------------------- |
+| SCHISM | Supported | Semi-implicit Cross-scale Hydroscience Integrated System Model |
+| SFINCS | Supported | Super-Fast INundation of CoastS                                |
 
 ## Installation
 

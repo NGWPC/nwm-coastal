@@ -1,6 +1,6 @@
 # Quick Start
 
-This guide walks you through running your first SCHISM simulation using the
+This guide walks you through running your first coastal simulation using the
 `coastal-calibration` CLI.
 
 ## Prerequisites
@@ -12,7 +12,9 @@ Before starting, ensure you have:
 - The Singularity image at `/ngencerf-app/singularity/ngen-coastal.sif`
 - Access to the `/ngen-test` NFS mount
 
-## Step 1: Generate a Configuration File
+## SCHISM Quick Start
+
+### Step 1: Generate a Configuration File
 
 Create a new configuration file for your simulation:
 
@@ -22,7 +24,7 @@ coastal-calibration init config.yaml --domain hawaii
 
 This generates a template configuration file with sensible defaults.
 
-## Step 2: Edit the Configuration
+### Step 2: Edit the Configuration
 
 Open `config.yaml` and set your SLURM username:
 
@@ -46,7 +48,7 @@ boundary:
     The configuration above is all you need! Paths are automatically generated based on your
     username, domain, and data sources.
 
-## Step 3: Validate the Configuration
+### Step 3: Validate the Configuration
 
 Before submitting, validate your configuration:
 
@@ -61,9 +63,9 @@ This checks for:
 - File and directory existence
 - SLURM configuration validity
 
-## Step 4: Submit the Job
+### Step 4: Submit the Job
 
-### Option A: Submit and Return Immediately (Default)
+#### Option A: Submit and Return Immediately (Default)
 
 ```bash
 coastal-calibration submit config.yaml
@@ -86,7 +88,7 @@ INFO  Job 167 submitted.
 INFO  Check job status with: squeue -j 167
 ```
 
-### Option B: Submit and Wait for Completion
+#### Option B: Submit and Wait for Completion
 
 Use the `--interactive` flag to monitor the job until it completes:
 
@@ -94,24 +96,51 @@ Use the `--interactive` flag to monitor the job until it completes:
 coastal-calibration submit config.yaml --interactive
 ```
 
-```console
-INFO  Running download stage on login node...
-INFO  Download stage completed
-INFO  Job submitted with ID: 167
-INFO  Waiting for job 167 to complete...
-INFO  Job 167 state: PENDING
-INFO  Job 167 state: CONFIGURING
-INFO  Job 167 state: RUNNING
-INFO  Job 167 state: COMPLETED
-INFO  Job 167 completed successfully.
-```
-
-## Step 5: Check Results
+### Step 5: Check Results
 
 After the job completes, find your outputs in the work directory:
 
 ```bash
 ls /ngen-test/coastal/your_username/schism_hawaii_stofs_nwm_ana/schism_2021-06-11/
+```
+
+## SFINCS Quick Start
+
+### Step 1: Generate a SFINCS Configuration
+
+```bash
+coastal-calibration init sfincs_config.yaml --domain atlgulf --model sfincs
+```
+
+### Step 2: Edit the Configuration
+
+Set your username and the path to a pre-built SFINCS model:
+
+```yaml
+model: sfincs
+
+slurm:
+  job_name: my_sfincs_run
+  user: your_username
+
+simulation:
+  start_date: 2025-06-01
+  duration_hours: 168
+  coastal_domain: atlgulf
+  meteo_source: nwm_ana
+
+boundary:
+  source: stofs
+
+model_config:
+  prebuilt_dir: /path/to/prebuilt/sfincs/model
+```
+
+### Step 3: Validate and Submit
+
+```bash
+coastal-calibration validate sfincs_config.yaml
+coastal-calibration submit sfincs_config.yaml --interactive
 ```
 
 ## Using the Python API

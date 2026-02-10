@@ -6,36 +6,9 @@ import json
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any
 
-from coastal_calibration.config.schema import CoastalCalibConfig
-from coastal_calibration.stages.boundary import (
-    BoundaryConditionStage,
-    UpdateParamsStage,
-)
-from coastal_calibration.stages.download import DownloadStage
-from coastal_calibration.stages.forcing import (
-    NWMForcingStage,
-    PostForcingStage,
-    PreForcingStage,
-)
-from coastal_calibration.stages.schism import (
-    PostSCHISMStage,
-    PreSCHISMStage,
-    SCHISMRunStage,
-)
-from coastal_calibration.stages.sfincs_build import (
-    SfincsDataCatalogStage,
-    SfincsDischargeStage,
-    SfincsForcingStage,
-    SfincsInitStage,
-    SfincsObservationPointsStage,
-    SfincsPrecipitationStage,
-    SfincsRunStage,
-    SfincsSymlinksStage,
-    SfincsTimingStage,
-    SfincsWriteStage,
-)
+from coastal_calibration.config.schema import CoastalCalibConfig, SchismModelConfig
 from coastal_calibration.utils.logging import (
     WorkflowMonitor,
     configure_logger,
@@ -107,32 +80,6 @@ class CoastalCalibRunner:
     ``config.model``.
     """
 
-    SCHISM_STAGE_ORDER: ClassVar[list[str]] = [
-        "download",
-        "pre_forcing",
-        "nwm_forcing",
-        "post_forcing",
-        "update_params",
-        "boundary_conditions",
-        "pre_schism",
-        "schism_run",
-        "post_schism",
-    ]
-
-    SFINCS_STAGE_ORDER: ClassVar[list[str]] = [
-        "download",
-        "sfincs_symlinks",
-        "sfincs_data_catalog",
-        "sfincs_init",
-        "sfincs_timing",
-        "sfincs_forcing",
-        "sfincs_obs",
-        "sfincs_discharge",
-        "sfincs_precip",
-        "sfincs_write",
-        "sfincs_run",
-    ]
-
     def __init__(self, config: CoastalCalibConfig) -> None:
         """Initialize the workflow runner.
 
@@ -162,10 +109,8 @@ class CoastalCalibRunner:
 
     @property
     def STAGE_ORDER(self) -> list[str]:  # noqa: N802
-        """Active stage order based on config.model."""
-        if self.config.model == "sfincs":
-            return self.SFINCS_STAGE_ORDER
-        return self.SCHISM_STAGE_ORDER
+        """Active stage order based on model config."""
+        return self.config.model_config.stage_order
 
     @property
     def slurm(self) -> SlurmManager:
@@ -175,33 +120,8 @@ class CoastalCalibRunner:
         return self._slurm
 
     def _init_stages(self) -> None:
-        """Initialize all workflow stages based on config.model."""
-        if self.config.model == "sfincs":
-            self._stages = {
-                "download": DownloadStage(self.config, self.monitor),
-                "sfincs_symlinks": SfincsSymlinksStage(self.config, self.monitor),
-                "sfincs_data_catalog": SfincsDataCatalogStage(self.config, self.monitor),
-                "sfincs_init": SfincsInitStage(self.config, self.monitor),
-                "sfincs_timing": SfincsTimingStage(self.config, self.monitor),
-                "sfincs_forcing": SfincsForcingStage(self.config, self.monitor),
-                "sfincs_obs": SfincsObservationPointsStage(self.config, self.monitor),
-                "sfincs_discharge": SfincsDischargeStage(self.config, self.monitor),
-                "sfincs_precip": SfincsPrecipitationStage(self.config, self.monitor),
-                "sfincs_write": SfincsWriteStage(self.config, self.monitor),
-                "sfincs_run": SfincsRunStage(self.config, self.monitor),
-            }
-        else:
-            self._stages = {
-                "download": DownloadStage(self.config, self.monitor),
-                "pre_forcing": PreForcingStage(self.config, self.monitor),
-                "nwm_forcing": NWMForcingStage(self.config, self.monitor),
-                "post_forcing": PostForcingStage(self.config, self.monitor),
-                "update_params": UpdateParamsStage(self.config, self.monitor),
-                "boundary_conditions": BoundaryConditionStage(self.config, self.monitor),
-                "pre_schism": PreSCHISMStage(self.config, self.monitor),
-                "schism_run": SCHISMRunStage(self.config, self.monitor),
-                "post_schism": PostSCHISMStage(self.config, self.monitor),
-            }
+        """Initialize all workflow stages via model config."""
+        self._stages = self.config.model_config.create_stages(self.config, self.monitor)
 
     def validate(self) -> list[str]:
         """Validate configuration and prerequisites.
@@ -355,8 +275,41 @@ class CoastalCalibRunner:
         self.config.to_yaml(config_file)
         self.monitor.info(f"Configuration saved to: {config_file}")
 
-    def _generate_runner_script(self) -> None:
-        """Generate the inner workflow runner script for SLURM job.
+    def _generate_sfincs_runner_script(self) -> None:
+        """Generate a SFINCS runner script for SLURM."""
+        from coastal_calibration.config.schema import SfincsModelConfig
+        from coastal_calibration.stages.sfincs_build import get_model_root, resolve_sif_path
+
+        work_dir = self.config.paths.work_dir
+        runner_script = work_dir / "sing_run_generated.bash"
+
+        assert isinstance(self.config.model_config, SfincsModelConfig)  # noqa: S101
+        model_root = get_model_root(self.config)
+        sif_path = resolve_sif_path(self.config)
+
+        script_lines = [
+            "#!/usr/bin/env bash",
+            "set -euox pipefail",
+            "",
+            "# Auto-generated SFINCS workflow runner script",
+            f"# Generated: {datetime.now().isoformat()}",
+            "",
+            f"export OMP_NUM_THREADS={self.config.model_config.omp_num_threads}",
+            "",
+            "# Run SFINCS in Singularity container",
+            f"singularity run -B{model_root}:/data {sif_path}",
+            "",
+            'echo "=== SFINCS Workflow Complete ==="',
+            "",
+        ]
+
+        script_content = "\n".join(script_lines)
+        runner_script.write_text(script_content)
+        runner_script.chmod(0o755)
+        self.monitor.info(f"Generated SFINCS runner script: {runner_script}")
+
+    def _generate_schism_runner_script(self) -> None:
+        """Generate the SCHISM inner workflow runner script for SLURM job.
 
         This script mirrors the original sing_run.bash structure, calling
         the individual stage bash scripts directly rather than using the
@@ -367,8 +320,10 @@ class CoastalCalibRunner:
 
         sim = self.config.simulation
         paths = self.config.paths
-        slurm = self.config.slurm
         boundary = self.config.boundary
+
+        assert isinstance(self.config.model_config, SchismModelConfig)  # noqa: S101
+        model = self.config.model_config
 
         # Get scripts directory (where the bash stage scripts live)
         scripts_dir = Path(__file__).parent / "scripts"
@@ -391,14 +346,14 @@ class CoastalCalibRunner:
         geo_grid = domain_to_geo_grid.get(sim.coastal_domain, "geo_em.d01.nc")
 
         # Compute derived values
-        nprocs = slurm.nodes * slurm.ntasks_per_node
-        nscribes = min(self.config.mpi.nscribes, nprocs - 1) if nprocs > 1 else 0
+        nprocs = model.total_tasks
+        nscribes = min(model.nscribes, nprocs - 1) if nprocs > 1 else 0
 
         # Use STOFS or TPXO for boundary conditions
         use_tpxo = boundary.source == "tpxo"
 
         # Get SCHISM binary name from config
-        schism_binary = self.config.mpi.schism_binary
+        schism_binary = model.binary
 
         # Get STOFS file path if using STOFS
         stofs_file = ""
@@ -423,13 +378,13 @@ class CoastalCalibRunner:
             "#!/usr/bin/env bash",
             "set -euox pipefail",
             "",
-            "# Auto-generated workflow runner script",
+            "# Auto-generated SCHISM workflow runner script",
             f"# Generated: {datetime.now().isoformat()}",
             "# This script mirrors sing_run.bash but with configuration from Python",
             "",
             "# === Configuration ===",
-            f"export NODES={slurm.nodes}",
-            f"export NCORES={slurm.ntasks_per_node}",
+            f"export NODES={model.nodes}",
+            f"export NCORES={model.ntasks_per_node}",
             f"export NPROCS={nprocs}",
             f"export NSCRIBES={nscribes}",
             "",
@@ -474,7 +429,7 @@ class CoastalCalibRunner:
             "",
             "# === Environment Setup ===",
             "export SAVE_ALL_TASKS=yes",
-            "export OMP_NUM_THREADS=2",
+            f"export OMP_NUM_THREADS={model.omp_num_threads}",
             "export OMP_PLACES=cores",
             "export MPICH_OFI_STARTUP_CONNECT=1",
             "export MPICH_COLL_SYNC=MPI_Bcast",
@@ -610,6 +565,18 @@ class CoastalCalibRunner:
         runner_script.write_text(script_content)
         runner_script.chmod(0o755)
         self.monitor.info(f"Generated runner script: {runner_script}")
+
+    def _generate_runner_script(self) -> None:
+        """Generate the inner workflow runner script for SLURM job.
+
+        For SCHISM this mirrors the original sing_run.bash structure.
+        For SFINCS this generates a simpler OpenMP-based script.
+        """
+        model_config = self.config.model_config
+        if isinstance(model_config, SchismModelConfig):
+            self._generate_schism_runner_script()
+        else:
+            self._generate_sfincs_runner_script()
 
     def submit(self, wait: bool = False, log_file: Path | None = None) -> WorkflowResult:
         """Submit workflow as a SLURM job.

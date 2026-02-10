@@ -65,15 +65,6 @@ class WorkflowStage(ABC):
         forcing_end_dt = start_dt + timedelta(hours=length_hrs)
         env["FORCING_END_DATE"] = forcing_end_dt.strftime("%Y%m%d%H00")
 
-        if length_hrs <= 0:
-            schism_begin_dt = start_dt + timedelta(hours=length_hrs)
-            env["SCHISM_BEGIN_DATE"] = schism_begin_dt.strftime("%Y%m%d%H00")
-            env["SCHISM_END_DATE"] = f"{pdycyc}00"
-        else:
-            env["SCHISM_BEGIN_DATE"] = f"{pdycyc}00"
-            schism_end_dt = start_dt + timedelta(hours=length_hrs)
-            env["SCHISM_END_DATE"] = schism_end_dt.strftime("%Y%m%d%H00")
-
         env["END_DATETIME"] = forcing_end_dt.strftime("%Y%m%d%H")
 
         env["PDY"] = pdy
@@ -84,11 +75,15 @@ class WorkflowStage(ABC):
         env["FORCING_START_HOUR"] = cyc
 
     def build_environment(self) -> dict[str, str]:
-        """Build environment variables for the stage."""
+        """Build environment variables for the stage.
+
+        Shared variables are set here.  Model-specific variables (compute
+        resources, mesh paths, etc.) are added by the concrete
+        :class:`~coastal_calibration.config.schema.ModelConfig` via its
+        :meth:`build_environment` method.
+        """
         sim = self.config.simulation
         paths = self.config.paths
-        mpi = self.config.mpi
-        slurm = self.config.slurm
 
         env = os.environ.copy()
 
@@ -116,18 +111,11 @@ class WorkflowStage(ABC):
         env["PARMnwm"] = str(paths.parm_nwm)
         env["EXECnwm"] = str(paths.exec_nwm)
 
-        env["NODES"] = str(slurm.nodes)
-        env["NCORES"] = str(slurm.ntasks_per_node)
-        env["NPROCS"] = str(slurm.total_tasks)
-        env["NSCRIBES"] = str(mpi.nscribes)
-        env["OMP_NUM_THREADS"] = str(mpi.omp_num_threads)
-
         env["CONDA_ENVS_PATH"] = str(paths.conda_envs_path)
 
         env["INLAND_DOMAIN"] = sim.inland_domain
         env["NWM_DOMAIN"] = sim.nwm_domain
         env["GEO_GRID"] = sim.geo_grid
-        env["SCHISM_ESMFMESH"] = str(paths.schism_mesh(sim))
         env["GEOGRID_FILE"] = str(paths.geogrid_file(sim))
 
         env["NWM_FORCING_DIR"] = str(paths.meteo_dir(sim.meteo_source))
@@ -143,6 +131,9 @@ class WorkflowStage(ABC):
 
         # Add paths to bundled scripts so bash scripts can find them
         env.update(get_script_environment_vars())
+
+        # Delegate model-specific variables (compute resources, mesh, etc.)
+        self.config.model_config.build_environment(env, self.config)
 
         self._env = env
         return env
@@ -239,9 +230,12 @@ class WorkflowStage(ABC):
         sing_cmd.extend(command)
 
         if use_mpi:
-            tasks = mpi_tasks or self.config.slurm.total_tasks
-            mpi_cmd = ["mpiexec", "-n", str(tasks)]
-            if self.config.mpi.oversubscribe:
+            if mpi_tasks is None:
+                msg = "mpi_tasks must be specified when use_mpi=True"
+                raise ValueError(msg)
+            mpi_cmd = ["mpiexec", "-n", str(mpi_tasks)]
+            oversubscribe = getattr(self.config.model_config, "oversubscribe", False)
+            if oversubscribe:
                 mpi_cmd.append("--oversubscribe")
             sing_cmd = [*mpi_cmd, *sing_cmd]
 

@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
+from coastal_calibration.config.schema import SchismModelConfig
 from coastal_calibration.stages.base import WorkflowStage
+
+if TYPE_CHECKING:
+    from coastal_calibration.config.schema import CoastalCalibConfig
+    from coastal_calibration.utils.logging import WorkflowMonitor
 
 
 class PreSCHISMStage(WorkflowStage):
@@ -12,6 +17,15 @@ class PreSCHISMStage(WorkflowStage):
 
     name = "pre_schism"
     description = "Prepare SCHISM inputs (discharge, partitioning)"
+
+    def __init__(
+        self,
+        config: CoastalCalibConfig,
+        monitor: WorkflowMonitor | None = None,
+    ) -> None:
+        super().__init__(config, monitor)
+        assert isinstance(config.model_config, SchismModelConfig)  # noqa: S101
+        self.model: SchismModelConfig = config.model_config
 
     def run(self) -> dict[str, Any]:
         """Execute SCHISM pre-processing."""
@@ -51,6 +65,15 @@ class SCHISMRunStage(WorkflowStage):
     name = "schism_run"
     description = "Run SCHISM model (MPI)"
 
+    def __init__(
+        self,
+        config: CoastalCalibConfig,
+        monitor: WorkflowMonitor | None = None,
+    ) -> None:
+        super().__init__(config, monitor)
+        assert isinstance(config.model_config, SchismModelConfig)  # noqa: S101
+        self.model: SchismModelConfig = config.model_config
+
     def run(self) -> dict[str, Any]:
         """Execute SCHISM model run."""
         self._update_substep("Building environment")
@@ -63,18 +86,18 @@ class SCHISMRunStage(WorkflowStage):
         env["OMPI_ALLOW_RUN_AS_ROOT"] = "1"
         env["OMPI_ALLOW_RUN_AS_ROOT_CONFIRM"] = "1"
 
-        nscribes = self.config.mpi.nscribes
+        nscribes = self.model.nscribes
         exec_dir = env.get("EXECnwm", "")
-        schism_binary = f"{exec_dir}/{self.config.mpi.schism_binary}"
+        schism_binary = f"{exec_dir}/{self.model.binary}"
 
-        self._update_substep(f"Running pschism with {self.config.slurm.total_tasks} MPI tasks")
+        self._update_substep(f"Running pschism with {self.model.total_tasks} MPI tasks")
 
         self.run_singularity_command(
             ["/bin/bash", "-c", f"{schism_binary} {nscribes}"],
             env=env,
             pwd=self.config.paths.work_dir,
             use_mpi=True,
-            mpi_tasks=self.config.slurm.total_tasks,
+            mpi_tasks=self.model.total_tasks,
         )
 
         return {
@@ -88,6 +111,15 @@ class PostSCHISMStage(WorkflowStage):
 
     name = "post_schism"
     description = "Post-process SCHISM outputs"
+
+    def __init__(
+        self,
+        config: CoastalCalibConfig,
+        monitor: WorkflowMonitor | None = None,
+    ) -> None:
+        super().__init__(config, monitor)
+        assert isinstance(config.model_config, SchismModelConfig)  # noqa: S101
+        self.model: SchismModelConfig = config.model_config
 
     def run(self) -> dict[str, Any]:
         """Execute SCHISM post-processing."""

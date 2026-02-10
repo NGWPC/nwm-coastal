@@ -12,8 +12,8 @@ from coastal_calibration.config.schema import (
     CoastalCalibConfig,
     DownloadConfig,
     MonitoringConfig,
-    MPIConfig,
     PathConfig,
+    SchismModelConfig,
     SimulationConfig,
     SlurmConfig,
 )
@@ -40,8 +40,6 @@ def sample_slurm_config():
     """Create a sample SlurmConfig."""
     return SlurmConfig(
         job_name="test_job",
-        nodes=2,
-        ntasks_per_node=18,
         partition="test-partition",
         user="testuser",
     )
@@ -86,7 +84,7 @@ def sample_config(
         simulation=sample_simulation_config,
         boundary=sample_boundary_config,
         paths=sample_path_config,
-        mpi=MPIConfig(),
+        model_config=SchismModelConfig(),
         monitoring=MonitoringConfig(),
         download=DownloadConfig(enabled=False),
     )
@@ -104,6 +102,7 @@ def sample_config_yaml(tmp_path, sample_config):
 def minimal_config_dict(tmp_work_dir, tmp_download_dir):
     """Return a minimal config dictionary."""
     return {
+        "model": "schism",
         "slurm": {"user": "testuser"},
         "simulation": {
             "start_date": "2021-06-11",

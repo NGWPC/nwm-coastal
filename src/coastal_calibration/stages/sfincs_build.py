@@ -2,7 +2,7 @@
 
 All stages subclass :class:`~coastal_calibration.stages.base.WorkflowStage`
 and accept a :class:`~coastal_calibration.config.schema.CoastalCalibConfig`.
-SFINCS-specific settings are read from ``config.sfincs``
+SFINCS-specific settings are read from ``config.model_config``
 (:class:`~coastal_calibration.config.schema.SfincsModelConfig`).
 
 The HydroMT ``SfincsModel`` instance is shared between stages via a
@@ -16,6 +16,7 @@ import subprocess
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
+from coastal_calibration.config.schema import SfincsModelConfig
 from coastal_calibration.stages.base import WorkflowStage
 from coastal_calibration.stages.sfincs import create_nc_symlinks, generate_data_catalog
 
@@ -24,7 +25,8 @@ if TYPE_CHECKING:
 
     from hydromt_sfincs import SfincsModel  # pyright: ignore[reportMissingImports]
 
-    from coastal_calibration.config.schema import CoastalCalibConfig, SfincsModelConfig
+    from coastal_calibration.config.schema import CoastalCalibConfig
+    from coastal_calibration.utils.logging import WorkflowMonitor
 
 SFINCS_DOCKER_IMAGE = "deltares/sfincs-cpu"
 
@@ -64,13 +66,13 @@ def _clear_model(config: CoastalCalibConfig) -> None:
 
 
 def _sfincs_cfg(config: CoastalCalibConfig) -> SfincsModelConfig:
-    """Return the ``config.sfincs`` section, raising if absent."""
-    if config.sfincs is None:
-        raise ValueError("config.sfincs must be set when model='sfincs'")
-    return config.sfincs
+    """Return the SFINCS model config, raising if not the active model."""
+    if not isinstance(config.model_config, SfincsModelConfig):
+        raise TypeError("model_config must be SfincsModelConfig when model='sfincs'")
+    return config.model_config
 
 
-def _model_root(config: CoastalCalibConfig) -> Path:
+def get_model_root(config: CoastalCalibConfig) -> Path:
     """Effective model output directory."""
     sfincs = _sfincs_cfg(config)
     return sfincs.model_root or (config.paths.work_dir / "sfincs_model")
@@ -96,12 +98,12 @@ def _waterlevel_geodataset(config: CoastalCalibConfig) -> str | None:
 # ---------------------------------------------------------------------------
 
 
-def _resolve_sif_path(config: CoastalCalibConfig) -> Path:
+def resolve_sif_path(config: CoastalCalibConfig) -> Path:
     """Resolve the Singularity SIF path from configuration."""
     sfincs = _sfincs_cfg(config)
-    if sfincs.sif_path is not None:
-        return sfincs.sif_path
-    return _model_root(config) / f"sfincs-cpu_{sfincs.docker_tag}.sif"
+    if sfincs.container_image is not None:
+        return sfincs.container_image
+    return get_model_root(config) / f"sfincs-cpu_{sfincs.container_tag}.sif"
 
 
 def _pull_singularity_image(
@@ -112,14 +114,14 @@ def _pull_singularity_image(
 ) -> Path:
     """Pull the SFINCS Docker image as a Singularity SIF file."""
     if sif_path is None:
-        sif_path = _resolve_sif_path(config)
+        sif_path = resolve_sif_path(config)
 
     if sif_path.exists():
         return sif_path
 
     sif_path.parent.mkdir(parents=True, exist_ok=True)
     sfincs = _sfincs_cfg(config)
-    docker_uri = f"docker://{SFINCS_DOCKER_IMAGE}:{sfincs.docker_tag}"
+    docker_uri = f"docker://{SFINCS_DOCKER_IMAGE}:{sfincs.container_tag}"
     cmd = ["singularity", "pull", str(sif_path), docker_uri]
 
     result = subprocess.run(cmd, capture_output=True, text=True, check=False)
@@ -136,7 +138,7 @@ def _run_singularity(
 ) -> subprocess.CompletedProcess[str]:
     """Run SFINCS inside a Singularity container."""
     if model_root is None:
-        model_root = _model_root(config)
+        model_root = get_model_root(config)
 
     cmd = ["singularity", "run", f"-B{model_root}:/data", str(sif_path)]
 
@@ -231,6 +233,15 @@ class SfincsInitStage(WorkflowStage):
         "netbndbzsbzifile",
     )
 
+    def __init__(
+        self,
+        config: CoastalCalibConfig,
+        monitor: WorkflowMonitor | None = None,
+    ) -> None:
+        super().__init__(config, monitor)
+        assert isinstance(config.model_config, SfincsModelConfig)  # noqa: S101
+        self.sfincs: SfincsModelConfig = config.model_config
+
     def _clear_missing_file_refs(self, model: SfincsModel) -> None:
         """Clear config references to files that do not exist on disk."""
         model_root = model.root.path
@@ -248,8 +259,7 @@ class SfincsInitStage(WorkflowStage):
         """Load a pre-built SFINCS model and register it for subsequent stages."""
         from hydromt_sfincs import SfincsModel  # pyright: ignore[reportMissingImports]
 
-        sfincs = _sfincs_cfg(self.config)
-        root = _model_root(self.config)
+        root = get_model_root(self.config)
 
         data_libs: list[str] = []
         catalog_path = _data_catalog_path(self.config)
@@ -259,7 +269,7 @@ class SfincsInitStage(WorkflowStage):
         self._update_substep("Loading pre-built SFINCS model")
 
         # Copy pre-built files to model_root if source is different
-        source_dir = sfincs.model_dir
+        source_dir = self.sfincs.prebuilt_dir
         if source_dir.resolve() != root.resolve():
             root.mkdir(parents=True, exist_ok=True)
             for src_file in source_dir.iterdir():
@@ -350,19 +360,27 @@ class SfincsObservationPointsStage(WorkflowStage):
     name = "sfincs_obs"
     description = "Add observation points"
 
+    def __init__(
+        self,
+        config: CoastalCalibConfig,
+        monitor: WorkflowMonitor | None = None,
+    ) -> None:
+        super().__init__(config, monitor)
+        assert isinstance(config.model_config, SfincsModelConfig)  # noqa: S101
+        self.sfincs: SfincsModelConfig = config.model_config
+
     def run(self) -> dict[str, Any]:
         """Add observation points from config or file."""
-        sfincs = _sfincs_cfg(self.config)
         model = _get_model(self.config)
 
-        if sfincs.obs_locations is None and not sfincs.obs_points:
+        if self.sfincs.observation_locations_file is None and not self.sfincs.observation_points:
             self._log("No observation points configured, skipping")
             return {"status": "skipped"}
 
         self._update_substep("Adding observation points")
 
         # When merge=False, clear existing observation points first
-        if not sfincs.obs_merge:
+        if not self.sfincs.merge_observations:
             try:
                 existing = model.observation_points.nr_points
                 if existing > 0:
@@ -371,20 +389,20 @@ class SfincsObservationPointsStage(WorkflowStage):
             except Exception:  # noqa: S110
                 pass  # No existing points to clear
 
-        if sfincs.obs_locations is not None:
+        if self.sfincs.observation_locations_file is not None:
             model.observation_points.create(
-                locations=str(sfincs.obs_locations),
-                merge=sfincs.obs_merge,
+                locations=str(self.sfincs.observation_locations_file),
+                merge=self.sfincs.merge_observations,
             )
-            self._log(f"Observation points added from {sfincs.obs_locations}")
-        elif sfincs.obs_points:
-            for pt in sfincs.obs_points:
+            self._log(f"Observation points added from {self.sfincs.observation_locations_file}")
+        elif self.sfincs.observation_points:
+            for pt in self.sfincs.observation_points:
                 model.observation_points.add_point(
                     x=pt["x"],
                     y=pt["y"],
-                    name=pt.get("name", f"obs_{sfincs.obs_points.index(pt)}"),
+                    name=pt.get("name", f"obs_{self.sfincs.observation_points.index(pt)}"),
                 )
-            self._log(f"Added {len(sfincs.obs_points)} observation point(s)")
+            self._log(f"Added {len(self.sfincs.observation_points)} observation point(s)")
 
         return {"status": "completed"}
 
@@ -394,6 +412,15 @@ class SfincsDischargeStage(WorkflowStage):
 
     name = "sfincs_discharge"
     description = "Add discharge sources"
+
+    def __init__(
+        self,
+        config: CoastalCalibConfig,
+        monitor: WorkflowMonitor | None = None,
+    ) -> None:
+        super().__init__(config, monitor)
+        assert isinstance(config.model_config, SfincsModelConfig)  # noqa: S101
+        self.sfincs: SfincsModelConfig = config.model_config
 
     @staticmethod
     def _parse_src_file(path: Path) -> list[tuple[float, float, str]]:
@@ -414,17 +441,16 @@ class SfincsDischargeStage(WorkflowStage):
 
     def run(self) -> dict[str, Any]:
         """Add discharge source points from a ``.src`` or GeoJSON file."""
-        sfincs = _sfincs_cfg(self.config)
         model = _get_model(self.config)
 
-        if sfincs.src_locations is None:
+        if self.sfincs.discharge_locations_file is None:
             self._log("No discharge configuration, skipping")
             return {"status": "skipped"}
 
         self._update_substep("Adding discharge source points")
 
         # When merge=False, clear existing discharge points first
-        if not sfincs.src_merge:
+        if not self.sfincs.merge_discharge:
             try:
                 existing = model.discharge_points.nr_points
                 if existing > 0:
@@ -433,7 +459,7 @@ class SfincsDischargeStage(WorkflowStage):
             except Exception:  # noqa: S110
                 pass  # No existing points to clear
 
-        src_path = sfincs.src_locations
+        src_path = self.sfincs.discharge_locations_file
         suffix = src_path.suffix.lower()
 
         if suffix == ".src":
@@ -444,7 +470,7 @@ class SfincsDischargeStage(WorkflowStage):
         else:
             model.discharge_points.create(
                 locations=str(src_path),
-                merge=sfincs.src_merge,
+                merge=self.sfincs.merge_discharge,
             )
             self._log(f"Discharge source points added from {src_path}")
 
@@ -457,19 +483,26 @@ class SfincsPrecipitationStage(WorkflowStage):
     name = "sfincs_precip"
     description = "Add precipitation forcing"
 
+    def __init__(
+        self,
+        config: CoastalCalibConfig,
+        monitor: WorkflowMonitor | None = None,
+    ) -> None:
+        super().__init__(config, monitor)
+        assert isinstance(config.model_config, SfincsModelConfig)  # noqa: S101
+        self.sfincs: SfincsModelConfig = config.model_config
+
     def run(self) -> dict[str, Any]:
         """Add precipitation from a dataset in the data catalog."""
-        sfincs = _sfincs_cfg(self.config)
-
-        if sfincs.precip_dataset is None:
+        if self.sfincs.precip_dataset is None:
             self._log("No precipitation configured, skipping")
             return {"status": "skipped"}
 
         model = _get_model(self.config)
 
         self._update_substep("Adding precipitation forcing")
-        model.precipitation.create(precip=sfincs.precip_dataset)
-        self._log(f"Precipitation forcing added from {sfincs.precip_dataset}")
+        model.precipitation.create(precip=self.sfincs.precip_dataset)
+        self._log(f"Precipitation forcing added from {self.sfincs.precip_dataset}")
 
         return {"status": "completed"}
 
@@ -487,7 +520,7 @@ class SfincsWriteStage(WorkflowStage):
         self._update_substep("Writing model to disk")
         model.write()
 
-        root = _model_root(self.config)
+        root = get_model_root(self.config)
         self._log(f"SFINCS model written to {root}")
 
         return {

@@ -16,6 +16,7 @@ from coastal_calibration.config.schema import (
     CoastalCalibConfig,
     DownloadConfig,
     PathConfig,
+    SchismModelConfig,
     SimulationConfig,
     SlurmConfig,
 )
@@ -177,6 +178,7 @@ class TestGenerateDataCatalog:
             ),
             boundary=BoundaryConfig(source="stofs"),
             paths=PathConfig(work_dir=work_dir, raw_download_dir=dl_dir),
+            model_config=SchismModelConfig(),
             download=DownloadConfig(enabled=False),
         )
 
