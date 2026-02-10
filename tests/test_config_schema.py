@@ -174,6 +174,7 @@ class TestSchismModelConfig:
         assert cfg.nscribes == 2
         assert cfg.omp_num_threads == 2
         assert cfg.oversubscribe is False
+        assert cfg.include_noaa_gages is False
 
     def test_total_tasks(self):
         cfg = SchismModelConfig(nodes=3, ntasks_per_node=10)
@@ -212,6 +213,7 @@ class TestSchismModelConfig:
         assert d["ntasks_per_node"] == 18
         assert d["nscribes"] == 2
         assert "binary" in d
+        assert d["include_noaa_gages"] is False
 
     def test_generate_job_script_lines(self, sample_config):
         cfg = SchismModelConfig()
@@ -228,6 +230,7 @@ class TestSfincsModelConfig:
         assert cfg.container_tag == "latest"
         assert cfg.merge_observations is False
         assert cfg.merge_discharge is False
+        assert cfg.include_noaa_gages is False
 
     def test_model_name(self, tmp_path):
         cfg = SfincsModelConfig(prebuilt_dir=tmp_path)
@@ -256,6 +259,7 @@ class TestSfincsModelConfig:
         assert d["prebuilt_dir"] == str(tmp_path)
         assert d["omp_num_threads"] == get_cpu_count()
         assert "container_tag" in d
+        assert d["include_noaa_gages"] is False
 
     def test_explicit_omp_num_threads(self, tmp_path):
         """Explicit omp_num_threads is preserved (e.g., cluster YAML)."""

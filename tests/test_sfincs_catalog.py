@@ -25,11 +25,11 @@ from coastal_calibration.stages.sfincs import (
     CatalogMetadata,
     DataAdapter,
     DataCatalog,
-    SFINCSDataCatalogStage,
     create_nc_symlinks,
     generate_data_catalog,
     remove_nc_symlinks,
 )
+from coastal_calibration.stages.sfincs_build import SfincsDataCatalogStage
 
 
 class TestDataAdapter:
@@ -329,14 +329,14 @@ class TestRemoveNcSymlinks:
         assert real_file.exists()
 
 
-class TestSFINCSDataCatalogStage:
+class TestSfincsDataCatalogStage:
     def test_validate_download_dir_missing(self, sample_config, tmp_path):
         sample_config.paths.raw_download_dir = tmp_path / "nonexistent"
-        stage = SFINCSDataCatalogStage(sample_config)
+        stage = SfincsDataCatalogStage(sample_config)
         errors = stage.validate()
         assert any("does not exist" in e for e in errors)
 
     def test_validate_download_dir_exists(self, sample_config):
-        stage = SFINCSDataCatalogStage(sample_config)
+        stage = SfincsDataCatalogStage(sample_config)
         errors = stage.validate()
         assert len(errors) == 0
