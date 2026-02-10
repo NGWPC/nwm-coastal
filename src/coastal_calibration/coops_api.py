@@ -41,7 +41,13 @@ def _check_plot_deps() -> None:
         )
 
 
-__all__ = ["COOPSAPIClient", "DatumValue", "StationDatum", "query_coops_bygeometry", "query_coops_byids"]
+__all__ = [
+    "COOPSAPIClient",
+    "DatumValue",
+    "StationDatum",
+    "query_coops_bygeometry",
+    "query_coops_byids",
+]
 
 
 @dataclass

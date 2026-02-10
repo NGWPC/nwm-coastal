@@ -139,10 +139,8 @@ class TestSfincsObservationPointsStageNOAA:
         sfincs_config.model_config.include_noaa_gages = True
         _set_model(sfincs_config, mock_model)
 
-        with patch(
-            "coastal_calibration.coops_api.COOPSAPIClient"
-        ) as MockClient:
-            mock_client = MockClient.return_value
+        with patch("coastal_calibration.coops_api.COOPSAPIClient") as mock_cls:
+            mock_client = mock_cls.return_value
             mock_client.stations_metadata = noaa_stations_gdf
 
             stage = SfincsObservationPointsStage(sfincs_config)
@@ -167,10 +165,8 @@ class TestSfincsObservationPointsStageNOAA:
             crs=4326,
         )
 
-        with patch(
-            "coastal_calibration.coops_api.COOPSAPIClient"
-        ) as MockClient:
-            mock_client = MockClient.return_value
+        with patch("coastal_calibration.coops_api.COOPSAPIClient") as mock_cls:
+            mock_client = mock_cls.return_value
             mock_client.stations_metadata = empty_gdf
 
             stage = SfincsObservationPointsStage(sfincs_config)
@@ -187,10 +183,8 @@ class TestSfincsObservationPointsStageNOAA:
         ]
         _set_model(sfincs_config, mock_model)
 
-        with patch(
-            "coastal_calibration.coops_api.COOPSAPIClient"
-        ) as MockClient:
-            mock_client = MockClient.return_value
+        with patch("coastal_calibration.coops_api.COOPSAPIClient") as mock_cls:
+            mock_client = mock_cls.return_value
             mock_client.stations_metadata = noaa_stations_gdf
 
             stage = SfincsObservationPointsStage(sfincs_config)
@@ -213,10 +207,8 @@ class TestSfincsObservationPointsStageNOAA:
         sfincs_config.model_config.include_noaa_gages = True
         _set_model(sfincs_config, mock_model)
 
-        with patch(
-            "coastal_calibration.coops_api.COOPSAPIClient"
-        ) as MockClient:
-            mock_client = MockClient.return_value
+        with patch("coastal_calibration.coops_api.COOPSAPIClient") as mock_cls:
+            mock_client = mock_cls.return_value
             mock_client.stations_metadata = noaa_stations_gdf
 
             stage = SfincsObservationPointsStage(sfincs_config)

@@ -22,10 +22,10 @@ from coastal_calibration.coops_api import (
     query_coops_byids,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def mock_stations_gdf():
@@ -103,9 +103,11 @@ class TestCheckPlotDeps:
         _check_plot_deps()
 
     def test_raises_when_missing(self):
-        with patch("builtins.__import__", side_effect=ImportError):
-            with pytest.raises(ImportError, match="Missing optional dependencies"):
-                _check_plot_deps()
+        with (
+            patch("builtins.__import__", side_effect=ImportError),
+            pytest.raises(ImportError, match="Missing optional dependencies"),
+        ):
+            _check_plot_deps()
 
 
 # ---------------------------------------------------------------------------
@@ -313,9 +315,11 @@ class TestGetDatums:
 
     def test_error_response_skipped(self, client):
         error_resp = {"error": {"message": "Station not found"}}
-        with patch.object(client, "fetch_data", return_value=[error_resp]):
-            with pytest.raises(ValueError, match="No valid datum data"):
-                client.get_datums("INVALID")
+        with (
+            patch.object(client, "fetch_data", return_value=[error_resp]),
+            pytest.raises(ValueError, match="No valid datum data"),
+        ):
+            client.get_datums("INVALID")
 
     def test_none_response_skipped(self, client, datum_response):
         with patch.object(client, "fetch_data", return_value=[None, datum_response]):
@@ -467,13 +471,16 @@ class TestProcessResponses:
         assert ds.attrs["product"] == "water_level"
         assert ds.attrs["datum"] == "MLLW"
         assert ds.attrs["source"] == "NOAA CO-OPS API"
-        np.testing.assert_allclose(
-            ds["water_level"].values[:, 0], [0.412, 0.418, 0.425], atol=1e-6
-        )
+        np.testing.assert_allclose(ds["water_level"].values[:, 0], [0.412, 0.418, 0.425], atol=1e-6)
 
     def test_multiple_stations(self, water_level_response):
         resp2 = {
-            "metadata": {"id": "8770570", "name": "Sabine Pass North", "lat": "29.72", "lon": "-93.87"},
+            "metadata": {
+                "id": "8770570",
+                "name": "Sabine Pass North",
+                "lat": "29.72",
+                "lon": "-93.87",
+            },
             "data": [
                 {"t": "2023-01-01 00:00", "v": "0.100", "s": "0.001", "f": "0,0,0,0", "q": "v"},
                 {"t": "2023-01-01 00:06", "v": "0.110", "s": "0.001", "f": "0,0,0,0", "q": "v"},
@@ -589,20 +596,16 @@ class TestProcessResponses:
 
 class TestQueryCoopsByIds:
     def test_end_before_start_raises(self, mock_stations_gdf):
-        with patch.object(
-            COOPSAPIClient, "_get_stations_metadata", return_value=mock_stations_gdf
+        with (
+            patch.object(COOPSAPIClient, "_get_stations_metadata", return_value=mock_stations_gdf),
+            pytest.raises(ValueError, match="end_date must be after begin_date"),
         ):
-            with pytest.raises(ValueError, match="end_date must be after begin_date"):
-                query_coops_byids(["8771450"], "20230102", "20230101")
+            query_coops_byids(["8771450"], "20230102", "20230101")
 
     def test_successful_query(self, mock_stations_gdf, water_level_response):
         with (
-            patch.object(
-                COOPSAPIClient, "_get_stations_metadata", return_value=mock_stations_gdf
-            ),
-            patch.object(
-                COOPSAPIClient, "fetch_data", return_value=[water_level_response]
-            ),
+            patch.object(COOPSAPIClient, "_get_stations_metadata", return_value=mock_stations_gdf),
+            patch.object(COOPSAPIClient, "fetch_data", return_value=[water_level_response]),
         ):
             ds = query_coops_byids(["8771450"], "20230101", "20230102")
             assert isinstance(ds, xr.Dataset)
@@ -616,17 +619,13 @@ class TestQueryCoopsByIds:
 
 class TestQueryCoopsByGeometry:
     def test_invalid_geometry_raises(self, mock_stations_gdf):
-        with patch.object(
-            COOPSAPIClient, "_get_stations_metadata", return_value=mock_stations_gdf
-        ):
+        with patch.object(COOPSAPIClient, "_get_stations_metadata", return_value=mock_stations_gdf):
             bad_geom = shapely.Polygon([(0, 0), (1, 1), (0, 1), (1, 0)])
             with pytest.raises(ValueError, match="Invalid geometry"):
                 query_coops_bygeometry(bad_geom, "20230101", "20230102")
 
     def test_no_stations_in_geometry_raises(self, mock_stations_gdf):
-        with patch.object(
-            COOPSAPIClient, "_get_stations_metadata", return_value=mock_stations_gdf
-        ):
+        with patch.object(COOPSAPIClient, "_get_stations_metadata", return_value=mock_stations_gdf):
             # Somewhere in the Pacific with no stations
             geom = shapely.box(170, -50, 175, -45)
             with pytest.raises(ValueError, match="No stations found"):
@@ -636,9 +635,7 @@ class TestQueryCoopsByGeometry:
         # Box around Galveston
         geom = shapely.box(-95.0, 29.0, -94.5, 29.5)
         with (
-            patch.object(
-                COOPSAPIClient, "_get_stations_metadata", return_value=mock_stations_gdf
-            ),
+            patch.object(COOPSAPIClient, "_get_stations_metadata", return_value=mock_stations_gdf),
             patch("coastal_calibration.coops_api.query_coops_byids") as mock_byids,
         ):
             mock_byids.return_value = xr.Dataset()
