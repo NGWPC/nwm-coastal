@@ -386,13 +386,10 @@ def _build_nwm_ana_forcing_urls(
         date_str = fetch_dt.strftime("%Y%m%d")
         hour_str = f"{fetch_dt.hour:02d}"
 
-        url = (
-            f"{base_url}/nwm.{date_str}/"
-            f"forcing_analysis_assim{suffix}/"
-            f"nwm.t{hour_str}z.analysis_assim.forcing.tm02.{name}.nc"
-        )
+        fname = f"nwm.t{hour_str}z.analysis_assim.forcing.tm02.{name}.nc"
+        url = f"{base_url}/nwm.{date_str}/forcing_analysis_assim{suffix}/{fname}"
         urls.append(url)
-        paths.append(out_dir / f"{dt.strftime('%Y%m%d%H')}.LDASIN_DOMAIN1")
+        paths.append(out_dir / fname)
 
     return urls, paths
 

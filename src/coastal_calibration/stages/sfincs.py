@@ -294,9 +294,13 @@ def _build_meteo_entry(
     CatalogEntry
         Catalog entry for meteo data.
     """
-    # URI is relative to the root (download_dir)
-    # Use .nc symlinks to work around HydroMT ext_override bug
-    uri = f"{PathConfig.METEO_SUBDIR}/{meteo_source}/*.LDASIN_DOMAIN1.nc"
+    # URI is relative to the root (download_dir).
+    # nwm_retro files lack an extension so we use .nc symlinks to work
+    # around a HydroMT ext_override bug.  nwm_ana files are already .nc.
+    if meteo_source == "nwm_retro":
+        uri = f"{PathConfig.METEO_SUBDIR}/{meteo_source}/*.LDASIN_DOMAIN1.nc"
+    else:
+        uri = f"{PathConfig.METEO_SUBDIR}/{meteo_source}/*.nc"
 
     temporal_extent = _get_temporal_extent(sim)
 
@@ -699,7 +703,9 @@ def create_nc_symlinks(
 
     if include_meteo:
         meteo_dir = download_dir / PathConfig.METEO_SUBDIR / meteo_source
-        if meteo_dir.exists():
+        # nwm_ana forcing files are already .nc — no symlinks needed.
+        # Only nwm_retro (extension-less LDASIN_DOMAIN1) requires the workaround.
+        if meteo_source == "nwm_retro" and meteo_dir.exists():
             for src in meteo_dir.glob("*.LDASIN_DOMAIN1"):
                 dst = src.with_suffix(".LDASIN_DOMAIN1.nc")
                 if not dst.exists():
@@ -753,7 +759,8 @@ def remove_nc_symlinks(
 
     if include_meteo:
         meteo_dir = download_dir / PathConfig.METEO_SUBDIR / meteo_source
-        if meteo_dir.exists():
+        # Only nwm_retro has LDASIN symlinks; nwm_ana files are native .nc.
+        if meteo_source == "nwm_retro" and meteo_dir.exists():
             for link in meteo_dir.glob("*.LDASIN_DOMAIN1.nc"):
                 if link.is_symlink():
                     link.unlink()
