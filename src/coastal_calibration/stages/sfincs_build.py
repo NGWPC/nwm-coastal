@@ -710,22 +710,34 @@ class SfincsPlotStage(WorkflowStage):
         )
         axes_flat = np.atleast_1d(axes).ravel()
 
+        datum = obs_ds.attrs.get("datum", "")
+        ylabel = f"Water Level (m, {datum})" if datum else "Water Level (m)"
+
         for i, idx in enumerate(noaa_indices):
             ax = axes_flat[i]
             sim_ts = point_h.isel({station_dim: idx})
             station_id = obs_ds.station_id.isel(station=i).item()
 
-            # Observed
             obs_wl = obs_ds.water_level.isel(station=i)
-            ax.plot(obs_wl.time, obs_wl, label="Observed", color="k", linewidth=0.8)
+            has_obs = bool(np.isfinite(obs_wl).any())
+            has_sim = bool(np.isfinite(sim_ts).any())
 
-            # Simulated
-            ax.plot(sim_ts.time, sim_ts, color="r", ls="--", alpha=0.5)
-            ax.scatter(sim_ts.time, sim_ts, label="Simulated", color="r", marker="x", s=15)
+            if has_obs:
+                ax.plot(obs_wl.time, obs_wl, label="Observed", color="k", linewidth=0.8)
 
-            ax.set_title(f"NOAA {station_id}", fontsize=10)
-            ax.set_ylabel("Water Level (m)")
-            ax.legend(fontsize="small")
+            if has_sim:
+                ax.plot(sim_ts.time, sim_ts, color="r", ls="--", alpha=0.5)
+                ax.scatter(sim_ts.time, sim_ts, label="Simulated", color="r", marker="x", s=15)
+
+            title = f"NOAA {station_id}"
+            if not has_obs:
+                title += " (no obs)"
+            if not has_sim:
+                title += " (no sim)"
+            ax.set_title(title, fontsize=10)
+            ax.set_ylabel(ylabel)
+            if has_obs or has_sim:
+                ax.legend(fontsize="small")
 
         # Remove unused axes
         for j in range(n_stations, len(axes_flat)):
@@ -804,7 +816,7 @@ class SfincsPlotStage(WorkflowStage):
                 begin_date,
                 end_date,
                 product="water_level",
-                datum="NAVD",
+                datum="MSL",
                 units="metric",
                 time_zone="gmt",
             )
