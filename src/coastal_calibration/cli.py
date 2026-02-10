@@ -62,6 +62,7 @@ def run(
     try:
         cfg = CoastalCalibConfig.from_yaml(config_path)
         runner = CoastalCalibRunner(cfg)
+        configure_logger(level="INFO")
 
         if dry_run:
             logger.info("Dry run mode - validating configuration...")
@@ -108,9 +109,8 @@ def submit(config: Path, interactive: bool) -> None:
         cfg = CoastalCalibConfig.from_yaml(config_path)
         cfg.paths.work_dir.mkdir(parents=True, exist_ok=True)
 
-        configure_logger(level="INFO")
-
         runner = CoastalCalibRunner(cfg)
+        configure_logger(level="INFO")
         result = runner.submit(wait=interactive, log_file=None)
 
         if result.success:

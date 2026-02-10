@@ -609,20 +609,29 @@ def _filter_existing(
 
     # Bulk remote-size check for surviving .nc files.
     if nc_urls:
-        invalid = check_downloads(nc_urls, nc_paths)
-        for url, path in zip(nc_urls, nc_paths, strict=False):
-            if path in invalid:
-                logger.warning(
-                    "Truncated file detected (expected %d bytes, got %d), re-downloading: %s",
-                    invalid[path],
-                    path.stat().st_size,
-                    path,
-                )
-                path.unlink(missing_ok=True)
-                pending_urls.append(url)
-                pending_paths.append(path)
-            else:
-                existing += 1
+        try:
+            invalid = check_downloads(nc_urls, nc_paths)
+        except Exception:
+            logger.warning(
+                "Remote size check failed (network unavailable?). "
+                "Accepting %d existing files that passed magic-bytes validation.",
+                len(nc_urls),
+            )
+            existing += len(nc_urls)
+        else:
+            for url, path in zip(nc_urls, nc_paths, strict=False):
+                if path in invalid:
+                    logger.warning(
+                        "Truncated file detected (expected %d bytes, got %d), re-downloading: %s",
+                        invalid[path],
+                        path.stat().st_size,
+                        path,
+                    )
+                    path.unlink(missing_ok=True)
+                    pending_urls.append(url)
+                    pending_paths.append(path)
+                else:
+                    existing += 1
 
     return pending_urls, pending_paths, existing
 
@@ -660,13 +669,21 @@ def _tally_results(
     ]
     nc_paths = [p for p in pending_paths if p.exists() and p.suffix == ".nc"]
     if nc_urls:
-        invalid = check_downloads(nc_urls, nc_paths)
-        for path in invalid:
-            result.successful -= 1
-            result.failed += 1
-            result.errors.append(f"Truncated download: {path.name}")
-            logger.warning("Truncated file detected, removing: %s", path)
-            path.unlink(missing_ok=True)
+        try:
+            invalid = check_downloads(nc_urls, nc_paths)
+        except Exception:
+            logger.warning(
+                "Remote size check failed after download (network unavailable?). "
+                "Skipping post-download size validation for %d files.",
+                len(nc_urls),
+            )
+        else:
+            for path in invalid:
+                result.successful -= 1
+                result.failed += 1
+                result.errors.append(f"Truncated download: {path.name}")
+                logger.warning("Truncated file detected, removing: %s", path)
+                path.unlink(missing_ok=True)
 
 
 def _execute_download(
