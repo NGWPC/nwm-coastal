@@ -45,7 +45,11 @@ jobs:
 
     - name: Deploy dev docs
       if: github.ref == 'refs/heads/main'
-      run: mike deploy --push dev
+      run: |
+        mike deploy --push dev
+        if ! mike list | grep -q latest; then
+          mike set-default --push dev
+        fi
 
     - name: Deploy tagged version
       if: startsWith(github.ref, 'refs/tags/v')
