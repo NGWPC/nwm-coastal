@@ -29,7 +29,6 @@ paths:
 
 download:
   enabled: true
-  skip_existing: true
   raise_on_error: false  # don't abort on partial download failures
 
 monitoring:
