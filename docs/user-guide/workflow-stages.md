@@ -4,6 +4,12 @@ The coastal calibration workflow consists of sequential stages, each performing 
 specific task in the simulation pipeline. The stage order depends on the selected model
 (SCHISM or SFINCS).
 
+Both `run` and `submit` execute the same stage pipeline. Each stage is classified as
+either **Python-only** or **container** (requires Singularity/MPI). When using `submit`,
+Python-only stages run on the login node while container stages are submitted as a SLURM
+job. When using `run`, all stages execute locally (e.g., inside an interactive compute
+session).
+
 ## SCHISM Stage Overview
 
 ```mermaid
@@ -32,8 +38,11 @@ flowchart TD
     F --> G[sfincs_obs]
     G --> H[sfincs_discharge]
     H --> I[sfincs_precip]
-    I --> J[sfincs_write]
-    J --> K[sfincs_run]
+    I --> J[sfincs_wind]
+    J --> K[sfincs_pressure]
+    K --> L[sfincs_write]
+    L --> M[sfincs_run]
+    M --> N[sfincs_plot]
 ```
 
 ## SCHISM Stage Details
@@ -181,8 +190,6 @@ work_dir/
 - Validate all input files present
 - Set up symbolic links
 - Configure MPI environment
-- If `include_noaa_gages` is enabled and `station.in` exists, patch `param.nml` to set
-    `iout_sta = 1` for station output
 
 **Runs On:** Compute node (inside Singularity)
 
@@ -320,7 +327,27 @@ STOFS water level data.
 
 - Add NWM precipitation data as spatially distributed forcing
 
-### 10. sfincs_write
+### 10. sfincs_wind
+
+**Purpose:** Add wind forcing.
+
+**Tasks:**
+
+- Add NWM wind data as spatially distributed forcing
+
+**Runs On:** Login node (Python-only)
+
+### 11. sfincs_pressure
+
+**Purpose:** Add atmospheric pressure forcing.
+
+**Tasks:**
+
+- Add NWM atmospheric pressure data as spatially distributed forcing
+
+**Runs On:** Login node (Python-only)
+
+### 12. sfincs_write
 
 **Purpose:** Write the final SFINCS model.
 
@@ -329,7 +356,9 @@ STOFS water level data.
 - Write all SFINCS input files (`sfincs.inp`, `sfincs.bnd`, etc.)
 - Generate boundary and forcing NetCDF files
 
-### 11. sfincs_run
+**Runs On:** Login node (Python-only)
+
+### 13. sfincs_run
 
 **Purpose:** Execute the SFINCS model.
 
@@ -340,19 +369,38 @@ STOFS water level data.
 
 **Runs On:** Compute node (OpenMP, inside Singularity)
 
+### 14. sfincs_plot
+
+**Purpose:** Compare simulated water levels against observations.
+
+**Tasks:**
+
+- Read SFINCS output at observation points
+- Fetch NOAA CO-OPS observed water levels
+- Generate comparison plots
+- Save figures to the `figs/` directory
+
+**Runs On:** Login node or compute node (Python, requires network access)
+
 ## Running Partial Workflows
+
+Both `run` and `submit` support `--start-from` and `--stop-after`.
 
 ### CLI
 
 ```bash
-# SCHISM examples
+# SCHISM examples (run)
 coastal-calibration run config.yaml --stop-after download
 coastal-calibration run config.yaml --start-from pre_forcing --stop-after post_forcing
 coastal-calibration run config.yaml --start-from boundary_conditions
 
+# SCHISM examples (submit)
+coastal-calibration submit config.yaml --start-from boundary_conditions -i
+coastal-calibration submit config.yaml --stop-after post_forcing
+
 # SFINCS examples
 coastal-calibration run config.yaml --stop-after sfincs_write
-coastal-calibration run config.yaml --start-from sfincs_run
+coastal-calibration submit config.yaml --start-from sfincs_run -i
 ```
 
 ### Python API
@@ -363,8 +411,11 @@ from coastal_calibration import CoastalCalibConfig, CoastalCalibRunner
 config = CoastalCalibConfig.from_yaml("config.yaml")
 runner = CoastalCalibRunner(config)
 
-# Run specific stages
+# Run specific stages locally
 result = runner.run(start_from="pre_forcing", stop_after="post_forcing")
+
+# Submit partial pipeline to SLURM
+result = runner.submit(wait=True, start_from="boundary_conditions")
 ```
 
 ## Error Handling

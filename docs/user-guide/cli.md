@@ -86,7 +86,9 @@ Or with errors:
 
 ### submit
 
-Submit a workflow as a SLURM job.
+Submit a workflow as a SLURM job. Python-only stages run on the login node; container
+stages are submitted as a SLURM job. The same stage pipeline is used as the `run`
+command.
 
 ```bash
 coastal-calibration submit <config> [OPTIONS]
@@ -103,6 +105,8 @@ coastal-calibration submit <config> [OPTIONS]
 | Option                | Description                          | Default |
 | --------------------- | ------------------------------------ | ------- |
 | `--interactive`, `-i` | Wait for job completion with updates | False   |
+| `--start-from`        | Stage to start from (skip earlier)   | First   |
+| `--stop-after`        | Stage to stop after (skip later)     | Last    |
 
 **Examples:**
 
@@ -113,6 +117,10 @@ coastal-calibration submit config.yaml
 # Submit and wait for completion
 coastal-calibration submit config.yaml --interactive
 coastal-calibration submit config.yaml -i
+
+# Submit partial pipeline
+coastal-calibration submit config.yaml --start-from boundary_conditions -i
+coastal-calibration submit config.yaml --stop-after post_forcing
 ```
 
 ### run
@@ -162,8 +170,11 @@ coastal-calibration run <config> [OPTIONS]
 - `sfincs_obs`
 - `sfincs_discharge`
 - `sfincs_precip`
+- `sfincs_wind`
+- `sfincs_pressure`
 - `sfincs_write`
 - `sfincs_run`
+- `sfincs_plot`
 
 **Examples:**
 
@@ -234,8 +245,11 @@ SFINCS workflow stages:
   7. sfincs_obs: Add observation points
   8. sfincs_discharge: Add discharge sources
   9. sfincs_precip: Add precipitation forcing
-  10. sfincs_write: Write SFINCS model
-  11. sfincs_run: Run SFINCS model (Singularity)
+  10. sfincs_wind: Add wind forcing
+  11. sfincs_pressure: Add atmospheric pressure forcing
+  12. sfincs_write: Write SFINCS model
+  13. sfincs_run: Run SFINCS model (Singularity)
+  14. sfincs_plot: Plot simulated vs observed water levels
 ```
 
 ## Exit Codes

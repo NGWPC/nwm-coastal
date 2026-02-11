@@ -98,8 +98,13 @@ coastal-calibration validate config.yaml
 coastal-calibration submit config.yaml
 ```
 
-By default, the CLI submits the job and returns immediately after the download stage
-completes (the download runs on the login node before submission):
+Both `run` and `submit` execute the same stage pipeline. The difference is that `run`
+executes everything locally (for use inside an interactive compute session), while
+`submit` runs Python-only stages on the login node and submits container stages as a
+SLURM job. Both support `--start-from` and `--stop-after` for partial workflows.
+
+By default, the CLI submits the job and returns immediately after the Python-only
+pre-job stages complete (e.g., download, observation station discovery):
 
 ```console
 INFO  Running download stage on login node...
@@ -122,23 +127,11 @@ Use the `--interactive` (or `-i`) flag to wait and monitor the job until complet
 coastal-calibration submit config.yaml --interactive
 ```
 
-```console
-INFO  Running download stage on login node...
-INFO  meteo/nwm_ana: 4/4 [OK]
-INFO  hydro/nwm: 16/16 [OK]
-INFO  coastal/stofs: 1/1 [OK]
-INFO  Total: 21/21 (failed: 0)
-INFO  Download stage completed
-INFO  Generated job script: .../submit_job.sh
-INFO  Generated runner script: .../sing_run_generated.bash
-INFO  Submitting job: .../submit_job.sh
-INFO  Job submitted with ID: 167
-INFO  Waiting for job 167 to complete...
-INFO  Job 167 state: PENDING
-INFO  Job 167 state: CONFIGURING
-INFO  Job 167 state: RUNNING
-INFO  Job 167 state: COMPLETED
-INFO  Job 167 completed successfully.
+Run partial pipelines with `--start-from` and `--stop-after`:
+
+```bash
+coastal-calibration submit config.yaml --start-from boundary_conditions
+coastal-calibration submit config.yaml --stop-after post_forcing -i
 ```
 
 ## Python API
@@ -157,8 +150,10 @@ if result.success:
 ### Running Partial Workflows
 
 ```python
+# Both run() and submit() support start_from/stop_after
 result = runner.run(start_from="pre_forcing", stop_after="post_forcing")
 result = runner.run(start_from="pre_schism")
+result = runner.submit(wait=True, start_from="boundary_conditions")
 ```
 
 ## Configuration Reference
@@ -249,29 +244,37 @@ present.
 
 ### SCHISM Stages
 
-1. **`download`** - Download NWM/STOFS data
-1. **`pre_forcing`** - Prepare NWM forcing data
-1. **`nwm_forcing`** - Generate atmospheric forcing (MPI)
-1. **`post_forcing`** - Post-process forcing data
-1. **`update_params`** - Create SCHISM `param.nml` file
-1. **`boundary_conditions`** - Generate boundary conditions
-1. **`pre_schism`** - Prepare SCHISM inputs
-1. **`schism_run`** - Run SCHISM model (MPI)
-1. **`post_schism`** - Post-process outputs
+Each stage is either Python-only (runs on login node in `submit`) or container-based
+(runs inside SLURM job in `submit`). In `run` mode all stages execute locally.
+
+1. **`download`** - Download NWM/STOFS data _(Python-only)_
+1. **`pre_forcing`** - Prepare NWM forcing data _(container)_
+1. **`nwm_forcing`** - Generate atmospheric forcing (MPI) _(container)_
+1. **`post_forcing`** - Post-process forcing data _(container)_
+1. **`update_params`** - Create SCHISM `param.nml` file _(container)_
+1. **`schism_obs`** - Add NOAA observation stations _(Python-only)_
+1. **`boundary_conditions`** - Generate boundary conditions _(container)_
+1. **`pre_schism`** - Prepare SCHISM inputs _(container)_
+1. **`schism_run`** - Run SCHISM model (MPI) _(container)_
+1. **`post_schism`** - Post-process outputs _(container)_
+1. **`schism_plot`** - Plot simulated vs observed water levels _(Python-only)_
 
 ### SFINCS Stages
 
-1. **`download`** - Download NWM/STOFS data
-1. **`sfincs_symlinks`** - Create `.nc` symlinks for NWM data
-1. **`sfincs_data_catalog`** - Generate HydroMT data catalog
-1. **`sfincs_init`** - Initialize SFINCS model (pre-built)
-1. **`sfincs_timing`** - Set SFINCS timing
-1. **`sfincs_forcing`** - Add water level forcing
-1. **`sfincs_obs`** - Add observation points
-1. **`sfincs_discharge`** - Add discharge sources
-1. **`sfincs_precip`** - Add precipitation forcing
-1. **`sfincs_write`** - Write SFINCS model
-1. **`sfincs_run`** - Run SFINCS model (Singularity)
+1. **`download`** - Download NWM/STOFS data _(Python-only)_
+1. **`sfincs_symlinks`** - Create `.nc` symlinks for NWM data _(Python-only)_
+1. **`sfincs_data_catalog`** - Generate HydroMT data catalog _(Python-only)_
+1. **`sfincs_init`** - Initialize SFINCS model (pre-built) _(Python-only)_
+1. **`sfincs_timing`** - Set SFINCS timing _(Python-only)_
+1. **`sfincs_forcing`** - Add water level forcing _(Python-only)_
+1. **`sfincs_obs`** - Add observation points _(Python-only)_
+1. **`sfincs_discharge`** - Add discharge sources _(Python-only)_
+1. **`sfincs_precip`** - Add precipitation forcing _(Python-only)_
+1. **`sfincs_wind`** - Add wind forcing _(Python-only)_
+1. **`sfincs_pressure`** - Add atmospheric pressure forcing _(Python-only)_
+1. **`sfincs_write`** - Write SFINCS model _(Python-only)_
+1. **`sfincs_run`** - Run SFINCS model (Singularity) _(container)_
+1. **`sfincs_plot`** - Plot simulated vs observed water levels _(Python-only)_
 
 ## Configuration Inheritance
 
@@ -326,6 +329,10 @@ coastal-calibration submit config.yaml
 # Submit job and wait for completion with status updates
 coastal-calibration submit config.yaml --interactive
 coastal-calibration submit config.yaml -i
+
+# Submit with partial pipeline
+coastal-calibration submit config.yaml --start-from boundary_conditions
+coastal-calibration submit config.yaml --stop-after post_forcing -i
 
 # Run workflow locally (inside SLURM job or for testing)
 coastal-calibration run config.yaml

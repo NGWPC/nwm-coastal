@@ -73,8 +73,8 @@ coastal-calibration submit config.yaml
 
 This will:
 
-1. Download required NWM and STOFS data (on the login node)
-1. Generate SLURM job scripts
+1. Run Python-only pre-job stages on the login node (download, observation stations)
+1. Generate a SLURM job script for container stages
 1. Submit the job and return immediately
 
 ```console
@@ -94,6 +94,16 @@ Use the `--interactive` flag to monitor the job until it completes:
 
 ```bash
 coastal-calibration submit config.yaml --interactive
+```
+
+#### Option C: Submit a Partial Pipeline
+
+Use `--start-from` and `--stop-after` (same options as `run`) to submit only part of the
+workflow:
+
+```bash
+coastal-calibration submit config.yaml --start-from boundary_conditions -i
+coastal-calibration submit config.yaml --stop-after post_forcing
 ```
 
 ### Step 5: Check Results

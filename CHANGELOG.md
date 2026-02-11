@@ -30,6 +30,15 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 
+- Unified `run` and `submit` execution pipelines — both commands now execute the same
+    stage pipeline. `submit` automatically partitions stages into login-node
+    (Python-only) and SLURM job (container) groups.
+- `--start-from` and `--stop-after` options for `submit` command, matching `run`
+- `requires_container` class attribute on `WorkflowStage` for automatic stage
+    classification (Python-only vs container)
+- `schism_obs` stage (NOAA observation station discovery) and `schism_plot` stage
+    (simulated vs observed water level plots) to SCHISM workflow
+- `sfincs_wind`, `sfincs_pressure`, and `sfincs_plot` stages to SFINCS workflow
 - SFINCS coastal model workflow with full pipeline (download through sfincs_run)
 - Polymorphic `ModelConfig` ABC with `SchismModelConfig` and `SfincsModelConfig`
     concrete implementations

@@ -149,6 +149,10 @@ else:
 
 ### Submit to SLURM
 
+Both `run()` and `submit()` execute the same stage pipeline. `submit()` automatically
+partitions stages: Python-only stages run on the login node, while container stages are
+bundled into a SLURM job.
+
 ```python
 from coastal_calibration import CoastalCalibConfig, CoastalCalibRunner
 
@@ -163,6 +167,10 @@ print(f"Job {result.job_id} submitted")
 result = runner.submit(wait=True)
 if result.success:
     print(f"Job completed in {result.duration_seconds:.1f}s")
+
+# Submit partial pipeline
+result = runner.submit(wait=True, start_from="boundary_conditions")
+result = runner.submit(wait=True, stop_after="post_forcing")
 ```
 
 ### Run Directly
