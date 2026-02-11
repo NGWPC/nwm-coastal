@@ -274,3 +274,89 @@ class TestSplitStagesForSubmit:
         # schism_obs must be in pre_job, NOT in job
         assert "schism_obs" in pre_job
         assert "schism_obs" not in job
+
+
+class TestPreparePromotedStageDeps:
+    """Tests for _prepare_promoted_stage_deps dependency pre-creation."""
+
+    @pytest.fixture
+    def config_with_local_parm(self, sample_config, tmp_path):
+        """Override parm_dir with a temp directory so tests can create files."""
+        sample_config.paths.parm_dir = tmp_path / "parm_root"
+        sample_config.paths.parm_dir.mkdir()
+        return sample_config
+
+    def test_schism_obs_symlinks_hgrid_from_parm_nwm(self, config_with_local_parm):
+        """schism_obs dep creates hgrid.gr3 symlink from parm_nwm, not parm_dir."""
+        config = config_with_local_parm
+        runner = CoastalCalibRunner(config)
+        runner._init_stages()
+
+        work_dir = config.paths.work_dir
+        parm_nwm = config.paths.parm_nwm  # parm_dir / "parm"
+        domain = config.simulation.coastal_domain
+
+        # Create the source hgrid.gr3 at the parm_nwm path
+        src_dir = parm_nwm / "coastal" / domain
+        src_dir.mkdir(parents=True, exist_ok=True)
+        hgrid_src = src_dir / "hgrid.gr3"
+        hgrid_src.write_text("test hgrid content")
+
+        runner._prepare_promoted_stage_deps("schism_obs")
+
+        hgrid_dst = work_dir / "hgrid.gr3"
+        assert hgrid_dst.exists()
+        assert hgrid_dst.is_symlink()
+        assert hgrid_dst.resolve() == hgrid_src.resolve()
+
+    def test_schism_obs_does_not_use_parm_dir_directly(self, config_with_local_parm):
+        """Ensure the symlink source is parm_nwm (parm_dir/parm), not parm_dir."""
+        config = config_with_local_parm
+        runner = CoastalCalibRunner(config)
+        runner._init_stages()
+
+        work_dir = config.paths.work_dir
+        parm_dir = config.paths.parm_dir
+        domain = config.simulation.coastal_domain
+
+        # Create hgrid.gr3 at the WRONG path (parm_dir/coastal/...)
+        wrong_dir = parm_dir / "coastal" / domain
+        wrong_dir.mkdir(parents=True, exist_ok=True)
+        (wrong_dir / "hgrid.gr3").write_text("wrong location")
+
+        # Don't create it at the correct path (parm_nwm/coastal/...)
+        runner._prepare_promoted_stage_deps("schism_obs")
+
+        # Should NOT have created the symlink (source doesn't exist at correct path)
+        hgrid_dst = work_dir / "hgrid.gr3"
+        assert not hgrid_dst.exists()
+
+    def test_schism_obs_skips_if_hgrid_already_exists(self, config_with_local_parm):
+        """If hgrid.gr3 already exists in work_dir, don't overwrite."""
+        config = config_with_local_parm
+        runner = CoastalCalibRunner(config)
+        runner._init_stages()
+
+        work_dir = config.paths.work_dir
+        hgrid_dst = work_dir / "hgrid.gr3"
+        hgrid_dst.write_text("existing hgrid")
+
+        # Should not raise or modify the existing file
+        runner._prepare_promoted_stage_deps("schism_obs")
+        assert hgrid_dst.read_text() == "existing hgrid"
+        assert not hgrid_dst.is_symlink()
+
+    def test_non_schism_obs_stage_is_noop(self, config_with_local_parm):
+        """Non-schism_obs stages should not create any files."""
+        config = config_with_local_parm
+        runner = CoastalCalibRunner(config)
+        runner._init_stages()
+
+        work_dir = config.paths.work_dir
+        before = set(work_dir.iterdir())
+
+        runner._prepare_promoted_stage_deps("download")
+        runner._prepare_promoted_stage_deps("schism_plot")
+
+        after = set(work_dir.iterdir())
+        assert before == after
