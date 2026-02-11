@@ -15,12 +15,14 @@ class UpdateParamsStage(WorkflowStage):
 
     name = "update_params"
     description = "Create SCHISM param.nml"
+    requires_container = True
 
     def run(self) -> dict[str, Any]:
         """Execute parameter file creation."""
         self._update_substep("Building environment")
         env = self.build_environment()
 
+        self._log("Creating param.nml and symlinking mesh files")
         self._update_substep("Running update_params")
         script_path = self._get_scripts_dir() / "run_sing_coastal_workflow_update_params.bash"
 
@@ -30,6 +32,7 @@ class UpdateParamsStage(WorkflowStage):
         )
 
         param_file = self.config.paths.work_dir / "param.nml"
+        self._log(f"Parameter file created: {param_file}")
         return {
             "param_file": str(param_file),
             "status": "completed",
@@ -41,12 +44,14 @@ class TPXOBoundaryStage(WorkflowStage):
 
     name = "tpxo_boundary"
     description = "Create boundary forcing from TPXO"
+    requires_container = True
 
     def run(self) -> dict[str, Any]:
         """Execute TPXO boundary condition generation."""
         self._update_substep("Building environment")
         env = self.build_environment()
 
+        self._log("Generating tidal boundary from TPXO atlas")
         self._update_substep("Running make_tpxo_ocean")
         script_path = self._get_scripts_dir() / "run_sing_coastal_workflow_make_tpxo_ocean.bash"
 
@@ -56,6 +61,7 @@ class TPXOBoundaryStage(WorkflowStage):
         )
 
         elev_file = self.config.paths.work_dir / "elev2D.th.nc"
+        self._log(f"TPXO boundary file created: {elev_file}")
         return {
             "elev2d_file": str(elev_file),
             "status": "completed",
@@ -67,6 +73,7 @@ class STOFSBoundaryStage(WorkflowStage):
 
     name = "stofs_boundary"
     description = "Regrid STOFS boundary data"
+    requires_container = True
 
     def _resolve_stofs_file(self) -> Path:
         """Resolve STOFS file path from config or download directory."""
@@ -100,6 +107,7 @@ class STOFSBoundaryStage(WorkflowStage):
         env = self.build_environment()
 
         stofs_file = self._resolve_stofs_file()
+        self._log(f"Using STOFS file: {stofs_file}")
 
         self._update_substep("Pre-processing STOFS data")
         pre_script = self._get_scripts_dir() / "run_sing_coastal_workflow_pre_make_stofs_ocean.bash"
@@ -152,8 +160,10 @@ class STOFSBoundaryStage(WorkflowStage):
             env=env,
         )
 
+        elev_file = work_dir / "elev2D.th.nc"
+        self._log(f"STOFS boundary file created: {elev_file}")
         return {
-            "elev2d_file": str(work_dir / "elev2D.th.nc"),
+            "elev2d_file": str(elev_file),
             "status": "completed",
         }
 
@@ -174,6 +184,7 @@ class BoundaryConditionStage(WorkflowStage):
 
     name = "boundary_conditions"
     description = "Generate boundary conditions"
+    requires_container = True
 
     def run(self) -> dict[str, Any]:
         """Execute appropriate boundary condition stage."""

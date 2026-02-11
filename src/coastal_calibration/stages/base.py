@@ -25,6 +25,7 @@ class WorkflowStage(ABC):
 
     name: str = "base"
     description: str = "Base workflow stage"
+    requires_container: bool = False
 
     def __init__(
         self,

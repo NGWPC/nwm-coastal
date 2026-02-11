@@ -14,6 +14,7 @@ class PreForcingStage(WorkflowStage):
 
     name = "pre_forcing"
     description = "Prepare NWM forcing data"
+    requires_container = True
 
     def run(self) -> dict[str, Any]:
         """Execute pre-forcing preparation."""
@@ -30,6 +31,7 @@ class PreForcingStage(WorkflowStage):
         forcing_output.mkdir(exist_ok=True)
 
         self._update_substep("Running pre_nwm_forcing_coastal")
+        self._log("Creating forcing symlinks and output directories")
         script_path = self._get_scripts_dir() / "run_sing_coastal_workflow_pre_forcing_coastal.bash"
 
         self.run_singularity_command(
@@ -37,6 +39,7 @@ class PreForcingStage(WorkflowStage):
             env=env,
         )
 
+        self._log(f"Pre-forcing complete — output dir: {forcing_output}")
         return {
             "forcing_output_dir": str(forcing_output),
             "status": "completed",
@@ -48,6 +51,7 @@ class NWMForcingStage(WorkflowStage):
 
     name = "nwm_forcing"
     description = "Generate NWM atmospheric forcing (MPI)"
+    requires_container = True
 
     def run(self) -> dict[str, Any]:
         """Execute NWM forcing generation with MPI."""
@@ -93,6 +97,7 @@ class NWMForcingStage(WorkflowStage):
             f"{ush_dir}/wrf_hydro_workflow_dev/forcings/WrfHydroFECPP/workflow_driver.py"
         )
 
+        self._log(f"Generating {sim.duration_hours}h forcing from {forcing_begin} via MPI")
         self._update_substep("Running workflow_driver.py with MPI")
         self.run_singularity_command(
             [python_path, workflow_script],
@@ -100,6 +105,7 @@ class NWMForcingStage(WorkflowStage):
             use_mpi=True,
         )
 
+        self._log(f"NWM forcing generated in {nwm_forcing_output}")
         return {
             "forcing_output_dir": env["NWM_FORCING_OUTPUT_DIR"],
             "status": "completed",
@@ -111,12 +117,14 @@ class PostForcingStage(WorkflowStage):
 
     name = "post_forcing"
     description = "Post-process forcing data"
+    requires_container = True
 
     def run(self) -> dict[str, Any]:
         """Execute post-forcing cleanup."""
         self._update_substep("Building environment")
         env = self.build_environment()
 
+        self._log("Running makeAtmo.py post-processing")
         self._update_substep("Running post_nwm_forcing_coastal")
         script_path = (
             self._get_scripts_dir() / "run_sing_coastal_workflow_post_forcing_coastal.bash"
@@ -135,4 +143,6 @@ class PostForcingStage(WorkflowStage):
                 "Check makeAtmo.py log for errors."
             )
 
+        n_sflux = sum(1 for _ in sflux_dir.iterdir())
+        self._log(f"Post-processing complete — {n_sflux} sflux file(s) produced")
         return {"status": "completed"}

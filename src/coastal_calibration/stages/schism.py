@@ -201,8 +201,11 @@ class SchismObservationStage(WorkflowStage):
         work_dir = self.config.paths.work_dir
         hgrid_path = work_dir / "hgrid.gr3"
         if not hgrid_path.exists():
-            self._log("hgrid.gr3 not found, skipping observation stage")
-            return {"status": "skipped", "reason": "no hgrid.gr3"}
+            raise FileNotFoundError(
+                f"hgrid.gr3 not found in {work_dir}. "
+                "The update_params stage must run before schism_obs "
+                "so that the mesh file is symlinked into the work directory."
+            )
 
         # Read mesh metadata
         self._update_substep("Reading hgrid.gr3 metadata")
@@ -213,8 +216,10 @@ class SchismObservationStage(WorkflowStage):
         self._update_substep("Reading open boundaries")
         open_boundaries = _read_open_boundary_nodes(hgrid_path, n_nodes, n_elements)
         if not open_boundaries:
-            self._log("No open boundaries found in hgrid.gr3, skipping")
-            return {"status": "skipped", "reason": "no open boundaries"}
+            raise RuntimeError(
+                "No open boundaries found in hgrid.gr3. "
+                "Cannot discover NOAA stations without boundary geometry."
+            )
 
         total_bnd_nodes = sum(len(b) for b in open_boundaries)
         self._log(
@@ -241,8 +246,10 @@ class SchismObservationStage(WorkflowStage):
         selected = stations_gdf[stations_gdf.within(hull)]
 
         if selected.empty:
-            self._log("No NOAA CO-OPS stations found within domain hull")
-            return {"status": "completed", "noaa_stations": 0}
+            raise RuntimeError(
+                "No NOAA CO-OPS stations found within domain hull. "
+                "Set include_noaa_gages to false if station output is not needed."
+            )
 
         station_ids = selected["station_id"].tolist()
         lons = [row.geometry.x for _, row in selected.iterrows()]
@@ -269,6 +276,7 @@ class PreSCHISMStage(WorkflowStage):
 
     name = "pre_schism"
     description = "Prepare SCHISM inputs (discharge, partitioning)"
+    requires_container = True
 
     def __init__(
         self,
@@ -284,6 +292,7 @@ class PreSCHISMStage(WorkflowStage):
         self._update_substep("Building environment")
         env = self.build_environment()
 
+        self._log("Running discharge, sink/source, and mesh partitioning")
         self._update_substep("Running pre_schism")
         script_path = self._get_scripts_dir() / "run_sing_coastal_workflow_pre_schism.bash"
 
@@ -310,6 +319,7 @@ class PreSCHISMStage(WorkflowStage):
             _patch_param_nml(work_dir / "param.nml")
             self._log("Set iout_sta = 1 in param.nml")
 
+        self._log("SCHISM pre-processing complete")
         return {
             "partition_file": str(work_dir / "partition.prop"),
             "outputs_dir": str(work_dir / "outputs"),
@@ -322,6 +332,7 @@ class SCHISMRunStage(WorkflowStage):
 
     name = "schism_run"
     description = "Run SCHISM model (MPI)"
+    requires_container = True
 
     def __init__(
         self,
@@ -348,6 +359,10 @@ class SCHISMRunStage(WorkflowStage):
         exec_dir = env.get("EXECnwm", "")
         schism_binary = f"{exec_dir}/{self.model.binary}"
 
+        self._log(
+            f"Launching {self.model.binary} with {self.model.total_tasks} MPI tasks "
+            f"({self.model.nodes} node(s), {self.model.nscribes} scribe(s))"
+        )
         self._update_substep(f"Running pschism with {self.model.total_tasks} MPI tasks")
 
         self.run_singularity_command(
@@ -358,6 +373,7 @@ class SCHISMRunStage(WorkflowStage):
             mpi_tasks=self.model.total_tasks,
         )
 
+        self._log("SCHISM run completed successfully")
         return {
             "outputs_dir": str(self.config.paths.work_dir / "outputs"),
             "status": "completed",
@@ -369,6 +385,7 @@ class PostSCHISMStage(WorkflowStage):
 
     name = "post_schism"
     description = "Post-process SCHISM outputs"
+    requires_container = True
 
     def __init__(
         self,
@@ -390,6 +407,7 @@ class PostSCHISMStage(WorkflowStage):
             error_content = fatal_error.read_text()[-2000:]
             raise RuntimeError(f"SCHISM run failed: {error_content}")
 
+        self._log("Checking outputs and combining hotstarts")
         self._update_substep("Running post_schism")
         script_path = self._get_scripts_dir() / "run_sing_coastal_workflow_post_schism.bash"
 
@@ -398,6 +416,7 @@ class PostSCHISMStage(WorkflowStage):
             env=env,
         )
 
+        self._log("SCHISM post-processing complete")
         return {
             "outputs_dir": str(self.config.paths.work_dir / "outputs"),
             "status": "completed",

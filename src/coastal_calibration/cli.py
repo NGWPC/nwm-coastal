@@ -94,14 +94,30 @@ def run(
     is_flag=True,
     help="Wait for job completion and show status updates.",
 )
-def submit(config: Path, interactive: bool) -> None:
+@click.option(
+    "--start-from",
+    type=str,
+    help="Stage to start from (skip earlier stages).",
+)
+@click.option(
+    "--stop-after",
+    type=str,
+    help="Stage to stop after (skip later stages).",
+)
+def submit(
+    config: Path,
+    interactive: bool,
+    start_from: str | None,
+    stop_after: str | None,
+) -> None:
     """Submit workflow as a SLURM job.
 
     CONFIG is the path to a YAML configuration file.
 
     By default, submits the job and returns immediately after submission.
     Use --interactive to wait and monitor the job until completion.
-    The download step always runs on the login node before submission.
+    Python-only stages run on the login node; container stages are
+    submitted as a SLURM job.
     """
     config_path = config.resolve()
 
@@ -111,7 +127,12 @@ def submit(config: Path, interactive: bool) -> None:
 
         runner = CoastalCalibRunner(cfg)
         configure_logger(level="INFO")
-        result = runner.submit(wait=interactive, log_file=None)
+        result = runner.submit(
+            wait=interactive,
+            log_file=None,
+            start_from=start_from,
+            stop_after=stop_after,
+        )
 
         if result.success:
             if interactive:
@@ -313,8 +334,11 @@ def stages(model: str | None) -> None:
         ("sfincs_obs", "Add observation points"),
         ("sfincs_discharge", "Add discharge sources"),
         ("sfincs_precip", "Add precipitation forcing"),
+        ("sfincs_wind", "Add wind forcing"),
+        ("sfincs_pressure", "Add atmospheric pressure forcing"),
         ("sfincs_write", "Write SFINCS model"),
         ("sfincs_run", "Run SFINCS model (Singularity)"),
+        ("sfincs_plot", "Plot simulated vs observed water levels"),
     ]
 
     def _print_stages(title: str, stage_list: list[tuple[str, str]]) -> None:

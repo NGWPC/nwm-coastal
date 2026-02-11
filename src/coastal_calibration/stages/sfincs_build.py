@@ -654,6 +654,7 @@ class SfincsRunStage(WorkflowStage):
 
     name = "sfincs_run"
     description = "Run SFINCS model (Singularity)"
+    requires_container = True
 
     def run(self) -> dict[str, Any]:
         """Execute SFINCS via Singularity."""
@@ -1044,9 +1045,14 @@ class SfincsDataCatalogStage(WorkflowStage):
         }
 
     def validate(self) -> list[str]:
-        """Check that the download directory exists."""
+        """Check that the download directory exists.
+
+        When ``download.enabled`` is ``True`` the directory will be
+        created by the download stage, so this check is skipped.
+        """
         errors = super().validate()
-        download_dir = self.config.paths.download_dir
-        if not download_dir.exists():
-            errors.append(f"Download directory does not exist: {download_dir}")
+        if not self.config.download.enabled:
+            download_dir = self.config.paths.download_dir
+            if not download_dir.exists():
+                errors.append(f"Download directory does not exist: {download_dir}")
         return errors
