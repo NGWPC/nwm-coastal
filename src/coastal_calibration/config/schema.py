@@ -348,11 +348,13 @@ class SchismModelConfig(ModelConfig):
             "pre_forcing",
             "nwm_forcing",
             "post_forcing",
+            "schism_obs",
             "update_params",
             "boundary_conditions",
             "pre_schism",
             "schism_run",
             "post_schism",
+            "schism_plot",
         ]
 
     def build_environment(  # noqa: D102
@@ -426,6 +428,8 @@ class SchismModelConfig(ModelConfig):
         from coastal_calibration.stages.schism import (
             PostSCHISMStage,
             PreSCHISMStage,
+            SchismObservationStage,
+            SchismPlotStage,
             SCHISMRunStage,
         )
 
@@ -434,11 +438,13 @@ class SchismModelConfig(ModelConfig):
             "pre_forcing": PreForcingStage(config, monitor),
             "nwm_forcing": NWMForcingStage(config, monitor),
             "post_forcing": PostForcingStage(config, monitor),
+            "schism_obs": SchismObservationStage(config, monitor),
             "update_params": UpdateParamsStage(config, monitor),
             "boundary_conditions": BoundaryConditionStage(config, monitor),
             "pre_schism": PreSCHISMStage(config, monitor),
             "schism_run": SCHISMRunStage(config, monitor),
             "post_schism": PostSCHISMStage(config, monitor),
+            "schism_plot": SchismPlotStage(config, monitor),
         }
 
     def generate_job_script_lines(  # noqa: D102
