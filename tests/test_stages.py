@@ -417,25 +417,25 @@ class TestPlotableStations:
         assert len(result) == 3
         assert [sid for sid, _ in result] == ["A", "B", "C"]
 
-    def test_no_obs_only_sim(self):
-        """Station with sim but no obs data is still plotable."""
+    def test_sim_only_excluded(self):
+        """Station with sim but no obs is excluded (no comparison possible)."""
         import numpy as np
 
         sim = np.ones((5, 2))
         obs = self._make_obs_ds(["A"], fill_value=np.nan)
         result = _plotable_stations(["A", "B"], sim, obs)
-        # "A" has sim (all 1s) and NaN obs -> sim valid -> keep
-        # "B" has sim (all 1s) and not in obs -> sim valid -> keep
-        assert len(result) == 2
+        # "A" has sim (all 1s) but NaN obs -> excluded
+        # "B" has sim (all 1s) but not in obs -> excluded
+        assert len(result) == 0
 
-    def test_no_sim_only_obs(self):
-        """Station with obs but NaN sim is still plotable."""
+    def test_obs_only_excluded(self):
+        """Station with obs but NaN sim is excluded (no comparison possible)."""
         import numpy as np
 
         sim = np.full((5, 1), np.nan)
         obs = self._make_obs_ds(["A"], fill_value=1.0)
         result = _plotable_stations(["A"], sim, obs)
-        assert len(result) == 1
+        assert len(result) == 0
 
     def test_neither_obs_nor_sim(self):
         """Station with all-NaN sim and all-NaN obs is excluded."""
@@ -446,20 +446,23 @@ class TestPlotableStations:
         result = _plotable_stations(["A", "B"], sim, obs)
         assert len(result) == 0
 
-    def test_mixed_keeps_valid_only(self):
-        """Only stations with at least one valid series are kept."""
+    def test_mixed_keeps_both_only(self):
+        """Only stations with both sim and obs are kept for comparison."""
         import numpy as np
 
-        # Station 0: sim valid, obs NaN -> keep
-        # Station 1: sim NaN, obs NaN -> skip
-        # Station 2: sim NaN, obs valid -> keep
-        sim = np.full((5, 3), np.nan)
+        # Station 0 ("A"): sim valid, obs NaN -> excluded (no comparison)
+        # Station 1 ("B"): sim NaN, obs NaN -> excluded
+        # Station 2 ("C"): sim NaN, obs valid -> excluded (no comparison)
+        # Station 3 ("D"): sim valid, obs valid -> KEPT
+        sim = np.full((5, 4), np.nan)
         sim[:, 0] = 1.0
-        obs = self._make_obs_ds(["A", "B", "C"], fill_value=np.nan)
+        sim[:, 3] = 2.0
+        obs = self._make_obs_ds(["A", "B", "C", "D"], fill_value=np.nan)
         obs.water_level.loc[{"station": "C"}] = 1.0
-        result = _plotable_stations(["A", "B", "C"], sim, obs)
-        assert [sid for sid, _ in result] == ["A", "C"]
-        assert [idx for _, idx in result] == [0, 2]
+        obs.water_level.loc[{"station": "D"}] = 3.0
+        result = _plotable_stations(["A", "B", "C", "D"], sim, obs)
+        assert [sid for sid, _ in result] == ["D"]
+        assert [idx for _, idx in result] == [3]
 
 
 class TestPlotFigures:
