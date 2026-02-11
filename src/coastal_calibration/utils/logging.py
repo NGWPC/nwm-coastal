@@ -478,6 +478,18 @@ class WorkflowMonitor:
         self.logger.info(f"  [{status_icon}] {status.value.upper()} ({stage.duration_str})")
         if message:
             self.logger.info(f"  {message}")
+        self.logger.info("-" * 40)
+
+    def mark_stage_completed(self, name: str) -> None:
+        """Mark a stage as completed without start/end logging.
+
+        Use this for stages whose execution was handled externally
+        (e.g., inside a SLURM job) so the timing summary shows a
+        checkmark instead of ``?``.
+        """
+        if name not in self.stages:
+            self.stages[name] = StageProgress(name=name)
+        self.stages[name].status = StageStatus.COMPLETED
 
     def update_substep(self, stage_name: str, substep: str) -> None:
         """Update current substep within a stage."""

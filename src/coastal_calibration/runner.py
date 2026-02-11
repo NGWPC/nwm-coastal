@@ -422,6 +422,7 @@ class CoastalCalibRunner:
             '        fmt="${elapsed}s"',
             "    fi",
             '    echo "$(log_ts) INFO       [✓] COMPLETED (${fmt})"',
+            '    echo "$(log_ts) INFO     ----------------------------------------"',
             "}",
             "",
             "log_info() {",
@@ -947,14 +948,14 @@ class CoastalCalibRunner:
                 errors=validation_errors,
             )
 
-        self._prepare_work_directory()
-
         stages_to_run = self._get_stages_to_run(start_from, stop_after)
         pre_job, job, post_job = self._split_stages_for_submit(stages_to_run)
 
         # Register all stages for monitoring
         self.monitor.register_stages(stages_to_run)
         self.monitor.start_workflow()
+
+        self._prepare_work_directory()
 
         # --- Run pre-job stages on login node ---
         try:
@@ -1035,6 +1036,12 @@ class CoastalCalibRunner:
             )
 
         stages_completed.extend(job)
+
+        # Mark container stages as completed in the monitor so the
+        # timing summary shows checkmarks instead of "?" for stages
+        # that ran inside the SLURM job.
+        for stage_name in job:
+            self.monitor.mark_stage_completed(stage_name)
 
         # --- Run post-job stages on login node ---
         try:

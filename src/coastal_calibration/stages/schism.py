@@ -550,7 +550,7 @@ class SchismPlotStage(WorkflowStage):
             if d.units == "feet":
                 offset *= 0.3048
             obs_ds.water_level.loc[{"station": sid}] -= offset
-            self._log(f"Station {sid}: MLLW->MSL offset = {offset:.4f} m")
+            self._log(f"Station {sid}: MLLW->MSL offset = {offset:.4f} m", "debug")
 
         obs_ds.attrs["datum"] = "MSL"
         return obs_ds
