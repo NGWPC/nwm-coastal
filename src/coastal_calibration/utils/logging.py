@@ -448,7 +448,6 @@ class WorkflowMonitor:
         stage.start_time = datetime.now()
         stage.message = message
 
-        self.logger.info("-" * 40)
         self.logger.info(f"Stage: {name}")
         if message:
             self.logger.info(f"  {message}")

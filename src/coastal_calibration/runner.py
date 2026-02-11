@@ -402,7 +402,6 @@ class CoastalCalibRunner:
             "log_stage_start() {",
             "    local name=$1",
             '    local desc=${2:-""}',
-            '    echo "$(log_ts) INFO     ----------------------------------------"',
             '    echo "$(log_ts) INFO     Stage: ${name}"',
             '    if [[ -n "$desc" ]]; then',
             '        echo "$(log_ts) INFO       ${desc}"',
