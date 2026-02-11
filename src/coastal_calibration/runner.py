@@ -326,10 +326,11 @@ class CoastalCalibRunner:
         if stage_name == "schism_obs":
             # schism_obs needs hgrid.gr3 in work_dir.  Normally the
             # update_params container stage symlinks it, but that hasn't
-            # run yet.  Create the symlink from parm_dir.
+            # run yet.  Create the symlink from parm_nwm (the parameter
+            # files directory, i.e. parm_dir / "parm").
             work_dir = self.config.paths.work_dir
             hgrid_src = (
-                self.config.paths.parm_dir
+                self.config.paths.parm_nwm
                 / "coastal"
                 / self.config.simulation.coastal_domain
                 / "hgrid.gr3"
