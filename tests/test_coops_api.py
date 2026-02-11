@@ -327,6 +327,135 @@ class TestGetDatums:
             assert len(result) == 1
             assert result[0].station_id == "8771450"
 
+    def test_null_datums_field_handled(self, client):
+        """Stations that return ``"datums": null`` must not crash."""
+        null_datums_resp = {
+            "accepted": None,
+            "superseded": None,
+            "epoch": None,
+            "units": "feet",
+            "OrthometricDatum": None,
+            "datums": None,
+            "LAT": None,
+            "LATdate": None,
+            "LATtime": None,
+            "HAT": None,
+            "HATdate": None,
+            "HATtime": None,
+            "min": None,
+            "mindate": None,
+            "mintime": None,
+            "max": None,
+            "maxdate": None,
+            "maxtime": None,
+            "DatumAnalysisPeriod": None,
+            "NGSLink": None,
+            "ctrlStation": None,
+        }
+        with patch.object(client, "fetch_data", return_value=[null_datums_resp]):
+            result = client.get_datums(["9752621"])
+            assert len(result) == 1
+            assert result[0].station_id == "9752621"
+            assert result[0].datums == []
+            assert result[0].datum_analysis_period == []
+
+
+class TestFilterStationsByDatum:
+    def test_keeps_stations_with_valid_datums(self, client):
+        resp = {
+            "accepted": "",
+            "superseded": "",
+            "epoch": "",
+            "units": "meters",
+            "OrthometricDatum": "",
+            "datums": [
+                {"name": "MLLW", "description": "", "value": "0.0"},
+                {"name": "MSL", "description": "", "value": "0.162"},
+            ],
+            "LAT": "0",
+            "LATdate": "",
+            "LATtime": "",
+            "HAT": "0",
+            "HATdate": "",
+            "HATtime": "",
+            "min": "0",
+            "mindate": "",
+            "mintime": "",
+            "max": "0",
+            "maxdate": "",
+            "maxtime": "",
+            "DatumAnalysisPeriod": [],
+            "NGSLink": "",
+            "ctrlStation": "",
+        }
+        with patch.object(client, "fetch_data", return_value=[resp]):
+            result = client.filter_stations_by_datum(["8771450"])
+            assert result == {"8771450"}
+
+    def test_excludes_null_datums(self, client):
+        null_resp = {
+            "accepted": None,
+            "superseded": None,
+            "epoch": None,
+            "units": "feet",
+            "OrthometricDatum": None,
+            "datums": None,
+            "LAT": None,
+            "LATdate": None,
+            "LATtime": None,
+            "HAT": None,
+            "HATdate": None,
+            "HATtime": None,
+            "min": None,
+            "mindate": None,
+            "mintime": None,
+            "max": None,
+            "maxdate": None,
+            "maxtime": None,
+            "DatumAnalysisPeriod": None,
+            "NGSLink": None,
+            "ctrlStation": None,
+        }
+        with patch.object(client, "fetch_data", return_value=[null_resp]):
+            result = client.filter_stations_by_datum(["9752621"])
+            assert result == set()
+
+    def test_mixed_valid_and_invalid(self, client):
+        valid_resp = {
+            "accepted": "",
+            "superseded": "",
+            "epoch": "",
+            "units": "meters",
+            "OrthometricDatum": "",
+            "datums": [
+                {"name": "MLLW", "description": "", "value": "0.0"},
+                {"name": "MSL", "description": "", "value": "0.162"},
+            ],
+            "LAT": "0",
+            "LATdate": "",
+            "LATtime": "",
+            "HAT": "0",
+            "HATdate": "",
+            "HATtime": "",
+            "min": "0",
+            "mindate": "",
+            "mintime": "",
+            "max": "0",
+            "maxdate": "",
+            "maxtime": "",
+            "DatumAnalysisPeriod": [],
+            "NGSLink": "",
+            "ctrlStation": "",
+        }
+        with patch.object(client, "fetch_data", return_value=[None, valid_resp]):
+            result = client.filter_stations_by_datum(["BAD", "8771450"])
+            assert result == {"8771450"}
+
+    def test_all_fail_returns_empty(self, client):
+        with patch.object(client, "fetch_data", return_value=[None]):
+            result = client.filter_stations_by_datum(["BAD"])
+            assert result == set()
+
 
 # ---------------------------------------------------------------------------
 # _get_stations_metadata (cache behaviour)
