@@ -115,8 +115,9 @@ def _plotable_stations(
 ) -> list[tuple[str, int]]:
     """Return (station_id, column_index) pairs that have data to plot.
 
-    A station is plotable when at least one of its simulated or
-    observed time-series contains finite values.
+    A station is plotable only when *both* its simulated and observed
+    time-series contain finite values — a comparison plot with only
+    one series is not useful.
     """
     result: list[tuple[str, int]] = []
     for i, sid in enumerate(station_ids):
@@ -124,7 +125,7 @@ def _plotable_stations(
         has_obs = False
         if sid in obs_ds.station.values:
             has_obs = bool(np.isfinite(obs_ds.water_level.sel(station=sid)).any())
-        if has_sim or has_obs:
+        if has_sim and has_obs:
             result.append((sid, i))
     return result
 
