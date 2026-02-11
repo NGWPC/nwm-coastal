@@ -32,6 +32,7 @@ from coastal_calibration.stages.schism import (
     PostSCHISMStage,
     PreSCHISMStage,
     SCHISMRunStage,
+    _patch_param_nml,
 )
 from coastal_calibration.utils.logging import WorkflowMonitor
 
@@ -283,3 +284,105 @@ class TestBuildDateEnvNegativeDuration:
         env = stage.build_environment()
         # With negative duration, SCHISM_BEGIN_DATE should be before SCHISM_END_DATE
         assert env["SCHISM_END_DATE"] == "202106110000"
+
+
+class TestPatchParamNml:
+    """Tests for _patch_param_nml station output patching."""
+
+    def test_replaces_existing_iout_sta(self, tmp_path):
+        p = tmp_path / "param.nml"
+        p.write_text("&SCHOUT\n  iout_sta = 0\n/\n")
+        _patch_param_nml(p)
+        text = p.read_text()
+        assert "iout_sta = 1" in text
+        assert "iout_sta = 0" not in text
+
+    def test_inserts_iout_sta_after_schout(self, tmp_path):
+        p = tmp_path / "param.nml"
+        p.write_text("&SCHOUT\n  some_param = 1\n/\n")
+        _patch_param_nml(p)
+        text = p.read_text()
+        assert "iout_sta = 1" in text
+
+    def test_sets_nspool_sta(self, tmp_path):
+        """nspool_sta must be set when enabling station output."""
+        p = tmp_path / "param.nml"
+        p.write_text("&SCHOUT\n  iout_sta = 0\n/\n")
+        _patch_param_nml(p)
+        text = p.read_text()
+        assert "nspool_sta = 18" in text
+
+    def test_replaces_existing_nspool_sta(self, tmp_path):
+        p = tmp_path / "param.nml"
+        p.write_text("&SCHOUT\n  iout_sta = 0\n  nspool_sta = 99\n/\n")
+        _patch_param_nml(p)
+        text = p.read_text()
+        assert "nspool_sta = 18" in text
+        assert "nspool_sta = 99" not in text
+
+    def test_custom_nspool_sta(self, tmp_path):
+        p = tmp_path / "param.nml"
+        p.write_text("&SCHOUT\n  iout_sta = 0\n/\n")
+        _patch_param_nml(p, nspool_sta=36)
+        text = p.read_text()
+        assert "nspool_sta = 36" in text
+
+    def test_inserts_nspool_sta_after_iout_sta(self, tmp_path):
+        """When nspool_sta doesn't exist, insert it after iout_sta."""
+        p = tmp_path / "param.nml"
+        p.write_text("&SCHOUT\n  iout_sta = 0\n  other = 5\n/\n")
+        _patch_param_nml(p)
+        text = p.read_text()
+        lines = text.splitlines()
+        iout_idx = next(i for i, line in enumerate(lines) if "iout_sta" in line)
+        nspool_idx = next(i for i, line in enumerate(lines) if "nspool_sta" in line)
+        assert nspool_idx == iout_idx + 1
+
+    def test_fallback_appends_schout_block(self, tmp_path):
+        """When &SCHOUT is missing, append a new block."""
+        p = tmp_path / "param.nml"
+        p.write_text("&CORE\n  dt = 200\n/\n")
+        _patch_param_nml(p)
+        text = p.read_text()
+        assert "iout_sta = 1" in text
+        assert "nspool_sta = 18" in text
+
+    def test_nhot_write_divisibility(self, tmp_path):
+        """Default nspool_sta=18 divides all nhot_write values.
+
+        Covers runtime values from update_param.bash (18, 72, 162, 2160)
+        and every domain template (hawaii=162, atlgulf/pacific=324, prvi=8640).
+        """
+        nhot_values = [18, 72, 162, 324, 2160, 8640, 18 * 5, 18 * 12]
+        for nhot in nhot_values:
+            assert nhot % 18 == 0, f"nhot_write={nhot} not divisible by nspool_sta=18"
+
+    @pytest.mark.parametrize(
+        ("nhot_write", "old_nspool_sta"),
+        [
+            (162, 10),  # hawaii
+            (324, 18),  # atlgulf / pacific
+            (8640, 10),  # prvi
+        ],
+        ids=["hawaii", "atlgulf_pacific", "prvi"],
+    )
+    def test_domain_template_param_nml(self, tmp_path, nhot_write, old_nspool_sta):
+        """Patch real domain templates so mod(nhot_write, nspool_sta)==0."""
+        p = tmp_path / "param.nml"
+        p.write_text(
+            "&SCHOUT\n"
+            f"  nhot_write = {nhot_write}\n"
+            "  iout_sta = 0\n"
+            f"  nspool_sta = {old_nspool_sta}"
+            " !needed if iout_sta/=0; mod(nhot_write,nspool_sta) must=0\n"
+            "/\n"
+        )
+        _patch_param_nml(p)
+        text = p.read_text()
+        assert "iout_sta = 1" in text
+        assert "nspool_sta = 18" in text
+        assert f"nspool_sta = {old_nspool_sta}" not in text or old_nspool_sta == 18
+        # The inline comment should be preserved
+        assert "!needed if" in text
+        # Verify the constraint: mod(nhot_write, nspool_sta) == 0
+        assert nhot_write % 18 == 0
