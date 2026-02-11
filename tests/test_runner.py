@@ -98,11 +98,13 @@ class TestCoastalCalibRunner:
             "pre_forcing",
             "nwm_forcing",
             "post_forcing",
+            "schism_obs",
             "update_params",
             "boundary_conditions",
             "pre_schism",
             "schism_run",
             "post_schism",
+            "schism_plot",
         ]
         assert expected == SchismModelConfig().stage_order
 
