@@ -314,8 +314,13 @@ def _build_meteo_entry(
         notes = "NWM Analysis and Assimilation forcing files"
         source_version = "operational"
 
+    # nwm_retro uses lat/lon (EPSG:4326); nwm_ana uses a Lambert Conformal
+    # projection stored in the file's ``crs`` variable — omit the CRS so
+    # HydroMT reads it from the netCDF metadata.
+    crs = 4326 if meteo_source == "nwm_retro" else None
+
     metadata = CatalogMetadata(
-        crs=4326,
+        crs=crs,
         temporal_extent=temporal_extent,
         category="meteo",
         source_url=source_url,
