@@ -994,6 +994,10 @@ class CoastalCalibRunner:
                 errors=[],
             )
 
+        self.monitor.info(f"Submitting SLURM job with {len(job)} stage(s):")
+        for stage_name in job:
+            self.monitor.info(f"  \u2022 {stage_name}")
+
         self._generate_runner_script(job)
 
         job_script = self.config.paths.work_dir / "submit_job.sh"
