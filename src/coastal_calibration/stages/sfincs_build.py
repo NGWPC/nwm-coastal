@@ -401,6 +401,22 @@ class SfincsObservationPointsStage(WorkflowStage):
             self._log("No NOAA CO-OPS stations found within model domain")
             return 0
 
+        # Keep only stations with valid MSL/MLLW datums so that the
+        # plotting stage can convert observations from MLLW to MSL.
+        candidate_ids = selected["station_id"].tolist()
+        valid_ids = client.filter_stations_by_datum(candidate_ids)
+        dropped = set(candidate_ids) - valid_ids
+        if dropped:
+            self._log(
+                f"Excluded {len(dropped)} station(s) without datum data: "
+                f"{', '.join(sorted(dropped))}",
+                "warning",
+            )
+        selected = selected[selected["station_id"].isin(valid_ids)]
+        if selected.empty:
+            self._log("No NOAA CO-OPS stations with valid datum data in domain")
+            return 0
+
         # Project selected stations into the model CRS
         selected_projected = selected.to_crs(model_crs)
 
@@ -858,23 +874,31 @@ class SfincsPlotStage(WorkflowStage):
             time_zone="gmt",
         )
 
-        # Convert MLLW → MSL using per-station datum offsets.
+        # All stations reaching this point were pre-filtered by
+        # SfincsObservationPointsStage to have valid MSL/MLLW datums.
+        import numpy as np
+
         client = COOPSAPIClient()
-        try:
-            datums = client.get_datums(station_ids)
-        except ValueError:
-            datums = []
+        datums = client.get_datums(station_ids)
 
         datum_map = {d.station_id: d for d in datums}
         for sid in station_ids:
             d = datum_map.get(sid)
             if d is None:
-                self._log(f"Station {sid}: no datum info, skipping MLLW→MSL", "warning")
+                self._log(
+                    f"Station {sid}: datum lookup failed unexpectedly, dropping from comparison",
+                    "warning",
+                )
+                obs_ds.water_level.loc[{"station": sid}] = np.nan
                 continue
             msl = d.get_datum_value("MSL")
             mllw = d.get_datum_value("MLLW")
             if msl is None or mllw is None:
-                self._log(f"Station {sid}: missing MSL/MLLW datum values", "warning")
+                self._log(
+                    f"Station {sid}: missing MSL/MLLW unexpectedly, dropping from comparison",
+                    "warning",
+                )
+                obs_ds.water_level.loc[{"station": sid}] = np.nan
                 continue
             offset = msl - mllw
             if d.units == "feet":
@@ -946,11 +970,7 @@ class SfincsPlotStage(WorkflowStage):
         end_dt = sim.start_date + timedelta(hours=sim.duration_hours)
         end_date = end_dt.strftime("%Y%m%d %H:%M")
 
-        try:
-            obs_ds = self._fetch_observations_msl(noaa_station_ids, begin_date, end_date)
-        except Exception as exc:
-            self._log(f"Failed to fetch NOAA observations: {exc}", "warning")
-            return {"status": "skipped", "reason": f"coops fetch failed: {exc}"}
+        obs_ds = self._fetch_observations_msl(noaa_station_ids, begin_date, end_date)
 
         # Plot comparison
         self._update_substep("Generating comparison plot")

@@ -426,13 +426,14 @@ class COOPSAPIClient:
                 )
                 continue
 
+            raw_datums = response.get("datums") or []
             datum_values = [
                 DatumValue(
                     name=datum_dict.get("name", ""),
                     description=datum_dict.get("description", ""),
                     value=np.float64(datum_dict.get("value", np.nan)),
                 )
-                for datum_dict in response.get("datums", [])
+                for datum_dict in raw_datums
             ]
 
             station_datum = StationDatum(
@@ -455,7 +456,7 @@ class COOPSAPIClient:
                 max_value=np.float64(response.get("max", np.nan)),
                 max_date=response.get("maxdate", ""),
                 max_time=response.get("maxtime", ""),
-                datum_analysis_period=response.get("DatumAnalysisPeriod", []),
+                datum_analysis_period=response.get("DatumAnalysisPeriod") or [],
                 ngs_link=response.get("NGSLink", ""),
                 ctrl_station=response.get("ctrlStation", ""),
             )
@@ -468,6 +469,36 @@ class COOPSAPIClient:
         if single_input:
             return datum_objects[0]
         return datum_objects
+
+    def filter_stations_by_datum(self, station_ids: list[str]) -> set[str]:
+        """Return station IDs that have valid MSL and MLLW datum values.
+
+        Stations whose datum endpoint returns ``null`` or that lack
+        MSL/MLLW entries are excluded so that every retained station
+        can be converted from MLLW to MSL.
+
+        Parameters
+        ----------
+        station_ids : list[str]
+            Candidate station IDs to check.
+
+        Returns
+        -------
+        set[str]
+            Subset of *station_ids* with valid MSL **and** MLLW datums.
+        """
+        try:
+            datums = self.get_datums(station_ids)
+        except ValueError:
+            return set()
+
+        valid: set[str] = set()
+        for d in datums:
+            msl = d.get_datum_value("MSL")
+            mllw = d.get_datum_value("MLLW")
+            if msl is not None and mllw is not None:
+                valid.add(d.station_id)
+        return valid
 
 
 def _add_variable_attributes(

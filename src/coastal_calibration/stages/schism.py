@@ -296,6 +296,29 @@ class SchismObservationStage(WorkflowStage):
                 "Set include_noaa_gages to false if station output is not needed."
             )
 
+        candidate_ids = selected["station_id"].tolist()
+
+        # Filter to stations with valid MSL/MLLW datums so that
+        # every station written to station.in can later be converted
+        # from MLLW to MSL during the plotting stage.
+        self._update_substep("Filtering stations by datum availability")
+        valid_ids = client.filter_stations_by_datum(candidate_ids)
+
+        dropped = set(candidate_ids) - valid_ids
+        if dropped:
+            self._log(
+                f"Excluded {len(dropped)} station(s) without datum data: "
+                f"{', '.join(sorted(dropped))}",
+                "warning",
+            )
+
+        selected = selected[selected["station_id"].isin(valid_ids)]
+        if selected.empty:
+            raise RuntimeError(
+                "No NOAA CO-OPS stations with valid datum data found within domain hull. "
+                "Set include_noaa_gages to false if station output is not needed."
+            )
+
         station_ids = selected["station_id"].tolist()
         lons = [row.geometry.x for _, row in selected.iterrows()]
         lats = [row.geometry.y for _, row in selected.iterrows()]
@@ -529,22 +552,29 @@ class SchismPlotStage(WorkflowStage):
             time_zone="gmt",
         )
 
+        # All stations reaching this point were pre-filtered by
+        # SchismObservationStage to have valid MSL/MLLW datums.
         client = COOPSAPIClient()
-        try:
-            datums = client.get_datums(station_ids)
-        except ValueError:
-            datums = []
+        datums = client.get_datums(station_ids)
 
         datum_map = {d.station_id: d for d in datums}
         for sid in station_ids:
             d = datum_map.get(sid)
             if d is None:
-                self._log(f"Station {sid}: no datum info, skipping MLLW->MSL", "warning")
+                self._log(
+                    f"Station {sid}: datum lookup failed unexpectedly, dropping from comparison",
+                    "warning",
+                )
+                obs_ds.water_level.loc[{"station": sid}] = np.nan
                 continue
             msl = d.get_datum_value("MSL")
             mllw = d.get_datum_value("MLLW")
             if msl is None or mllw is None:
-                self._log(f"Station {sid}: missing MSL/MLLW datum values", "warning")
+                self._log(
+                    f"Station {sid}: missing MSL/MLLW unexpectedly, dropping from comparison",
+                    "warning",
+                )
+                obs_ds.water_level.loc[{"station": sid}] = np.nan
                 continue
             offset = msl - mllw
             if d.units == "feet":
@@ -736,11 +766,7 @@ class SchismPlotStage(WorkflowStage):
         end_dt = start_dt + timedelta(hours=sim.duration_hours)
         end_date = end_dt.strftime("%Y%m%d %H:%M")
 
-        try:
-            obs_ds = self._fetch_observations_msl(station_ids, begin_date, end_date)
-        except Exception as exc:
-            self._log(f"Failed to fetch NOAA observations: {exc}", "warning")
-            return {"status": "skipped", "reason": f"coops fetch failed: {exc}"}
+        obs_ds = self._fetch_observations_msl(station_ids, begin_date, end_date)
 
         # Generate comparison plots (2x2 per figure)
         self._update_substep("Generating comparison plots")
