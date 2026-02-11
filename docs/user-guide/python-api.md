@@ -88,6 +88,45 @@ config = CoastalCalibConfig(
 config.to_yaml("generated_config.yaml")
 ```
 
+### Enabling NOAA Observation Station Comparison
+
+To automatically discover NOAA CO-OPS water level stations within the model domain and
+generate comparison plots after the SCHISM run, set `include_noaa_gages=True` in the
+model configuration:
+
+```python
+config = CoastalCalibConfig(
+    slurm=SlurmConfig(
+        job_name="hawaii_with_obs",
+        user="your_username",
+    ),
+    simulation=SimulationConfig(
+        start_date=datetime(2021, 6, 11),
+        duration_hours=24,
+        coastal_domain="hawaii",
+        meteo_source="nwm_ana",
+    ),
+    boundary=BoundaryConfig(source="stofs"),
+    paths=PathConfig(
+        work_dir=Path("/ngen-test/coastal/your_username/hawaii_obs"),
+        raw_download_dir=Path("/ngen-test/coastal/your_username/downloads"),
+    ),
+    model_config=SchismModelConfig(
+        nodes=2,
+        ntasks_per_node=18,
+        include_noaa_gages=True,  # Enable station discovery & comparison plots
+    ),
+)
+```
+
+This activates two additional stages in the pipeline:
+
+- **`schism_obs`** discovers NOAA CO-OPS stations via the concave hull of the open
+    boundary nodes and writes `station.in` and `station_noaa_ids.txt`.
+- **`schism_plot`** reads SCHISM station output (`staout_1`), fetches observations from
+    the CO-OPS API (with MLLW→MSL datum conversion), and saves comparison plots to
+    `figs/`.
+
 ### Creating SFINCS Configuration Programmatically
 
 ```python

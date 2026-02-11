@@ -114,6 +114,14 @@ After the job completes, find your outputs in the work directory:
 ls /ngen-test/coastal/your_username/schism_hawaii_stofs_nwm_ana/schism_2021-06-11/
 ```
 
+!!! tip "Compare with NOAA observations"
+
+    Add `include_noaa_gages: true` under `model_config` to automatically discover NOAA
+    CO-OPS water level stations, collect station time-series during the simulation, and
+    generate comparison plots after the run completes. See
+    [Configuration](../user-guide/configuration.md#noaa-observation-stations-include_noaa_gages)
+    for details.
+
 ## SFINCS Quick Start
 
 ### Step 1: Generate a SFINCS Configuration

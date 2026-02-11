@@ -14,6 +14,8 @@ HPC clusters with Singularity containers and SLURM job scheduling.
 - **Multiple Domains**: Support for Hawaii, Puerto Rico/Virgin Islands, Atlantic/Gulf,
     and Pacific
 - **Boundary Conditions**: TPXO tidal model and STOFS water level support
+- **NOAA Observation Stations**: Automatic discovery of CO-OPS water level stations
+    within the model domain, with post-run comparison plots (simulated vs observed)
 - **Workflow Control**: Unified `run` and `submit` pipelines with `--start-from` /
     `--stop-after` support for partial workflows
 - **Configuration Inheritance**: Share common settings across multiple runs

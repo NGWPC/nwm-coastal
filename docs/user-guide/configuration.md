@@ -206,16 +206,33 @@ model_config:
   include_noaa_gages: true        # Enable NOAA observation stations & comparison plots
 ```
 
-| Parameter            | Type   | Default                                     |
-| -------------------- | ------ | ------------------------------------------- |
-| `nodes`              | int    | 2                                           |
-| `ntasks_per_node`    | int    | 18                                          |
-| `exclusive`          | bool   | true                                        |
-| `nscribes`           | int    | 2                                           |
-| `omp_num_threads`    | int    | 2                                           |
-| `oversubscribe`      | bool   | false                                       |
-| `binary`             | string | `pschism_wcoss2_NO_PARMETIS_TVD-VL.openmpi` |
-| `include_noaa_gages` | bool   | false                                       |
+| Parameter            | Type   | Default                                     | Description                                  |
+| -------------------- | ------ | ------------------------------------------- | -------------------------------------------- |
+| `nodes`              | int    | 2                                           | Number of compute nodes                      |
+| `ntasks_per_node`    | int    | 18                                          | MPI tasks per node                           |
+| `exclusive`          | bool   | true                                        | Request exclusive node access                |
+| `nscribes`           | int    | 2                                           | SCHISM I/O scribes                           |
+| `omp_num_threads`    | int    | 2                                           | OpenMP threads                               |
+| `oversubscribe`      | bool   | false                                       | Allow MPI oversubscription                   |
+| `binary`             | string | `pschism_wcoss2_NO_PARMETIS_TVD-VL.openmpi` | SCHISM executable name                       |
+| `include_noaa_gages` | bool   | false                                       | Enable NOAA station discovery and comparison |
+
+#### NOAA Observation Stations (`include_noaa_gages`)
+
+When set to `true`, two additional stages are activated in the SCHISM pipeline:
+
+- **`schism_obs`**: Automatically discovers NOAA CO-OPS water level stations within the
+    model domain by computing a concave hull around the open boundary nodes in
+    `hgrid.gr3` and querying the CO-OPS API. Writes a `station.in` file so SCHISM
+    outputs time-series at those locations, and a `station_noaa_ids.txt` companion that
+    maps station indices to NOAA station IDs. The `pre_schism` stage then patches
+    `param.nml` to enable station output (`iout_sta = 1`, `nspool_sta = 18`).
+- **`schism_plot`**: After the SCHISM run completes, reads the station output
+    (`staout_1`), fetches the corresponding NOAA CO-OPS observations (converting from
+    MLLW to MSL datum), and generates 2×2 comparison plots saved to `figs/`.
+
+Both stages require network access for NOAA CO-OPS API calls and are classified as
+Python-only stages (they run on the login node in `submit` mode).
 
 #### SFINCS Model Configuration
 

@@ -177,15 +177,16 @@ present.
 
 #### SCHISM (`SchismModelConfig`)
 
-| Parameter         | Type | Default                                     | Description                  |
-| ----------------- | ---- | ------------------------------------------- | ---------------------------- |
-| `nodes`           | int  | 2                                           | Number of compute nodes      |
-| `ntasks_per_node` | int  | 18                                          | MPI tasks per node           |
-| `exclusive`       | bool | true                                        | Request exclusive nodes      |
-| `nscribes`        | int  | 2                                           | Number of SCHISM I/O scribes |
-| `omp_num_threads` | int  | 2                                           | OpenMP threads               |
-| `oversubscribe`   | bool | false                                       | Allow MPI oversubscription   |
-| `binary`          | str  | `pschism_wcoss2_NO_PARMETIS_TVD-VL.openmpi` | SCHISM executable name       |
+| Parameter            | Type | Default                                     | Description                                  |
+| -------------------- | ---- | ------------------------------------------- | -------------------------------------------- |
+| `nodes`              | int  | 2                                           | Number of compute nodes                      |
+| `ntasks_per_node`    | int  | 18                                          | MPI tasks per node                           |
+| `exclusive`          | bool | true                                        | Request exclusive nodes                      |
+| `nscribes`           | int  | 2                                           | Number of SCHISM I/O scribes                 |
+| `omp_num_threads`    | int  | 2                                           | OpenMP threads                               |
+| `oversubscribe`      | bool | false                                       | Allow MPI oversubscription                   |
+| `binary`             | str  | `pschism_wcoss2_NO_PARMETIS_TVD-VL.openmpi` | SCHISM executable name                       |
+| `include_noaa_gages` | bool | false                                       | Enable NOAA station discovery and comparison |
 
 #### SFINCS (`SfincsModelConfig`)
 

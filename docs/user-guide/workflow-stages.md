@@ -140,28 +140,45 @@ work_dir/
 
 ### 6. schism_obs
 
-**Purpose:** Discover NOAA CO-OPS observation stations and create `station.in`.
+**Purpose:** Automatically discover NOAA CO-OPS water level stations within the model
+domain and generate a SCHISM `station.in` file so that SCHISM writes time-series output
+at those locations.
 
-**Enabled by:** `model_config.include_noaa_gages: true`
+**Enabled by:** `model_config.include_noaa_gages: true` (disabled by default)
 
-**Depends on:** `update_params` (which symlinks `hgrid.gr3` into the work directory)
+**Depends on:** `update_params` (which symlinks `hgrid.gr3` into the work directory).
+When running via `submit`, this stage is promoted to the login node and the dependency
+on `hgrid.gr3` is resolved automatically via a symlink from the parameter directory.
 
-**Tasks:**
+**How it works:**
 
-- Read open boundary nodes from `hgrid.gr3`
-- Compute concave hull of boundary node coordinates
-- Query NOAA CO-OPS API for water level stations within the hull polygon
-- Write `station.in` and `station_noaa_ids.txt` to the work directory
+1. Parses `hgrid.gr3` to extract the coordinates of all open boundary nodes.
+1. Computes a concave hull around the boundary points (using `shapely.concave_hull` with
+    `ratio=0.05`).
+1. Queries the NOAA CO-OPS API to find active water level stations that fall inside the
+    hull polygon.
+1. Writes `station.in` (SCHISM station definition file with elevation-only output flag)
+    and a companion `station_noaa_ids.txt` that maps each station index to its NOAA
+    station ID.
 
-**Runs On:** Login node or compute node (Python, requires network access)
+**Runs On:** Login node (in `submit` mode) or compute node (in `run` mode). Requires
+network access for the CO-OPS API call.
 
 **Outputs:**
 
 ```
 work_dir/
-├── station.in
-└── station_noaa_ids.txt
+├── station.in             # SCHISM station definition file
+└── station_noaa_ids.txt   # Index-to-NOAA-ID mapping
 ```
+
+!!! note "param.nml patching"
+
+    When `station.in` exists, the `pre_schism` stage automatically patches `param.nml` to
+    set `iout_sta = 1` (enable station output) and `nspool_sta = 18` (output interval in
+    time-steps). The value `nspool_sta = 18` is chosen because it divides all `nhot_write`
+    values used across domain templates (162, 324, 8640, etc.), satisfying the SCHISM
+    constraint `mod(nhot_write, nspool_sta) == 0`.
 
 ### 7. boundary_conditions
 
@@ -225,19 +242,23 @@ work_dir/
 
 ### 11. schism_plot
 
-**Purpose:** Compare simulated water levels against NOAA observations.
+**Purpose:** Compare SCHISM-simulated water levels against NOAA CO-OPS observations at
+every station discovered by the `schism_obs` stage.
 
 **Enabled by:** `model_config.include_noaa_gages: true`
 
-**Tasks:**
+**How it works:**
 
-- Read station output from `staout_1`
-- Fetch NOAA CO-OPS observed water levels for each station
-- Convert observation datum from MLLW to MSL
-- Generate 2×2 comparison plots (simulated vs observed)
-- Save figures to the `figs/` directory
+1. Reads the SCHISM station time-series from `outputs/staout_1`.
+1. Loads the station-to-NOAA-ID mapping from `station_noaa_ids.txt`.
+1. Fetches observed water levels from the CO-OPS API in the MLLW datum and converts to
+    MSL using per-station datum offsets retrieved from the API.
+1. Generates 2×2 comparison plots (four stations per figure) showing simulated vs
+    observed water levels.
+1. Saves PNG figures to the `figs/` subdirectory.
 
-**Runs On:** Login node or compute node (Python, requires network access)
+**Runs On:** Login node (in `submit` mode, after SLURM job completes) or compute node
+(in `run` mode). Requires network access for the CO-OPS API call.
 
 **Outputs:**
 
@@ -248,6 +269,12 @@ work_dir/
     ├── stations_comparison_002.png
     └── ...
 ```
+
+!!! tip "Datum conversion"
+
+    Observations are fetched in MLLW (Mean Lower Low Water) and converted to MSL (Mean Sea
+    Level) so they share the same vertical reference as the SCHISM simulation output. The
+    conversion offset is obtained from the CO-OPS datums endpoint for each station.
 
 ## SFINCS Stage Details
 

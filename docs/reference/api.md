@@ -74,6 +74,28 @@ This page provides detailed documentation for the NWM Coastal Python API.
 
 ::: coastal_calibration.downloader.validate_date_ranges
 
+## NOAA CO-OPS API
+
+### COOPSAPIClient
+
+::: coastal_calibration.coops_api.COOPSAPIClient
+    options:
+      show_source: true
+      members:
+        - stations_metadata
+        - validate_parameters
+        - build_url
+        - fetch_data
+        - get_datums
+
+### query_coops_byids
+
+::: coastal_calibration.coops_api.query_coops_byids
+
+### query_coops_bygeometry
+
+::: coastal_calibration.coops_api.query_coops_bygeometry
+
 ## Type Aliases
 
 ```python
