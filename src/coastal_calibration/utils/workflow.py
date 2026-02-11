@@ -41,31 +41,41 @@ def pre_nwm_forcing_coastal(
     length_hrs: int,
     nwm_forcing_retro_dir: str | Path,
     data_exec: str | Path,
+    meteo_source: str = "nwm_retro",
+    coastal_domain: str = "conus",
 ) -> dict[str, str]:
     """Prepare NWM forcing data for coastal model.
 
     Creates symlinks to LDASIN forcing files and sets up environment variables
-    for the coastal forcing engine.
+    for the coastal forcing engine.  Both ``nwm_retro`` and ``nwm_ana`` store
+    downloaded files as ``YYYYMMDDHH.LDASIN_DOMAIN1``, so this function
+    creates symlinks using that convention for all meteo sources.
 
     This replaces pre_nwm_forcing_coastal.bash.
 
     Parameters
     ----------
     date_string : str
-        Date string in YYYYMMDDHH format
+        Date string in YYYYMMDDHH format.
     coastal_forcing_output_dir : str or Path
-        Output directory for coastal forcing files
+        Output directory for coastal forcing files.
     length_hrs : int
-        Number of hours of forcing data
+        Number of hours of forcing data.
     nwm_forcing_retro_dir : str or Path
-        Directory containing NWM forcing files (LDASIN)
+        Directory containing NWM forcing files (``YYYYMMDDHH.LDASIN_DOMAIN1``).
     data_exec : str or Path
-        Working directory for execution
+        Working directory for execution.
+    meteo_source : str
+        Meteorological data source (``"nwm_retro"`` or ``"nwm_ana"``).
+        Kept for API compatibility; both sources now use the same naming.
+    coastal_domain : str
+        Coastal domain name (e.g. ``"hawaii"``, ``"conus"``).
+        Kept for API compatibility.
 
     Returns
     -------
     dict
-        Environment variables that were set
+        Environment variables that were set.
     """
     _validate_date_string(date_string)
 

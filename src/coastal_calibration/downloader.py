@@ -372,7 +372,16 @@ def _build_nwm_ana_forcing_urls(
     output_dir: Path,
     domain: str,
 ) -> tuple[list[str], list[Path]]:
-    """Build URLs for NWM Analysis forcing files from GCS."""
+    """Build URLs for NWM Analysis forcing files from GCS.
+
+    Files are saved locally as ``YYYYMMDDHH.LDASIN_DOMAIN1`` (using the
+    *simulation* timestamp ``dt``, not the lagged fetch timestamp) so that:
+
+    1. Multi-day simulations do not overwrite files from different dates
+       (the remote filename only contains the hour, not the date).
+    2. The ``pre_forcing`` stage can create symlinks with the same
+       convention used by ``nwm_retro``, simplifying downstream code.
+    """
     base_url = "https://storage.googleapis.com/national-water-model"
     suffix, name = _DOMAIN_MAP_ANA.get(domain, ("", "conus"))
 
@@ -386,10 +395,12 @@ def _build_nwm_ana_forcing_urls(
         date_str = fetch_dt.strftime("%Y%m%d")
         hour_str = f"{fetch_dt.hour:02d}"
 
-        fname = f"nwm.t{hour_str}z.analysis_assim.forcing.tm02.{name}.nc"
-        url = f"{base_url}/nwm.{date_str}/forcing_analysis_assim{suffix}/{fname}"
+        remote_name = f"nwm.t{hour_str}z.analysis_assim.forcing.tm02.{name}.nc"
+        url = f"{base_url}/nwm.{date_str}/forcing_analysis_assim{suffix}/{remote_name}"
         urls.append(url)
-        paths.append(out_dir / fname)
+        # Save with simulation-hour timestamp to avoid overwrites across days.
+        local_name = f"{dt.strftime('%Y%m%d%H')}.LDASIN_DOMAIN1"
+        paths.append(out_dir / local_name)
 
     return urls, paths
 

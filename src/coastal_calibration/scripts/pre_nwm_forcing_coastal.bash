@@ -47,6 +47,7 @@ pre_nwm_forcing_coastal() {
   #
   mkdir -p $NWM_FORCING_OUTPUT_DIR/${FORCING_BEGIN_DATE:0:10}
 
+  # Both nwm_retro and nwm_ana downloads use YYYYMMDDHH.LDASIN_DOMAIN1 naming.
   # Use date command for hour arithmetic (available in bash)
   base_epoch=$(date -d "${PDY:0:4}-${PDY:4:2}-${PDY:6:2} ${cyc}:00:00" +%s)
   for ((i=0; i<=${LENGTH_HRS}; i++))
@@ -54,7 +55,7 @@ pre_nwm_forcing_coastal() {
         current_epoch=$((base_epoch + i * 3600))
         pdycyc=$(date -d "@${current_epoch}" +%Y%m%d%H)
         f=${pdycyc}.LDASIN_DOMAIN1
-        ln -sf ${nwm_forcing_retro_dir}/${f} $NWM_FORCING_OUTPUT_DIR/${FORCING_BEGIN_DATE:0:10}
+        ln -sf ${nwm_forcing_retro_dir}/${f} $NWM_FORCING_OUTPUT_DIR/${FORCING_BEGIN_DATE:0:10}/${f}
   done
 
   mkdir -p $COASTAL_FORCING_OUTPUT_DIR
