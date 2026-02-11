@@ -730,12 +730,19 @@ class CoastalCalibRunner:
             )
             # Patch param.nml to enable station output when station.in was
             # created by the schism_obs stage on the login node.
+            # nspool_sta must divide nhot_write or SCHISM aborts with
+            # "mod(nhot_write,nspool_sta)/=0".  18 matches nspool and
+            # divides every nhot_write value update_param.bash produces.
             if model.include_noaa_gages:
                 lines.extend(
                     [
                         f'if [[ -f "{work_dir}/station.in" ]]; then',
-                        '    log_info "Patching param.nml: iout_sta = 1"',
+                        '    log_info "Patching param.nml: iout_sta = 1, nspool_sta = 18"',
                         f'    sed -i "s/^\\(\\s*\\)iout_sta\\s*=.*/\\1iout_sta = 1/" "{work_dir}/param.nml"',
+                        f'    sed -i "s/^\\(\\s*\\)nspool_sta\\s*=.*/\\1nspool_sta = 18/" "{work_dir}/param.nml"',
+                        f'    if ! grep -q "nspool_sta" "{work_dir}/param.nml"; then',
+                        f'        sed -i "/^\\s*iout_sta/a\\  nspool_sta = 18" "{work_dir}/param.nml"',
+                        "    fi",
                         "fi",
                     ]
                 )

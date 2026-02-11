@@ -124,40 +124,63 @@ def _read_staout(staout_path: Path) -> tuple[NDArray[np.float64], NDArray[np.flo
     return time_seconds, elevation
 
 
-def _patch_param_nml(param_path: Path) -> None:
-    """Set ``iout_sta = 1`` in param.nml (SCHOUT namelist).
+def _patch_param_nml(param_path: Path, nspool_sta: int = 18) -> None:
+    """Enable station output in param.nml (SCHOUT namelist).
 
-    If ``iout_sta`` already exists, its value is replaced.  Otherwise,
-    the line is inserted right after the ``&SCHOUT`` header.
+    Sets ``iout_sta = 1`` and ``nspool_sta`` so that SCHISM writes
+    station time-series.  ``nspool_sta`` must divide ``nhot_write``
+    evenly or SCHISM will abort with
+    ``mod(nhot_write, nspool_sta) /= 0``.
+
+    The default *nspool_sta=18* matches the ``nspool`` value used by
+    ``update_param.bash`` and is a divisor of every ``nhot_write``
+    value that script produces (18, 72, 162, 2160, …).
+
+    Parameters
+    ----------
+    param_path : Path
+        Path to param.nml.
+    nspool_sta : int, default 18
+        Station output interval in time-steps.
     """
     text = param_path.read_text()
 
-    # Try replacing an existing iout_sta line
+    # --- iout_sta ---
     new_text, count = re.subn(
         r"(?mi)^(\s*)iout_sta\s*=\s*\d+",
         r"\g<1>iout_sta = 1",
         text,
     )
-    if count > 0:
-        param_path.write_text(new_text)
-        return
+    if count == 0:
+        # Insert after &SCHOUT header
+        new_text = re.sub(
+            r"(?mi)(^&SCHOUT\s*$)",
+            r"\1\n  iout_sta = 1",
+            text,
+            count=1,
+        )
+        if new_text == text:
+            # Fallback: append a new &SCHOUT block
+            lines = text.splitlines(keepends=True)
+            lines.append("! Added by coastal_calibration\n&SCHOUT\n  iout_sta = 1\n/\n")
+            new_text = "".join(lines)
 
-    # Insert after &SCHOUT header
-    new_text = re.sub(
-        r"(?mi)(^&SCHOUT\s*$)",
-        r"\1\n  iout_sta = 1",
-        text,
-        count=1,
+    # --- nspool_sta ---
+    text2, count2 = re.subn(
+        r"(?mi)^(\s*)nspool_sta\s*=\s*\d+",
+        rf"\g<1>nspool_sta = {nspool_sta}",
+        new_text,
     )
-    if new_text != text:
-        param_path.write_text(new_text)
-        return
+    if count2 == 0:
+        # Insert after iout_sta (which we just ensured is present)
+        text2 = re.sub(
+            r"(?mi)(^\s*iout_sta\s*=\s*1)",
+            rf"\1\n  nspool_sta = {nspool_sta}",
+            new_text,
+            count=1,
+        )
 
-    # Fallback: append before the first / that closes a namelist
-    # This handles cases where &SCHOUT is not present (unlikely).
-    lines = text.splitlines(keepends=True)
-    lines.append("! Added by coastal_calibration\n&SCHOUT\n  iout_sta = 1\n/\n")
-    param_path.write_text("".join(lines))
+    param_path.write_text(text2)
 
 
 # ---------------------------------------------------------------------------
@@ -317,7 +340,7 @@ class PreSCHISMStage(WorkflowStage):
         if self.model.include_noaa_gages and (work_dir / "station.in").exists():
             self._update_substep("Patching param.nml for station output")
             _patch_param_nml(work_dir / "param.nml")
-            self._log("Set iout_sta = 1 in param.nml")
+            self._log("Set iout_sta = 1, nspool_sta = 18 in param.nml")
 
         self._log("SCHISM pre-processing complete")
         return {
