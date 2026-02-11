@@ -11,11 +11,13 @@ flowchart TD
     A[download] --> B[pre_forcing]
     B --> C[nwm_forcing]
     C --> D[post_forcing]
-    D --> E[update_params]
-    E --> F[boundary_conditions]
-    F --> G[pre_schism]
-    G --> H[schism_run]
-    H --> I[post_schism]
+    D --> E[schism_obs]
+    E --> F[update_params]
+    F --> G[boundary_conditions]
+    G --> H[pre_schism]
+    H --> I[schism_run]
+    I --> J[post_schism]
+    J --> K[schism_plot]
 ```
 
 ## SFINCS Stage Overview
@@ -106,7 +108,30 @@ work_dir/
 
 **Runs On:** Compute node (inside Singularity)
 
-### 5. update_params
+### 5. schism_obs
+
+**Purpose:** Discover NOAA CO-OPS observation stations and create `station.in`.
+
+**Enabled by:** `model_config.include_noaa_gages: true`
+
+**Tasks:**
+
+- Read open boundary nodes from `hgrid.gr3`
+- Compute concave hull of boundary node coordinates
+- Query NOAA CO-OPS API for water level stations within the hull polygon
+- Write `station.in` and `station_noaa_ids.txt` to the work directory
+
+**Runs On:** Login node or compute node (Python, requires network access)
+
+**Outputs:**
+
+```
+work_dir/
+├── station.in
+└── station_noaa_ids.txt
+```
+
+### 6. update_params
 
 **Purpose:** Generate SCHISM parameter file.
 
@@ -125,7 +150,7 @@ work_dir/
 └── param.nml
 ```
 
-### 6. boundary_conditions
+### 7. boundary_conditions
 
 **Purpose:** Generate boundary conditions from TPXO or STOFS.
 
@@ -143,7 +168,7 @@ work_dir/
 
 **Runs On:** Compute node (inside Singularity)
 
-### 7. pre_schism
+### 8. pre_schism
 
 **Purpose:** Final preparation before SCHISM execution.
 
@@ -152,10 +177,12 @@ work_dir/
 - Validate all input files present
 - Set up symbolic links
 - Configure MPI environment
+- If `include_noaa_gages` is enabled and `station.in` exists, patch `param.nml` to set
+    `iout_sta = 1` for station output
 
 **Runs On:** Compute node (inside Singularity)
 
-### 8. schism_run
+### 9. schism_run
 
 **Purpose:** Execute the SCHISM model.
 
@@ -173,7 +200,7 @@ work_dir/
 - OpenMP threads configured via `omp_num_threads`
 - Total processes = `nodes * ntasks_per_node`
 
-### 9. post_schism
+### 10. post_schism
 
 **Purpose:** Post-process SCHISM outputs.
 
@@ -184,6 +211,32 @@ work_dir/
 - Create visualization-ready files
 
 **Runs On:** Compute node (inside Singularity)
+
+### 11. schism_plot
+
+**Purpose:** Compare simulated water levels against NOAA observations.
+
+**Enabled by:** `model_config.include_noaa_gages: true`
+
+**Tasks:**
+
+- Read station output from `staout_1`
+- Fetch NOAA CO-OPS observed water levels for each station
+- Convert observation datum from MLLW to MSL
+- Generate 2×2 comparison plots (simulated vs observed)
+- Save figures to the `figs/` directory
+
+**Runs On:** Login node or compute node (Python, requires network access)
+
+**Outputs:**
+
+```
+work_dir/
+└── figs/
+    ├── stations_comparison_001.png
+    ├── stations_comparison_002.png
+    └── ...
+```
 
 ## SFINCS Stage Details
 
@@ -337,10 +390,12 @@ Stage timing:
   pre_forcing: 12.3s
   nwm_forcing: 234.5s
   post_forcing: 8.7s
+  schism_obs: 3.8s
   update_params: 2.1s
   boundary_conditions: 156.8s
   pre_schism: 5.4s
   schism_run: 1823.6s
   post_schism: 67.2s
-Total: 2355.8s
+  schism_plot: 15.4s
+Total: 2375.0s
 ```

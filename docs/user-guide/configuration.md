@@ -203,17 +203,19 @@ model_config:
   omp_num_threads: 2              # OpenMP threads
   oversubscribe: false            # Allow MPI oversubscription
   binary: pschism_wcoss2_NO_PARMETIS_TVD-VL.openmpi
+  include_noaa_gages: true        # Enable NOAA observation stations & comparison plots
 ```
 
-| Parameter         | Type   | Default                                     |
-| ----------------- | ------ | ------------------------------------------- |
-| `nodes`           | int    | 2                                           |
-| `ntasks_per_node` | int    | 18                                          |
-| `exclusive`       | bool   | true                                        |
-| `nscribes`        | int    | 2                                           |
-| `omp_num_threads` | int    | 2                                           |
-| `oversubscribe`   | bool   | false                                       |
-| `binary`          | string | `pschism_wcoss2_NO_PARMETIS_TVD-VL.openmpi` |
+| Parameter            | Type   | Default                                     |
+| -------------------- | ------ | ------------------------------------------- |
+| `nodes`              | int    | 2                                           |
+| `ntasks_per_node`    | int    | 18                                          |
+| `exclusive`          | bool   | true                                        |
+| `nscribes`           | int    | 2                                           |
+| `omp_num_threads`    | int    | 2                                           |
+| `oversubscribe`      | bool   | false                                       |
+| `binary`             | string | `pschism_wcoss2_NO_PARMETIS_TVD-VL.openmpi` |
+| `include_noaa_gages` | bool   | false                                       |
 
 #### SFINCS Model Configuration
 

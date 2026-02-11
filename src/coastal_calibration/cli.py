@@ -271,6 +271,9 @@ simulation:
 
 boundary:
   source: {boundary_source}
+
+model_config:
+  include_noaa_gages: true
 """
 
     output_path.write_text(config_content)
@@ -291,11 +294,13 @@ def stages(model: str | None) -> None:
         ("pre_forcing", "Prepare NWM forcing data"),
         ("nwm_forcing", "Generate atmospheric forcing (MPI)"),
         ("post_forcing", "Post-process forcing data"),
+        ("schism_obs", "Add NOAA observation stations"),
         ("update_params", "Create SCHISM param.nml"),
         ("boundary_conditions", "Generate boundary conditions (TPXO/STOFS)"),
         ("pre_schism", "Prepare SCHISM inputs"),
         ("schism_run", "Run SCHISM model (MPI)"),
         ("post_schism", "Post-process SCHISM outputs"),
+        ("schism_plot", "Plot simulated vs observed water levels"),
     ]
 
     sfincs_stages = [

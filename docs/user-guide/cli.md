@@ -143,11 +143,13 @@ coastal-calibration run <config> [OPTIONS]
 - `pre_forcing`
 - `nwm_forcing`
 - `post_forcing`
+- `schism_obs`
 - `update_params`
 - `boundary_conditions`
 - `pre_schism`
 - `schism_run`
 - `post_schism`
+- `schism_plot`
 
 **Available Stages (SFINCS):**
 
@@ -210,15 +212,17 @@ coastal-calibration stages --model sfincs
 
 ```console
 SCHISM workflow stages:
-  1. download: Download NWM/STOFS data
+  1. download: Download NWM/STOFS data (optional)
   2. pre_forcing: Prepare NWM forcing data
   3. nwm_forcing: Generate atmospheric forcing (MPI)
   4. post_forcing: Post-process forcing data
-  5. update_params: Create SCHISM param.nml
-  6. boundary_conditions: Generate boundary conditions
-  7. pre_schism: Prepare SCHISM inputs
-  8. schism_run: Run SCHISM model (MPI)
-  9. post_schism: Post-process SCHISM outputs
+  5. schism_obs: Add NOAA observation stations
+  6. update_params: Create SCHISM param.nml
+  7. boundary_conditions: Generate boundary conditions (TPXO/STOFS)
+  8. pre_schism: Prepare SCHISM inputs
+  9. schism_run: Run SCHISM model (MPI)
+  10. post_schism: Post-process SCHISM outputs
+  11. schism_plot: Plot simulated vs observed water levels
 
 SFINCS workflow stages:
   1. download: Download NWM/STOFS data (optional)

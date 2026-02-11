@@ -317,6 +317,13 @@ class SchismModelConfig(ModelConfig):
         Allow MPI oversubscription.
     binary : str
         SCHISM executable name.
+    include_noaa_gages : bool
+        When True, automatically query NOAA CO-OPS for water level
+        stations within the model domain (computed from the concave
+        hull of open boundary nodes in ``hgrid.gr3``), write a
+        ``station.in`` file, set ``iout_sta = 1`` in ``param.nml``,
+        and generate sim-vs-obs comparison plots after the run.
+        Requires the ``plot`` optional dependencies.
     """
 
     nodes: int = 2
