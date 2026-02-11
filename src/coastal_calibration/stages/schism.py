@@ -108,6 +108,27 @@ def _read_station_noaa_ids(base_dir: Path) -> list[str]:
     return [line.strip() for line in path.read_text().splitlines() if line.strip()]
 
 
+def _plotable_stations(
+    station_ids: list[str],
+    sim_elevation: NDArray[np.float64],
+    obs_ds: Any,
+) -> list[tuple[str, int]]:
+    """Return (station_id, column_index) pairs that have data to plot.
+
+    A station is plotable when at least one of its simulated or
+    observed time-series contains finite values.
+    """
+    result: list[tuple[str, int]] = []
+    for i, sid in enumerate(station_ids):
+        has_sim = bool(np.isfinite(sim_elevation[:, i]).any())
+        has_obs = False
+        if sid in obs_ds.station.values:
+            has_obs = bool(np.isfinite(obs_ds.water_level.sel(station=sid)).any())
+        if has_sim or has_obs:
+            result.append((sid, i))
+    return result
+
+
 def _read_staout(staout_path: Path) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     """Read SCHISM station output file (staout_1).
 
@@ -543,6 +564,10 @@ class SchismPlotStage(WorkflowStage):
     ) -> list[Path]:
         """Create 2x2 comparison figures and save them.
 
+        Stations that have *neither* valid observations nor valid
+        simulated data are skipped entirely so that empty panels do
+        not appear in the output.
+
         Parameters
         ----------
         sim_times : array-like
@@ -561,31 +586,40 @@ class SchismPlotStage(WorkflowStage):
         list[Path]
             Paths to the saved figures.
         """
+        import matplotlib.dates as mdates
         import matplotlib.pyplot as plt
 
-        n_stations = len(station_ids)
-        n_figures = math.ceil(n_stations / _STATIONS_PER_FIGURE)
+        # ── Pre-filter: keep only stations with at least obs or sim ──
+        plotable = _plotable_stations(station_ids, sim_elevation, obs_ds)
+
+        if not plotable:
+            figs_dir.mkdir(parents=True, exist_ok=True)
+            return []
+
+        n_plotable = len(plotable)
+        n_figures = math.ceil(n_plotable / _STATIONS_PER_FIGURE)
         figs_dir.mkdir(parents=True, exist_ok=True)
 
         saved: list[Path] = []
         for fig_idx in range(n_figures):
             start = fig_idx * _STATIONS_PER_FIGURE
-            end = min(start + _STATIONS_PER_FIGURE, n_stations)
-            batch_ids = station_ids[start:end]
-            batch_size = len(batch_ids)
+            end = min(start + _STATIONS_PER_FIGURE, n_plotable)
+            batch = plotable[start:end]
+            batch_size = len(batch)
+
+            nrows = 2 if batch_size > 2 else 1
+            ncols = 2 if batch_size > 1 else 1
 
             fig, axes = plt.subplots(
-                2,
-                2,
-                figsize=(16, 10),
-                sharex=True,
+                nrows,
+                ncols,
+                figsize=(16, 5 * nrows),
                 squeeze=False,
             )
             axes_flat = axes.ravel()
 
-            for i, sid in enumerate(batch_ids):
+            for i, (sid, col_idx) in enumerate(batch):
                 ax = axes_flat[i]
-                col_idx = start + i
 
                 # Simulated
                 sim_ts = sim_elevation[:, col_idx]
@@ -593,7 +627,6 @@ class SchismPlotStage(WorkflowStage):
 
                 # Observed
                 has_obs = False
-                title = f"NOAA {sid}"
                 if sid in obs_ds.station.values:
                     obs_wl = obs_ds.water_level.sel(station=sid)
                     has_obs = bool(np.isfinite(obs_wl).any())
@@ -603,10 +636,8 @@ class SchismPlotStage(WorkflowStage):
                             obs_wl.values,
                             label="Observed",
                             color="k",
-                            linewidth=0.8,
+                            linewidth=1.0,
                         )
-                    else:
-                        title += " (no obs)"
 
                 if has_sim:
                     ax.plot(
@@ -622,17 +653,23 @@ class SchismPlotStage(WorkflowStage):
                         label="Simulated",
                         color="r",
                         marker="x",
-                        s=15,
+                        s=25,
                     )
-                else:
-                    title += " (no sim)"
-                ax.set_title(title, fontsize=10)
-                ax.set_ylabel("Water Level (m, MSL)")
-                if has_obs or has_sim:
-                    ax.legend(fontsize="small")
+
+                ax.set_title(f"NOAA {sid}", fontsize=14, fontweight="bold")
+                ax.set_ylabel("Water Level (m, MSL)", fontsize=12)
+                ax.tick_params(axis="both", labelsize=11)
+                ax.legend(fontsize=11, loc="best")
+
+                # Readable date formatting on x-axis
+                ax.xaxis.set_major_formatter(mdates.DateFormatter("%m-%d %H:%M"))
+                ax.xaxis.set_major_locator(mdates.AutoDateLocator(minticks=4, maxticks=8))
+                for label in ax.get_xticklabels():
+                    label.set_rotation(30)
+                    label.set_horizontalalignment("right")
 
             # Remove unused axes
-            for j in range(batch_size, _STATIONS_PER_FIGURE):
+            for j in range(batch_size, nrows * ncols):
                 axes_flat[j].remove()
 
             fig.tight_layout()
