@@ -143,8 +143,8 @@ coastal-calibration run <config> [OPTIONS]
 - `pre_forcing`
 - `nwm_forcing`
 - `post_forcing`
-- `schism_obs`
 - `update_params`
+- `schism_obs`
 - `boundary_conditions`
 - `pre_schism`
 - `schism_run`
@@ -216,8 +216,8 @@ SCHISM workflow stages:
   2. pre_forcing: Prepare NWM forcing data
   3. nwm_forcing: Generate atmospheric forcing (MPI)
   4. post_forcing: Post-process forcing data
-  5. schism_obs: Add NOAA observation stations
-  6. update_params: Create SCHISM param.nml
+  5. update_params: Create SCHISM param.nml
+  6. schism_obs: Add NOAA observation stations
   7. boundary_conditions: Generate boundary conditions (TPXO/STOFS)
   8. pre_schism: Prepare SCHISM inputs
   9. schism_run: Run SCHISM model (MPI)

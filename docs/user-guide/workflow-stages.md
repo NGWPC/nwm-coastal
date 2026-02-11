@@ -11,8 +11,8 @@ flowchart TD
     A[download] --> B[pre_forcing]
     B --> C[nwm_forcing]
     C --> D[post_forcing]
-    D --> E[schism_obs]
-    E --> F[update_params]
+    D --> E[update_params]
+    E --> F[schism_obs]
     F --> G[boundary_conditions]
     G --> H[pre_schism]
     H --> I[schism_run]
@@ -108,11 +108,34 @@ work_dir/
 
 **Runs On:** Compute node (inside Singularity)
 
-### 5. schism_obs
+### 5. update_params
+
+**Purpose:** Generate SCHISM parameter file and symlink mesh files.
+
+**Tasks:**
+
+- Symlink `hgrid.gr3` and other mesh files into the work directory
+- Create `param.nml` with simulation parameters
+- Set time stepping configuration
+- Configure output options
+
+**Runs On:** Compute node (inside Singularity)
+
+**Outputs:**
+
+```
+work_dir/
+├── hgrid.gr3 (symlink)
+└── param.nml
+```
+
+### 6. schism_obs
 
 **Purpose:** Discover NOAA CO-OPS observation stations and create `station.in`.
 
 **Enabled by:** `model_config.include_noaa_gages: true`
+
+**Depends on:** `update_params` (which symlinks `hgrid.gr3` into the work directory)
 
 **Tasks:**
 
@@ -129,25 +152,6 @@ work_dir/
 work_dir/
 ├── station.in
 └── station_noaa_ids.txt
-```
-
-### 6. update_params
-
-**Purpose:** Generate SCHISM parameter file.
-
-**Tasks:**
-
-- Create `param.nml` with simulation parameters
-- Set time stepping configuration
-- Configure output options
-
-**Runs On:** Compute node (inside Singularity)
-
-**Outputs:**
-
-```
-work_dir/
-└── param.nml
 ```
 
 ### 7. boundary_conditions
@@ -390,8 +394,8 @@ Stage timing:
   pre_forcing: 12.3s
   nwm_forcing: 234.5s
   post_forcing: 8.7s
-  schism_obs: 3.8s
   update_params: 2.1s
+  schism_obs: 3.8s
   boundary_conditions: 156.8s
   pre_schism: 5.4s
   schism_run: 1823.6s
