@@ -255,7 +255,7 @@ slurm:
 
 simulation:
   start_date: {start_date_str}
-  duration_hours: 3
+  duration_hours: 12
   coastal_domain: {domain}
   meteo_source: {meteo_source}
 
@@ -286,7 +286,7 @@ slurm:
 
 simulation:
   start_date: {start_date_str}
-  duration_hours: 3
+  duration_hours: 12
   coastal_domain: {domain}
   meteo_source: {meteo_source}
 

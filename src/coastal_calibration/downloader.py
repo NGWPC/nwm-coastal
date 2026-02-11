@@ -234,13 +234,22 @@ def get_default_sources(
     ValueError
         If no valid source combination exists for the domain.
     """
-    # Preferred combinations in priority order
-    combos: list[tuple[MeteoSource, BoundarySource]] = [
-        ("nwm_retro", "stofs"),
-        ("nwm_ana", "stofs"),
-        ("nwm_retro", "tpxo"),
-        ("nwm_ana", "tpxo"),
-    ]
+    # Preferred combinations in priority order.
+    # PRVI uses nwm_ana first because SCHISM currently fails with nwm_retro.
+    if domain == "prvi":
+        combos: list[tuple[MeteoSource, BoundarySource]] = [
+            ("nwm_ana", "stofs"),
+            ("nwm_ana", "tpxo"),
+            ("nwm_retro", "stofs"),
+            ("nwm_retro", "tpxo"),
+        ]
+    else:
+        combos = [
+            ("nwm_retro", "stofs"),
+            ("nwm_ana", "stofs"),
+            ("nwm_retro", "tpxo"),
+            ("nwm_ana", "tpxo"),
+        ]
 
     for meteo, coastal in combos:
         overlap = get_overlapping_range(meteo, coastal, domain)
