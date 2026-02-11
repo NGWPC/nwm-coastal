@@ -239,7 +239,6 @@ class DownloadConfig:
     """Data download configuration."""
 
     enabled: bool = True
-    skip_existing: bool = True
     timeout: int = 600
     raise_on_error: bool = True
     limit_per_host: int = 4
@@ -1057,7 +1056,6 @@ class CoastalCalibConfig:
             },
             "download": {
                 "enabled": self.download.enabled,
-                "skip_existing": self.download.skip_existing,
                 "timeout": self.download.timeout,
                 "raise_on_error": self.download.raise_on_error,
                 "limit_per_host": self.download.limit_per_host,

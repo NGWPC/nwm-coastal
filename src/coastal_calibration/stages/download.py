@@ -46,7 +46,6 @@ class DownloadStage(WorkflowStage):
             tpxo_local_path=tpxo_data_path,
             timeout=download_cfg.timeout,
             raise_on_error=download_cfg.raise_on_error,
-            skip_existing=download_cfg.skip_existing,
         )
 
         # Track STOFS file path in result instead of mutating config

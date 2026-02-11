@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Literal
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-from tiny_retriever import check_downloads, download
+from tiny_retriever import download
 
 from coastal_calibration.config.schema import (
     BoundarySource,
@@ -536,163 +536,14 @@ def _build_glofs_urls(
     return urls, paths
 
 
-_HDF5_MAGIC = b"\x89HDF\r\n\x1a\n"
-_CDF_MAGIC = b"CDF"
-
-
-def _is_valid_netcdf(path: Path) -> bool:
-    """Check whether *path* looks like a valid netCDF file.
-
-    Verifies the file starts with either the HDF5 or classic-CDF magic
-    bytes.
-    """
-    if not path.exists():
-        return False
-
-    if path.stat().st_size < 8:
-        return False
-
-    with path.open("rb") as fh:
-        header = fh.read(8)
-
-    if header.startswith(_HDF5_MAGIC):
-        return True
-
-    return header[:3] == _CDF_MAGIC
-
-
-def _filter_existing(
-    urls: list[str],
-    file_paths: list[Path],
-) -> tuple[list[str], list[Path], int]:
-    """Separate already-downloaded files from those still needed.
-
-    For netCDF files the magic bytes are checked and
-    ``tiny_retriever.check_downloads`` compares local sizes against
-    the remote ``Content-Length`` so that corrupt / truncated downloads
-    are re-queued instead of silently skipped.
-
-    Returns (pending_urls, pending_paths, already_exist_count).
-    """
-    pending_urls: list[str] = []
-    pending_paths: list[Path] = []
-    existing = 0
-
-    # Collect .nc files that exist on disk for a bulk size check.
-    nc_urls: list[str] = []
-    nc_paths: list[Path] = []
-
-    for url, path in zip(urls, file_paths, strict=False):
-        if not path.exists() or path.stat().st_size == 0:
-            pending_urls.append(url)
-            pending_paths.append(path)
-            continue
-
-        if path.suffix == ".nc":
-            # Quick magic-bytes check first.
-            if not _is_valid_netcdf(path):
-                logger.warning(
-                    "Corrupt file (bad magic bytes), re-downloading: %s",
-                    path,
-                )
-                path.unlink(missing_ok=True)
-                pending_urls.append(url)
-                pending_paths.append(path)
-                continue
-            nc_urls.append(url)
-            nc_paths.append(path)
-        else:
-            existing += 1
-
-    # Bulk remote-size check for surviving .nc files.
-    if nc_urls:
-        try:
-            invalid = check_downloads(nc_urls, nc_paths)
-        except Exception:
-            logger.warning(
-                "Remote size check failed (network unavailable?). "
-                "Accepting %d existing files that passed magic-bytes validation.",
-                len(nc_urls),
-            )
-            existing += len(nc_urls)
-        else:
-            for url, path in zip(nc_urls, nc_paths, strict=False):
-                if path in invalid:
-                    logger.warning(
-                        "Truncated file detected (expected %d bytes, got %d), re-downloading: %s",
-                        invalid[path],
-                        path.stat().st_size,
-                        path,
-                    )
-                    path.unlink(missing_ok=True)
-                    pending_urls.append(url)
-                    pending_paths.append(path)
-                else:
-                    existing += 1
-
-    return pending_urls, pending_paths, existing
-
-
-def _tally_results(
-    result: DownloadResult,
-    pending_urls: list[str],
-    pending_paths: list[Path],
-) -> None:
-    """Count successful/failed downloads and clean up empty/corrupt files."""
-    for url, path in zip(pending_urls, pending_paths, strict=False):
-        if not path.exists() or path.stat().st_size == 0:
-            result.failed += 1
-            if not result.errors:
-                result.errors.append(f"Failed to download: {url}")
-            if path.exists():
-                path.unlink()
-            continue
-
-        # Quick magic-bytes sanity check for netCDF files.
-        if path.suffix == ".nc" and not _is_valid_netcdf(path):
-            result.failed += 1
-            result.errors.append(f"Corrupt download (bad netCDF): {path.name}")
-            logger.warning("Downloaded file is corrupt, removing: %s", path)
-            path.unlink(missing_ok=True)
-            continue
-
-        result.successful += 1
-
-    # Bulk remote-size check for all freshly downloaded .nc files.
-    nc_urls = [
-        u
-        for u, p in zip(pending_urls, pending_paths, strict=False)
-        if p.exists() and p.suffix == ".nc"
-    ]
-    nc_paths = [p for p in pending_paths if p.exists() and p.suffix == ".nc"]
-    if nc_urls:
-        try:
-            invalid = check_downloads(nc_urls, nc_paths)
-        except Exception:
-            logger.warning(
-                "Remote size check failed after download (network unavailable?). "
-                "Skipping post-download size validation for %d files.",
-                len(nc_urls),
-            )
-        else:
-            for path in invalid:
-                result.successful -= 1
-                result.failed += 1
-                result.errors.append(f"Truncated download: {path.name}")
-                logger.warning("Truncated file detected, removing: %s", path)
-                path.unlink(missing_ok=True)
-
-
 def _execute_download(
     urls: list[str],
     file_paths: list[Path],
     source_name: str,
     timeout: int,
     raise_on_error: bool,
-    *,
-    skip_existing: bool = False,
 ) -> DownloadResult:
-    """Execute download using tiny_retriever."""
+    """Download all *urls* to *file_paths* using tiny_retriever."""
     if not urls:
         return DownloadResult(source=source_name)
 
@@ -702,25 +553,24 @@ def _execute_download(
         file_paths=list(file_paths),
     )
 
-    if skip_existing:
-        pending_urls, pending_paths, existing = _filter_existing(urls, file_paths)
-        result.successful += existing
-    else:
-        pending_urls = urls
-        pending_paths = list(file_paths)
-
-    if not pending_urls:
-        return result
-
-    for path in pending_paths:
+    for path in file_paths:
         path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        download(pending_urls, pending_paths, timeout=timeout, raise_status=raise_on_error)
+        download(urls, file_paths, timeout=timeout, raise_status=raise_on_error)
     except Exception as e:
         result.errors.append(str(e))
 
-    _tally_results(result, pending_urls, pending_paths)
+    for url, path in zip(urls, file_paths, strict=False):
+        if not path.exists() or path.stat().st_size == 0:
+            result.failed += 1
+            if not result.errors:
+                result.errors.append(f"Failed to download: {url}")
+            if path.exists():
+                path.unlink()
+        else:
+            result.successful += 1
+
     return result
 
 
@@ -793,7 +643,6 @@ def download_data(
     tpxo_local_path: Path | str | None = None,
     timeout: int = 600,
     raise_on_error: bool = False,
-    skip_existing: bool = False,
 ) -> DownloadResults:
     """Download meteorological, hydrological, and coastal data.
 
@@ -829,9 +678,6 @@ def download_data(
     raise_on_error : bool, optional
         Whether to raise exceptions on download failures.
         Defaults to ``False``.
-    skip_existing : bool, optional
-        Skip files that already exist on disk.
-        Defaults to ``False``.
 
     Returns
     -------
@@ -862,9 +708,7 @@ def download_data(
         urls, paths = _build_nwm_retro_forcing_urls(start, end, out_dir, domain)
     else:
         urls, paths = _build_nwm_ana_forcing_urls(start, end, out_dir, domain)
-    meteo_result = _execute_download(
-        urls, paths, f"meteo/{meteo_source}", timeout, raise_on_error, skip_existing=skip_existing
-    )
+    meteo_result = _execute_download(urls, paths, f"meteo/{meteo_source}", timeout, raise_on_error)
 
     if hydro_source == "ngen":
         hydro_result = DownloadResult(
@@ -874,22 +718,12 @@ def download_data(
     elif meteo_source == "nwm_retro":
         urls, paths = _build_nwm_retro_streamflow_urls(start, end, out_dir, domain)
         hydro_result = _execute_download(
-            urls,
-            paths,
-            f"hydro/{hydro_source}",
-            timeout,
-            raise_on_error,
-            skip_existing=skip_existing,
+            urls, paths, f"hydro/{hydro_source}", timeout, raise_on_error
         )
     else:
         urls, paths = _build_nwm_ana_streamflow_urls(start, end, out_dir, domain)
         hydro_result = _execute_download(
-            urls,
-            paths,
-            f"hydro/{hydro_source}",
-            timeout,
-            raise_on_error,
-            skip_existing=skip_existing,
+            urls, paths, f"hydro/{hydro_source}", timeout, raise_on_error
         )
 
     if coastal_source == "tpxo":
@@ -919,13 +753,11 @@ def download_data(
         # STOFS fields file is ~12 GB -- give it a generous timeout.
         stofs_timeout = max(timeout, 3600)
         coastal_result = _execute_download(
-            urls, paths, "coastal/stofs", stofs_timeout, raise_on_error, skip_existing=skip_existing
+            urls, paths, "coastal/stofs", stofs_timeout, raise_on_error
         )
     else:
         urls, paths = _build_glofs_urls(start, end, out_dir, glofs_model)
-        coastal_result = _execute_download(
-            urls, paths, "coastal/glofs", timeout, raise_on_error, skip_existing=skip_existing
-        )
+        coastal_result = _execute_download(urls, paths, "coastal/glofs", timeout, raise_on_error)
 
     results = DownloadResults(meteo=meteo_result, hydro=hydro_result, coastal=coastal_result)
     _log_summary(results)
