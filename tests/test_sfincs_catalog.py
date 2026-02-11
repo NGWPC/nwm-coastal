@@ -235,8 +235,8 @@ class TestGenerateDataCatalog:
         assert catalog.name == "custom"
         assert catalog.version == "3.0"
 
-    def test_nwm_ana_meteo_uri_uses_nc_glob(self, tmp_path):
-        """nwm_ana meteo entry should use *.nc glob (no LDASIN symlinks)."""
+    def test_nwm_ana_meteo_uri_uses_ldasin_glob(self, tmp_path):
+        """nwm_ana meteo entry should use *.LDASIN_DOMAIN1.nc glob (same as nwm_retro)."""
         work_dir = tmp_path / "work"
         work_dir.mkdir()
         dl_dir = tmp_path / "downloads"
@@ -263,8 +263,7 @@ class TestGenerateDataCatalog:
         )
         entry = catalog.entries[0]
         assert entry.name == "nwm_ana_meteo"
-        assert entry.uri.endswith("*.nc")
-        assert "LDASIN" not in entry.uri
+        assert entry.uri.endswith("*.LDASIN_DOMAIN1.nc")
 
 
 class TestCreateNcSymlinks:
@@ -312,18 +311,22 @@ class TestCreateNcSymlinks:
         result = create_nc_symlinks(tmp_path, include_streamflow=False)
         assert len(result["meteo"]) == 0  # Already existed
 
-    def test_skips_meteo_symlinks_for_nwm_ana(self, tmp_path):
-        """nwm_ana forcing files are already .nc — no meteo symlinks needed."""
+    def test_creates_meteo_symlinks_for_nwm_ana(self, tmp_path):
+        """nwm_ana downloads use LDASIN naming — .nc symlinks are needed."""
         meteo_dir = tmp_path / "meteo" / "nwm_ana"
         meteo_dir.mkdir(parents=True)
-        (meteo_dir / "nwm.t00z.analysis_assim.forcing.tm02.conus.nc").write_text("data")
+        (meteo_dir / "2021042100.LDASIN_DOMAIN1").write_text("data")
+        (meteo_dir / "2021042101.LDASIN_DOMAIN1").write_text("data")
 
         result = create_nc_symlinks(
             tmp_path,
             meteo_source="nwm_ana",
             include_streamflow=False,
         )
-        assert len(result["meteo"]) == 0  # No symlinks created
+        assert len(result["meteo"]) == 2
+        for link in result["meteo"]:
+            assert link.name.endswith(".LDASIN_DOMAIN1.nc")
+            assert link.is_symlink()
 
     def test_nonexistent_dir(self, tmp_path):
         result = create_nc_symlinks(tmp_path)
