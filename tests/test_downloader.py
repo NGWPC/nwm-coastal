@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from unittest.mock import patch
 
 import pytest
 
@@ -17,7 +16,6 @@ from coastal_calibration.downloader import (
     _build_nwm_retro_forcing_urls,
     _build_nwm_retro_streamflow_urls,
     _build_stofs_urls,
-    _filter_existing,
     get_date_range,
     get_default_sources,
     get_overlapping_range,
@@ -360,7 +358,7 @@ class TestBuildUrls:
         assert "t12z" in urls[0]
 
     def test_stofs_path_includes_date(self, tmp_path):
-        """Different dates produce different local paths to avoid skip_existing collisions."""
+        """Different dates produce different local paths."""
         _, paths_a = _build_stofs_urls(datetime(2022, 6, 1, 0), tmp_path)
         _, paths_b = _build_stofs_urls(datetime(2022, 7, 1, 0), tmp_path)
         assert paths_a[0] != paths_b[0]
@@ -378,73 +376,6 @@ class TestBuildUrls:
         end = datetime(2023, 1, 1, 1)
         urls, _paths = _build_glofs_urls(start, end, tmp_path, "lmhofs")
         assert "lake-michigan-huron" in urls[0]
-
-
-class TestFilterExisting:
-    # Valid HDF5 magic header (8 bytes) + padding.
-    _HDF5_HEADER = b"\x89HDF\r\n\x1a\n" + b"\x01" * 1024
-
-    def test_no_existing(self, tmp_path):
-        urls = ["http://a", "http://b"]
-        paths = [tmp_path / "a.nc", tmp_path / "b.nc"]
-        pending_urls, _pending_paths, existing = _filter_existing(urls, paths)
-        assert len(pending_urls) == 2
-        assert existing == 0
-
-    @patch("coastal_calibration.downloader.check_downloads", return_value={})
-    def test_some_existing(self, mock_check, tmp_path):
-        """Valid .nc file passes magic-byte + remote-size check."""
-        urls = ["http://a", "http://b"]
-        f = tmp_path / "a.nc"
-        f.write_bytes(self._HDF5_HEADER)
-        paths = [f, tmp_path / "b.nc"]
-        pending_urls, _pending_paths, existing = _filter_existing(urls, paths)
-        assert len(pending_urls) == 1
-        assert existing == 1
-        assert pending_urls[0] == "http://b"
-
-    def test_empty_file_not_counted(self, tmp_path):
-        urls = ["http://a"]
-        f = tmp_path / "a.nc"
-        f.write_text("")
-        paths = [f]
-        pending_urls, _pending_paths, existing = _filter_existing(urls, paths)
-        assert len(pending_urls) == 1
-        assert existing == 0
-
-    def test_corrupt_nc_requeued(self, tmp_path):
-        """A .nc file with invalid magic bytes is deleted and re-queued."""
-        urls = ["http://a"]
-        f = tmp_path / "a.nc"
-        f.write_text("not-a-netcdf-file")
-        paths = [f]
-        pending_urls, _pending_paths, existing = _filter_existing(urls, paths)
-        assert len(pending_urls) == 1
-        assert existing == 0
-        assert not f.exists(), "corrupt file should be deleted"
-
-    @patch("coastal_calibration.downloader.check_downloads")
-    def test_truncated_nc_requeued(self, mock_check, tmp_path):
-        """A .nc file that passes magic-byte check but fails size check is re-queued."""
-        f = tmp_path / "a.nc"
-        f.write_bytes(self._HDF5_HEADER)
-        mock_check.return_value = {f: 99999}
-        urls = ["http://a"]
-        paths = [f]
-        pending_urls, _pending_paths, existing = _filter_existing(urls, paths)
-        assert len(pending_urls) == 1
-        assert existing == 0
-        assert not f.exists(), "truncated file should be deleted"
-
-    def test_non_nc_file_skipped_by_size(self, tmp_path):
-        """Non-.nc files are accepted with a simple size > 0 check."""
-        urls = ["http://a"]
-        f = tmp_path / "a.txt"
-        f.write_text("data")
-        paths = [f]
-        pending_urls, _pending_paths, existing = _filter_existing(urls, paths)
-        assert len(pending_urls) == 0
-        assert existing == 1
 
 
 class TestValidateDateRanges:

@@ -337,7 +337,6 @@ class TestDownloadConfig:
     def test_defaults(self):
         cfg = DownloadConfig()
         assert cfg.enabled is True
-        assert cfg.skip_existing is True
         assert cfg.timeout == 600
         assert cfg.raise_on_error is True
 
