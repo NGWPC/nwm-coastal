@@ -50,14 +50,19 @@ EOF
 
 ### 3. Install
 
+By default, `uv` hardlinks files from its cache into `site-packages`. Singularity/Apptainer
+cannot resolve these hardlinks when bind-mounting the bundled scripts directory into the
+container. Setting `UV_LINK_MODE=copy` forces `uv` to copy the files so they exist as real
+files in `site-packages`.
+
 ```bash
-pixi install
+UV_LINK_MODE=copy pixi install
 ```
 
 This creates a fully isolated environment under `/opt/coastal-calibration/.pixi/` with
 all conda and PyPI dependencies resolved together.
 
-### 4. Create a wrapper script
+### 5. Create a wrapper script
 
 ```bash
 cat > /opt/coastal-calibration/coastal-calibration <<'WRAPPER'
@@ -67,7 +72,7 @@ WRAPPER
 chmod +x /opt/coastal-calibration/coastal-calibration
 ```
 
-### 5. Make it available to all users
+### 6. Make it available to all users
 
 Symlink into a shared bin directory:
 
@@ -79,7 +84,7 @@ sudo ln -sf /opt/coastal-calibration/coastal-calibration /usr/local/bin/coastal-
 
 ```bash
 cd /opt/coastal-calibration
-pixi update
+UV_LINK_MODE=copy pixi update
 ```
 
 That's it — one command. All conda and PyPI dependencies are re-resolved and the
