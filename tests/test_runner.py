@@ -171,3 +171,106 @@ class TestCoastalCalibRunner:
         runner = CoastalCalibRunner(sample_config)
         stages = runner._get_stages_to_run(None, None)
         assert "download" in stages
+
+
+class TestSplitStagesForSubmit:
+    """Tests for _split_stages_for_submit stage partitioning."""
+
+    def test_schism_split_full_pipeline(self, sample_config):
+        """SCHISM: download→pre_job, forcing/boundary/run→job, plot→post_job."""
+        sample_config.download.enabled = True
+        runner = CoastalCalibRunner(sample_config)
+        runner._init_stages()
+
+        stages = runner._get_stages_to_run(None, None)
+        pre_job, job, post_job = runner._split_stages_for_submit(stages)
+
+        # download is python-only, before first container stage
+        assert "download" in pre_job
+        # schism_obs is sandwiched between container stages, promoted to pre_job
+        assert "schism_obs" in pre_job
+        # All container stages should be in job
+        assert "pre_forcing" in job
+        assert "nwm_forcing" in job
+        assert "post_forcing" in job
+        assert "update_params" in job
+        assert "boundary_conditions" in job
+        assert "pre_schism" in job
+        assert "schism_run" in job
+        assert "post_schism" in job
+        # schism_plot is python-only, after last container stage
+        assert "schism_plot" in post_job
+        # No stage should appear in multiple groups
+        all_stages = pre_job + job + post_job
+        assert len(all_stages) == len(set(all_stages))
+        assert set(all_stages) == set(stages)
+
+    def test_sfincs_split_full_pipeline(self, tmp_path, sample_config):
+        """SFINCS: 13 stages→pre_job, sfincs_run→job, sfincs_plot→post_job."""
+        from coastal_calibration.config.schema import SfincsModelConfig
+
+        sample_config.model_config = SfincsModelConfig(prebuilt_dir=tmp_path)
+        sample_config.download.enabled = True
+        runner = CoastalCalibRunner(sample_config)
+        runner._init_stages()
+
+        stages = runner._get_stages_to_run(None, None)
+        pre_job, job, post_job = runner._split_stages_for_submit(stages)
+
+        # All stages before sfincs_run are python-only → pre_job
+        assert len(pre_job) == 12  # download + 11 build stages
+        assert job == ["sfincs_run"]
+        assert post_job == ["sfincs_plot"]
+
+    def test_schism_split_start_from_container(self, sample_config):
+        """--start-from=schism_run: no pre_job, schism_run+post_schism in job."""
+        runner = CoastalCalibRunner(sample_config)
+        runner._init_stages()
+
+        stages = runner._get_stages_to_run("schism_run", None)
+        pre_job, job, post_job = runner._split_stages_for_submit(stages)
+
+        assert pre_job == []
+        assert "schism_run" in job
+        assert "post_schism" in job
+        assert "schism_plot" in post_job
+
+    def test_schism_split_stop_after_forcing(self, sample_config):
+        """--stop-after=post_forcing: no post_job."""
+        runner = CoastalCalibRunner(sample_config)
+        runner._init_stages()
+
+        stages = runner._get_stages_to_run(None, "post_forcing")
+        _pre_job, job, post_job = runner._split_stages_for_submit(stages)
+
+        assert post_job == []
+        assert "pre_forcing" in job
+        assert "nwm_forcing" in job
+        assert "post_forcing" in job
+
+    def test_no_container_stages(self, sample_config):
+        """When only python-only stages remain, everything goes to pre_job."""
+        runner = CoastalCalibRunner(sample_config)
+        runner._init_stages()
+
+        # schism_obs and schism_plot are python-only
+        # If we start from schism_plot and stop after schism_plot
+        stages = runner._get_stages_to_run("schism_plot", "schism_plot")
+        pre_job, job, post_job = runner._split_stages_for_submit(stages)
+
+        assert pre_job == ["schism_plot"]
+        assert job == []
+        assert post_job == []
+
+    def test_schism_obs_promoted_to_pre_job(self, sample_config):
+        """schism_obs (sandwiched between container stages) is promoted."""
+        runner = CoastalCalibRunner(sample_config)
+        runner._init_stages()
+
+        # Full pipeline includes schism_obs between post_forcing and boundary_conditions
+        stages = runner._get_stages_to_run(None, None)
+        pre_job, job, _post_job = runner._split_stages_for_submit(stages)
+
+        # schism_obs must be in pre_job, NOT in job
+        assert "schism_obs" in pre_job
+        assert "schism_obs" not in job
