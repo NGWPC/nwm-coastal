@@ -12,27 +12,23 @@
 model: sfincs
 
 slurm:
-  user: test
+  user: sfincs_texas
 
 simulation:
   start_date: 2025-06-01
   duration_hours: 168  # 7 days
   coastal_domain: atlgulf
-  meteo_source: nwm_ana  # nwm_retro ends 2023-01-31; nwm_ana covers 2018-10-01 to present
+  meteo_source: nwm_ana  # nwm_retro ends 2023-01-31
 
 boundary:
   source: stofs
 
 paths:
-  work_dir: ./tmp_texas_run
-  raw_download_dir: ./tmp_texas_run/downloads
+  work_dir: ./sfincs_texas
+  raw_download_dir: ./sfincs_texas/downloads
 
 download:
   enabled: true
-  raise_on_error: false  # don't abort on partial download failures
-
-monitoring:
-  log_level: INFO
 
 model_config:
   prebuilt_dir: ./texas
@@ -40,28 +36,7 @@ model_config:
   merge_observations: false
   merge_discharge: false
   include_noaa_gages: true
-  navd88_to_msl_m: -0.147  # NAVD88→MSL vertical offset for Texas coast
+  navd88_to_msl_m: 0.147
+  include_precip: false
   include_wind: false
   include_pressure: false
-  # observation_points:
-  #   - x: 830344.95
-  #     y: 3187383.41
-  #     name: Sargent (8772985)
-  #   - x: 801500.14
-  #     y: 3179759.77
-  #     name: Matagorda City (8773146)
-  #   - x: 733642.95
-  #     y: 3170505.01
-  #     name: Port Lavaca (8773259)
-  #   - x: 755758.90
-  #     y: 3150019.47
-  #     name: Port O'Connor (8773701)
-  #   - x: 761521.61
-  #     y: 3147395.72
-  #     name: Matagorda Bay Entrance Channel (8773767)
-  #   - x: 758914.37
-  #     y: 3149643.75
-  #     name: Matagorda Ship Channel Marker 19 (mg0101)
-  #   - x: 761531.97
-  #     y: 3147370.44
-  #     name: Matagorda Entrance Channel (mg0201)
