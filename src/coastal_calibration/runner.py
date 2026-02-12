@@ -450,7 +450,11 @@ class CoastalCalibRunner:
             Container stage names to include in the script.
         """
         from coastal_calibration.config.schema import SfincsModelConfig
-        from coastal_calibration.stages.sfincs_build import get_model_root, resolve_sif_path
+        from coastal_calibration.stages.sfincs_build import (
+            SFINCS_DOCKER_IMAGE,
+            get_model_root,
+            resolve_sif_path,
+        )
 
         work_dir = self.config.paths.work_dir
         runner_script = work_dir / "sing_run_generated.bash"
@@ -458,6 +462,7 @@ class CoastalCalibRunner:
         assert isinstance(self.config.model_config, SfincsModelConfig)  # noqa: S101
         model_root = get_model_root(self.config)
         sif_path = resolve_sif_path(self.config)
+        docker_uri = f"docker://{SFINCS_DOCKER_IMAGE}:{self.config.model_config.container_tag}"
 
         script_lines = [
             "#!/usr/bin/env bash",
@@ -478,6 +483,16 @@ class CoastalCalibRunner:
         )
 
         if "sfincs_run" in container_stages:
+            pull_lines = [
+                "# Pull Singularity image if not already present",
+                f'if [ ! -f "{sif_path}" ]; then',
+                f'    echo "Pulling Singularity image: {docker_uri}"',
+                f'    mkdir -p "{sif_path.parent}"',
+                f'    singularity pull "{sif_path}" "{docker_uri}"',
+                "fi",
+                "",
+            ]
+            script_lines.extend(pull_lines)
             script_lines.extend(
                 [
                     'log_stage_start "sfincs_run" "Run SFINCS model (Singularity)"',

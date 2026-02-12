@@ -128,11 +128,16 @@ def _waterlevel_geodataset(config: CoastalCalibConfig) -> str | None:
 
 
 def resolve_sif_path(config: CoastalCalibConfig) -> Path:
-    """Resolve the Singularity SIF path from configuration."""
+    """Resolve the Singularity SIF path from configuration.
+
+    When no explicit ``container_image`` is set, the SIF file is stored
+    in the download directory so that it can be reused across runs
+    without re-downloading.
+    """
     sfincs = _sfincs_cfg(config)
     if sfincs.container_image is not None:
         return sfincs.container_image
-    return get_model_root(config) / f"sfincs-cpu_{sfincs.container_tag}.sif"
+    return config.paths.download_dir / f"sfincs-cpu_{sfincs.container_tag}.sif"
 
 
 def _pull_singularity_image(
