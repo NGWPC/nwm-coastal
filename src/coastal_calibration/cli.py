@@ -25,7 +25,7 @@ def _raise_cli_error(message: str) -> None:
 
 
 @click.group()
-@click.version_option(package_name="coastal-calibration")
+@click.version_option(package_name="coastal_calibration")
 def cli() -> None:
     """Coastal calibration workflow manager (SCHISM, SFINCS)."""
 
