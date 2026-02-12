@@ -518,6 +518,11 @@ class SfincsModelConfig(ModelConfig):
     include_pressure : bool
         When True, add spatially-varying atmospheric pressure forcing
         (``press_msl``) and enable barometric correction (``baro=1``).
+    navd88_to_msl_m : float
+        Vertical offset in metres to convert SFINCS output from NAVD88 to
+        MSL.  The value is *added* to the simulated water level before
+        comparison with NOAA CO-OPS observations (which are in MSL).
+        Set to ``0.0`` (default) when no correction is needed.
     container_tag : str
         Tag for the ``deltares/sfincs-cpu`` Docker/Singularity image.
     container_image : Path, optional
@@ -540,6 +545,7 @@ class SfincsModelConfig(ModelConfig):
     include_precip: bool = False
     include_wind: bool = False
     include_pressure: bool = False
+    navd88_to_msl_m: float = 0.0
     container_tag: str = "latest"
     container_image: Path | None = None
     omp_num_threads: int = field(default=0)

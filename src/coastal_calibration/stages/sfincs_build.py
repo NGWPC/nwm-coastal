@@ -11,10 +11,13 @@ module-level registry keyed by config ``id``.
 
 from __future__ import annotations
 
+import math
 import shutil
 import subprocess
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any
+
+import numpy as np
 
 from coastal_calibration.config.schema import SfincsModelConfig
 from coastal_calibration.stages.base import WorkflowStage
@@ -24,11 +27,37 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from hydromt_sfincs import SfincsModel  # pyright: ignore[reportMissingImports]
+    from numpy.typing import NDArray
 
     from coastal_calibration.config.schema import CoastalCalibConfig
     from coastal_calibration.utils.logging import WorkflowMonitor
 
 SFINCS_DOCKER_IMAGE = "deltares/sfincs-cpu"
+# Maximum number of stations per figure (2x2 layout).
+_STATIONS_PER_FIGURE = 4
+
+
+def _plotable_stations(
+    station_ids: list[str],
+    sim_elevation: NDArray[np.float64],
+    obs_ds: Any,
+) -> list[tuple[str, int]]:
+    """Return (station_id, column_index) pairs that have data to plot.
+
+    A station is plotable only when *both* its simulated and observed
+    time-series contain finite values — a comparison plot with only
+    one series is not useful.
+    """
+    result: list[tuple[str, int]] = []
+    for i, sid in enumerate(station_ids):
+        has_sim = bool(np.isfinite(sim_elevation[:, i]).any())
+        has_obs = False
+        if sid in obs_ds.station.values:
+            has_obs = bool(np.isfinite(obs_ds.water_level.sel(station=sid)).any())
+        if has_sim and has_obs:
+            result.append((sid, i))
+    return result
+
 
 # ---------------------------------------------------------------------------
 # Shared model instance management
@@ -756,91 +785,129 @@ class SfincsPlotStage(WorkflowStage):
         return names
 
     @staticmethod
-    def _plot_comparison(
-        point_h: Any,
-        station_dim: str,
-        noaa_indices: list[int],
+    def _plot_figures(
+        sim_times: Any,
+        sim_elevation: NDArray[np.float64],
+        station_ids: list[str],
         obs_ds: Any,
-        model_root: Path,
-    ) -> Path:
-        """Create a comparison figure and save it.
+        figs_dir: Path,
+    ) -> list[Path]:
+        """Create comparison figures and save them.
+
+        Stations that lack *both* valid observations and valid simulated
+        data are skipped so that empty panels do not appear.
 
         Parameters
         ----------
-        point_h : xr.DataArray
-            Simulated water surface elevation at observation points.
-        station_dim : str
-            Name of the station dimension in ``point_h``.
-        noaa_indices : list[int]
-            Indices into ``point_h`` for NOAA stations.
+        sim_times : array-like
+            Simulation datetimes.
+        sim_elevation : ndarray
+            Simulated elevation of shape (n_times, n_stations).
+        station_ids : list[str]
+            NOAA station IDs (one per column in ``sim_elevation``).
         obs_ds : xr.Dataset
-            NOAA observed water level dataset.
-        model_root : Path
-            SFINCS model root directory.
+            Observed water levels.
+        figs_dir : Path
+            Output directory for figures.
 
         Returns
         -------
-        Path
-            Path to the saved figure.
+        list[Path]
+            Paths to the saved figures.
         """
-        import matplotlib.pyplot as plt  # pyright: ignore[reportMissingImports]
-        import numpy as np  # pyright: ignore[reportMissingImports]
+        import matplotlib.dates as mdates
+        import matplotlib.pyplot as plt
 
-        n_stations = len(noaa_indices)
-        ncols = min(2, n_stations)
-        nrows = (n_stations + ncols - 1) // ncols
+        # ── Pre-filter: keep only stations with both obs and sim ──
+        plotable = _plotable_stations(station_ids, sim_elevation, obs_ds)
 
-        fig, axes = plt.subplots(
-            nrows,
-            ncols,
-            figsize=(8 * ncols, 3 * nrows),
-            sharex=True,
-            squeeze=False,
-        )
-        axes_flat = np.atleast_1d(axes).ravel()
+        if not plotable:
+            figs_dir.mkdir(parents=True, exist_ok=True)
+            return []
 
-        datum = obs_ds.attrs.get("datum", "")
-        ylabel = f"Water Level (m, {datum})" if datum else "Water Level (m)"
-
-        for i, idx in enumerate(noaa_indices):
-            ax = axes_flat[i]
-            sim_ts = point_h.isel({station_dim: idx})
-            station_id = obs_ds.station_id.isel(station=i).item()
-
-            obs_wl = obs_ds.water_level.isel(station=i)
-            has_obs = bool(np.isfinite(obs_wl).any())
-            has_sim = bool(np.isfinite(sim_ts).any())
-
-            if has_obs:
-                ax.plot(obs_wl.time, obs_wl, label="Observed", color="k", linewidth=0.8)
-
-            if has_sim:
-                ax.plot(sim_ts.time, sim_ts, color="r", ls="--", alpha=0.5)
-                ax.scatter(sim_ts.time, sim_ts, label="Simulated", color="r", marker="x", s=15)
-
-            title = f"NOAA {station_id}"
-            if not has_obs:
-                title += " (no obs)"
-            if not has_sim:
-                title += " (no sim)"
-            ax.set_title(title, fontsize=10)
-            ax.set_ylabel(ylabel)
-            if has_obs or has_sim:
-                ax.legend(fontsize="small")
-
-        # Remove unused axes
-        for j in range(n_stations, len(axes_flat)):
-            axes_flat[j].remove()
-
-        fig.tight_layout()
-
-        figs_dir = model_root / "figs"
+        n_plotable = len(plotable)
+        n_figures = math.ceil(n_plotable / _STATIONS_PER_FIGURE)
         figs_dir.mkdir(parents=True, exist_ok=True)
-        fig_path = figs_dir / "stations_comparison.png"
-        fig.savefig(fig_path, dpi=300, bbox_inches="tight")
-        plt.close(fig)
 
-        return fig_path
+        saved: list[Path] = []
+        for fig_idx in range(n_figures):
+            start = fig_idx * _STATIONS_PER_FIGURE
+            end = min(start + _STATIONS_PER_FIGURE, n_plotable)
+            batch = plotable[start:end]
+            batch_size = len(batch)
+
+            nrows = 2 if batch_size > 2 else 1
+            ncols = 2 if batch_size > 1 else 1
+
+            fig, axes = plt.subplots(
+                nrows,
+                ncols,
+                figsize=(16, 5 * nrows),
+                squeeze=False,
+            )
+            axes_flat = axes.ravel()
+
+            for i, (sid, col_idx) in enumerate(batch):
+                ax = axes_flat[i]
+
+                # Simulated
+                sim_ts = sim_elevation[:, col_idx]
+                has_sim = bool(np.isfinite(sim_ts).any())
+
+                # Observed
+                has_obs = False
+                if sid in obs_ds.station.values:
+                    obs_wl = obs_ds.water_level.sel(station=sid)
+                    has_obs = bool(np.isfinite(obs_wl).any())
+                    if has_obs:
+                        ax.plot(
+                            obs_wl.time.values,
+                            obs_wl.values,
+                            label="Observed",
+                            color="k",
+                            linewidth=1.0,
+                        )
+
+                if has_sim:
+                    ax.plot(
+                        sim_times,
+                        sim_ts,
+                        color="r",
+                        ls="--",
+                        alpha=0.5,
+                    )
+                    ax.scatter(
+                        sim_times,
+                        sim_ts,
+                        label="Simulated",
+                        color="r",
+                        marker="x",
+                        s=25,
+                    )
+
+                ax.set_title(f"NOAA {sid}", fontsize=14, fontweight="bold")
+                ax.set_ylabel("Water Level (m, MSL)", fontsize=12)
+                ax.tick_params(axis="both", labelsize=11)
+                ax.legend(fontsize=11, loc="best")
+
+                # Readable date formatting on x-axis
+                ax.xaxis.set_major_formatter(mdates.DateFormatter("%m-%d %H:%M"))
+                ax.xaxis.set_major_locator(mdates.AutoDateLocator(minticks=4, maxticks=8))
+                for label in ax.get_xticklabels():
+                    label.set_rotation(30)
+                    label.set_horizontalalignment("right")
+
+            # Remove unused axes
+            for j in range(batch_size, nrows * ncols):
+                axes_flat[j].remove()
+
+            fig.tight_layout()
+            fig_path = figs_dir / f"stations_comparison_{fig_idx + 1:03d}.png"
+            fig.savefig(fig_path, dpi=300, bbox_inches="tight")
+            plt.close(fig)
+            saved.append(fig_path)
+
+        return saved
 
     def _fetch_observations_msl(
         self,
@@ -963,6 +1030,19 @@ class SfincsPlotStage(WorkflowStage):
             self._log("No NOAA observation points found, skipping plot stage")
             return {"status": "skipped", "reason": "no noaa stations"}
 
+        # Extract numpy arrays from xarray for the selected NOAA stations
+        sim_times = point_zs.time.values
+        sim_elevation = np.column_stack(
+            [point_zs.isel({station_dim: idx}).values for idx in noaa_indices]
+        )
+
+        # Apply NAVD88 → MSL datum correction so SFINCS output is
+        # comparable to NOAA CO-OPS observations (which are in MSL).
+        datum_offset = self.sfincs.navd88_to_msl_m
+        if datum_offset != 0.0:
+            sim_elevation = sim_elevation + datum_offset
+            self._log(f"Applied NAVD88→MSL offset: {datum_offset:+.4f} m")
+
         # Fetch observed water levels (MLLW → MSL)
         self._update_substep("Fetching NOAA CO-OPS observations")
         sim = self.config.simulation
@@ -972,12 +1052,17 @@ class SfincsPlotStage(WorkflowStage):
 
         obs_ds = self._fetch_observations_msl(noaa_station_ids, begin_date, end_date)
 
-        # Plot comparison
-        self._update_substep("Generating comparison plot")
-        fig_path = self._plot_comparison(point_zs, station_dim, noaa_indices, obs_ds, model_root)
+        # Generate comparison plots
+        self._update_substep("Generating comparison plots")
+        figs_dir = model_root / "figs"
+        fig_paths = self._plot_figures(sim_times, sim_elevation, noaa_station_ids, obs_ds, figs_dir)
 
-        self._log(f"Comparison plot saved to {fig_path}")
-        return {"status": "completed", "figure": str(fig_path)}
+        self._log(f"Saved {len(fig_paths)} comparison figure(s) to {figs_dir}")
+        return {
+            "status": "completed",
+            "figures": [str(p) for p in fig_paths],
+            "figs_dir": str(figs_dir),
+        }
 
 
 # ---------------------------------------------------------------------------
