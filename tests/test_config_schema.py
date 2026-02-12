@@ -658,9 +658,10 @@ class TestCoastalCalibConfig:
         assert model_root.is_absolute()
         assert sif_path.is_absolute()
 
-        # The SIF path must live directly inside model_root, not in a
-        # doubled "model_root / model_root" subtree.
-        sif_relative = sif_path.relative_to(model_root)
+        # The SIF path must live inside the download directory so that
+        # it can be reused across runs without re-downloading.
+        download_dir = cfg.paths.download_dir
+        sif_relative = sif_path.relative_to(download_dir)
         assert ".." not in sif_relative.parts
         assert sif_relative == Path(f"sfincs-cpu_{cfg.model_config.container_tag}.sif")
 
