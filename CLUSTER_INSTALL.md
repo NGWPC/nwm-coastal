@@ -50,7 +50,7 @@ ffmpeg = "*"
 
 [pypi-dependencies]
 coastal-calibration = { git = "https://github.com/cheginit/nwm-coastal.git", extras = ["sfincs", "plot"] }
-hydromt-sfincs = { git = "https://github.com/Deltares/hydromt_sfincs" }
+hydromt-sfincs = { git = "https://github.com/Deltares/hydromt_sfincs", rev = "41aac0a3980fc2714ec28eafb0463d40abfc979a" }
 EOF
 ```
 
@@ -85,7 +85,7 @@ sudo ln -sf /ngen-test/coastal-calibration/coastal-calibration /usr/local/bin/co
 
 ```bash
 cd /ngen-test/coastal-calibration
-pixi update
+UV_LINK_MODE=copy pixi update
 UV_LINK_MODE=copy pixi run uv pip install --reinstall-package coastal-calibration \
   "coastal-calibration[sfincs,plot] @ git+https://github.com/cheginit/nwm-coastal.git"
 ```
