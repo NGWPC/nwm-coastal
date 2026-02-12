@@ -56,7 +56,7 @@ EOF
 ### 3. Install
 
 ```bash
-pixi install
+UV_LINK_MODE=copy pixi install
 ```
 
 This creates a fully isolated environment under `/ngen-test/coastal-calibration/.pixi/`
