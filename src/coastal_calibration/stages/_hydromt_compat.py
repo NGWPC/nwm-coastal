@@ -111,3 +111,47 @@ def patch_boundary_conditions_index_dim() -> None:
 
     SfincsBoundaryBase._validate_and_prepare_gdf = _validate_and_normalise
     SfincsBoundaryBase._validate_and_prepare_gdf._patched = True  # type: ignore[attr-defined]
+
+
+def patch_meteo_write_gridded() -> None:
+    """Avoid OOM in ``write_gridded`` by keeping dask arrays lazy.
+
+    ``SfincsMeteo.write_gridded`` calls ``self.data.load()`` which
+    materialises the entire lazy dask dataset into memory.  For a
+    typical NWM forcing setup (precip + wind + pressure) this can
+    exceed 90 GB — far more than a login-node's 32 GB.
+
+    xarray's ``to_netcdf`` already handles dask-backed datasets by
+    streaming chunks to disk, so the ``.load()`` call is unnecessary.
+    This patch replaces ``write_gridded`` with a version that skips
+    ``.load()`` and writes directly from the lazy dataset.
+    """
+    try:
+        from hydromt_sfincs.components.forcing.meteo import SfincsMeteo
+    except ImportError:
+        return
+
+    _original = SfincsMeteo.write_gridded
+    if getattr(_original, "_patched", False):
+        return
+
+    import xarray as xr
+
+    def _write_gridded_lazy(self, filename=None, rename=None):  # type: ignore[no-untyped-def]
+        tref = self.model.config.get("tref")
+        tref_str = tref.strftime("%Y-%m-%d %H:%M:%S")
+        encoding = {"time": {"units": f"minutes since {tref_str}", "dtype": "float64"}}
+
+        # Keep dataset lazy — no .load()
+        ds = self.data
+
+        # combine variables and rename to output names
+        rename = {v: k for k, v in rename.items() if v in ds}
+        if len(rename) > 0:
+            ds = xr.merge([ds[v] for v in rename.keys()]).rename(rename)
+
+        # Stream dask chunks to disk without full materialisation
+        ds.to_netcdf(filename, encoding=encoding)
+
+    SfincsMeteo.write_gridded = _write_gridded_lazy
+    SfincsMeteo.write_gridded._patched = True  # type: ignore[attr-defined]
