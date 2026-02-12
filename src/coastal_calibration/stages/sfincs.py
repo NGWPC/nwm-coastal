@@ -10,12 +10,14 @@ import yaml
 
 from coastal_calibration.config.schema import MeteoSource, PathConfig
 from coastal_calibration.stages._hydromt_compat import (
+    patch_boundary_conditions_index_dim,
     patch_serialize_crs,
     register_round_coords_preprocessor,
 )
 
 patch_serialize_crs()
 register_round_coords_preprocessor()
+patch_boundary_conditions_index_dim()
 
 if TYPE_CHECKING:
     from coastal_calibration.config.schema import CoastalCalibConfig, SimulationConfig
