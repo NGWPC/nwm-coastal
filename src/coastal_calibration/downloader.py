@@ -576,8 +576,11 @@ def _execute_download(
     for path in file_paths:
         path.parent.mkdir(parents=True, exist_ok=True)
 
+    # 8 mb chunk size is reasonable for large files like STOFS (~12 GB)
+    # while not causing too much overhead for smaller files.
+    chunk_size = 8 * 1024 * 1024
     try:
-        download(urls, file_paths, timeout=timeout, raise_status=raise_on_error)
+        download(urls, file_paths, timeout=timeout, raise_status=raise_on_error, chunk_size=chunk_size)
     except Exception as e:
         result.errors.append(str(e))
 
