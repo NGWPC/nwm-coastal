@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import xarray as xr
+
 
 def register_round_coords_preprocessor() -> None:
     """Register a ``round_coords`` preprocessor in hydromt.
@@ -23,7 +28,6 @@ def register_round_coords_preprocessor() -> None:
         return
 
     import numpy as np
-    import xarray as xr
 
     def round_coords(ds: xr.Dataset) -> xr.Dataset:
         """Round x and y coordinates to the nearest integer."""

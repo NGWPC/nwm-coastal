@@ -1,20 +1,8 @@
-"""Coastal Calibration Workflow Python API.
-
-This package provides a Python interface for running coastal model calibration
-workflows (SCHISM, SFINCS) using Singularity containers on SLURM-managed HPC clusters.
-
-Example usage:
-    from coastal_calibration import CoastalCalibConfig, CoastalCalibRunner
-
-    config = CoastalCalibConfig.from_yaml("config.yaml")
-    runner = CoastalCalibRunner(config)
-    result = runner.submit()
-
-    if result.success:
-        print(f"Workflow completed in {result.duration_seconds:.1f}s")
-"""
+"""Coastal Calibration Workflow Python API."""
 
 from __future__ import annotations
+
+from importlib.metadata import PackageNotFoundError, version
 
 from coastal_calibration.config.schema import (
     BoundaryConfig,
@@ -68,7 +56,10 @@ from coastal_calibration.utils.workflow import (
     pre_nwm_forcing_coastal,
 )
 
-__version__ = "0.1.0"
+try:
+    __version__ = version("coastal_calibration")
+except PackageNotFoundError:
+    __version__ = "999"
 
 __all__ = [
     "DATA_SOURCE_DATE_RANGES",
@@ -101,6 +92,7 @@ __all__ = [
     "SimulationConfig",
     "SlurmConfig",
     "WorkflowResult",
+    "__version__",
     # Data Catalog (SFINCS)
     "create_nc_symlinks",
     # Downloader

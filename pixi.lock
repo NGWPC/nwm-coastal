@@ -2619,8 +2619,8 @@ packages:
   requires_python: '>=3.8'
 - pypi: ./
   name: coastal-calibration
-  version: 0.1.0
-  sha256: fed674d18005a41f4a7d1c672b109086fd23e4c2d5dd6920e03b93c8c2e185e8
+  version: 0.1.dev161+gedde99706.d20260212
+  sha256: e67cf4e15f3040227952c86136184d8e48a9d1fd7bd28fed3c4c46a6b541e555
   requires_dist:
   - pyyaml>=6
   - rich-click
@@ -2628,8 +2628,8 @@ packages:
   - ipykernel ; extra == 'dev'
   - ipywidgets ; extra == 'dev'
   - mike>=2 ; extra == 'docs'
-  - mkdocs>=1.6 ; extra == 'docs'
   - mkdocs-material>=9.5 ; extra == 'docs'
+  - mkdocs>=1.6 ; extra == 'docs'
   - mkdocstrings[python]>=0.27 ; extra == 'docs'
   - ruff ; extra == 'docs'
   - codespell ; extra == 'lint'
