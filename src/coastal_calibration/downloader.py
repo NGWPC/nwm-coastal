@@ -580,7 +580,9 @@ def _execute_download(
     # while not causing too much overhead for smaller files.
     chunk_size = 8 * 1024 * 1024
     try:
-        download(urls, file_paths, timeout=timeout, raise_status=raise_on_error, chunk_size=chunk_size)
+        download(
+            urls, file_paths, timeout=timeout, raise_status=raise_on_error, chunk_size=chunk_size
+        )
     except Exception as e:
         result.errors.append(str(e))
 

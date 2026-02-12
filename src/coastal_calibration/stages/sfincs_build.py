@@ -26,9 +26,9 @@ from coastal_calibration.stages.sfincs import create_nc_symlinks, generate_data_
 if TYPE_CHECKING:
     from pathlib import Path
 
+    import xarray as xr
     from hydromt_sfincs import SfincsModel  # pyright: ignore[reportMissingImports]
     from numpy.typing import NDArray
-    import xarray as xr
 
     from coastal_calibration.config.schema import CoastalCalibConfig
     from coastal_calibration.utils.logging import WorkflowMonitor
