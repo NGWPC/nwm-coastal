@@ -9,6 +9,9 @@ from typing import TYPE_CHECKING, Any, Literal
 import yaml
 
 from coastal_calibration.config.schema import MeteoSource, PathConfig
+from coastal_calibration.stages._hydromt_compat import patch_serialize_crs
+
+patch_serialize_crs()
 
 if TYPE_CHECKING:
     from coastal_calibration.config.schema import CoastalCalibConfig, SimulationConfig
