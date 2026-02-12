@@ -294,7 +294,6 @@ test314 = { features = [ "test", "plot", "py314" ] }
 dev = { features = [ "dev", "sfincs", "plot", "test", "py314" ] }
 schism = { features = [ "schism", "py314" ] }
 sfincs = { features = [ "sfincs", "plot", "py314" ] }
-plot = { features = [ "dev", "plot", "py314" ] }
 typecheck = { features = [ "typecheck", "py314" ] }
 lint = { features = [ "lint", "py314" ], no-default-feature = true }
 docs = { features = [ "docs", "py314" ] }
