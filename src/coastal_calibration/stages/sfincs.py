@@ -307,12 +307,15 @@ def _build_meteo_entry(
         source_url = "https://noaa-nwm-retrospective-3-0-pds.s3.amazonaws.com"
         notes = "NWM Retrospective 3.0 LDASIN forcing files"
         source_version = "3.0"
+        crs = 4326
     else:
         source_url = "https://storage.googleapis.com/national-water-model"
         notes = "NWM Analysis and Assimilation forcing files"
         source_version = "operational"
+        crs = "+proj=lcc +lat_0=40 +lon_0=-97 +lat_1=30 +lat_2=60 +x_0=0 +y_0=0 +R=6370000 +units=m +no_defs=True"
 
     metadata = CatalogMetadata(
+        crs=crs,
         temporal_extent=temporal_extent,
         category="meteo",
         source_url=source_url,
@@ -422,7 +425,7 @@ def _build_coastal_stofs_entry(
     temporal_extent = _get_temporal_extent(sim)
 
     metadata = CatalogMetadata(
-        crs=4326,
+        crs="+proj=lcc +lat_1=25 +lat_2=25 +lat_0=25 +lon_0=265 +x_0=0 +y_0=0 +R=6371200 +units=m +no_defs",
         temporal_extent=temporal_extent,
         category="ocean",
         source_url="https://noaa-gestofs-pds.s3.amazonaws.com",

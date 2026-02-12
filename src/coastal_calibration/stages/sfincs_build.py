@@ -15,7 +15,7 @@ import math
 import shutil
 import subprocess
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
@@ -28,6 +28,7 @@ if TYPE_CHECKING:
 
     from hydromt_sfincs import SfincsModel  # pyright: ignore[reportMissingImports]
     from numpy.typing import NDArray
+    import xarray as xr
 
     from coastal_calibration.config.schema import CoastalCalibConfig
     from coastal_calibration.utils.logging import WorkflowMonitor
@@ -1016,6 +1017,7 @@ class SfincsPlotStage(WorkflowStage):
             self._log("No point_zs or point_h in output, skipping plot stage")
             return {"status": "skipped", "reason": "no point_zs"}
 
+        point_zs = cast("xr.DataArray", point_zs)
         station_dim = self._station_dim(point_zs)
         obs_names = self._read_obs_names(mod, model_root)
 
@@ -1032,7 +1034,7 @@ class SfincsPlotStage(WorkflowStage):
             return {"status": "skipped", "reason": "no noaa stations"}
 
         # Extract numpy arrays from xarray for the selected NOAA stations
-        sim_times = point_zs.time.values
+        sim_times = point_zs["time"].to_numpy()
         sim_elevation = np.column_stack(
             [point_zs.isel({station_dim: idx}).values for idx in noaa_indices]
         )
