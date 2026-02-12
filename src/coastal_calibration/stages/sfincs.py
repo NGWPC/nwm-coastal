@@ -428,7 +428,7 @@ def _build_coastal_stofs_entry(
     temporal_extent = _get_temporal_extent(sim)
 
     metadata = CatalogMetadata(
-        crs="+proj=lcc +lat_1=25 +lat_2=25 +lat_0=25 +lon_0=265 +x_0=0 +y_0=0 +R=6371200 +units=m +no_defs",
+        crs=4326,
         temporal_extent=temporal_extent,
         category="ocean",
         source_url="https://noaa-gestofs-pds.s3.amazonaws.com",
@@ -444,13 +444,22 @@ def _build_coastal_stofs_entry(
         },
     )
 
-    # Use a dict driver to pass ``drop_variables`` — the STOFS netCDF has
-    # a scalar variable called ``nvel`` that clashes with the ``nvel``
-    # dimension, causing ``xr.open_mfdataset`` to raise a ``ValueError``.
+    # Use a dict driver to pass ``drop_variables``.  The STOFS netCDF
+    # (ADCIRC output) contains UGRID-like mesh topology variables
+    # (``adcirc_mesh``, ``element``) that cause xugrid to fail because
+    # ADCIRC uses 1-based face-node indexing while UGRID requires 0-based.
+    # We also drop the scalar ``nvel`` which clashes with the ``nvel``
+    # dimension.  Only the node coordinates (``x``, ``y``) and the water
+    # level variable (``zeta``/``cwl``) are needed.
     driver: dict[str, Any] = {
         "name": "geodataset_xarray",
         "options": {
-            "drop_variables": ["nvel"],
+            "drop_variables": [
+                "nvel",
+                "adcirc_mesh",
+                "element",
+                "mesh",
+            ],
         },
     }
 
