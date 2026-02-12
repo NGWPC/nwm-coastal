@@ -50,6 +50,7 @@ ffmpeg = "*"
 
 [pypi-dependencies]
 coastal-calibration = { git = "https://github.com/cheginit/nwm-coastal.git", extras = ["sfincs", "plot"] }
+hydromt-sfincs = { git = "https://github.com/Deltares/hydromt_sfincs" }
 EOF
 ```
 
