@@ -496,6 +496,7 @@ class CoastalCalibRunner:
             script_lines.extend(
                 [
                     'log_stage_start "sfincs_run" "Run SFINCS model (Singularity)"',
+                    f'cd "{model_root}"',
                     f"singularity run -B{model_root}:/data {sif_path}",
                     'log_stage_end "sfincs_run"',
                     "",
