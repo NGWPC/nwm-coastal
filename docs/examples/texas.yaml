@@ -37,6 +37,6 @@ model_config:
   merge_discharge: false
   include_noaa_gages: true
   navd88_to_msl_m: 0.147
-  include_precip: false
-  include_wind: false
-  include_pressure: false
+  include_precip: true
+  include_wind: true
+  include_pressure: true
