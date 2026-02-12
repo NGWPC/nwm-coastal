@@ -225,6 +225,7 @@ class CoastalCalibRunner:
 
         self.monitor.register_stages(self.STAGE_ORDER)
         self.monitor.start_workflow()
+        self.monitor.info("-" * 40)
 
         stages_to_run = self._get_stages_to_run(start_from, stop_after)
 
@@ -971,6 +972,7 @@ class CoastalCalibRunner:
         self.monitor.start_workflow()
 
         self._prepare_work_directory()
+        self.monitor.info("-" * 40)
 
         # --- Run pre-job stages on login node ---
         try:
@@ -1063,6 +1065,8 @@ class CoastalCalibRunner:
             self.monitor.mark_stage_completed(stage_name)
 
         # --- Run post-job stages on login node ---
+        if post_job:
+            self.monitor.info("-" * 40)
         try:
             post_completed = self._run_stages_on_login_node(post_job)
             stages_completed.extend(post_completed)
