@@ -9,9 +9,13 @@ from typing import TYPE_CHECKING, Any, Literal
 import yaml
 
 from coastal_calibration.config.schema import MeteoSource, PathConfig
-from coastal_calibration.stages._hydromt_compat import patch_serialize_crs
+from coastal_calibration.stages._hydromt_compat import (
+    patch_serialize_crs,
+    register_round_coords_preprocessor,
+)
 
 patch_serialize_crs()
+register_round_coords_preprocessor()
 
 if TYPE_CHECKING:
     from coastal_calibration.config.schema import CoastalCalibConfig, SimulationConfig
@@ -333,10 +337,40 @@ def _build_meteo_entry(
         unit_add=NWM_METEO_UNIT_ADD,
     )
 
+    # NWM LDASIN files store projected (LCC) coordinates with floating-point
+    # rounding errors up to ~0.125 m.  hydromt's raster accessor rejects
+    # them as non-regular because its tolerance (atol=5e-4) is far too tight
+    # for metre-scale coordinates.  The custom ``round_coords`` preprocessor
+    # (registered in ``_hydromt_compat``) rounds x/y to the nearest integer,
+    # making the grid perfectly regular.
+    #
+    # Each LDASIN file also carries a scalar ``reference_time`` coordinate
+    # (model initialisation time).  When ``open_mfdataset`` concatenates
+    # the files, ``reference_time`` becomes a new dimension and inflates
+    # the data to 4-D (reference_time, time, y, x).  hydromt only supports
+    # 2-D/3-D arrays, so we drop it via ``drop_variables``.
+    driver: str | dict[str, Any]
+    if meteo_source == "nwm_retro":
+        driver = {
+            "name": "raster_xarray",
+            "options": {
+                "preprocess": "round_latlon",
+                "drop_variables": ["reference_time", "crs"],
+            },
+        }
+    else:
+        driver = {
+            "name": "raster_xarray",
+            "options": {
+                "preprocess": "round_coords",
+                "drop_variables": ["reference_time", "crs"],
+            },
+        }
+
     return CatalogEntry(
         name=f"{meteo_source}_meteo",
         data_type="RasterDataset",
-        driver="raster_xarray",
+        driver=driver,
         uri=uri,
         metadata=metadata,
         data_adapter=data_adapter,
