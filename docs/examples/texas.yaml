@@ -40,8 +40,9 @@ model_config:
   merge_observations: false
   merge_discharge: false
   include_noaa_gages: true
-  include_wind: true       # 10-m wind from NWM LDASIN (wind10_u, wind10_v)
-  include_pressure: true   # surface pressure from NWM LDASIN (press_msl)
+  navd88_to_msl_m: -0.147  # NAVD88→MSL vertical offset for Texas coast
+  include_wind: false
+  include_pressure: false
   # observation_points:
   #   - x: 830344.95
   #     y: 3187383.41
