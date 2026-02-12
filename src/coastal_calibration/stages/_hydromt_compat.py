@@ -76,3 +76,38 @@ def patch_serialize_crs() -> None:
     # already-captured reference to the function object sees the fix.
     _original.__code__ = _safe_serialize_crs.__code__
     _original._patched = True  # type: ignore[attr-defined]
+
+
+def patch_boundary_conditions_index_dim() -> None:
+    """Fix hydromt-sfincs ``_validate_and_prepare_gdf`` not normalising index name.
+
+    ``BoundaryConditionComponent._create_dummy_dataset`` hard-codes
+    ``dims=("time", "index")``, but ``GeoDataset.from_gdf`` derives
+    ``index_dim`` from ``gdf.index.name``.  When the geodataset's
+    spatial dimension is not ``"index"`` (e.g. ``"node"`` for ADCIRC /
+    STOFS data), the two names diverge and ``from_gdf`` raises
+    ``ValueError: Index dimension node not found in data_vars``.
+
+    This patch wraps ``_validate_and_prepare_gdf`` to rename the GDF
+    index to ``"index"`` after validation, keeping everything consistent.
+    """
+    try:
+        from hydromt_sfincs.components.forcing.boundary_conditions import (
+            SfincsBoundaryBase,
+        )
+    except ImportError:
+        return
+
+    _original_validate = SfincsBoundaryBase._validate_and_prepare_gdf
+
+    if getattr(_original_validate, "_patched", False):
+        return
+
+    def _validate_and_normalise(self, gdf):  # type: ignore[no-untyped-def]
+        gdf = _original_validate(self, gdf)
+        if gdf.index.name != "index":
+            gdf.index.name = "index"
+        return gdf
+
+    SfincsBoundaryBase._validate_and_prepare_gdf = _validate_and_normalise
+    SfincsBoundaryBase._validate_and_prepare_gdf._patched = True  # type: ignore[attr-defined]
