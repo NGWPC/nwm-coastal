@@ -941,10 +941,6 @@ class SfincsPlotStage(WorkflowStage):
             time_zone="gmt",
         )
 
-        # All stations reaching this point were pre-filtered by
-        # SfincsObservationPointsStage to have valid MSL/MLLW datums.
-        import numpy as np
-
         client = COOPSAPIClient()
         datums = client.get_datums(station_ids)
 
