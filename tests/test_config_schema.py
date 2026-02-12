@@ -261,6 +261,7 @@ class TestSfincsModelConfig:
         assert cfg.merge_observations is False
         assert cfg.merge_discharge is False
         assert cfg.include_noaa_gages is False
+        assert cfg.navd88_to_msl_m == 0.0
 
     def test_model_name(self, tmp_path):
         cfg = SfincsModelConfig(prebuilt_dir=tmp_path)
@@ -293,6 +294,10 @@ class TestSfincsModelConfig:
         assert d["omp_num_threads"] == get_cpu_count()
         assert "container_tag" in d
         assert d["include_noaa_gages"] is False
+
+    def test_explicit_navd88_to_msl_m(self, tmp_path):
+        cfg = SfincsModelConfig(prebuilt_dir=tmp_path, navd88_to_msl_m=-0.147)
+        assert cfg.navd88_to_msl_m == pytest.approx(-0.147)
 
     def test_explicit_omp_num_threads(self, tmp_path):
         """Explicit omp_num_threads is preserved (e.g., cluster YAML)."""
@@ -573,6 +578,33 @@ class TestCoastalCalibConfig:
         cfg = CoastalCalibConfig.from_yaml(config_path)
         assert isinstance(cfg.model_config, SfincsModelConfig)
         assert cfg.model == "sfincs"
+
+    def test_sfincs_navd88_to_msl_m_from_yaml(self, tmp_path):
+        """navd88_to_msl_m round-trips through YAML."""
+        config_dict = {
+            "model": "sfincs",
+            "slurm": {"user": "test"},
+            "simulation": {
+                "start_date": "2021-06-11",
+                "duration_hours": 3,
+                "coastal_domain": "pacific",
+                "meteo_source": "nwm_retro",
+            },
+            "boundary": {"source": "tpxo"},
+            "paths": {
+                "work_dir": str(tmp_path / "work"),
+                "raw_download_dir": str(tmp_path / "dl"),
+            },
+            "model_config": {
+                "prebuilt_dir": str(tmp_path / "prebuilt"),
+                "navd88_to_msl_m": -0.147,
+            },
+        }
+        config_path = tmp_path / "sfincs_datum.yaml"
+        config_path.write_text(yaml.dump(config_dict))
+        cfg = CoastalCalibConfig.from_yaml(config_path)
+        assert isinstance(cfg.model_config, SfincsModelConfig)
+        assert cfg.model_config.navd88_to_msl_m == pytest.approx(-0.147)
 
     def test_relative_yaml_paths_resolve_to_absolute(self, tmp_path, monkeypatch):
         """Regression: relative paths in YAML must resolve to absolute.
