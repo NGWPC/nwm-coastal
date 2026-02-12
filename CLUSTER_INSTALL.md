@@ -41,6 +41,7 @@ platforms = ["linux-64"]
 
 [dependencies]
 python = "~=3.14.0"
+uv = "*"
 proj = "*"
 libgdal-core = "*"
 hdf5 = "*"
@@ -84,10 +85,13 @@ sudo ln -sf /ngen-test/coastal-calibration/coastal-calibration /usr/local/bin/co
 ```bash
 cd /ngen-test/coastal-calibration
 pixi update
+UV_LINK_MODE=copy pixi run uv pip install --reinstall-package coastal-calibration \
+  "coastal-calibration[sfincs,plot] @ git+https://github.com/cheginit/nwm-coastal.git"
 ```
 
-That's it — one command. All conda and PyPI dependencies are re-resolved and the
-`coastal-calibration` CLI is updated in place.
+`UV_LINK_MODE=copy` is required on NFS shared filesystems where hardlinks (the default)
+don't work across filesystem boundaries. The `--reinstall-package` flag forces `uv` to
+re-fetch and rebuild the package from the latest commit on the remote repository.
 
 ## Verifying the installation
 
