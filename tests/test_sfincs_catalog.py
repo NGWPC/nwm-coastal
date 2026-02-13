@@ -217,14 +217,15 @@ class TestGenerateDataCatalog:
         assert "glofs" in catalog.entries[0].name
 
     def test_generate_tpxo_source(self, catalog_config):
+        """TPXO forcing is handled directly by SfincsForcingStage, not via the catalog."""
         catalog = generate_data_catalog(
             catalog_config,
             coastal_source="tpxo",
             include_meteo=False,
             include_streamflow=False,
         )
-        assert len(catalog.entries) == 1
-        assert "tpxo" in catalog.entries[0].name
+        # No TPXO catalog entry — predict_tide runs outside HydroMT
+        assert len(catalog.entries) == 0
 
     def test_catalog_name_and_version(self, catalog_config):
         catalog = generate_data_catalog(
