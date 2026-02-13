@@ -665,13 +665,15 @@ class SfincsForcingStage(_SfincsStageBase):
         )
 
         # 10. Inject into HydroMT model
+        # Clear stale ASCII boundary refs that the pre-built sfincs.inp may
+        # carry.  Without this, HydroMT tries to read a .bzs that doesn't
+        # exist.  We write netCDF instead.
+        for key in ("bzsfile", "bzifile", "bndfile", "bcafile"):
+            model.config.set(key, None)
+        model.config.set("netbndbzsbzifile", "sfincs_netbndbzsbzifile.nc")
+
         self._update_substep("Setting water level forcing on model")
         model.water_level.set(df=df_fine, gdf=gdf_bnd, merge=False)
-
-        # Ensure the write stage produces netCDF rather than ASCII.
-        # SfincsInitStage clears netbndbzsbzifile because the file
-        # doesn't exist yet at init time; re-enable it now.
-        model.config.set("netbndbzsbzifile", "sfincs_netbndbzsbzifile.nc")
 
     def run(self) -> dict[str, Any]:
         """Add water level boundary forcing."""
