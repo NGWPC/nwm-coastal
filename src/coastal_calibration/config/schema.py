@@ -523,6 +523,13 @@ class SfincsModelConfig(ModelConfig):
         MSL.  The value is *added* to the simulated water level before
         comparison with NOAA CO-OPS observations (which are in MSL).
         Set to ``0.0`` (default) when no correction is needed.
+    sfincs_exe : Path, optional
+        Path to a locally compiled SFINCS executable.  When set, the
+        ``sfincs_run`` stage invokes this binary directly instead of
+        using a Singularity container, making it possible to run on
+        systems where Singularity is unavailable (e.g. macOS laptops).
+        The container-related options (``container_tag``,
+        ``container_image``) are ignored when ``sfincs_exe`` is set.
     container_tag : str
         Tag for the ``deltares/sfincs-cpu`` Docker/Singularity image.
     container_image : Path, optional
@@ -546,6 +553,7 @@ class SfincsModelConfig(ModelConfig):
     include_wind: bool = False
     include_pressure: bool = False
     navd88_to_msl_m: float = 0.0
+    sfincs_exe: Path | None = None
     container_tag: str = "latest"
     container_image: Path | None = None
     omp_num_threads: int = field(default=0)
@@ -558,6 +566,8 @@ class SfincsModelConfig(ModelConfig):
             self.observation_locations_file = Path(self.observation_locations_file).resolve()
         if self.discharge_locations_file is not None:
             self.discharge_locations_file = Path(self.discharge_locations_file).resolve()
+        if self.sfincs_exe is not None:
+            self.sfincs_exe = Path(self.sfincs_exe).expanduser().resolve()
         if self.container_image is not None:
             self.container_image = Path(self.container_image).resolve()
         if self.omp_num_threads <= 0:
@@ -617,6 +627,9 @@ class SfincsModelConfig(ModelConfig):
             errors.append(
                 f"model_config.discharge_locations_file not found: {self.discharge_locations_file}"
             )
+
+        if self.sfincs_exe and not self.sfincs_exe.exists():
+            errors.append(f"model_config.sfincs_exe not found: {self.sfincs_exe}")
 
         if self.container_image and not self.container_image.exists():
             errors.append(f"model_config.container_image not found: {self.container_image}")
@@ -687,6 +700,8 @@ class SfincsModelConfig(ModelConfig):
             "include_precip": self.include_precip,
             "include_wind": self.include_wind,
             "include_pressure": self.include_pressure,
+            "navd88_to_msl_m": self.navd88_to_msl_m,
+            "sfincs_exe": (str(self.sfincs_exe) if self.sfincs_exe else None),
             "container_tag": self.container_tag,
             "container_image": (str(self.container_image) if self.container_image else None),
             "omp_num_threads": self.omp_num_threads,

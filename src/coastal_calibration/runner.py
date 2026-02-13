@@ -484,25 +484,38 @@ class CoastalCalibRunner:
         )
 
         if "sfincs_run" in container_stages:
-            pull_lines = [
-                "# Pull Singularity image if not already present",
-                f'if [ ! -f "{sif_path}" ]; then',
-                f'    echo "Pulling Singularity image: {docker_uri}"',
-                f'    mkdir -p "{sif_path.parent}"',
-                f'    singularity pull "{sif_path}" "{docker_uri}"',
-                "fi",
-                "",
-            ]
-            script_lines.extend(pull_lines)
-            script_lines.extend(
-                [
-                    'log_stage_start "sfincs_run" "Run SFINCS model (Singularity)"',
-                    f'cd "{model_root}"',
-                    f"singularity run -B{model_root}:/data {sif_path}",
-                    'log_stage_end "sfincs_run"',
+            sfincs_exe = self.config.model_config.sfincs_exe
+            if sfincs_exe is not None:
+                # Native executable — no Singularity required
+                script_lines.extend(
+                    [
+                        'log_stage_start "sfincs_run" "Run SFINCS model (native)"',
+                        f'cd "{model_root}"',
+                        f'"{sfincs_exe}"',
+                        'log_stage_end "sfincs_run"',
+                        "",
+                    ]
+                )
+            else:
+                pull_lines = [
+                    "# Pull Singularity image if not already present",
+                    f'if [ ! -f "{sif_path}" ]; then',
+                    f'    echo "Pulling Singularity image: {docker_uri}"',
+                    f'    mkdir -p "{sif_path.parent}"',
+                    f'    singularity pull "{sif_path}" "{docker_uri}"',
+                    "fi",
                     "",
                 ]
-            )
+                script_lines.extend(pull_lines)
+                script_lines.extend(
+                    [
+                        'log_stage_start "sfincs_run" "Run SFINCS model (Singularity)"',
+                        f'cd "{model_root}"',
+                        f"singularity run -B{model_root}:/data {sif_path}",
+                        'log_stage_end "sfincs_run"',
+                        "",
+                    ]
+                )
 
         script_lines.extend(
             [

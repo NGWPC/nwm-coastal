@@ -138,9 +138,14 @@ def patch_meteo_write_gridded() -> None:
     import xarray as xr
 
     def _write_gridded_lazy(self, filename=None, rename=None):  # type: ignore[no-untyped-def]
+        import gc
+        from pathlib import Path
+
+        import netCDF4
+        import numpy as np
+
         tref = self.model.config.get("tref")
         tref_str = tref.strftime("%Y-%m-%d %H:%M:%S")
-        encoding = {"time": {"units": f"minutes since {tref_str}", "dtype": "float64"}}
 
         # Keep dataset lazy — no .load()
         ds = self.data
@@ -148,10 +153,55 @@ def patch_meteo_write_gridded() -> None:
         # combine variables and rename to output names
         rename = {v: k for k, v in rename.items() if v in ds}
         if len(rename) > 0:
-            ds = xr.merge([ds[v] for v in rename.keys()]).rename(rename)
+            ds = xr.merge([ds[v] for v in rename]).rename(rename)
 
-        # Stream dask chunks to disk without full materialisation
-        ds.to_netcdf(filename, encoding=encoding)
+        # Write one time-step at a time using netCDF4 directly so
+        # peak memory stays close to a single 2-D slice (~150 MB)
+        # instead of the full 3-D array.
+        filename = Path(filename)
+        filename.parent.mkdir(parents=True, exist_ok=True)
+
+        time_vals = ds["time"].values
+        var_names = list(ds.data_vars)
+
+        nc = netCDF4.Dataset(str(filename), "w")
+        try:
+            # --- dimensions ---
+            nc.createDimension("time", None)  # unlimited
+            for dim in ds.dims:
+                if dim != "time":
+                    nc.createDimension(dim, ds.sizes[dim])
+
+            # --- time variable ---
+            time_var = nc.createVariable("time", "f8", ("time",))
+            time_var.units = f"minutes since {tref_str}"
+
+            # --- spatial coordinate variables ---
+            for coord in ds.coords:
+                if coord == "time":
+                    continue
+                arr = ds.coords[coord].values
+                nc_coord = nc.createVariable(coord, arr.dtype, ds.coords[coord].dims)
+                nc_coord[:] = arr
+
+            # --- data variables ---
+            nc_vars = {}
+            for vname in var_names:
+                da = ds[vname]
+                dims = tuple(str(d) for d in da.dims)
+                nc_vars[vname] = nc.createVariable(vname, da.dtype, dims)
+
+            # --- write one time-step at a time ---
+            t0 = np.datetime64(tref_str)
+            for i in range(len(time_vals)):
+                time_var[i] = (time_vals[i] - t0) / np.timedelta64(1, "m")
+                chunk = ds.isel(time=i).compute()
+                for vname in var_names:
+                    nc_vars[vname][i, :] = chunk[vname].values
+                del chunk
+                gc.collect()
+        finally:
+            nc.close()
 
     SfincsMeteo.write_gridded = _write_gridded_lazy
     SfincsMeteo.write_gridded._patched = True  # type: ignore[attr-defined]

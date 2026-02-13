@@ -12,6 +12,7 @@ module-level registry keyed by config ``id``.
 from __future__ import annotations
 
 import math
+import os
 import shutil
 import subprocess
 from datetime import timedelta
@@ -144,8 +145,6 @@ def resolve_sif_path(config: CoastalCalibConfig) -> Path:
 def _pull_singularity_image(
     config: CoastalCalibConfig,
     sif_path: Path | None = None,
-    *,
-    _log: Any = None,
 ) -> Path:
     """Pull the SFINCS Docker image as a Singularity SIF file."""
     if sif_path is None:
@@ -166,23 +165,34 @@ def _pull_singularity_image(
     return sif_path
 
 
-def _run_singularity(
-    config: CoastalCalibConfig,
-    sif_path: Path,
-    model_root: Path | None = None,
+def _run_and_log(
+    cmd: list[str],
+    model_root: Path,
+    *,
+    env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    """Run SFINCS inside a Singularity container."""
-    if model_root is None:
-        model_root = get_model_root(config)
+    """Run a command, stream output to ``sfincs_log.txt``, and raise on failure.
 
-    cmd = ["singularity", "run", f"-B{model_root}:/data", str(sif_path)]
+    This is the shared subprocess helper used by both the Singularity and
+    native-executable code paths.
 
+    Parameters
+    ----------
+    cmd : list[str]
+        Command and arguments to execute.
+    model_root : Path
+        Working directory for the process *and* location of the log file.
+    env : dict, optional
+        Environment variables.  ``None`` inherits the current environment.
+    """
     log_path = model_root / "sfincs_log.txt"
     stdout_lines: list[str] = []
     stderr_lines: list[str] = []
+
     with subprocess.Popen(
         cmd,
         cwd=model_root,
+        env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
@@ -199,10 +209,8 @@ def _run_singularity(
         proc.wait()
 
     if proc.returncode == 127:
-        raise RuntimeError("singularity not found. Make sure it is installed and on PATH.")
+        raise RuntimeError(f"{cmd[0]!r} not found. Make sure it is installed and on PATH.")
     if proc.returncode != 0:
-        # Include the last portion of stdout/stderr so the caller can
-        # see what went wrong without having to open the log file.
         tail_stdout = "".join(stdout_lines[-20:]).rstrip()
         tail_stderr = "".join(stderr_lines[-20:]).rstrip()
         detail = ""
@@ -222,12 +230,42 @@ def _run_singularity(
     )
 
 
+def _run_singularity(
+    config: CoastalCalibConfig,
+    sif_path: Path,
+    model_root: Path | None = None,
+) -> subprocess.CompletedProcess[str]:
+    """Run SFINCS inside a Singularity container."""
+    if model_root is None:
+        model_root = get_model_root(config)
+
+    cmd = ["singularity", "run", f"-B{model_root}:/data", str(sif_path)]
+    return _run_and_log(cmd, model_root)
+
+
 # ---------------------------------------------------------------------------
 # SFINCS workflow stages  (all subclass WorkflowStage)
 # ---------------------------------------------------------------------------
 
 
-class SfincsInitStage(WorkflowStage):
+class _SfincsStageBase(WorkflowStage):
+    """Common base for SFINCS stages that need ``self.sfincs``.
+
+    Avoids repeating the ``isinstance`` assertion and attribute
+    assignment in every stage ``__init__``.
+    """
+
+    def __init__(
+        self,
+        config: CoastalCalibConfig,
+        monitor: WorkflowMonitor | None = None,
+    ) -> None:
+        super().__init__(config, monitor)
+        assert isinstance(config.model_config, SfincsModelConfig)  # noqa: S101
+        self.sfincs: SfincsModelConfig = config.model_config
+
+
+class SfincsInitStage(_SfincsStageBase):
     """Initialise the SFINCS model (pre-built mode).
 
     Copies pre-built model files to the output directory, opens the model
@@ -266,16 +304,11 @@ class SfincsInitStage(WorkflowStage):
         "netspwfile",
         "netsrcdisfile",
         "netbndbzsbzifile",
+        # NetCDF forcing files (gridded meteo)
+        "netamprfile",
+        "netampfile",
+        "netamuamvfile",
     )
-
-    def __init__(
-        self,
-        config: CoastalCalibConfig,
-        monitor: WorkflowMonitor | None = None,
-    ) -> None:
-        super().__init__(config, monitor)
-        assert isinstance(config.model_config, SfincsModelConfig)  # noqa: S101
-        self.sfincs: SfincsModelConfig = config.model_config
 
     def _clear_missing_file_refs(self, model: SfincsModel) -> None:
         """Clear config references to files that do not exist on disk."""
@@ -389,20 +422,11 @@ class SfincsForcingStage(WorkflowStage):
         return {"status": "completed"}
 
 
-class SfincsObservationPointsStage(WorkflowStage):
+class SfincsObservationPointsStage(_SfincsStageBase):
     """Add observation points to the model."""
 
     name = "sfincs_obs"
     description = "Add observation points"
-
-    def __init__(
-        self,
-        config: CoastalCalibConfig,
-        monitor: WorkflowMonitor | None = None,
-    ) -> None:
-        super().__init__(config, monitor)
-        assert isinstance(config.model_config, SfincsModelConfig)  # noqa: S101
-        self.sfincs: SfincsModelConfig = config.model_config
 
     def _add_noaa_gages(self, model: SfincsModel) -> int:
         """Query NOAA CO-OPS and add water-level stations as observation points.
@@ -512,28 +536,17 @@ class SfincsObservationPointsStage(WorkflowStage):
         return {"status": "completed", "noaa_stations": noaa_count}
 
 
-class SfincsDischargeStage(WorkflowStage):
+class SfincsDischargeStage(_SfincsStageBase):
     """Add discharge source points to the model."""
 
     name = "sfincs_discharge"
     description = "Add discharge sources"
 
-    def __init__(
-        self,
-        config: CoastalCalibConfig,
-        monitor: WorkflowMonitor | None = None,
-    ) -> None:
-        super().__init__(config, monitor)
-        assert isinstance(config.model_config, SfincsModelConfig)  # noqa: S101
-        self.sfincs: SfincsModelConfig = config.model_config
-
     @staticmethod
     def _parse_src_file(path: Path) -> list[tuple[float, float, str]]:
         """Parse a SFINCS ``.src`` file into (x, y, name) tuples."""
-        from pathlib import Path as _Path
-
         points: list[tuple[float, float, str]] = []
-        for raw_line in _Path(path).read_text().splitlines():
+        for raw_line in path.read_text().splitlines():
             stripped = raw_line.strip()
             if not stripped:
                 continue
@@ -582,20 +595,11 @@ class SfincsDischargeStage(WorkflowStage):
         return {"status": "completed"}
 
 
-class SfincsPrecipitationStage(WorkflowStage):
+class SfincsPrecipitationStage(_SfincsStageBase):
     """Add precipitation forcing."""
 
     name = "sfincs_precip"
     description = "Add precipitation forcing"
-
-    def __init__(
-        self,
-        config: CoastalCalibConfig,
-        monitor: WorkflowMonitor | None = None,
-    ) -> None:
-        super().__init__(config, monitor)
-        assert isinstance(config.model_config, SfincsModelConfig)  # noqa: S101
-        self.sfincs: SfincsModelConfig = config.model_config
 
     def run(self) -> dict[str, Any]:
         """Add precipitation from a dataset in the data catalog."""
@@ -610,23 +614,19 @@ class SfincsPrecipitationStage(WorkflowStage):
         model.precipitation.create(precip=meteo_dataset)
         self._log(f"Precipitation forcing added from {meteo_dataset}")
 
+        # Write immediately and release memory so subsequent forcing
+        # stages don't accumulate ~91 GB of gridded data in RAM.
+        model.precipitation.write()
+        model.precipitation.clear()
+
         return {"status": "completed"}
 
 
-class SfincsWindStage(WorkflowStage):
+class SfincsWindStage(_SfincsStageBase):
     """Add spatially varying wind forcing (u10 / v10)."""
 
     name = "sfincs_wind"
     description = "Add wind forcing"
-
-    def __init__(
-        self,
-        config: CoastalCalibConfig,
-        monitor: WorkflowMonitor | None = None,
-    ) -> None:
-        super().__init__(config, monitor)
-        assert isinstance(config.model_config, SfincsModelConfig)  # noqa: S101
-        self.sfincs: SfincsModelConfig = config.model_config
 
     def run(self) -> dict[str, Any]:
         """Add wind forcing from a dataset in the data catalog."""
@@ -641,23 +641,18 @@ class SfincsWindStage(WorkflowStage):
         model.wind.create(wind=meteo_dataset)
         self._log(f"Wind forcing added from {meteo_dataset}")
 
+        # Write immediately and release memory (see SfincsPrecipitationStage).
+        model.wind.write()
+        model.wind.clear()
+
         return {"status": "completed"}
 
 
-class SfincsPressureStage(WorkflowStage):
+class SfincsPressureStage(_SfincsStageBase):
     """Add spatially varying atmospheric pressure forcing."""
 
     name = "sfincs_pressure"
     description = "Add atmospheric pressure forcing"
-
-    def __init__(
-        self,
-        config: CoastalCalibConfig,
-        monitor: WorkflowMonitor | None = None,
-    ) -> None:
-        super().__init__(config, monitor)
-        assert isinstance(config.model_config, SfincsModelConfig)  # noqa: S101
-        self.sfincs: SfincsModelConfig = config.model_config
 
     def run(self) -> dict[str, Any]:
         """Add atmospheric pressure from a dataset in the data catalog."""
@@ -674,6 +669,10 @@ class SfincsPressureStage(WorkflowStage):
         # Enable barometric pressure correction so SFINCS uses the forcing
         model.config.set("baro", 1)
         self._log(f"Atmospheric pressure forcing added from {meteo_dataset} (baro=1 enabled)")
+
+        # Write immediately and release memory (see SfincsPrecipitationStage).
+        model.pressure.write()
+        model.pressure.clear()
 
         return {"status": "completed"}
 
@@ -700,30 +699,60 @@ class SfincsWriteStage(WorkflowStage):
         }
 
 
-class SfincsRunStage(WorkflowStage):
-    """Run the SFINCS model via Singularity container."""
+class SfincsRunStage(_SfincsStageBase):
+    """Run the SFINCS model via a native executable or Singularity container.
+
+    When ``model_config.sfincs_exe`` is set the stage invokes the binary
+    directly, which avoids the Singularity dependency (useful on macOS or
+    other systems where Singularity is unavailable).  Otherwise it falls
+    back to the Singularity container workflow.
+    """
 
     name = "sfincs_run"
-    description = "Run SFINCS model (Singularity)"
-    requires_container = True
+    description = "Run SFINCS model"
+
+    def __init__(
+        self,
+        config: CoastalCalibConfig,
+        monitor: WorkflowMonitor | None = None,
+    ) -> None:
+        super().__init__(config, monitor)
+        # Only require a container when no native exe is configured.
+        self.requires_container = self.sfincs.sfincs_exe is None
+
+    # ------------------------------------------------------------------ #
+    # Stage entry-point
+    # ------------------------------------------------------------------ #
 
     def run(self) -> dict[str, Any]:
-        """Execute SFINCS via Singularity."""
-        self._update_substep("Pulling Singularity image")
-        sif_path = _pull_singularity_image(self.config, _log=self._log)
+        """Execute SFINCS via native binary or Singularity."""
+        model_root = get_model_root(self.config)
 
-        self._update_substep("Running SFINCS model")
-        _run_singularity(self.config, sif_path)
+        if self.sfincs.sfincs_exe is not None:
+            # ── Native executable ──
+            self._log(f"Running SFINCS via native executable: {self.sfincs.sfincs_exe}")
+            self._update_substep("Running SFINCS (native)")
+            env = {**os.environ, "OMP_NUM_THREADS": str(self.sfincs.omp_num_threads)}
+            _run_and_log([str(self.sfincs.sfincs_exe)], model_root, env=env)
+            mode = "native"
+        else:
+            # ── Singularity container ──
+            self._update_substep("Pulling Singularity image")
+            sif_path = _pull_singularity_image(self.config)
+
+            self._update_substep("Running SFINCS (Singularity)")
+            _run_singularity(self.config, sif_path)
+            mode = "singularity"
 
         self._log("SFINCS run completed")
 
         # Clean up model registry
         _clear_model(self.config)
 
-        return {"status": "completed"}
+        return {"status": "completed", "mode": mode}
 
 
-class SfincsPlotStage(WorkflowStage):
+class SfincsPlotStage(_SfincsStageBase):
     """Plot simulated water levels against NOAA CO-OPS observations.
 
     After the SFINCS run, this stage reads ``point_zs`` (water surface
@@ -747,15 +776,6 @@ class SfincsPlotStage(WorkflowStage):
 
     name = "sfincs_plot"
     description = "Plot simulated vs observed water levels"
-
-    def __init__(
-        self,
-        config: CoastalCalibConfig,
-        monitor: WorkflowMonitor | None = None,
-    ) -> None:
-        super().__init__(config, monitor)
-        assert isinstance(config.model_config, SfincsModelConfig)  # noqa: S101
-        self.sfincs: SfincsModelConfig = config.model_config
 
     @staticmethod
     def _station_dim(point_h: Any) -> str:
