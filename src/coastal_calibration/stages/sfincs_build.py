@@ -575,14 +575,11 @@ class SfincsForcingStage(_SfincsStageBase):
 
         point_dfs: list[pd.Series] = []
         for idx, (lon, lat) in enumerate(lonlats):
-            mask = ((df_raw["Lat"] - lat).abs() < 0.01) & (
-                (df_raw["Lon"] - lon).abs() < 0.01
-            )
+            mask = ((df_raw["Lat"] - lat).abs() < 0.01) & ((df_raw["Lon"] - lon).abs() < 0.01)
             subset = df_raw.loc[mask].sort_values("datetime")
             if subset.empty:
                 raise ValueError(
-                    f"No OTPS output for boundary point {idx} "
-                    f"(lat={lat:.4f}, lon={lon:.4f})"
+                    f"No OTPS output for boundary point {idx} (lat={lat:.4f}, lon={lon:.4f})"
                 )
             series = subset.set_index("datetime")["z(m)"].astype(float)
             series.name = idx
@@ -670,6 +667,11 @@ class SfincsForcingStage(_SfincsStageBase):
         # 10. Inject into HydroMT model
         self._update_substep("Setting water level forcing on model")
         model.water_level.set(df=df_fine, gdf=gdf_bnd, merge=False)
+
+        # Ensure the write stage produces netCDF rather than ASCII.
+        # SfincsInitStage clears netbndbzsbzifile because the file
+        # doesn't exist yet at init time; re-enable it now.
+        model.config.set("netbndbzsbzifile", "sfincs_netbndbzsbzifile.nc")
 
     def run(self) -> dict[str, Any]:
         """Add water level boundary forcing."""
