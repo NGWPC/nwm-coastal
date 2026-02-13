@@ -67,6 +67,11 @@ def _plotable_stations(
 # The SFINCS build stages share a HydroMT ``SfincsModel`` between them.
 # We use a module-level dictionary keyed by the ``CoastalCalibConfig`` id to
 # store the model instance across stages within a single runner invocation.
+#
+# When ``--start-from`` skips ``sfincs_init``, the registry is empty.  In
+# that case ``_get_model`` lazily re-opens the model from disk (the same
+# ``r+`` open + read that ``SfincsInitStage`` performs) so that mid-pipeline
+# restarts work transparently.
 _MODEL_REGISTRY: dict[int, SfincsModel] = {}
 
 
@@ -76,19 +81,45 @@ def _set_model(config: CoastalCalibConfig, model: SfincsModel) -> None:
 
 
 def _get_model(config: CoastalCalibConfig) -> SfincsModel:
-    """Retrieve the SfincsModel instance for the given config."""
+    """Retrieve — or lazily re-open — the SfincsModel for *config*.
+
+    On a fresh run the model is populated by ``SfincsInitStage``.  When
+    the runner restarts mid-pipeline (``--start-from``), the registry is
+    empty.  In that case we re-open the model from ``model_root`` in the
+    same way ``SfincsInitStage.run`` does (``mode="r+"``, then ``read()``).
+    """
     try:
         return _MODEL_REGISTRY[id(config)]
     except KeyError:
+        pass
+
+    # Lazy re-init from disk
+    root = get_model_root(config)
+    inp_file = root / "sfincs.inp"
+    if not inp_file.exists():
         raise RuntimeError(
-            "SFINCS model not initialised. "
-            "Ensure the 'sfincs_init' stage runs before other SFINCS stages."
-        ) from None
+            "SFINCS model not initialised and no sfincs.inp found at "
+            f"{root}.  Ensure the 'sfincs_init' stage runs first."
+        )
+
+    from hydromt_sfincs import SfincsModel as _Sfincs  # pyright: ignore[reportMissingImports]
+
+    data_libs: list[str] = []
+    catalog_path = _data_catalog_path(config)
+    if catalog_path is not None:
+        data_libs.append(str(catalog_path))
+
+    model = _Sfincs(data_libs=data_libs, root=str(root), mode="r+", write_gis=True)
+    model.read()
+    _MODEL_REGISTRY[id(config)] = model
+    return model
 
 
 def _clear_model(config: CoastalCalibConfig) -> None:
     """Remove the SfincsModel instance for the given config."""
     _MODEL_REGISTRY.pop(id(config), None)
+
+
 
 
 # ---------------------------------------------------------------------------

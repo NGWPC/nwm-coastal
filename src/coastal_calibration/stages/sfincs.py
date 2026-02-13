@@ -691,7 +691,7 @@ def generate_data_catalog(
         elif effective_coastal_source == "glofs":
             coastal_entry = _build_coastal_glofs_entry(sim, glofs_model)
         elif effective_coastal_source == "tpxo":
-            coastal_entry = _build_coastal_tpxo_entry(config.paths.otps_dir, sim)
+            coastal_entry = _build_coastal_tpxo_entry(config.paths.tpxo_data_dir, sim)
         else:
             coastal_entry = None
 

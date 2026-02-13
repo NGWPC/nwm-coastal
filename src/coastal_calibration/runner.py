@@ -119,9 +119,59 @@ class CoastalCalibRunner:
             self._slurm = SlurmManager(self.config, self.monitor)
         return self._slurm
 
+    # Name of the lightweight JSON file that tracks completed stages.
+    _STATUS_FILENAME = ".pipeline_status.json"
+
     def _init_stages(self) -> None:
         """Initialize all workflow stages via model config."""
         self._stages = self.config.model_config.create_stages(self.config, self.monitor)
+
+    # ------------------------------------------------------------------
+    # Pipeline status tracking
+    # ------------------------------------------------------------------
+
+    @property
+    def _status_path(self) -> Path:
+        """Path to the pipeline status file in the work directory."""
+        return self.config.paths.work_dir / self._STATUS_FILENAME
+
+    def _load_status(self) -> dict[str, Any]:
+        """Load pipeline status from disk (empty dict if missing)."""
+        if self._status_path.exists():
+            return json.loads(self._status_path.read_text())  # type: ignore[no-any-return]
+        return {}
+
+    def _save_stage_status(self, stage_name: str) -> None:
+        """Mark *stage_name* as completed in the pipeline status file."""
+        status = self._load_status()
+        completed: list[str] = status.get("completed_stages", [])
+        if stage_name not in completed:
+            completed.append(stage_name)
+        status["completed_stages"] = completed
+        self._status_path.write_text(json.dumps(status, indent=2) + "\n")
+
+    def _check_prerequisites(self, start_from: str) -> list[str]:
+        """Verify that all stages before *start_from* have completed.
+
+        Returns a list of error messages (empty if all prerequisites met).
+        """
+        status = self._load_status()
+        completed: set[str] = set(status.get("completed_stages", []))
+
+        all_stages = self.STAGE_ORDER
+        if start_from not in all_stages:
+            return [f"Unknown stage: {start_from}"]
+
+        start_idx = all_stages.index(start_from)
+        missing = [s for s in all_stages[:start_idx] if s not in completed]
+        if missing:
+            return [
+                f"Cannot start from '{start_from}': prerequisite stage(s) "
+                f"{', '.join(repr(s) for s in missing)} have not completed.  "
+                f"Run them first or start from an earlier stage.  "
+                f"(Status file: {self._status_path})"
+            ]
+        return []
 
     def validate(self) -> list[str]:
         """Validate configuration and prerequisites.
@@ -210,6 +260,21 @@ class CoastalCalibRunner:
                 errors=validation_errors,
             )
 
+        # When resuming mid-pipeline, verify that earlier stages completed.
+        if start_from:
+            prereq_errors = self._check_prerequisites(start_from)
+            if prereq_errors:
+                return WorkflowResult(
+                    success=False,
+                    job_id=None,
+                    start_time=start_time,
+                    end_time=datetime.now(),
+                    stages_completed=[],
+                    stages_failed=[],
+                    outputs={},
+                    errors=prereq_errors,
+                )
+
         if dry_run:
             self.monitor.info("Dry run mode - validation passed, no execution")
             return WorkflowResult(
@@ -239,6 +304,7 @@ class CoastalCalibRunner:
                     self._results[current_stage] = result
                     outputs[current_stage] = result
                     stages_completed.append(current_stage)
+                    self._save_stage_status(current_stage)
 
             self.monitor.end_workflow(success=True)
             success = True
@@ -368,6 +434,7 @@ class CoastalCalibRunner:
                 result = stage.run()
                 self._results[name] = result
                 completed.append(name)
+                self._save_stage_status(name)
 
         return completed
 
@@ -977,6 +1044,21 @@ class CoastalCalibRunner:
                 errors=validation_errors,
             )
 
+        # When resuming mid-pipeline, verify that earlier stages completed.
+        if start_from:
+            prereq_errors = self._check_prerequisites(start_from)
+            if prereq_errors:
+                return WorkflowResult(
+                    success=False,
+                    job_id=None,
+                    start_time=start_time,
+                    end_time=datetime.now(),
+                    stages_completed=[],
+                    stages_failed=[],
+                    outputs={},
+                    errors=prereq_errors,
+                )
+
         stages_to_run = self._get_stages_to_run(start_from, stop_after)
         pre_job, job, post_job = self._split_stages_for_submit(stages_to_run)
 
@@ -1076,6 +1158,7 @@ class CoastalCalibRunner:
         # that ran inside the SLURM job.
         for stage_name in job:
             self.monitor.mark_stage_completed(stage_name)
+            self._save_stage_status(stage_name)
 
         # --- Run post-job stages on login node ---
         if post_job:
