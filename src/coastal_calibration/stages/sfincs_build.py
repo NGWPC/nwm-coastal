@@ -428,27 +428,258 @@ class SfincsTimingStage(WorkflowStage):
         return {"status": "completed"}
 
 
-class SfincsForcingStage(WorkflowStage):
-    """Add water level boundary forcing."""
+class SfincsForcingStage(_SfincsStageBase):
+    """Add water level boundary forcing.
+
+    When ``boundary.source`` is ``"tpxo"``, tide predictions are generated
+    using the OTPS ``predict_tide`` Fortran binary inside the SCHISM
+    Singularity container and then injected into the HydroMT model.
+    For all other sources the standard HydroMT geodataset path is used.
+    """
 
     name = "sfincs_forcing"
     description = "Add water level forcing"
 
-    def run(self) -> dict[str, Any]:
-        """Add water level boundary forcing from a geodataset."""
-        wl_geodataset = _waterlevel_geodataset(self.config)
+    # Hourly OTPS predictions, interpolated to this interval (seconds)
+    _TPXO_RAW_DT = 3600
+    _TPXO_INTERP_DT = 600
 
+    # ------------------------------------------------------------------
+    # TPXO tidal forcing via OTPS predict_tide
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _parse_bnd_file(bnd_path: Path) -> list[tuple[float, float, str]]:
+        """Parse a SFINCS ``.bnd`` file into (x, y, name) tuples.
+
+        The format is identical to ``.src`` / ``.obs`` files::
+
+            x  y  "name"
+        """
+        points: list[tuple[float, float, str]] = []
+        for raw_line in bnd_path.read_text().splitlines():
+            stripped = raw_line.strip()
+            if not stripped:
+                continue
+            parts = stripped.split('"')
+            coords = parts[0].strip().split()
+            name = parts[1].strip() if len(parts) > 1 else f"bnd_{len(points)}"
+            x, y = float(coords[0]), float(coords[1])
+            points.append((x, y, name))
+        return points
+
+    @staticmethod
+    def _write_otps_input(
+        otps_path: Path,
+        lonlats: list[tuple[float, float]],
+        tstart: Any,
+        tstop: Any,
+        dt_seconds: int,
+    ) -> None:
+        """Write the ``otps_lat_lon_time.txt`` input file for ``predict_tide``.
+
+        Each boundary point gets one line per timestep in the format
+        ``lat  lon  YYYY MM DD HH MM SS`` expected by the OTPS binary.
+        """
+        from datetime import timedelta as _td
+
+        dt = _td(seconds=dt_seconds)
+        with otps_path.open("w") as f:
+            for lon, lat in lonlats:
+                current = tstart
+                while current <= tstop:
+                    f.write(f"{lat:12.6f}  {lon:12.6f}  {current.strftime('%Y %m %d %H %M %S')}\n")
+                    current += dt
+
+    def _prepare_tpxo_files(self, model_root: Path) -> None:
+        """Copy OTPS setup files and symlink the TPXO atlas data."""
+        import shutil as _shutil
+
+        from coastal_calibration.scripts_path import get_scripts_dir
+
+        scripts_dir = get_scripts_dir()
+        for fname in ("setup_tpxo.txt", "Model_tpxo10_atlas"):
+            src = scripts_dir / fname
+            dst = model_root / fname
+            if not dst.exists():
+                _shutil.copy2(src, dst)
+
+        tpxo_data_dir = self.config.paths.tpxo_data_dir
+        link_target = model_root / "TPXO10_atlas_v2_nc"
+        if not link_target.exists():
+            link_target.symlink_to(tpxo_data_dir)
+            self._log(f"Symlinked {tpxo_data_dir} -> {link_target}")
+
+    def _run_predict_tide(self, model_root: Path) -> Path:
+        """Run the OTPS ``predict_tide`` binary inside Singularity.
+
+        Returns the path to the ``otps_out.txt`` output file.
+        """
+        env = self.build_environment()
+        otps_dir = str(self.config.paths.otps_dir)
+
+        bindings = self._get_default_bindings()
+        bindings.append(str(model_root))
+        tpxo_real = str(self.config.paths.tpxo_data_dir.resolve())
+        if tpxo_real not in bindings:
+            bindings.append(tpxo_real)
+
+        self.run_singularity_command(
+            command=[
+                "bash",
+                "-c",
+                f"cd {model_root} && {otps_dir}/predict_tide < setup_tpxo.txt",
+            ],
+            bindings=bindings,
+            pwd=model_root,
+            env=env,
+        )
+
+        otps_out = model_root / "otps_out.txt"
+        if not otps_out.exists():
+            raise FileNotFoundError(
+                f"predict_tide did not produce {otps_out}.  "
+                "Check that the TPXO atlas data and OTPS binary are present."
+            )
+        return otps_out
+
+    @staticmethod
+    def _parse_otps_output(
+        otps_out: Path,
+        lonlats: list[tuple[float, float]],
+    ) -> Any:
+        """Parse ``otps_out.txt`` into a wide DataFrame (time x points).
+
+        Returns a :class:`~pandas.DataFrame` with a ``DatetimeIndex`` and
+        one integer column per boundary point.
+        """
+        import pandas as pd
+
+        df_raw = pd.read_csv(otps_out, sep=r"\s+", header=3, on_bad_lines="skip")
+        col_lat, col_lon = df_raw.columns[0], df_raw.columns[1]
+        col_date, col_time = df_raw.columns[2], df_raw.columns[3]
+        col_z = df_raw.columns[4]
+
+        df_raw["datetime"] = pd.to_datetime(
+            df_raw[col_date].astype(str) + " " + df_raw[col_time].astype(str),
+            format="%m.%d.%Y %H:%M",
+        )
+
+        point_dfs: list[pd.Series] = []
+        for idx, (lon, lat) in enumerate(lonlats):
+            mask = ((df_raw[col_lat] - lat).abs() < 0.01) & ((df_raw[col_lon] - lon).abs() < 0.01)
+            subset = df_raw.loc[mask].sort_values("datetime")
+            if subset.empty:
+                raise ValueError(
+                    f"No OTPS output for boundary point {idx} (lat={lat:.4f}, lon={lon:.4f})"
+                )
+            series = subset.set_index("datetime")[col_z].astype(float)
+            series.name = idx
+            point_dfs.append(series)
+
+        df_ts = pd.concat(point_dfs, axis=1)
+        df_ts.index.name = "time"
+        return df_ts
+
+    def _create_tpxo_forcing(self, model: SfincsModel) -> None:
+        """Synthesize water-level forcing from TPXO tidal constituents.
+
+        The workflow mirrors the SCHISM ``make_tpxo_ocean.bash`` script:
+        read boundary locations, generate OTPS input, run ``predict_tide``
+        inside the Singularity container, parse and interpolate the output,
+        then inject into the HydroMT model via ``water_level.set()``.
+        """
+        from datetime import datetime as _dt
+
+        import geopandas as gpd
+        from pyproj import Transformer
+        from shapely.geometry import Point
+
+        model_root = get_model_root(self.config)
+        bnd_path = model_root / "sfincs.bnd"
+        if not bnd_path.exists():
+            raise FileNotFoundError(
+                f"Boundary file {bnd_path} not found.  "
+                "Ensure the pre-built model includes sfincs.bnd."
+            )
+
+        # 1. Read boundary points
+        bnd_points = self._parse_bnd_file(bnd_path)
+        if not bnd_points:
+            raise ValueError("No boundary points found in sfincs.bnd")
+        self._log(f"Read {len(bnd_points)} boundary point(s) from {bnd_path}")
+
+        # 2. Transform to lon/lat
+        model_crs = model.crs
+        transformer = Transformer.from_crs(model_crs, 4326, always_xy=True)
+        lonlats = [transformer.transform(x, y) for x, y, _ in bnd_points]
+
+        # 3. Generate OTPS input file
+        tstart = model.config.data.tstart
+        tstop = model.config.data.tstop
+        if isinstance(tstart, str):
+            tstart = _dt.fromisoformat(tstart)
+        if isinstance(tstop, str):
+            tstop = _dt.fromisoformat(tstop)
+
+        otps_input_path = model_root / "otps_lat_lon_time.txt"
+        self._write_otps_input(otps_input_path, lonlats, tstart, tstop, self._TPXO_RAW_DT)
+        self._log(f"Wrote OTPS input ({len(lonlats)} points) to {otps_input_path}")
+
+        # 4-5. Copy setup files and symlink atlas data
+        self._prepare_tpxo_files(model_root)
+
+        # 6. Run predict_tide
+        self._update_substep("Running OTPS predict_tide")
+        otps_out = self._run_predict_tide(model_root)
+        self._log("predict_tide completed successfully")
+
+        # 7. Parse output
+        self._update_substep("Parsing TPXO output")
+        df_ts = self._parse_otps_output(otps_out, lonlats)
+        n_points = len(lonlats)
+        self._log(f"Parsed {len(df_ts)} timesteps x {n_points} points from otps_out.txt")
+
+        # 8. Interpolate to finer resolution
+        interp_freq = f"{self._TPXO_INTERP_DT}s"
+        df_fine = df_ts.resample(interp_freq).interpolate(method="linear")
+        df_fine = df_fine.loc[df_ts.index[0] : df_ts.index[-1]]
+        self._log(f"Interpolated to {interp_freq}: {len(df_fine)} timesteps")
+
+        # 9. Build GeoDataFrame for boundary locations
+        geom = [Point(x, y) for x, y, _ in bnd_points]
+        names = [name for _, _, name in bnd_points]
+        gdf_bnd = gpd.GeoDataFrame(
+            {"name": names},
+            geometry=geom,
+            index=list(range(n_points)),
+            crs=model_crs,
+        )
+
+        # 10. Inject into HydroMT model
+        self._update_substep("Setting water level forcing on model")
+        model.water_level.set(df=df_fine, gdf=gdf_bnd, merge=False)
+
+    def run(self) -> dict[str, Any]:
+        """Add water level boundary forcing."""
+        model = _get_model(self.config)
+
+        if self.config.boundary.source == "tpxo":
+            self._update_substep("Creating TPXO tidal forcing")
+            self._create_tpxo_forcing(model)
+            self._log("Water level forcing added from TPXO predict_tide")
+            return {"status": "completed", "source": "tpxo"}
+
+        wl_geodataset = _waterlevel_geodataset(self.config)
         if wl_geodataset is None:
             self._log("No water level geodataset configured, skipping")
             return {"status": "skipped"}
-
-        model = _get_model(self.config)
 
         self._update_substep("Adding water level forcing")
         model.water_level.create(geodataset=wl_geodataset)
         self._log(f"Water level forcing added from {wl_geodataset}")
 
-        return {"status": "completed"}
+        return {"status": "completed", "source": wl_geodataset}
 
 
 class SfincsObservationPointsStage(_SfincsStageBase):
