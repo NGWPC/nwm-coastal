@@ -40,3 +40,4 @@ model_config:
   include_precip: true
   include_wind: true
   include_pressure: true
+# sfincs_exe: ~/.local/bin/sfincs
