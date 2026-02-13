@@ -563,59 +563,6 @@ def _build_coastal_glofs_entry(
     )
 
 
-def _build_coastal_tpxo_entry(
-    tpxo_dir: Path,
-    sim: SimulationConfig,
-) -> CatalogEntry:
-    """Build catalog entry for TPXO tidal constituent data.
-
-    Parameters
-    ----------
-    tpxo_dir : Path
-        Path to TPXO data directory.
-    sim : SimulationConfig
-        Simulation configuration.
-
-    Returns
-    -------
-    CatalogEntry
-        Catalog entry for TPXO data.
-    """
-    # TPXO netCDF files contain tidal constituents
-    uri = str(tpxo_dir / "*.nc")
-
-    temporal_extent = _get_temporal_extent(sim)
-
-    metadata = CatalogMetadata(
-        crs=4326,
-        temporal_extent=temporal_extent,
-        category="ocean",
-        source_url="https://www.tpxo.net/global",
-        source_license="Licensed (requires TPXO registration)",
-        source_version="TPXO9",
-        notes="TPXO tidal constituent data for boundary conditions",
-    )
-
-    data_adapter = DataAdapter(
-        rename={
-            "ha": "tidal_amplitude",
-            "hp": "tidal_phase",
-            "hRe": "tidal_real",
-            "hIm": "tidal_imag",
-        },
-    )
-
-    return CatalogEntry(
-        name="tpxo_tidal",
-        data_type="GeoDataset",
-        driver="geodataset_xarray",
-        uri=uri,
-        metadata=metadata,
-        data_adapter=data_adapter,
-        version=temporal_extent[0][:10],
-    )
-
-
 def generate_data_catalog(
     config: CoastalCalibConfig,
     output_path: Path | str | None = None,
@@ -691,7 +638,9 @@ def generate_data_catalog(
         elif effective_coastal_source == "glofs":
             coastal_entry = _build_coastal_glofs_entry(sim, glofs_model)
         elif effective_coastal_source == "tpxo":
-            coastal_entry = _build_coastal_tpxo_entry(config.paths.tpxo_data_dir, sim)
+            # TPXO forcing is handled directly by SfincsForcingStage
+            # using predict_tide, not via the HydroMT data catalog.
+            coastal_entry = None
         else:
             coastal_entry = None
 
