@@ -552,28 +552,39 @@ class SfincsForcingStage(_SfincsStageBase):
 
         Returns a :class:`~pandas.DataFrame` with a ``DatetimeIndex`` and
         one integer column per boundary point.
+
+        The OTPS output has a 3-line header followed by a column header::
+
+            Lat       Lon     mm.dd.yyyy  hh:mm:ss   z(m)
+
+        We let :func:`pandas.read_csv` merge the date and time columns
+        into a single ``datetime`` column via ``parse_dates``.
         """
         import pandas as pd
 
-        df_raw = pd.read_csv(otps_out, sep=r"\s+", header=3, on_bad_lines="skip")
-        col_lat, col_lon = df_raw.columns[0], df_raw.columns[1]
-        col_date, col_time = df_raw.columns[2], df_raw.columns[3]
-        col_z = df_raw.columns[4]
-
-        df_raw["datetime"] = pd.to_datetime(
-            df_raw[col_date].astype(str) + " " + df_raw[col_time].astype(str),
-            format="%m.%d.%Y %H:%M",
+        # Column header names from OTPS: Lat, Lon, mm.dd.yyyy, hh:mm:ss, z(m)
+        # parse_dates={"datetime": [2, 3]} merges the date+time columns and
+        # pandas infers the format automatically.
+        df_raw = pd.read_csv(
+            otps_out,
+            sep=r"\s+",
+            header=3,
+            on_bad_lines="skip",
+            parse_dates={"datetime": ["mm.dd.yyyy", "hh:mm:ss"]},
         )
 
         point_dfs: list[pd.Series] = []
         for idx, (lon, lat) in enumerate(lonlats):
-            mask = ((df_raw[col_lat] - lat).abs() < 0.01) & ((df_raw[col_lon] - lon).abs() < 0.01)
+            mask = ((df_raw["Lat"] - lat).abs() < 0.01) & (
+                (df_raw["Lon"] - lon).abs() < 0.01
+            )
             subset = df_raw.loc[mask].sort_values("datetime")
             if subset.empty:
                 raise ValueError(
-                    f"No OTPS output for boundary point {idx} (lat={lat:.4f}, lon={lon:.4f})"
+                    f"No OTPS output for boundary point {idx} "
+                    f"(lat={lat:.4f}, lon={lon:.4f})"
                 )
-            series = subset.set_index("datetime")[col_z].astype(float)
+            series = subset.set_index("datetime")["z(m)"].astype(float)
             series.name = idx
             point_dfs.append(series)
 
