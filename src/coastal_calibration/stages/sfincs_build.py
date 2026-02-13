@@ -80,6 +80,30 @@ def _set_model(config: CoastalCalibConfig, model: SfincsModel) -> None:
     _MODEL_REGISTRY[id(config)] = model
 
 
+# ---------------------------------------------------------------------------
+# Helper — resolve paths from CoastalCalibConfig
+# ---------------------------------------------------------------------------
+
+
+def _sfincs_cfg(config: CoastalCalibConfig) -> SfincsModelConfig:
+    """Return the SFINCS model config, raising if not the active model."""
+    if not isinstance(config.model_config, SfincsModelConfig):
+        raise TypeError("model_config must be SfincsModelConfig when model='sfincs'")
+    return config.model_config
+
+
+def get_model_root(config: CoastalCalibConfig) -> Path:
+    """Effective model output directory."""
+    sfincs = _sfincs_cfg(config)
+    return sfincs.model_root or (config.paths.work_dir / "sfincs_model")
+
+
+def _data_catalog_path(config: CoastalCalibConfig) -> Path | None:
+    """Return catalog path if it exists on disk, else None."""
+    candidate = config.paths.work_dir / "data_catalog.yml"
+    return candidate if candidate.exists() else None
+
+
 def _get_model(config: CoastalCalibConfig) -> SfincsModel:
     """Retrieve — or lazily re-open — the SfincsModel for *config*.
 
@@ -118,32 +142,6 @@ def _get_model(config: CoastalCalibConfig) -> SfincsModel:
 def _clear_model(config: CoastalCalibConfig) -> None:
     """Remove the SfincsModel instance for the given config."""
     _MODEL_REGISTRY.pop(id(config), None)
-
-
-
-
-# ---------------------------------------------------------------------------
-# Helper — resolve paths from CoastalCalibConfig
-# ---------------------------------------------------------------------------
-
-
-def _sfincs_cfg(config: CoastalCalibConfig) -> SfincsModelConfig:
-    """Return the SFINCS model config, raising if not the active model."""
-    if not isinstance(config.model_config, SfincsModelConfig):
-        raise TypeError("model_config must be SfincsModelConfig when model='sfincs'")
-    return config.model_config
-
-
-def get_model_root(config: CoastalCalibConfig) -> Path:
-    """Effective model output directory."""
-    sfincs = _sfincs_cfg(config)
-    return sfincs.model_root or (config.paths.work_dir / "sfincs_model")
-
-
-def _data_catalog_path(config: CoastalCalibConfig) -> Path | None:
-    """Return catalog path if it exists on disk, else None."""
-    candidate = config.paths.work_dir / "data_catalog.yml"
-    return candidate if candidate.exists() else None
 
 
 def _waterlevel_geodataset(config: CoastalCalibConfig) -> str | None:

@@ -80,6 +80,9 @@ class CoastalCalibRunner:
     ``config.model``.
     """
 
+    # Name of the lightweight JSON file that tracks completed stages.
+    _STATUS_FILENAME = ".pipeline_status.json"
+
     def __init__(self, config: CoastalCalibConfig) -> None:
         """Initialize the workflow runner.
 
@@ -118,9 +121,6 @@ class CoastalCalibRunner:
         if self._slurm is None:
             self._slurm = SlurmManager(self.config, self.monitor)
         return self._slurm
-
-    # Name of the lightweight JSON file that tracks completed stages.
-    _STATUS_FILENAME = ".pipeline_status.json"
 
     def _init_stages(self) -> None:
         """Initialize all workflow stages via model config."""
