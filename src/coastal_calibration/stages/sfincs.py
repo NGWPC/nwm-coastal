@@ -313,17 +313,19 @@ def _build_meteo_entry(
 
     temporal_extent = _get_temporal_extent(sim)
 
+    # Both NWM Retrospective and Analysis LDASIN files use the same
+    # Lambert Conformal Conic (LCC) projected grid with coordinates in meters.
+    crs = "+proj=lcc +lat_0=40 +lon_0=-97 +lat_1=30 +lat_2=60 +x_0=0 +y_0=0 +R=6370000 +units=m +no_defs=True"
+
     # Determine source URL based on meteo source
     if meteo_source == "nwm_retro":
         source_url = "https://noaa-nwm-retrospective-3-0-pds.s3.amazonaws.com"
         notes = "NWM Retrospective 3.0 LDASIN forcing files"
         source_version = "3.0"
-        crs = 4326
     else:
         source_url = "https://storage.googleapis.com/national-water-model"
         notes = "NWM Analysis and Assimilation forcing files"
         source_version = "operational"
-        crs = "+proj=lcc +lat_0=40 +lon_0=-97 +lat_1=30 +lat_2=60 +x_0=0 +y_0=0 +R=6370000 +units=m +no_defs=True"
 
     metadata = CatalogMetadata(
         crs=crs,
@@ -353,23 +355,13 @@ def _build_meteo_entry(
     # the files, ``reference_time`` becomes a new dimension and inflates
     # the data to 4-D (reference_time, time, y, x).  hydromt only supports
     # 2-D/3-D arrays, so we drop it via ``drop_variables``.
-    driver: str | dict[str, Any]
-    if meteo_source == "nwm_retro":
-        driver = {
-            "name": "raster_xarray",
-            "options": {
-                "preprocess": "round_latlon",
-                "drop_variables": ["reference_time", "crs"],
-            },
-        }
-    else:
-        driver = {
-            "name": "raster_xarray",
-            "options": {
-                "preprocess": "round_coords",
-                "drop_variables": ["reference_time", "crs"],
-            },
-        }
+    driver: dict[str, Any] = {
+        "name": "raster_xarray",
+        "options": {
+            "preprocess": "round_coords",
+            "drop_variables": ["reference_time", "crs"],
+        },
+    }
 
     return CatalogEntry(
         name=f"{meteo_source}_meteo",
