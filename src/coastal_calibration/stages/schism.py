@@ -312,7 +312,7 @@ class SchismObservationStage(WorkflowStage):
                 "warning",
             )
 
-        selected = selected[selected["station_id"].isin(valid_ids)]
+        selected = selected[selected["station_id"].isin(sorted(valid_ids))]
         if selected.empty:
             raise RuntimeError(
                 "No NOAA CO-OPS stations with valid datum data found within domain hull. "

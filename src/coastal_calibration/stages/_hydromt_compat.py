@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    import geopandas as gpd
     import xarray as xr
 
 
@@ -57,7 +58,7 @@ def patch_serialize_crs() -> None:
     except ImportError:
         return
 
-    _original = _crs_mod._serialize_crs
+    _original = _crs_mod._serialize_crs  # type: ignore[reportPrivateUsage]
 
     # Only patch once
     if getattr(_original, "_patched", False):
@@ -98,19 +99,19 @@ def patch_boundary_conditions_index_dim() -> None:
     except ImportError:
         return
 
-    _original_validate = SfincsBoundaryBase._validate_and_prepare_gdf
+    _original_validate = SfincsBoundaryBase._validate_and_prepare_gdf  # type: ignore[reportPrivateUsage]
 
     if getattr(_original_validate, "_patched", False):
         return
 
-    def _validate_and_normalise(self, gdf):  # type: ignore[no-untyped-def]
+    def _validate_and_normalise(self: Any, gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
         gdf = _original_validate(self, gdf)
         if gdf.index.name != "index":
             gdf.index.name = "index"
         return gdf
 
-    SfincsBoundaryBase._validate_and_prepare_gdf = _validate_and_normalise
-    SfincsBoundaryBase._validate_and_prepare_gdf._patched = True  # type: ignore[attr-defined]
+    SfincsBoundaryBase._validate_and_prepare_gdf = _validate_and_normalise  # type: ignore[reportPrivateUsage]
+    SfincsBoundaryBase._validate_and_prepare_gdf._patched = True  # type: ignore[reportPrivateUsage, attr-defined]
 
 
 def patch_meteo_write_gridded() -> None:
@@ -137,7 +138,11 @@ def patch_meteo_write_gridded() -> None:
 
     import xarray as xr
 
-    def _write_gridded_lazy(self, filename=None, rename=None):  # type: ignore[no-untyped-def]
+    def _write_gridded_lazy(
+        self: Any,
+        filename: str | None = None,
+        rename: dict[str, str] | None = None,
+    ) -> None:
         import gc
         from pathlib import Path
 
@@ -151,20 +156,21 @@ def patch_meteo_write_gridded() -> None:
         ds = self.data
 
         # combine variables and rename to output names
-        rename = {v: k for k, v in rename.items() if v in ds}
-        if len(rename) > 0:
-            ds = xr.merge([ds[v] for v in rename]).rename(rename)
+        if rename is not None:
+            rename = {v: k for k, v in rename.items() if v in ds}
+            if len(rename) > 0:
+                ds = xr.merge([ds[v] for v in rename]).rename(rename)
 
         # Write one time-step at a time using netCDF4 directly so
         # peak memory stays close to a single 2-D slice (~150 MB)
         # instead of the full 3-D array.
-        filename = Path(filename)
-        filename.parent.mkdir(parents=True, exist_ok=True)
+        out_path = Path(filename) if filename is not None else Path("output.nc")
+        out_path.parent.mkdir(parents=True, exist_ok=True)
 
         time_vals = ds["time"].values
         var_names = list(ds.data_vars)
 
-        nc = netCDF4.Dataset(str(filename), "w")
+        nc = netCDF4.Dataset(str(out_path), "w")
         try:
             # --- dimensions ---
             nc.createDimension("time", None)  # unlimited

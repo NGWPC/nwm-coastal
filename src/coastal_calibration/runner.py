@@ -248,6 +248,9 @@ class CoastalCalibRunner:
         errors: list[str] = []
 
         validation_errors = self.validate()
+        # When resuming mid-pipeline, verify that earlier stages completed.
+        if not validation_errors and start_from:
+            validation_errors = self._check_prerequisites(start_from)
         if validation_errors:
             return WorkflowResult(
                 success=False,
@@ -259,21 +262,6 @@ class CoastalCalibRunner:
                 outputs={},
                 errors=validation_errors,
             )
-
-        # When resuming mid-pipeline, verify that earlier stages completed.
-        if start_from:
-            prereq_errors = self._check_prerequisites(start_from)
-            if prereq_errors:
-                return WorkflowResult(
-                    success=False,
-                    job_id=None,
-                    start_time=start_time,
-                    end_time=datetime.now(),
-                    stages_completed=[],
-                    stages_failed=[],
-                    outputs={},
-                    errors=prereq_errors,
-                )
 
         if dry_run:
             self.monitor.info("Dry run mode - validation passed, no execution")
@@ -1032,6 +1020,9 @@ class CoastalCalibRunner:
         errors: list[str] = []
 
         validation_errors = self.validate()
+        # When resuming mid-pipeline, verify that earlier stages completed.
+        if not validation_errors and start_from:
+            validation_errors = self._check_prerequisites(start_from)
         if validation_errors:
             return WorkflowResult(
                 success=False,
@@ -1043,21 +1034,6 @@ class CoastalCalibRunner:
                 outputs={},
                 errors=validation_errors,
             )
-
-        # When resuming mid-pipeline, verify that earlier stages completed.
-        if start_from:
-            prereq_errors = self._check_prerequisites(start_from)
-            if prereq_errors:
-                return WorkflowResult(
-                    success=False,
-                    job_id=None,
-                    start_time=start_time,
-                    end_time=datetime.now(),
-                    stages_completed=[],
-                    stages_failed=[],
-                    outputs={},
-                    errors=prereq_errors,
-                )
 
         stages_to_run = self._get_stages_to_run(start_from, stop_after)
         pre_job, job, post_job = self._split_stages_for_submit(stages_to_run)
