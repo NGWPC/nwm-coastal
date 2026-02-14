@@ -563,15 +563,13 @@ class SfincsForcingStage(_SfincsStageBase):
         import pandas as pd
 
         # Column header names from OTPS: Lat, Lon, mm.dd.yyyy, hh:mm:ss, z(m)
-        # parse_dates={"datetime": [2, 3]} merges the date+time columns and
-        # pandas infers the format automatically.
         df_raw = pd.read_csv(
             otps_out,
             sep=r"\s+",
             header=3,
             on_bad_lines="skip",
-            parse_dates={"datetime": ["mm.dd.yyyy", "hh:mm:ss"]},
         )
+        df_raw["datetime"] = pd.to_datetime(df_raw["mm.dd.yyyy"] + " " + df_raw["hh:mm:ss"])
 
         point_dfs: list[pd.Series] = []
         for idx, (lon, lat) in enumerate(lonlats):
@@ -660,7 +658,7 @@ class SfincsForcingStage(_SfincsStageBase):
         gdf_bnd = gpd.GeoDataFrame(
             {"name": names},
             geometry=geom,
-            index=list(range(n_points)),
+            index=range(n_points),
             crs=model_crs,
         )
 
@@ -756,7 +754,7 @@ class SfincsObservationPointsStage(_SfincsStageBase):
                 f"{', '.join(sorted(dropped))}",
                 "warning",
             )
-        selected = selected[selected["station_id"].isin(valid_ids)]
+        selected = selected[selected["station_id"].isin(sorted(valid_ids))]
         if selected.empty:
             self._log("No NOAA CO-OPS stations with valid datum data in domain")
             return 0
