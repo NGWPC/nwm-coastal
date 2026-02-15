@@ -1096,6 +1096,7 @@ class CoastalCalibRunner:
 
         if not wait:
             # Return immediately without waiting for job completion
+            self.monitor.end_workflow(success=True)
             return WorkflowResult(
                 success=True,
                 job_id=job_id,
