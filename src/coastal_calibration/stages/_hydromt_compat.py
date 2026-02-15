@@ -1,8 +1,15 @@
-"""Compatibility patches for hydromt bugs."""
+"""Temporary compatibility patches for hydromt bugs.
+
+All patches here are stopgaps until the fixes land upstream.
+Each one is idempotent (safe to call more than once) and logs
+when it is applied so problems are easy to trace.
+"""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
+
+from coastal_calibration.utils.logging import logger as _log
 
 if TYPE_CHECKING:
     import geopandas as gpd
@@ -39,6 +46,7 @@ def register_round_coords_preprocessor() -> None:
         return ds
 
     PREPROCESSORS["round_coords"] = round_coords
+    _log.info("Registered 'round_coords' preprocessor in hydromt.")
 
 
 def patch_serialize_crs() -> None:
@@ -49,9 +57,11 @@ def patch_serialize_crs() -> None:
     ``TypeError: 'NoneType' object is not iterable`` for any CRS that has
     no EPSG code and no recognised authority (e.g. custom proj strings).
 
-    This patch rewrites the function's code object in-place so that even
-    references already captured by Pydantic's ``PlainSerializer`` pick up
-    the fix.
+    Pydantic's ``PlainSerializer`` captures a direct reference to the
+    function object at class-definition time, so replacing the function
+    on the module would not affect already-imported Pydantic models.
+    We therefore swap the function's ``__code__`` in-place so the
+    existing reference picks up the fix.
     """
     try:
         import hydromt.typing.crs as _crs_mod
@@ -60,7 +70,6 @@ def patch_serialize_crs() -> None:
 
     _original = _crs_mod._serialize_crs  # type: ignore[reportPrivateUsage]
 
-    # Only patch once
     if getattr(_original, "_patched", False):
         return
 
@@ -73,10 +82,9 @@ def patch_serialize_crs() -> None:
             return list(auth)
         return crs.to_wkt()
 
-    # Replace the *code* of the original function so Pydantic's
-    # already-captured reference to the function object sees the fix.
     _original.__code__ = _safe_serialize_crs.__code__
     _original._patched = True  # type: ignore[attr-defined]
+    _log.info("Patched hydromt _serialize_crs to handle CRS without an authority.")
 
 
 def patch_boundary_conditions_index_dim() -> None:
@@ -112,6 +120,7 @@ def patch_boundary_conditions_index_dim() -> None:
 
     SfincsBoundaryBase._validate_and_prepare_gdf = _validate_and_normalise  # type: ignore[reportPrivateUsage]
     SfincsBoundaryBase._validate_and_prepare_gdf._patched = True  # type: ignore[reportPrivateUsage, attr-defined]
+    _log.info("Patched hydromt-sfincs _validate_and_prepare_gdf to normalise index name.")
 
 
 def patch_meteo_write_gridded() -> None:
@@ -122,10 +131,9 @@ def patch_meteo_write_gridded() -> None:
     typical NWM forcing setup (precip + wind + pressure) this can
     exceed 90 GB — far more than a login-node's 32 GB.
 
-    xarray's ``to_netcdf`` already handles dask-backed datasets by
-    streaming chunks to disk, so the ``.load()`` call is unnecessary.
-    This patch replaces ``write_gridded`` with a version that skips
-    ``.load()`` and writes directly from the lazy dataset.
+    This patch replaces ``write_gridded`` with a version that writes
+    one time-step at a time via netCDF4 directly, keeping peak memory
+    near ~150 MB instead of the full 3-D array.
     """
     try:
         from hydromt_sfincs.components.forcing.meteo import SfincsMeteo
@@ -136,14 +144,11 @@ def patch_meteo_write_gridded() -> None:
     if getattr(_original, "_patched", False):
         return
 
-    import xarray as xr
-
     def _write_gridded_lazy(
         self: Any,
         filename: str | None = None,
         rename: dict[str, str] | None = None,
     ) -> None:
-        import gc
         from pathlib import Path
 
         import netCDF4
@@ -152,18 +157,16 @@ def patch_meteo_write_gridded() -> None:
         tref = self.model.config.get("tref")
         tref_str = tref.strftime("%Y-%m-%d %H:%M:%S")
 
-        # Keep dataset lazy — no .load()
         ds = self.data
 
-        # combine variables and rename to output names
+        # Apply variable renaming (swap keys/values to match upstream convention)
+        # and select only the renamed variables.  The upstream code does the
+        # same: merge only the matching variables, then rename.
         if rename is not None:
-            rename = {v: k for k, v in rename.items() if v in ds}
-            if len(rename) > 0:
-                ds = xr.merge([ds[v] for v in rename]).rename(rename)
+            remap = {v: k for k, v in rename.items() if v in ds}
+            if remap:
+                ds = ds[list(remap)].rename(remap)
 
-        # Write one time-step at a time using netCDF4 directly so
-        # peak memory stays close to a single 2-D slice (~150 MB)
-        # instead of the full 3-D array.
         out_path = Path(filename) if filename is not None else Path("output.nc")
         out_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -205,9 +208,17 @@ def patch_meteo_write_gridded() -> None:
                 for vname in var_names:
                     nc_vars[vname][i, :] = chunk[vname].values
                 del chunk
-                gc.collect()
         finally:
             nc.close()
 
     SfincsMeteo.write_gridded = _write_gridded_lazy
     SfincsMeteo.write_gridded._patched = True  # type: ignore[attr-defined]
+    _log.info("Patched hydromt-sfincs write_gridded to stream time-steps lazily.")
+
+
+def apply_all_patches() -> None:
+    """Apply all hydromt/hydromt-sfincs compatibility patches."""
+    patch_serialize_crs()
+    register_round_coords_preprocessor()
+    patch_boundary_conditions_index_dim()
+    patch_meteo_write_gridded()
