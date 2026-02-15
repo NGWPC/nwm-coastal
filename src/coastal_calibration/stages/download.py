@@ -10,10 +10,19 @@ from coastal_calibration.stages.base import WorkflowStage
 
 
 class DownloadStage(WorkflowStage):
-    """Download required input data for SCHISM simulation."""
+    """Download required input data."""
 
     name = "download"
-    description = "Download input data (NWM, STOFS)"
+
+    @property  # type: ignore[override]
+    def description(self) -> str:  # type: ignore[override]
+        """Build description from the actual configured data sources."""
+        sources = ["NWM"]
+        try:
+            sources.append(self.config.boundary.source.upper())
+        except Exception:
+            sources.append("coastal")
+        return f"Download input data ({', '.join(sources)})"
 
     def run(self) -> dict[str, Any]:
         """Execute data download."""
