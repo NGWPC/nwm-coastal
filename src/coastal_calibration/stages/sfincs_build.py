@@ -144,6 +144,110 @@ def _clear_model(config: CoastalCalibConfig) -> None:
     _MODEL_REGISTRY.pop(id(config), None)
 
 
+def _meteo_dst_res(config: CoastalCalibConfig, model: SfincsModel) -> float:
+    """Return the output resolution (m) for gridded meteo forcing.
+
+    When the user specifies ``meteo_res`` in the configuration it is
+    returned directly.  Otherwise the base (coarsest) cell size of the
+    SFINCS quadtree grid is used: meteorological fields vary slowly in
+    space, so there is no benefit to a meteo grid finer than the
+    coarsest computational cell.
+
+    This also avoids the LCC → UTM reprojection inflation problem where
+    ``rioxarray.reproject`` produces an output grid spanning the entire
+    CONUS extent when no target resolution is specified.
+    """
+    sfincs = _sfincs_cfg(config)
+    if sfincs.meteo_res is not None:
+        return sfincs.meteo_res
+
+    # Read the base cell size from the quadtree grid stored in sfincs.nc.
+    # The grid structure stores ``dx`` and ``dy`` as attributes of the
+    # mesh topology variable, or can be inferred from sfincs.inp.
+    dx = float(model.config.get("dx", 0))
+    dy = float(model.config.get("dy", 0))
+    if dx > 0 and dy > 0:
+        return max(dx, dy)
+
+    # Quadtree grids: ``dx`` / ``dy`` are not always in the config but
+    # the grid NetCDF records them.  Fall back to the grid dataset.
+    try:
+        grid_ds = model.components["quadtree_grid"].data
+        dx = float(grid_ds.attrs.get("dx", 0))
+        dy = float(grid_ds.attrs.get("dy", 0))
+        if dx > 0 and dy > 0:
+            return max(dx, dy)
+    except Exception:  # noqa: S110
+        pass
+
+    # Absolute fallback: NWM native resolution (~1 km).
+    return 1000.0
+
+
+def _clip_meteo_to_domain(
+    model: SfincsModel,
+    component_name: str,
+    buffer: float = 10_000.0,
+) -> tuple[int, int]:
+    """Clip a gridded meteo component to the model domain.
+
+    After ``rioxarray.reproject`` converts NWM data from Lambert
+    Conformal Conic to UTM, the output grid can cover the entire CONUS
+    extent, producing multi-GB files that cripple the SFINCS simulation.
+    This helper uses :meth:`rioxarray.Dataset.rio.clip_box` to trim the
+    named component to the model region bounds plus a generous buffer so
+    that only the data the SFINCS binary actually reads is kept on disk.
+
+    Parameters
+    ----------
+    model : SfincsModel
+        The HydroMT SFINCS model with meteo data already loaded.
+    component_name : str
+        Name of the meteo component (``"precipitation"``, ``"wind"``,
+        or ``"pressure"``).
+    buffer : float
+        Extra metres around the model region bounds to include.
+        Default 10 km gives SFINCS comfortable headroom for
+        interpolation near the boundary.
+
+    Returns
+    -------
+    (nx_before, nx_after)
+        Number of x-cells before and after clipping, for logging.
+    """
+    component = getattr(model, component_name)
+    ds: xr.Dataset = component.data  # type: ignore[assignment]
+    nx_before = ds.sizes.get("x", 0)
+
+    # Determine the clip bounds in UTM from the model grid.
+    region_bounds = model.region.total_bounds  # (xmin, ymin, xmax, ymax)
+    minx = region_bounds[0] - buffer
+    miny = region_bounds[1] - buffer
+    maxx = region_bounds[2] + buffer
+    maxy = region_bounds[3] + buffer
+
+    # rio.clip_box handles CRS-aware clipping and automatically deals
+    # with descending y-coordinates, unlike a raw ds.sel() slice.
+    import rioxarray  # noqa: F401  # pyright: ignore[reportUnusedImport]  # activate .rio accessor
+
+    # Ensure the CRS is set — hydromt's reproject → rename → set chain
+    # can lose the spatial_ref coordinate.
+    if ds.rio.crs is None:
+        ds = ds.rio.write_crs(model.crs)
+
+    clipped = ds.rio.clip_box(minx=minx, miny=miny, maxx=maxx, maxy=maxy)
+    nx_after = clipped.sizes.get("x", 0)
+
+    if nx_after > 0 and clipped.sizes.get("y", 0) > 0:
+        # Replace the in-memory data with the clipped version.
+        # We assign ``_data`` directly because ``set()`` checks that
+        # spatial coordinates match, which would fail when the new
+        # data has different dimensions.
+        component._data = clipped
+
+    return nx_before, nx_after
+
+
 def _waterlevel_geodataset(config: CoastalCalibConfig) -> str | None:
     """Return the geodataset name for water-level forcing, or None."""
     catalog_path = _data_catalog_path(config)
@@ -339,6 +443,39 @@ class SfincsInitStage(_SfincsStageBase):
         "netamuamvfile",
     )
 
+    #: Generated NetCDF files that downstream stages will recreate.
+    #: Stale files from a previous run can crash the HDF5 library when
+    #: ``write_netcdf_safely`` (or a lazy ``model.read()``) tries to open
+    #: them, so we delete them at the start of every fresh initialisation.
+    _GENERATED_NC_FILES: tuple[str, ...] = (
+        "sfincs_netbndbzsbzifile.nc",
+        "sfincs_netamuv.nc",
+        "sfincs_netamp.nc",
+        "sfincs_netampr.nc",
+        "sfincs_netsrcdisfile.nc",
+        # SFINCS output files (not strictly forcing but can interfere)
+        "sfincs_map.nc",
+        "sfincs_his.nc",
+    )
+
+    def _remove_stale_outputs(self, root: Path) -> None:
+        """Delete generated netCDF files left over from a previous run.
+
+        The HydroMT ``write_netcdf_safely`` helper opens existing files to
+        check whether the data changed.  If a previous run produced files
+        with an incompatible schema (e.g. different number of stations)
+        the HDF5 library can segfault.  Removing them up front avoids the
+        issue entirely; every downstream stage will regenerate its files.
+        """
+        removed: list[str] = []
+        for name in self._GENERATED_NC_FILES:
+            p = root / name
+            if p.exists():
+                p.unlink()
+                removed.append(name)
+        if removed:
+            self._log(f"Removed stale output files: {', '.join(removed)}")
+
     def _clear_missing_file_refs(self, model: SfincsModel) -> None:
         """Clear config references to files that do not exist on disk."""
         model_root = model.root.path
@@ -375,6 +512,10 @@ class SfincsInitStage(_SfincsStageBase):
                     if not dst_file.exists():
                         shutil.copy2(src_file, dst_file)
             self._log(f"Copied pre-built model from {source_dir} to {root}")
+
+        # Remove generated netCDF files from any previous run so that
+        # downstream stages start fresh and never trip over stale data.
+        self._remove_stale_outputs(root)
 
         model = SfincsModel(
             data_libs=data_libs,
@@ -587,6 +728,49 @@ class SfincsForcingStage(_SfincsStageBase):
         df_ts.index.name = "time"
         return df_ts
 
+    def _inject_water_level(
+        self,
+        model: SfincsModel,
+        df_ts: Any,
+        gdf_bnd: Any,
+    ) -> None:
+        """Inject water-level forcing into the HydroMT model.
+
+        SFINCS needs *both* ``bndfile`` (boundary point locations on the
+        grid) and ``netbndbzsbzifile`` (time-varying water levels at those
+        points).  We temporarily clear all boundary file refs so that the
+        lazy initialisation of the water_level component starts with an
+        empty dataset, then restore ``bndfile`` before writing so the
+        SFINCS binary can find boundary locations.
+
+        A zero-filled ``bzi`` (infragravity) variable is added because the
+        SFINCS binary unconditionally queries ``zi`` in the netCDF file
+        (``sfincs_ncinput.F90:118``) and crashes if it is absent.
+        """
+        import xarray as xr_
+
+        for key in ("bzsfile", "bzifile", "bndfile", "bcafile", "netbndbzsbzifile"):
+            model.config.set(key, None)
+
+        _ = model.water_level.data  # force lazy init with empty data
+
+        self._update_substep("Setting water level forcing on model")
+        model.water_level.set(df=df_ts, gdf=gdf_bnd, merge=False)
+
+        # Add zero-filled bzi so the netCDF writer includes a ``zi``
+        # variable (SFINCS crashes without it).
+        ds = model.water_level.data
+        if "bzi" not in ds.data_vars:
+            ds["bzi"] = xr_.zeros_like(ds["bzs"])
+
+        # Restore bndfile so the SFINCS binary can locate boundary cells,
+        # and set netCDF output for the water level timeseries.
+        model.config.set("bndfile", "sfincs.bnd")
+        nc_name = "sfincs_netbndbzsbzifile.nc"
+        model.config.set("netbndbzsbzifile", nc_name)
+        model.water_level.write()
+        self._log(f"Wrote boundary forcing to {nc_name}")
+
     def _create_tpxo_forcing(self, model: SfincsModel) -> None:
         """Synthesize water-level forcing from TPXO tidal constituents.
 
@@ -663,25 +847,171 @@ class SfincsForcingStage(_SfincsStageBase):
         )
 
         # 10. Inject into HydroMT model
-        # Clear *all* boundary file refs so that the lazy initialisation of
-        # the water_level component (which reads from disk when _data is
-        # None) does not try to open a file that doesn't exist yet.
-        for key in ("bzsfile", "bzifile", "bndfile", "bcafile", "netbndbzsbzifile"):
-            model.config.set(key, None)
+        self._inject_water_level(model, df_fine, gdf_bnd)
 
-        # Force the component to initialise with empty data (ASCII path,
-        # bndfile=None → empty GeoDataFrame → nothing loaded).
-        _ = model.water_level.data
+    @staticmethod
+    def _idw_interpolate(
+        src_xy: NDArray[np.floating[Any]],
+        target_xy: NDArray[np.floating[Any]],
+        values: NDArray[np.floating[Any]],
+        k: int = 4,
+    ) -> NDArray[np.floating[Any]]:
+        """Inverse-distance weighted interpolation from source to target points.
 
-        self._update_substep("Setting water level forcing on model")
-        model.water_level.set(df=df_fine, gdf=gdf_bnd, merge=False)
+        Parameters
+        ----------
+        src_xy : ndarray, shape (N, 2)
+            Source point coordinates.
+        target_xy : ndarray, shape (M, 2)
+            Target point coordinates.
+        values : ndarray, shape (T, N)
+            Timeseries values at each source point.
+        k : int
+            Number of nearest neighbours to use (capped at N).
 
-        # Now that in-memory data is populated, switch to netCDF output and
-        # write the file so that it exists on disk for later stages.
-        nc_name = "sfincs_netbndbzsbzifile.nc"
-        model.config.set("netbndbzsbzifile", nc_name)
-        model.water_level.write()
-        self._log(f"Wrote boundary forcing to {nc_name}")
+        Returns
+        -------
+        ndarray, shape (T, M)
+            Interpolated values at each target point.
+        """
+        from scipy.spatial import cKDTree
+
+        k = min(k, len(src_xy))
+        tree = cKDTree(src_xy)
+        dists, idxs = tree.query(target_xy, k=k)
+
+        n_times, _ = values.shape
+        n_targets = len(target_xy)
+        result = np.empty((n_times, n_targets))
+
+        for j in range(n_targets):
+            d = np.atleast_1d(dists[j])
+            ix = np.atleast_1d(idxs[j])
+            exact = d < 1e-10
+            if np.any(exact):
+                result[:, j] = values[:, ix[exact][0]]
+            else:
+                weights = 1.0 / d
+                weights /= weights.sum()
+                result[:, j] = np.nansum(values[:, ix] * weights[np.newaxis, :], axis=1)
+
+        return result
+
+    def _load_geodataset_for_bnd(
+        self,
+        model: SfincsModel,
+        geodataset_name: str,
+        bnd_points: list[tuple[float, float, str]],
+    ) -> xr.DataArray | xr.Dataset:
+        """Load a geodataset clipped around the boundary point locations."""
+        import geopandas as gpd
+        from pyproj import Transformer
+        from shapely.geometry import Point
+
+        self._update_substep(f"Loading {geodataset_name} data")
+        tstart, tstop = model.get_model_time()
+
+        transformer = Transformer.from_crs(model.crs, 4326, always_xy=True)
+        bnd_lonlats = [transformer.transform(x, y) for x, y, _ in bnd_points]
+        bbox_gdf = gpd.GeoDataFrame(
+            geometry=[Point(lon, lat) for lon, lat in bnd_lonlats],
+            crs=4326,
+        )
+
+        da = model.data_catalog.get_geodataset(
+            geodataset_name,
+            geom=bbox_gdf,
+            buffer=50e3,  # 50 km buffer to ensure enough source nodes
+            variables=["waterlevel"],
+            time_range=(tstart, tstop),
+        )
+        self._log(f"Loaded {geodataset_name}: {da.sizes} dimensions")
+        return da
+
+    def _interpolate_to_bnd(
+        self,
+        da: xr.DataArray | xr.Dataset,
+        bnd_points: list[tuple[float, float, str]],
+        model_crs: Any,
+    ) -> Any:
+        """IDW-interpolate a geodataset to the boundary point locations."""
+        import pandas as pd
+        from pyproj import Transformer
+
+        src_gdf = da.vector.to_gdf()
+        src_xy = np.column_stack([src_gdf.geometry.x.values, src_gdf.geometry.y.values])
+
+        # Transform boundary points to the same CRS as the source data
+        src_crs = da.vector.crs
+        if src_crs is not None and src_crs != model_crs:
+            tr = Transformer.from_crs(model_crs, src_crs, always_xy=True)
+            bnd_in_src = [tr.transform(x, y) for x, y, _ in bnd_points]
+        else:
+            bnd_in_src = [(x, y) for x, y, _ in bnd_points]
+        target_xy = np.array(bnd_in_src)
+
+        wl_data: NDArray[np.floating[Any]] = np.asarray(
+            da.transpose(..., da.vector.index_dim).values
+        )
+        bnd_wl = self._idw_interpolate(src_xy, target_xy, wl_data)
+
+        time_vals = pd.DatetimeIndex(da.time.values)
+        df_ts = pd.DataFrame(bnd_wl, index=time_vals, columns=range(len(bnd_points)))
+        df_ts.index.name = "time"
+        return df_ts
+
+    def _create_geodataset_forcing(self, model: SfincsModel, geodataset_name: str) -> None:
+        """Create water-level forcing by interpolating a geodataset to boundary points.
+
+        Unlike ``model.water_level.create(geodataset=...)``, which passes
+        *all* source stations within the model region to the netCDF output
+        (incompatible with SFINCS when a ``.bnd`` file defines explicit
+        boundary points), this method:
+
+        1. Reads boundary locations from ``sfincs.bnd``.
+        2. Loads the geodataset (e.g. STOFS water levels).
+        3. Spatially interpolates the geodataset to the boundary points
+           using inverse-distance weighting from the nearest source nodes.
+        4. Injects the result into HydroMT the same way the TPXO path does.
+        """
+        import geopandas as gpd
+        from shapely.geometry import Point
+
+        model_root = get_model_root(self.config)
+        bnd_path = model_root / "sfincs.bnd"
+        if not bnd_path.exists():
+            raise FileNotFoundError(
+                f"Boundary file {bnd_path} not found.  "
+                "Ensure the pre-built model includes sfincs.bnd."
+            )
+
+        # 1. Read boundary points (in model CRS, typically UTM)
+        bnd_points = self._parse_bnd_file(bnd_path)
+        if not bnd_points:
+            raise ValueError("No boundary points found in sfincs.bnd")
+        n_bnd = len(bnd_points)
+        self._log(f"Read {n_bnd} boundary point(s) from {bnd_path}")
+
+        # 2. Load the geodataset clipped around the boundary points
+        da = self._load_geodataset_for_bnd(model, geodataset_name, bnd_points)
+
+        # 3. Spatially interpolate geodataset to boundary point locations
+        self._update_substep("Interpolating to boundary points")
+        df_ts = self._interpolate_to_bnd(da, bnd_points, model.crs)
+        self._log(
+            f"Interpolated {geodataset_name} to {n_bnd} boundary points ({len(df_ts)} time steps)"
+        )
+
+        # 4. Build GeoDataFrame for boundary locations (model CRS)
+        gdf_bnd = gpd.GeoDataFrame(
+            {"name": [name for _, _, name in bnd_points]},
+            geometry=[Point(x, y) for x, y, _ in bnd_points],
+            index=range(n_bnd),
+            crs=model.crs,
+        )
+
+        # 5. Inject into HydroMT model (same approach as TPXO path)
+        self._inject_water_level(model, df_ts, gdf_bnd)
 
     def run(self) -> dict[str, Any]:
         """Add water level boundary forcing."""
@@ -699,7 +1029,7 @@ class SfincsForcingStage(_SfincsStageBase):
             return {"status": "skipped"}
 
         self._update_substep("Adding water level forcing")
-        model.water_level.create(geodataset=wl_geodataset)
+        self._create_geodataset_forcing(model, wl_geodataset)
         self._log(f"Water level forcing added from {wl_geodataset}")
 
         return {"status": "completed", "source": wl_geodataset}
@@ -840,6 +1170,44 @@ class SfincsDischargeStage(_SfincsStageBase):
             points.append((x, y, name))
         return points
 
+    @staticmethod
+    def _filter_active_cells(
+        points: list[tuple[float, float, str]],
+        model: Any,
+    ) -> tuple[list[tuple[float, float, str]], list[str]]:
+        """Keep only source points that fall on active grid cells.
+
+        The SFINCS Fortran binary segfaults when a discharge source point
+        maps to an inactive cell (``mask != 1``), because the cell index
+        is left at 0 and the code later accesses ``zs(0)`` without any
+        bounds check.  This filter prevents the crash by dropping points
+        that do not land on an active face of the quadtree mesh.
+
+        Returns
+        -------
+        kept, dropped
+            ``kept`` are the (x, y, name) tuples on active cells;
+            ``dropped`` are the names of the removed points.
+        """
+        import numpy as np
+        from scipy.spatial import cKDTree
+
+        grid_ds = model.components["quadtree_grid"].data
+        ugrid = grid_ds.ugrid.grid
+        face_xy = np.column_stack([ugrid.face_x, ugrid.face_y])
+        mask = grid_ds["mask"].values
+
+        tree = cKDTree(face_xy)
+        kept: list[tuple[float, float, str]] = []
+        dropped: list[str] = []
+        for x, y, name in points:
+            _, idx = tree.query([x, y])
+            if mask[idx] == 1:
+                kept.append((x, y, name))
+            else:
+                dropped.append(name)
+        return kept, dropped
+
     def run(self) -> dict[str, Any]:
         """Add discharge source points from a ``.src`` or GeoJSON file."""
         model = _get_model(self.config)
@@ -865,9 +1233,17 @@ class SfincsDischargeStage(_SfincsStageBase):
 
         if suffix == ".src":
             parsed = self._parse_src_file(src_path)
-            for x, y, name in parsed:
+            # Filter out points on inactive grid cells to prevent
+            # a segfault in the SFINCS binary (zs(0) out-of-bounds).
+            kept, dropped = self._filter_active_cells(parsed, model)
+            if dropped:
+                self._log(
+                    f"Dropped {len(dropped)} source point(s) on inactive "
+                    f"cells: {', '.join(dropped)}"
+                )
+            for x, y, name in kept:
                 model.discharge_points.add_point(x=x, y=y, name=name)
-            self._log(f"Added {len(parsed)} discharge source point(s) from {src_path}")
+            self._log(f"Added {len(kept)} discharge source point(s) from {src_path}")
         else:
             model.discharge_points.create(
                 locations=str(src_path),
@@ -894,11 +1270,20 @@ class SfincsPrecipitationStage(_SfincsStageBase):
         meteo_dataset = f"{self.config.simulation.meteo_source}_meteo"
 
         self._update_substep("Adding precipitation forcing")
-        model.precipitation.create(precip=meteo_dataset)
-        self._log(f"Precipitation forcing added from {meteo_dataset}")
+        dst_res = _meteo_dst_res(self.config, model)
+        model.precipitation.create(precip=meteo_dataset, dst_res=dst_res)
+
+        # Clip the reprojected grid to the model domain.  Without this
+        # the LCC → UTM reprojection inflates the grid to cover the
+        # entire CONUS extent (~5 000 x 4 200 km).
+        nx_before, nx_after = _clip_meteo_to_domain(model, "precipitation")
+        self._log(
+            f"Precipitation forcing added from {meteo_dataset} "
+            f"(res={dst_res:.0f} m, clipped {nx_before}→{nx_after} x-cells)"
+        )
 
         # Write immediately and release memory so subsequent forcing
-        # stages don't accumulate ~91 GB of gridded data in RAM.
+        # stages don't accumulate large gridded data in RAM.
         model.precipitation.write()
         model.precipitation.clear()
 
@@ -921,8 +1306,14 @@ class SfincsWindStage(_SfincsStageBase):
         meteo_dataset = f"{self.config.simulation.meteo_source}_meteo"
 
         self._update_substep("Adding wind forcing")
-        model.wind.create(wind=meteo_dataset)
-        self._log(f"Wind forcing added from {meteo_dataset}")
+        dst_res = _meteo_dst_res(self.config, model)
+        model.wind.create(wind=meteo_dataset, dst_res=dst_res)
+
+        nx_before, nx_after = _clip_meteo_to_domain(model, "wind")
+        self._log(
+            f"Wind forcing added from {meteo_dataset} "
+            f"(res={dst_res:.0f} m, clipped {nx_before}→{nx_after} x-cells)"
+        )
 
         # Write immediately and release memory (see SfincsPrecipitationStage).
         model.wind.write()
@@ -947,11 +1338,17 @@ class SfincsPressureStage(_SfincsStageBase):
         meteo_dataset = f"{self.config.simulation.meteo_source}_meteo"
 
         self._update_substep("Adding atmospheric pressure forcing")
-        model.pressure.create(press=meteo_dataset)
+        dst_res = _meteo_dst_res(self.config, model)
+        model.pressure.create(press=meteo_dataset, dst_res=dst_res)
+
+        nx_before, nx_after = _clip_meteo_to_domain(model, "pressure")
 
         # Enable barometric pressure correction so SFINCS uses the forcing
         model.config.set("baro", 1)
-        self._log(f"Atmospheric pressure forcing added from {meteo_dataset} (baro=1 enabled)")
+        self._log(
+            f"Atmospheric pressure forcing added from {meteo_dataset} "
+            f"(baro=1, res={dst_res:.0f} m, clipped {nx_before}→{nx_after} x-cells)"
+        )
 
         # Write immediately and release memory (see SfincsPrecipitationStage).
         model.pressure.write()
