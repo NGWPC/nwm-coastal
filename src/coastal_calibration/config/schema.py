@@ -126,7 +126,7 @@ class BoundaryConfig:
 
     def __post_init__(self) -> None:
         if self.stofs_file is not None:
-            self.stofs_file = Path(self.stofs_file).resolve()
+            self.stofs_file = Path(self.stofs_file).expanduser().resolve()
 
 
 @dataclass
@@ -151,15 +151,18 @@ class PathConfig:
         # Resolve all path fields to absolute so that downstream paths
         # (model_root, sif_path, Singularity bind mounts, etc.) never
         # contain relative components that can double up when cwd changes.
-        self.work_dir = Path(self.work_dir).resolve()
-        self.parm_dir = Path(self.parm_dir).resolve()
-        self.nfs_mount = Path(self.nfs_mount).resolve()
-        self.singularity_image = Path(self.singularity_image).resolve()
-        self.ngen_app_dir = Path(self.ngen_app_dir).resolve()
+        # expanduser() must come before resolve() so that "~" is expanded
+        # to the user's home directory instead of being treated as a
+        # literal path component.
+        self.work_dir = Path(self.work_dir).expanduser().resolve()
+        self.parm_dir = Path(self.parm_dir).expanduser().resolve()
+        self.nfs_mount = Path(self.nfs_mount).expanduser().resolve()
+        self.singularity_image = Path(self.singularity_image).expanduser().resolve()
+        self.ngen_app_dir = Path(self.ngen_app_dir).expanduser().resolve()
         if self.raw_download_dir:
-            self.raw_download_dir = Path(self.raw_download_dir).resolve()
+            self.raw_download_dir = Path(self.raw_download_dir).expanduser().resolve()
         if self.hot_start_file:
-            self.hot_start_file = Path(self.hot_start_file).resolve()
+            self.hot_start_file = Path(self.hot_start_file).expanduser().resolve()
 
     @property
     def otps_dir(self) -> Path:
@@ -231,7 +234,7 @@ class MonitoringConfig:
 
     def __post_init__(self) -> None:
         if self.log_file is not None:
-            self.log_file = Path(self.log_file).resolve()
+            self.log_file = Path(self.log_file).expanduser().resolve()
 
 
 @dataclass
@@ -518,6 +521,21 @@ class SfincsModelConfig(ModelConfig):
     include_pressure : bool
         When True, add spatially-varying atmospheric pressure forcing
         (``press_msl``) and enable barometric correction (``baro=1``).
+    meteo_res : float, optional
+        Output resolution (m) for gridded meteorological forcing
+        (precipitation, wind, pressure).  When *None* (default) the
+        resolution is determined from the SFINCS quadtree grid — it
+        equals the base cell size (coarsest level) so that the meteo
+        grid is never finer than needed.  Setting an explicit value
+        (e.g. ``2000``) overrides the automatic calculation.
+
+        .. note::
+
+           Without this parameter the HydroMT ``reproject`` call
+           retains the source-data resolution (≈ 1 km for NWM), and
+           the LCC → UTM reprojection can inflate the output to the
+           full CONUS extent, producing multi-GB files and very slow
+           simulations.
     navd88_to_msl_m : float
         Vertical offset in metres to convert SFINCS output from NAVD88 to
         MSL.  The value is *added* to the simulated water level before
@@ -552,6 +570,7 @@ class SfincsModelConfig(ModelConfig):
     include_precip: bool = False
     include_wind: bool = False
     include_pressure: bool = False
+    meteo_res: float | None = None
     navd88_to_msl_m: float = 0.0
     sfincs_exe: Path | None = None
     container_tag: str = "latest"
@@ -559,17 +578,21 @@ class SfincsModelConfig(ModelConfig):
     omp_num_threads: int = field(default=0)
 
     def __post_init__(self) -> None:
-        self.prebuilt_dir = Path(self.prebuilt_dir).resolve()
+        self.prebuilt_dir = Path(self.prebuilt_dir).expanduser().resolve()
         if self.model_root is not None:
-            self.model_root = Path(self.model_root).resolve()
+            self.model_root = Path(self.model_root).expanduser().resolve()
         if self.observation_locations_file is not None:
-            self.observation_locations_file = Path(self.observation_locations_file).resolve()
+            self.observation_locations_file = (
+                Path(self.observation_locations_file).expanduser().resolve()
+            )
         if self.discharge_locations_file is not None:
-            self.discharge_locations_file = Path(self.discharge_locations_file).resolve()
+            self.discharge_locations_file = (
+                Path(self.discharge_locations_file).expanduser().resolve()
+            )
         if self.sfincs_exe is not None:
             self.sfincs_exe = Path(self.sfincs_exe).expanduser().resolve()
         if self.container_image is not None:
-            self.container_image = Path(self.container_image).resolve()
+            self.container_image = Path(self.container_image).expanduser().resolve()
         if self.omp_num_threads <= 0:
             from coastal_calibration.utils.system import get_cpu_count
 
