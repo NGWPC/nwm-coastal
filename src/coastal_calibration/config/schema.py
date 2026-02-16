@@ -803,6 +803,8 @@ def _build_interpolation_context(data: dict[str, Any]) -> dict[str, Any]:
     dict
         Flat dictionary with keys like "slurm.user", "simulation.coastal_domain".
     """
+    import os
+
     context: dict[str, Any] = {}
     for section, values in data.items():
         if isinstance(values, dict):
@@ -812,6 +814,10 @@ def _build_interpolation_context(data: dict[str, Any]) -> dict[str, Any]:
     # Top-level scalar keys (e.g., "model") are available without a section prefix.
     if "model" in data:
         context["model"] = data["model"]
+    # Fall back to $USER env var when slurm.user is not provided, so that
+    # default path templates (which reference ${slurm.user}) resolve correctly.
+    if "slurm.user" not in context:
+        context["slurm.user"] = os.environ.get("USER", "unknown")
     return context
 
 
