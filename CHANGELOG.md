@@ -63,12 +63,12 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     the `schism_obs` and `schism_plot` stages
 - Automatic `param.nml` patching (`iout_sta = 1`, `nspool_sta = 18`) when `station.in`
     exists, ensuring `mod(nhot_write, nspool_sta) == 0` across all domain templates
-- `forcing_to_mesh_offset_m` option in `SfincsModelConfig` to apply a vertical offset
-    to boundary-condition water levels before they enter SFINCS. For tidal-only sources
-    like TPXO, this anchors the tidal signal to the correct geodetic height of MSL on the
-    mesh.
-- `vdatum_mesh_to_msl_m` option in `SfincsModelConfig` to convert SFINCS output from
-    the mesh vertical datum to MSL for comparison with NOAA CO-OPS observations.
+- `forcing_to_mesh_offset_m` option in `SfincsModelConfig` to apply a vertical offset to
+    boundary-condition water levels before they enter SFINCS. For tidal-only sources
+    like TPXO, this anchors the tidal signal to the correct geodetic height of MSL on
+    the mesh.
+- `vdatum_mesh_to_msl_m` option in `SfincsModelConfig` to convert SFINCS output from the
+    mesh vertical datum to MSL for comparison with NOAA CO-OPS observations.
 - Sanity-check warning in `sfincs_forcing` when adjusted boundary water levels fall
     outside the ±15 m range, indicating a possible sign or magnitude error in
     `forcing_to_mesh_offset_m`.
