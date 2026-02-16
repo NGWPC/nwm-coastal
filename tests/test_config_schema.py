@@ -261,7 +261,7 @@ class TestSfincsModelConfig:
         assert cfg.merge_observations is False
         assert cfg.merge_discharge is False
         assert cfg.include_noaa_gages is False
-        assert cfg.vdatum_forcing_to_mesh_m == 0.0
+        assert cfg.forcing_to_mesh_offset_m == 0.0
         assert cfg.vdatum_mesh_to_msl_m == 0.0
 
     def test_model_name(self, tmp_path):
@@ -299,10 +299,10 @@ class TestSfincsModelConfig:
     def test_explicit_vdatum_offsets(self, tmp_path):
         cfg = SfincsModelConfig(
             prebuilt_dir=tmp_path,
-            vdatum_forcing_to_mesh_m=-0.147,
+            forcing_to_mesh_offset_m=-0.147,
             vdatum_mesh_to_msl_m=0.147,
         )
-        assert cfg.vdatum_forcing_to_mesh_m == pytest.approx(-0.147)
+        assert cfg.forcing_to_mesh_offset_m == pytest.approx(-0.147)
         assert cfg.vdatum_mesh_to_msl_m == pytest.approx(0.147)
 
     def test_explicit_omp_num_threads(self, tmp_path):
@@ -586,7 +586,7 @@ class TestCoastalCalibConfig:
         assert cfg.model == "sfincs"
 
     def test_sfincs_vdatum_offsets_from_yaml(self, tmp_path):
-        """vdatum_forcing_to_mesh_m and vdatum_mesh_to_msl_m round-trip through YAML."""
+        """forcing_to_mesh_offset_m and vdatum_mesh_to_msl_m round-trip through YAML."""
         config_dict = {
             "model": "sfincs",
             "slurm": {"user": "test"},
@@ -603,7 +603,7 @@ class TestCoastalCalibConfig:
             },
             "model_config": {
                 "prebuilt_dir": str(tmp_path / "prebuilt"),
-                "vdatum_forcing_to_mesh_m": -0.147,
+                "forcing_to_mesh_offset_m": -0.147,
                 "vdatum_mesh_to_msl_m": 0.147,
             },
         }
@@ -611,7 +611,7 @@ class TestCoastalCalibConfig:
         config_path.write_text(yaml.dump(config_dict))
         cfg = CoastalCalibConfig.from_yaml(config_path)
         assert isinstance(cfg.model_config, SfincsModelConfig)
-        assert cfg.model_config.vdatum_forcing_to_mesh_m == pytest.approx(-0.147)
+        assert cfg.model_config.forcing_to_mesh_offset_m == pytest.approx(-0.147)
         assert cfg.model_config.vdatum_mesh_to_msl_m == pytest.approx(0.147)
 
     def test_relative_yaml_paths_resolve_to_absolute(self, tmp_path, monkeypatch):
