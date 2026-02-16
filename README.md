@@ -190,17 +190,18 @@ present.
 
 #### SFINCS (`SfincsModelConfig`)
 
-| Parameter                    | Type | Default  | Description                     |
-| ---------------------------- | ---- | -------- | ------------------------------- |
-| `prebuilt_dir`               | path | required | Path to pre-built SFINCS model  |
-| `observation_points`         | list | `[]`     | Observation point coordinates   |
-| `observation_locations_file` | path | null     | Observation locations file      |
-| `merge_observations`         | bool | false    | Merge observations into model   |
-| `discharge_locations_file`   | path | null     | Discharge source locations file |
-| `merge_discharge`            | bool | false    | Merge discharge into model      |
-| `omp_num_threads`            | int  | 36       | OpenMP threads                  |
-| `container_tag`              | str  | latest   | SFINCS container tag            |
-| `container_image`            | path | null     | Singularity image path          |
+| Parameter                    | Type  | Default  | Description                            |
+| ---------------------------- | ----- | -------- | -------------------------------------- |
+| `prebuilt_dir`               | path  | required | Path to pre-built SFINCS model         |
+| `observation_points`         | list  | `[]`     | Observation point coordinates          |
+| `observation_locations_file` | path  | null     | Observation locations file             |
+| `merge_observations`         | bool  | false    | Merge observations into model          |
+| `discharge_locations_file`   | path  | null     | Discharge source locations file        |
+| `merge_discharge`            | bool  | false    | Merge discharge into model             |
+| `meteo_res`                  | float | null     | Meteo forcing output resolution (m)    |
+| `omp_num_threads`            | int   | auto     | OpenMP threads (defaults to CPU count) |
+| `container_tag`              | str   | latest   | SFINCS container tag                   |
+| `container_image`            | path  | null     | Singularity image path                 |
 
 ### Simulation Settings
 
@@ -220,6 +221,9 @@ present.
 | `stofs_file` | path | -               | STOFS file path           |
 
 ### Path Settings
+
+All path fields support `~` (tilde) expansion, so you can write `~/my_data` instead of
+the full home directory path.
 
 | Parameter           | Type | Default                                      | Description                        |
 | ------------------- | ---- | -------------------------------------------- | ---------------------------------- |

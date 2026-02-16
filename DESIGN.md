@@ -215,7 +215,8 @@ src/coastal_calibration/
 │   ├── boundary.py              # Boundary condition stages
 │   ├── schism.py                # SCHISM execution stages
 │   ├── sfincs.py                # SFINCS data catalog & symlinks
-│   └── sfincs_build.py          # SFINCS model build stages (HydroMT)
+│   ├── sfincs_build.py          # SFINCS model build stages (HydroMT)
+│   └── _hydromt_compat.py       # Compatibility patches for hydromt bugs
 │
 ├── scripts/                     # Embedded bash scripts
 │   ├── tpxo_to_open_bnds_hgrid/ # TPXO Python utilities
@@ -367,8 +368,10 @@ flowchart TD
     F --> G[sfincs_obs]
     G --> H[sfincs_discharge]
     H --> I[sfincs_precip]
-    I --> J[sfincs_write]
-    J --> K[sfincs_run]
+    I --> J[sfincs_wind]
+    J --> K[sfincs_pressure]
+    K --> L[sfincs_write]
+    L --> M[sfincs_run]
 ```
 
 Each stage is a Python class inheriting from `WorkflowStage`:
@@ -949,19 +952,22 @@ ______________________________________________________________________
 
 ### SFINCS Workflow Stages
 
-| Stage                 | Class                    | Description                        |
-| --------------------- | ------------------------ | ---------------------------------- |
-| `download`            | `DownloadStage`          | Download NWM/STOFS data            |
-| `sfincs_symlinks`     | `SFINCSSymlinksStage`    | Create `.nc` symlinks for NWM data |
-| `sfincs_data_catalog` | `SFINCSDataCatalogStage` | Generate HydroMT data catalog      |
-| `sfincs_init`         | `SFINCSInitStage`        | Initialize SFINCS model            |
-| `sfincs_timing`       | `SFINCSTimingStage`      | Set SFINCS timing                  |
-| `sfincs_forcing`      | `SFINCSForcingStage`     | Add water level forcing            |
-| `sfincs_obs`          | `SFINCSObsStage`         | Add observation points             |
-| `sfincs_discharge`    | `SFINCSDischargeStage`   | Add discharge sources              |
-| `sfincs_precip`       | `SFINCSPrecipStage`      | Add precipitation forcing          |
-| `sfincs_write`        | `SFINCSWriteStage`       | Write SFINCS model                 |
-| `sfincs_run`          | `SFINCSRunStage`         | Run SFINCS (Singularity/OpenMP)    |
+| Stage                 | Class                      | Description                                 |
+| --------------------- | -------------------------- | ------------------------------------------- |
+| `download`            | `DownloadStage`            | Download NWM/STOFS data                     |
+| `sfincs_symlinks`     | `SFINCSSymlinksStage`      | Create `.nc` symlinks for NWM data          |
+| `sfincs_data_catalog` | `SFINCSDataCatalogStage`   | Generate HydroMT data catalog               |
+| `sfincs_init`         | `SfincsInitStage`          | Initialize SFINCS model + clean stale files |
+| `sfincs_timing`       | `SfincsTimingStage`        | Set SFINCS timing                           |
+| `sfincs_forcing`      | `SfincsForcingStage`       | Add water level forcing (IDW interpolation) |
+| `sfincs_obs`          | `SfincsObsStage`           | Add observation points                      |
+| `sfincs_discharge`    | `SfincsDischargeStage`     | Add discharge sources (active-cell filter)  |
+| `sfincs_precip`       | `SfincsPrecipitationStage` | Add precipitation forcing + clip meteo grid |
+| `sfincs_wind`         | `SfincsWindStage`          | Add wind forcing + clip meteo grid          |
+| `sfincs_pressure`     | `SfincsPressureStage`      | Add pressure forcing + clip meteo grid      |
+| `sfincs_write`        | `SfincsWriteStage`         | Write SFINCS model                          |
+| `sfincs_run`          | `SfincsRunStage`           | Run SFINCS (Singularity/OpenMP)             |
+| `sfincs_plot`         | `SfincsPlotStage`          | Plot simulated vs observed water levels     |
 
 ______________________________________________________________________
 

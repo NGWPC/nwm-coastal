@@ -30,6 +30,23 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 
+- `meteo_res` option in `SfincsModelConfig` to control the output resolution (m) of
+    gridded meteorological forcing (precipitation, wind, pressure). When not set, the
+    resolution is derived from the SFINCS quadtree grid base cell size.
+- Meteo grid clipping (`_clip_meteo_to_domain`) that trims reprojected meteo grids to
+    the model domain extent, preventing the LCC → UTM reprojection from inflating grids
+    to CONUS scale — **reducing SFINCS runtime from 15 h+ to under 15 min**.
+- Stale netCDF file cleanup in `SfincsInitStage` to prevent HDF5 segfaults when
+    re-running a pipeline over an existing model directory.
+- Geodataset-based water-level forcing with IDW interpolation to boundary points,
+    replacing the built-in `model.water_level.create(geodataset=...)` which passed all
+    source stations incompatibly with `.bnd` files.
+- Active-cell filtering for discharge source points to prevent a SFINCS Fortran segfault
+    when a source point falls on an inactive grid cell.
+- `apply_all_patches()` convenience function in `_hydromt_compat` that applies all
+    hydromt/hydromt-sfincs compatibility patches in one call, with logging.
+- `quiet` parameter on `WorkflowMonitor.mark_stage_completed()` to control whether a
+    visible COMPLETED log line is emitted for externally-executed stages.
 - Unified `run` and `submit` execution pipelines — both commands now execute the same
     stage pipeline. `submit` automatically partitions stages into login-node
     (Python-only) and SLURM job (container) groups.
@@ -57,6 +74,11 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
+- `DownloadStage.description` is now a property that derives its text from the
+    configured data sources (e.g. "Download input data (NWM, TPXO)") instead of a static
+    string.
+- Hydromt compatibility patches consolidated into `apply_all_patches()` with per-patch
+    logging; individual imports replaced by a single call.
 - `CoastalCalibConfig` now takes `model_config: ModelConfig` instead of separate
     `model`, `mpi`, and `sfincs` parameters
 - `SlurmConfig` now contains only scheduling parameters (`job_name`, `partition`,
@@ -68,6 +90,13 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     `observation_points`, `obs_merge` -> `merge_observations`, `src_locations` ->
     `discharge_locations_file`, `src_merge` -> `merge_discharge`, `docker_tag` ->
     `container_tag`, `sif_path` -> `container_image`
+
+### Fixed
+
+- Call `expanduser()` before `resolve()` on all path config fields so that paths
+    containing `~` are correctly expanded to the user's home directory.
+- Call `monitor.end_workflow()` before returning early in no-wait mode (`submit` with
+    `wait=False`), so that the workflow timing summary is always closed.
 
 ### Removed
 

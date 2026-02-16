@@ -307,7 +307,9 @@ STOFS water level data.
 
 **Tasks:**
 
-- Load pre-built SFINCS model from `prebuilt_dir`
+- Copy pre-built SFINCS model from `prebuilt_dir` into the work directory
+- Remove stale netCDF output files from any previous run (prevents HDF5 segfaults when
+    `write_netcdf_safely` encounters files with an incompatible schema)
 - Set up model directory structure
 
 ### 5. sfincs_timing
@@ -325,8 +327,14 @@ STOFS water level data.
 
 **Tasks:**
 
-- Interpolate STOFS water levels to SFINCS boundary points
-- Generate boundary forcing files
+- Read boundary point locations from `sfincs.bnd`
+- For TPXO: synthesize tidal water levels from TPXO constituents using harmonic
+    reconstruction
+- For geodataset sources (STOFS): load the geodataset clipped around the boundary
+    points, spatially interpolate to boundary locations using inverse-distance weighting
+    (IDW), and inject into the HydroMT model
+- Write boundary forcing netCDF (`sfincs_netbndbzsbzifile.nc`) with a zero-filled `bzi`
+    (infragravity) variable required by the SFINCS binary
 
 ### 7. sfincs_obs
 
@@ -344,6 +352,8 @@ STOFS water level data.
 **Tasks:**
 
 - Add NWM streamflow discharge points from `discharge_locations_file`
+- Filter out source points that fall on inactive grid cells (prevents a SFINCS Fortran
+    segfault caused by out-of-bounds array access)
 - Generate discharge forcing time series
 
 ### 9. sfincs_precip
@@ -353,6 +363,8 @@ STOFS water level data.
 **Tasks:**
 
 - Add NWM precipitation data as spatially distributed forcing
+- Set the output resolution to `meteo_res` (or auto-derive from the quadtree grid)
+- Clip the reprojected grid to the model domain to prevent CONUS-scale inflation
 
 ### 10. sfincs_wind
 
@@ -361,6 +373,8 @@ STOFS water level data.
 **Tasks:**
 
 - Add NWM wind data as spatially distributed forcing
+- Set the output resolution to `meteo_res` (or auto-derive from the quadtree grid)
+- Clip the reprojected grid to the model domain to prevent CONUS-scale inflation
 
 **Runs On:** Login node (Python-only)
 
@@ -371,6 +385,9 @@ STOFS water level data.
 **Tasks:**
 
 - Add NWM atmospheric pressure data as spatially distributed forcing
+- Set the output resolution to `meteo_res` (or auto-derive from the quadtree grid)
+- Clip the reprojected grid to the model domain to prevent CONUS-scale inflation
+- Enable barometric pressure correction (`baro=1`)
 
 **Runs On:** Login node (Python-only)
 

@@ -164,6 +164,10 @@ config = CoastalCalibConfig(
         ],
         merge_observations=False,
         merge_discharge=False,
+        include_precip=True,
+        include_wind=True,
+        include_pressure=True,
+        meteo_res=2000,  # meteo output resolution in metres (auto-derived if None)
     ),
 )
 ```

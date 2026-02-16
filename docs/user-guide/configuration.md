@@ -163,6 +163,9 @@ boundary:
 
 Configure file system paths:
 
+All path fields support `~` (tilde) expansion, so you can write `~/my_data` instead of
+the full home directory path.
+
 ```yaml
 paths:
   work_dir: /path/to/work         # Working directory (auto-generated if not set)
@@ -246,22 +249,31 @@ model_config:
   merge_observations: false       # Merge observations into model
   discharge_locations_file:       # Discharge source locations file
   merge_discharge: false          # Merge discharge into model
-  omp_num_threads: 36             # OpenMP threads
+  meteo_res:                      # Meteo forcing resolution in metres (auto if null)
+  omp_num_threads: 36             # OpenMP threads (defaults to CPU count)
   container_tag: latest           # SFINCS container tag
   container_image:                # Singularity image path
 ```
 
-| Parameter                    | Type   | Default  |
-| ---------------------------- | ------ | -------- |
-| `prebuilt_dir`               | path   | required |
-| `observation_points`         | list   | `[]`     |
-| `observation_locations_file` | path   | null     |
-| `merge_observations`         | bool   | false    |
-| `discharge_locations_file`   | path   | null     |
-| `merge_discharge`            | bool   | false    |
-| `omp_num_threads`            | int    | 36       |
-| `container_tag`              | string | latest   |
-| `container_image`            | path   | null     |
+| Parameter                    | Type   | Default  | Description                                                          |
+| ---------------------------- | ------ | -------- | -------------------------------------------------------------------- |
+| `prebuilt_dir`               | path   | required | Path to pre-built SFINCS model                                       |
+| `observation_points`         | list   | `[]`     | Observation point coordinates                                        |
+| `observation_locations_file` | path   | null     | Observation locations file                                           |
+| `merge_observations`         | bool   | false    | Merge observations into model                                        |
+| `discharge_locations_file`   | path   | null     | Discharge source locations file                                      |
+| `merge_discharge`            | bool   | false    | Merge discharge into model                                           |
+| `meteo_res`                  | float  | null     | Meteo output resolution (m). Auto-derived from quadtree grid if null |
+| `omp_num_threads`            | int    | auto     | OpenMP threads (defaults to CPU count)                               |
+| `container_tag`              | string | latest   | SFINCS container tag                                                 |
+| `container_image`            | path   | null     | Singularity image path                                               |
+
+!!! note "Meteorological forcing resolution"
+
+    When `meteo_res` is not set, the resolution is automatically derived from the base cell
+    size of the SFINCS quadtree grid. This prevents the LCC → UTM reprojection of NWM data
+    from inflating the meteo grid to the full CONUS extent, which can produce multi-GB
+    forcing files and slow SFINCS runtime from minutes to hours.
 
 ### Monitoring Settings
 
