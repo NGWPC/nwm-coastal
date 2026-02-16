@@ -13,7 +13,7 @@ model: sfincs
 
 simulation:
   start_date: 2025-06-01
-  duration_hours: 168     # 7 days
+  duration_hours: 10      # 7 days
   coastal_domain: atlgulf
   meteo_source: nwm_ana   # nwm_retro ends 2023-01-31
 
@@ -21,8 +21,8 @@ boundary:
   source: stofs
 
 # paths:
-#   work_dir: ./docs/examples/sfincs_texas_ana
-#   raw_download_dir: ./docs/examples/sfincs_texas/downloads
+  # work_dir: ./docs/examples/sfincs_texas/sfincs_stofs_ana
+  # raw_download_dir: ./docs/examples/sfincs_texas/downloads
 
 download:
   enabled: true
@@ -33,9 +33,9 @@ model_config:
   merge_observations: false
   merge_discharge: false
   include_noaa_gages: true
-  vdatum_forcing_to_mesh_m: 0.0     # STOFS already in NAVD88
-  vdatum_mesh_to_msl_m: -0.171     # NAVD88 mesh → MSL observations
+  forcing_to_mesh_offset_m: 0.0    # STOFS already in NAVD88
+  vdatum_mesh_to_msl_m: 0.171      # NAVD88 mesh → MSL observations
   include_precip: true
   include_wind: true
   include_pressure: true
-# sfincs_exe: ~/.local/bin/sfincs
+  # sfincs_exe: ~/.local/bin/sfincs
