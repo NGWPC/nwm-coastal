@@ -754,12 +754,26 @@ class SfincsForcingStage(_SfincsStageBase):
 
         _ = model.water_level.data  # force lazy init with empty data
 
-        # Apply forcing-datum → mesh-datum correction so boundary
-        # water levels match the mesh's vertical datum.
-        forcing_offset = self.sfincs.vdatum_forcing_to_mesh_m
+        # Anchor the forcing signal to the mesh datum.  For tidal-only
+        # sources (e.g. TPXO) this places the mean water level at the
+        # correct geodetic height on the mesh.
+        forcing_offset = self.sfincs.forcing_to_mesh_offset_m
         if forcing_offset != 0.0:
             df_ts = df_ts + forcing_offset
             self._log(f"Applied forcing→mesh vdatum offset: {forcing_offset:+.4f} m")
+
+        wl_min = float(df_ts.min().min())
+        wl_max = float(df_ts.max().max())
+        wl_floor, wl_ceil = -15.0, 15.0
+        if wl_min < wl_floor or wl_max > wl_ceil:
+            self._log(
+                f"Boundary water levels after vdatum adjustment are outside "
+                f"[{wl_floor}, {wl_ceil}] m (min={wl_min:.3f}, "
+                f"max={wl_max:.3f}).  Check that "
+                f"forcing_to_mesh_offset_m={forcing_offset} has the "
+                f"correct sign and magnitude.",
+                "warning",
+            )
 
         self._update_substep("Setting water level forcing on model")
         model.water_level.set(df=df_ts, gdf=gdf_bnd, merge=False)

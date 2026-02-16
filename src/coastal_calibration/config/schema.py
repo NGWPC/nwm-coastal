@@ -536,24 +536,27 @@ class SfincsModelConfig(ModelConfig):
            the LCC → UTM reprojection can inflate the output to the
            full CONUS extent, producing multi-GB files and very slow
            simulations.
-    vdatum_forcing_to_mesh_m : float
+    forcing_to_mesh_offset_m : float
         Vertical offset in metres *added* to the boundary-condition water
-        levels to convert them from the forcing vertical datum to the
-        mesh (DEM) vertical datum before they enter SFINCS.
+        levels before they enter SFINCS.
 
-        When the forcing and mesh share the same datum set this to
-        ``0.0`` (e.g. STOFS forcing on a NAVD88 mesh).  When they
-        differ, set this to the signed offset that maps the forcing
-        datum to the mesh datum (e.g. ``-0.147`` for TPXO/MSL forcing
-        on a NAVD88 mesh on the Texas Gulf coast, because
-        MSL ≈ NAVD88 + 0.147 m there).
+        Tidal-only sources such as TPXO provide oscillations centred on
+        zero (MSL) but carry no information about where MSL sits on the
+        mesh's vertical datum.  This parameter anchors the forcing signal
+        to the correct geodetic height on the mesh.  Set it to the
+        elevation of MSL in the mesh datum obtained from VDatum
+        (e.g. ``0.171`` for a NAVD88 mesh on the Texas Gulf coast, where
+        MSL is 0.171 m above NAVD88).
+
+        For sources that already report water levels in the mesh datum
+        (e.g. STOFS on a NAVD88 mesh) set this to ``0.0``.
 
         Defaults to ``0.0``.
     vdatum_mesh_to_msl_m : float
         Vertical offset in metres *added* to the simulated water level
         before comparison with NOAA CO-OPS observations (which are in
         MSL).  The model output inherits the mesh vertical datum, so
-        this converts it to MSL (e.g. ``0.147`` for a NAVD88 mesh on
+        this converts it to MSL (e.g. ``0.171`` for a NAVD88 mesh on
         the Texas Gulf coast).
 
         Defaults to ``0.0``.
@@ -587,7 +590,7 @@ class SfincsModelConfig(ModelConfig):
     include_wind: bool = False
     include_pressure: bool = False
     meteo_res: float | None = None
-    vdatum_forcing_to_mesh_m: float = 0.0
+    forcing_to_mesh_offset_m: float = 0.0
     vdatum_mesh_to_msl_m: float = 0.0
     sfincs_exe: Path | None = None
     container_tag: str = "latest"
@@ -740,7 +743,7 @@ class SfincsModelConfig(ModelConfig):
             "include_precip": self.include_precip,
             "include_wind": self.include_wind,
             "include_pressure": self.include_pressure,
-            "vdatum_forcing_to_mesh_m": self.vdatum_forcing_to_mesh_m,
+            "forcing_to_mesh_offset_m": self.forcing_to_mesh_offset_m,
             "vdatum_mesh_to_msl_m": self.vdatum_mesh_to_msl_m,
             "sfincs_exe": (str(self.sfincs_exe) if self.sfincs_exe else None),
             "container_tag": self.container_tag,
