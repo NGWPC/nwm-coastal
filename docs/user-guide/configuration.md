@@ -249,6 +249,9 @@ model_config:
   merge_observations: false       # Merge observations into model
   discharge_locations_file:       # Discharge source locations file
   merge_discharge: false          # Merge discharge into model
+  include_noaa_gages: true        # Enable NOAA station discovery & comparison plots
+  forcing_to_mesh_offset_m: 0.0  # Vertical offset added to boundary forcing
+  vdatum_mesh_to_msl_m: 0.0      # Vertical offset converting model output to MSL
   meteo_res:                      # Meteo forcing resolution in metres (auto if null)
   omp_num_threads: 36             # OpenMP threads (defaults to CPU count)
   container_tag: latest           # SFINCS container tag
@@ -263,6 +266,9 @@ model_config:
 | `merge_observations`         | bool   | false    | Merge observations into model                                        |
 | `discharge_locations_file`   | path   | null     | Discharge source locations file                                      |
 | `merge_discharge`            | bool   | false    | Merge discharge into model                                           |
+| `include_noaa_gages`         | bool   | false    | Enable NOAA station discovery and comparison plots                   |
+| `forcing_to_mesh_offset_m`   | float  | 0.0      | Vertical offset (m) added to boundary forcing before simulation      |
+| `vdatum_mesh_to_msl_m`       | float  | 0.0      | Vertical offset (m) added to model output for MSL comparison         |
 | `meteo_res`                  | float  | null     | Meteo output resolution (m). Auto-derived from quadtree grid if null |
 | `omp_num_threads`            | int    | auto     | OpenMP threads (defaults to CPU count)                               |
 | `container_tag`              | string | latest   | SFINCS container tag                                                 |
@@ -274,6 +280,22 @@ model_config:
     size of the SFINCS quadtree grid. This prevents the LCC → UTM reprojection of NWM data
     from inflating the meteo grid to the full CONUS extent, which can produce multi-GB
     forcing files and slow SFINCS runtime from minutes to hours.
+
+!!! note "Vertical datum offsets"
+
+    SFINCS operates in the vertical datum of the mesh (e.g. NAVD88). When the boundary
+    forcing is in a different datum, `forcing_to_mesh_offset_m` anchors the forcing signal
+    to the correct height on the mesh. For tidal-only sources like TPXO, whose oscillations
+    are centred on zero (MSL), this places the mean water level at the geodetic height of
+    MSL on the mesh. For sources that already report water levels in the mesh datum (e.g.
+    STOFS on a NAVD88 mesh), set this to `0.0`.
+
+    After the simulation, `vdatum_mesh_to_msl_m` converts the model output from the mesh
+    datum to MSL for comparison with NOAA CO-OPS observations. Both values can be obtained
+    from the [NOAA VDatum API](https://vdatum.noaa.gov/vdatumweb/api/convert).
+
+    For example, on the Texas Gulf coast (NAVD88 mesh), VDatum reports MSL is 0.171 m
+    above NAVD88 at the domain centroid, so both parameters are set to `0.171`.
 
 ### Monitoring Settings
 

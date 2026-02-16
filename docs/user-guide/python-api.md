@@ -164,9 +164,12 @@ config = CoastalCalibConfig(
         ],
         merge_observations=False,
         merge_discharge=False,
+        include_noaa_gages=True,
         include_precip=True,
         include_wind=True,
         include_pressure=True,
+        forcing_to_mesh_offset_m=0.0,  # STOFS already in mesh datum
+        vdatum_mesh_to_msl_m=0.171,    # mesh datum (NAVD88) → MSL for obs comparison
         meteo_res=2000,  # meteo output resolution in metres (auto-derived if None)
     ),
 )
