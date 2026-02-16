@@ -16,23 +16,23 @@ slurm:
 
 simulation:
   start_date: 2025-06-01
-  duration_hours: 168  # 7 days
+  duration_hours: 168     # 7 days
   coastal_domain: atlgulf
-  meteo_source: nwm_ana  # nwm_retro ends 2023-01-31
+  meteo_source: nwm_ana   # nwm_retro ends 2023-01-31
 
 boundary:
   source: stofs
 
-paths:
-  work_dir: ./sfincs_texas
-  raw_download_dir: ./sfincs_texas/downloads
+# paths:
+#   work_dir: ./docs/examples/sfincs_texas_ana
+#   raw_download_dir: ./docs/examples/sfincs_texas/downloads
 
 download:
   enabled: true
 
 model_config:
-  prebuilt_dir: ./texas
-  discharge_locations_file: ./texas/sfincs_nwm.src
+  prebuilt_dir: ./docs/examples/texas
+  discharge_locations_file: ./docs/examples/texas/sfincs_nwm.src
   merge_observations: false
   merge_discharge: false
   include_noaa_gages: true
@@ -40,4 +40,4 @@ model_config:
   include_precip: true
   include_wind: true
   include_pressure: true
-# sfincs_exe: ~/.local/bin/sfincs
+  # sfincs_exe: ~/.local/bin/sfincs
