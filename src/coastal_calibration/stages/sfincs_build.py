@@ -172,7 +172,7 @@ def _meteo_dst_res(config: CoastalCalibConfig, model: SfincsModel) -> float:
     # Quadtree grids: ``dx`` / ``dy`` are not always in the config but
     # the grid NetCDF records them.  Fall back to the grid dataset.
     try:
-        grid_ds = model.components["quadtree_grid"].data
+        grid_ds = model.quadtree_grid.data
         dx = float(grid_ds.attrs.get("dx", 0))
         dy = float(grid_ds.attrs.get("dy", 0))
         if dx > 0 and dy > 0:
@@ -216,7 +216,7 @@ def _clip_meteo_to_domain(
         Number of x-cells before and after clipping, for logging.
     """
     component = getattr(model, component_name)
-    ds: xr.Dataset = component.data  # type: ignore[assignment]
+    ds: xr.Dataset = component.data
     nx_before = ds.sizes.get("x", 0)
 
     # Determine the clip bounds in UTM from the model grid.
@@ -895,10 +895,10 @@ class SfincsForcingStage(_SfincsStageBase):
         ndarray, shape (T, M)
             Interpolated values at each target point.
         """
-        from scipy.spatial import cKDTree
+        from scipy.spatial import KDTree
 
         k = min(k, len(src_xy))
-        tree = cKDTree(src_xy)
+        tree = KDTree(src_xy)
         dists, idxs = tree.query(target_xy, k=k)
 
         n_times, _ = values.shape
@@ -1211,14 +1211,14 @@ class SfincsDischargeStage(_SfincsStageBase):
             ``dropped`` are the names of the removed points.
         """
         import numpy as np
-        from scipy.spatial import cKDTree
+        from scipy.spatial import KDTree
 
-        grid_ds = model.components["quadtree_grid"].data
+        grid_ds = model.quadtree_grid.data
         ugrid = grid_ds.ugrid.grid
         face_xy = np.column_stack([ugrid.face_x, ugrid.face_y])
         mask = grid_ds["mask"].values
 
-        tree = cKDTree(face_xy)
+        tree = KDTree(face_xy)
         kept: list[tuple[float, float, str]] = []
         dropped: list[str] = []
         for x, y, name in points:
