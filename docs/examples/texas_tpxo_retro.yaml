@@ -33,7 +33,8 @@ model_config:
   merge_observations: false
   merge_discharge: false
   include_noaa_gages: true
-  navd88_to_msl_m: 0.147
+  vdatum_forcing_to_mesh_m: -0.147
+  vdatum_mesh_to_msl_m: 0.147
   include_precip: true
   include_wind: true
   include_pressure: true
