@@ -13,7 +13,7 @@ model: sfincs
 
 simulation:
   start_date: 2025-06-01
-  duration_hours: 10      # 7 days
+  duration_hours: 168     # 7 days
   coastal_domain: atlgulf
   meteo_source: nwm_ana   # nwm_retro ends 2023-01-31
 
