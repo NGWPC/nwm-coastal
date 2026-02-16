@@ -754,6 +754,13 @@ class SfincsForcingStage(_SfincsStageBase):
 
         _ = model.water_level.data  # force lazy init with empty data
 
+        # Apply forcing-datum → mesh-datum correction so boundary
+        # water levels match the mesh's vertical datum.
+        forcing_offset = self.sfincs.vdatum_forcing_to_mesh_m
+        if forcing_offset != 0.0:
+            df_ts = df_ts + forcing_offset
+            self._log(f"Applied forcing→mesh vdatum offset: {forcing_offset:+.4f} m")
+
         self._update_substep("Setting water level forcing on model")
         model.water_level.set(df=df_ts, gdf=gdf_bnd, merge=False)
 
@@ -1739,12 +1746,13 @@ class SfincsPlotStage(_SfincsStageBase):
             [point_zs.isel({station_dim: idx}).values for idx in noaa_indices]
         )
 
-        # Apply NAVD88 → MSL datum correction so SFINCS output is
-        # comparable to NOAA CO-OPS observations (which are in MSL).
-        datum_offset = self.sfincs.navd88_to_msl_m
+        # Apply mesh vdatum → MSL correction.  Model output inherits
+        # the mesh vertical datum; this offset converts to MSL for
+        # comparison with NOAA CO-OPS observations.
+        datum_offset = self.sfincs.vdatum_mesh_to_msl_m
         if datum_offset != 0.0:
             sim_elevation = sim_elevation + datum_offset
-            self._log(f"Applied NAVD88→MSL offset: {datum_offset:+.4f} m")
+            self._log(f"Applied mesh→MSL vdatum offset: {datum_offset:+.4f} m")
 
         # Fetch observed water levels (MLLW → MSL)
         self._update_substep("Fetching NOAA CO-OPS observations")

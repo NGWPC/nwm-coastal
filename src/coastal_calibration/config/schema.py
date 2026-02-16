@@ -536,11 +536,27 @@ class SfincsModelConfig(ModelConfig):
            the LCC → UTM reprojection can inflate the output to the
            full CONUS extent, producing multi-GB files and very slow
            simulations.
-    navd88_to_msl_m : float
-        Vertical offset in metres to convert SFINCS output from NAVD88 to
-        MSL.  The value is *added* to the simulated water level before
-        comparison with NOAA CO-OPS observations (which are in MSL).
-        Set to ``0.0`` (default) when no correction is needed.
+    vdatum_forcing_to_mesh_m : float
+        Vertical offset in metres *added* to the boundary-condition water
+        levels to convert them from the forcing vertical datum to the
+        mesh (DEM) vertical datum before they enter SFINCS.
+
+        When the forcing and mesh share the same datum set this to
+        ``0.0`` (e.g. STOFS forcing on a NAVD88 mesh).  When they
+        differ, set this to the signed offset that maps the forcing
+        datum to the mesh datum (e.g. ``-0.147`` for TPXO/MSL forcing
+        on a NAVD88 mesh on the Texas Gulf coast, because
+        MSL ≈ NAVD88 + 0.147 m there).
+
+        Defaults to ``0.0``.
+    vdatum_mesh_to_msl_m : float
+        Vertical offset in metres *added* to the simulated water level
+        before comparison with NOAA CO-OPS observations (which are in
+        MSL).  The model output inherits the mesh vertical datum, so
+        this converts it to MSL (e.g. ``0.147`` for a NAVD88 mesh on
+        the Texas Gulf coast).
+
+        Defaults to ``0.0``.
     sfincs_exe : Path, optional
         Path to a locally compiled SFINCS executable.  When set, the
         ``sfincs_run`` stage invokes this binary directly instead of
@@ -571,7 +587,8 @@ class SfincsModelConfig(ModelConfig):
     include_wind: bool = False
     include_pressure: bool = False
     meteo_res: float | None = None
-    navd88_to_msl_m: float = 0.0
+    vdatum_forcing_to_mesh_m: float = 0.0
+    vdatum_mesh_to_msl_m: float = 0.0
     sfincs_exe: Path | None = None
     container_tag: str = "latest"
     container_image: Path | None = None
@@ -723,7 +740,8 @@ class SfincsModelConfig(ModelConfig):
             "include_precip": self.include_precip,
             "include_wind": self.include_wind,
             "include_pressure": self.include_pressure,
-            "navd88_to_msl_m": self.navd88_to_msl_m,
+            "vdatum_forcing_to_mesh_m": self.vdatum_forcing_to_mesh_m,
+            "vdatum_mesh_to_msl_m": self.vdatum_mesh_to_msl_m,
             "sfincs_exe": (str(self.sfincs_exe) if self.sfincs_exe else None),
             "container_tag": self.container_tag,
             "container_image": (str(self.container_image) if self.container_image else None),
