@@ -955,21 +955,21 @@ ______________________________________________________________________
 
 ### SFINCS Workflow Stages
 
-| Stage                 | Class                      | Description                                 |
-| --------------------- | -------------------------- | ------------------------------------------- |
-| `download`            | `DownloadStage`            | Download NWM/STOFS data                     |
-| `sfincs_symlinks`     | `SFINCSSymlinksStage`      | Create `.nc` symlinks for NWM data          |
-| `sfincs_data_catalog` | `SFINCSDataCatalogStage`   | Generate HydroMT data catalog               |
-| `sfincs_init`         | `SfincsInitStage`          | Initialize SFINCS model + clean stale files |
-| `sfincs_timing`       | `SfincsTimingStage`        | Set SFINCS timing                           |
-| `sfincs_forcing`      | `SfincsForcingStage`       | Add water level forcing (IDW interpolation) |
-| `sfincs_obs`          | `SfincsObsStage`           | Add observation points                      |
-| `sfincs_discharge`    | `SfincsDischargeStage`     | Add discharge sources (active-cell filter)  |
-| `sfincs_precip`       | `SfincsPrecipitationStage` | Add precipitation forcing + clip meteo grid |
-| `sfincs_wind`         | `SfincsWindStage`          | Add wind forcing + clip meteo grid          |
-| `sfincs_pressure`     | `SfincsPressureStage`      | Add pressure forcing + clip meteo grid      |
-| `sfincs_write`        | `SfincsWriteStage`         | Write SFINCS model                          |
-| `sfincs_run`          | `SfincsRunStage`           | Run SFINCS (Singularity/OpenMP)             |
+| Stage                 | Class                      | Description                                                     |
+| --------------------- | -------------------------- | --------------------------------------------------------------- |
+| `download`            | `DownloadStage`            | Download NWM/STOFS data                                         |
+| `sfincs_symlinks`     | `SFINCSSymlinksStage`      | Create `.nc` symlinks for NWM data                              |
+| `sfincs_data_catalog` | `SFINCSDataCatalogStage`   | Generate HydroMT data catalog                                   |
+| `sfincs_init`         | `SfincsInitStage`          | Initialize SFINCS model + clean stale files                     |
+| `sfincs_timing`       | `SfincsTimingStage`        | Set SFINCS timing                                               |
+| `sfincs_forcing`      | `SfincsForcingStage`       | Add water level forcing (IDW interpolation)                     |
+| `sfincs_obs`          | `SfincsObsStage`           | Add observation points                                          |
+| `sfincs_discharge`    | `SfincsDischargeStage`     | Add discharge sources (active-cell filter)                      |
+| `sfincs_precip`       | `SfincsPrecipitationStage` | Add precipitation forcing + clip meteo grid                     |
+| `sfincs_wind`         | `SfincsWindStage`          | Add wind forcing + clip meteo grid                              |
+| `sfincs_pressure`     | `SfincsPressureStage`      | Add pressure forcing + clip meteo grid                          |
+| `sfincs_write`        | `SfincsWriteStage`         | Write SFINCS model                                              |
+| `sfincs_run`          | `SfincsRunStage`           | Run SFINCS (Singularity/OpenMP)                                 |
 | `sfincs_plot`         | `SfincsPlotStage`          | Plot simulated vs observed water levels (with datum conversion) |
 
 ______________________________________________________________________

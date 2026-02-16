@@ -294,8 +294,8 @@ model_config:
     datum to MSL for comparison with NOAA CO-OPS observations. Both values can be obtained
     from the [NOAA VDatum API](https://vdatum.noaa.gov/vdatumweb/api/convert).
 
-    For example, on the Texas Gulf coast (NAVD88 mesh), VDatum reports MSL is 0.171 m
-    above NAVD88 at the domain centroid, so both parameters are set to `0.171`.
+    For example, on the Texas Gulf coast (NAVD88 mesh), VDatum reports MSL is 0.171 m above
+    NAVD88 at the domain centroid, so both parameters are set to `0.171`.
 
 ### Monitoring Settings
 
