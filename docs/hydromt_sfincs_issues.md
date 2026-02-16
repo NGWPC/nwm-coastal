@@ -1,8 +1,9 @@
 # `hydromt-sfincs` Bug Reports
 
-Tested against **`hydromt-sfincs` v2.0.0.dev0** (build date 2025-12-18). All issues were
-discovered while integrating `hydromt-sfincs` into an automated coastal calibration
-pipeline that builds SFINCS models from NWM and STOFS/TPXO forcing data.
+Tested against **`hydromt-sfincs`** commit
+[`41aac0a`](https://github.com/Deltares/hydromt_sfincs/commit/41aac0a3980fc2714ec28eafb0463d40abfc979a).
+All issues were discovered while integrating `hydromt-sfincs` into an automated coastal
+calibration pipeline that builds SFINCS models from NWM and STOFS/TPXO forcing data.
 
 ______________________________________________________________________
 
