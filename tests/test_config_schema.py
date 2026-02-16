@@ -261,7 +261,8 @@ class TestSfincsModelConfig:
         assert cfg.merge_observations is False
         assert cfg.merge_discharge is False
         assert cfg.include_noaa_gages is False
-        assert cfg.navd88_to_msl_m == 0.0
+        assert cfg.vdatum_forcing_to_mesh_m == 0.0
+        assert cfg.vdatum_mesh_to_msl_m == 0.0
 
     def test_model_name(self, tmp_path):
         cfg = SfincsModelConfig(prebuilt_dir=tmp_path)
@@ -295,9 +296,14 @@ class TestSfincsModelConfig:
         assert "container_tag" in d
         assert d["include_noaa_gages"] is False
 
-    def test_explicit_navd88_to_msl_m(self, tmp_path):
-        cfg = SfincsModelConfig(prebuilt_dir=tmp_path, navd88_to_msl_m=-0.147)
-        assert cfg.navd88_to_msl_m == pytest.approx(-0.147)
+    def test_explicit_vdatum_offsets(self, tmp_path):
+        cfg = SfincsModelConfig(
+            prebuilt_dir=tmp_path,
+            vdatum_forcing_to_mesh_m=-0.147,
+            vdatum_mesh_to_msl_m=0.147,
+        )
+        assert cfg.vdatum_forcing_to_mesh_m == pytest.approx(-0.147)
+        assert cfg.vdatum_mesh_to_msl_m == pytest.approx(0.147)
 
     def test_explicit_omp_num_threads(self, tmp_path):
         """Explicit omp_num_threads is preserved (e.g., cluster YAML)."""
@@ -579,8 +585,8 @@ class TestCoastalCalibConfig:
         assert isinstance(cfg.model_config, SfincsModelConfig)
         assert cfg.model == "sfincs"
 
-    def test_sfincs_navd88_to_msl_m_from_yaml(self, tmp_path):
-        """navd88_to_msl_m round-trips through YAML."""
+    def test_sfincs_vdatum_offsets_from_yaml(self, tmp_path):
+        """vdatum_forcing_to_mesh_m and vdatum_mesh_to_msl_m round-trip through YAML."""
         config_dict = {
             "model": "sfincs",
             "slurm": {"user": "test"},
@@ -597,14 +603,16 @@ class TestCoastalCalibConfig:
             },
             "model_config": {
                 "prebuilt_dir": str(tmp_path / "prebuilt"),
-                "navd88_to_msl_m": -0.147,
+                "vdatum_forcing_to_mesh_m": -0.147,
+                "vdatum_mesh_to_msl_m": 0.147,
             },
         }
         config_path = tmp_path / "sfincs_datum.yaml"
         config_path.write_text(yaml.dump(config_dict))
         cfg = CoastalCalibConfig.from_yaml(config_path)
         assert isinstance(cfg.model_config, SfincsModelConfig)
-        assert cfg.model_config.navd88_to_msl_m == pytest.approx(-0.147)
+        assert cfg.model_config.vdatum_forcing_to_mesh_m == pytest.approx(-0.147)
+        assert cfg.model_config.vdatum_mesh_to_msl_m == pytest.approx(0.147)
 
     def test_relative_yaml_paths_resolve_to_absolute(self, tmp_path, monkeypatch):
         """Regression: relative paths in YAML must resolve to absolute.
