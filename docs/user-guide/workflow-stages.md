@@ -333,8 +333,20 @@ STOFS water level data.
 - For geodataset sources (STOFS): load the geodataset clipped around the boundary
     points, spatially interpolate to boundary locations using inverse-distance weighting
     (IDW), and inject into the HydroMT model
+- Apply `forcing_to_mesh_offset_m` to anchor the forcing signal to the correct height on
+    the mesh datum (see note below)
+- Emit a warning if the adjusted water levels fall outside the ±15 m sanity range
 - Write boundary forcing netCDF (`sfincs_netbndbzsbzifile.nc`) with a zero-filled `bzi`
     (infragravity) variable required by the SFINCS binary
+
+!!! tip "Forcing vertical datum offset"
+
+    Tidal-only sources like TPXO provide oscillations centred on zero (MSL) but carry no
+    information about where MSL sits on the mesh's vertical datum. The
+    `forcing_to_mesh_offset_m` parameter anchors the tidal signal to the correct geodetic
+    height on the mesh. For sources already in the mesh datum (e.g. STOFS on a NAVD88 mesh),
+    set this to `0.0`. The offset can be obtained from the
+    [NOAA VDatum API](https://vdatum.noaa.gov/vdatumweb/api/convert).
 
 ### 7. sfincs_obs
 
@@ -420,11 +432,20 @@ STOFS water level data.
 **Tasks:**
 
 - Read SFINCS output at observation points
-- Fetch NOAA CO-OPS observed water levels
-- Generate comparison plots
+- Apply `vdatum_mesh_to_msl_m` to convert model output from the mesh datum to MSL
+- Fetch NOAA CO-OPS observed water levels (MLLW converted to MSL using per-station datum
+    offsets from the CO-OPS API)
+- Generate comparison plots (simulated vs observed)
 - Save figures to the `figs/` directory
 
 **Runs On:** Login node or compute node (Python, requires network access)
+
+!!! tip "Output datum conversion"
+
+    SFINCS output inherits the vertical datum of the mesh (e.g. NAVD88). The
+    `vdatum_mesh_to_msl_m` offset converts the simulated water levels to MSL so they can be
+    compared with NOAA CO-OPS observations. This value can be obtained from the
+    [NOAA VDatum API](https://vdatum.noaa.gov/vdatumweb/api/convert).
 
 ## Running Partial Workflows
 

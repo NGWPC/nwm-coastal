@@ -654,6 +654,9 @@ boundary:
 
 model_config:
   prebuilt_dir: /path/to/texas/model
+  include_noaa_gages: true
+  forcing_to_mesh_offset_m: 0.0    # STOFS already in mesh datum
+  vdatum_mesh_to_msl_m: 0.171      # mesh datum → MSL for obs comparison
   omp_num_threads: 36
 
 download:
@@ -967,7 +970,7 @@ ______________________________________________________________________
 | `sfincs_pressure`     | `SfincsPressureStage`      | Add pressure forcing + clip meteo grid      |
 | `sfincs_write`        | `SfincsWriteStage`         | Write SFINCS model                          |
 | `sfincs_run`          | `SfincsRunStage`           | Run SFINCS (Singularity/OpenMP)             |
-| `sfincs_plot`         | `SfincsPlotStage`          | Plot simulated vs observed water levels     |
+| `sfincs_plot`         | `SfincsPlotStage`          | Plot simulated vs observed water levels (with datum conversion) |
 
 ______________________________________________________________________
 

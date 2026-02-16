@@ -42,6 +42,15 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     the `schism_obs` and `schism_plot` stages
 - Automatic `param.nml` patching (`iout_sta = 1`, `nspool_sta = 18`) when `station.in`
     exists, ensuring `mod(nhot_write, nspool_sta) == 0` across all domain templates
+- `forcing_to_mesh_offset_m` option in `SfincsModelConfig` to apply a vertical offset
+    to boundary-condition water levels before they enter SFINCS. For tidal-only sources
+    like TPXO, this anchors the tidal signal to the correct geodetic height of MSL on the
+    mesh.
+- `vdatum_mesh_to_msl_m` option in `SfincsModelConfig` to convert SFINCS output from
+    the mesh vertical datum to MSL for comparison with NOAA CO-OPS observations.
+- Sanity-check warning in `sfincs_forcing` when adjusted boundary water levels fall
+    outside the ±15 m range, indicating a possible sign or magnitude error in
+    `forcing_to_mesh_offset_m`.
 - `sfincs_wind`, `sfincs_pressure`, and `sfincs_plot` stages to SFINCS workflow
 - SFINCS coastal model workflow with full pipeline (download through sfincs_run)
 - Polymorphic `ModelConfig` ABC with `SchismModelConfig` and `SfincsModelConfig`
@@ -65,6 +74,11 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     `ntasks_per_node`, `exclusive`) moved to `SchismModelConfig`
 - Default path templates use `${model}_` prefix instead of hardcoded `schism_`
 - Stage order and stage creation delegated to `ModelConfig` subclasses
+- SFINCS datum handling split into two separate offsets: the former single
+    `navd88_to_msl_m` field is replaced by `forcing_to_mesh_offset_m` (applied to
+    boundary forcing before simulation) and `vdatum_mesh_to_msl_m` (applied to model
+    output for observation comparison). The two offsets serve fundamentally different
+    purposes and may have different values depending on the boundary source.
 - SFINCS field renames: `model_dir` -> `prebuilt_dir`, `obs_points` ->
     `observation_points`, `obs_merge` -> `merge_observations`, `src_locations` ->
     `discharge_locations_file`, `src_merge` -> `merge_discharge`, `docker_tag` ->
