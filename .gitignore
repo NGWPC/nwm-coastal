@@ -195,3 +195,7 @@ data/
 ### Test Reports ###
 junit.xml
 .htmlcov/
+
+### Temp
+cache
+docs/examples/texas/
