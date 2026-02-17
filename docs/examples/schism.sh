@@ -33,7 +33,7 @@ EOF
 # For production only this line is needed
 # coastal-calibration run "${CONFIG_FILE}"
 
-# For running the dev version we use pixi. 
+# For running the dev version we use pixi.
 # For production comment out these three lines.
 # For making uv to work well on NSF mounted locations
 # we need to set these envs
