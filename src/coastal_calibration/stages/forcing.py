@@ -105,6 +105,7 @@ class NWMForcingStage(WorkflowStage):
             sif_path=self.config.model_config.singularity_image,
             env=env,
             use_mpi=True,
+            mpi_tasks=self.config.model_config.total_tasks,
         )
 
         self._log(f"NWM forcing generated in {nwm_forcing_output}")

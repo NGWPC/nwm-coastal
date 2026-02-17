@@ -152,6 +152,7 @@ class STOFSBoundaryStage(WorkflowStage):
             sif_path=self.config.model_config.singularity_image,
             env=env,
             use_mpi=True,
+            mpi_tasks=self.config.model_config.total_tasks,
         )
 
         self._update_substep("Post-processing STOFS data")
