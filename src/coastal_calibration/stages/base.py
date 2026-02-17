@@ -276,22 +276,20 @@ class WorkflowStage(ABC):
         # With many ranks (e.g. 36) the pipe buffer (64 KB on Linux)
         # fills up and the child processes block on write while
         # subprocess.run waits for them to exit — a classic deadlock.
-        # Discard stdout and pipe stderr to a temp file so error
-        # messages are still available without polluting the SLURM log.
+        # Popen.communicate() avoids this by draining stdout and
+        # stderr on separate threads while the process runs.
         if use_mpi:
-            import tempfile
-
-            with tempfile.TemporaryFile(mode="w+t") as stderr_file:
-                result = subprocess.run(
-                    sing_cmd,
-                    env=singularity_env,
-                    stdout=subprocess.DEVNULL,
-                    stderr=stderr_file,
-                    text=True,
-                    check=False,
-                )
-                stderr_file.seek(0)
-                result.stderr = stderr_file.read()
+            proc = subprocess.Popen(
+                sing_cmd,
+                env=singularity_env,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            _, stderr = proc.communicate()
+            result = subprocess.CompletedProcess(
+                sing_cmd, proc.returncode, stdout="", stderr=stderr
+            )
         else:
             result = subprocess.run(
                 sing_cmd,

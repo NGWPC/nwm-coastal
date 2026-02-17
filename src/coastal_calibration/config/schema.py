@@ -379,7 +379,18 @@ class SchismModelConfig(ModelConfig):
         env["NPROCS"] = str(self.total_tasks)
         env["NSCRIBES"] = str(self.nscribes)
         env["OMP_NUM_THREADS"] = str(self.omp_num_threads)
+        env["OMP_PLACES"] = "cores"
         env["SCHISM_ESMFMESH"] = str(self.schism_mesh(config.simulation, config.paths))
+
+        # MPI / AWS EFA fabric tuning — required for reliable MPI
+        # on EFA-enabled instances (e.g. c5n-18xlarge).  Without
+        # these, MPI collectives can hang during ESMF initialisation.
+        env["MPICH_OFI_STARTUP_CONNECT"] = "1"
+        env["MPICH_COLL_SYNC"] = "MPI_Bcast"
+        env["MPICH_REDUCE_NO_SMP"] = "1"
+        env["FI_OFI_RXM_SAR_LIMIT"] = "3145728"
+        env["FI_MR_CACHE_MAX_COUNT"] = "0"
+        env["FI_EFA_RECVWIN_SIZE"] = "65536"
 
         # SCHISM date variables
         sim = config.simulation
