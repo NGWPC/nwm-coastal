@@ -14,7 +14,7 @@ def main():
     comm.Set_errhandler(MPI.ERRORS_ARE_FATAL)
     assert comm.Get_size() == ESMF.pet_count()
 
-    ESMF.Manager(debug=True)
+    ESMF.Manager(debug=False)
 
     # find input forcings
     if int(os.environ.get("LENGTH_HRS", 0)) < 0:  # AnA configuration
