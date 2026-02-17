@@ -1184,7 +1184,7 @@ environment. A dedicated ESMF container isolates this concern:
 - ESMPy (`ESMF` Python module) with MPI support
 - `workflow_driver.py` - regrids NWM forcing fields to SCHISM mesh via ESMF
 - `regrid_estofs.py` - regrids STOFS water levels to SCHISM open boundaries via ESMF
-- Python scientific stack (numpy, netCDF4, xarray)
+- Python scientific stack (`numpy`, `netCDF4`, `xarray`)
 - OpenMPI runtime matching the cluster
 
 This container is invoked via `singularity exec` with `mpiexec` for the two ESMF-based
@@ -1193,7 +1193,7 @@ address since both scripts are already functional MPI Python programs.
 
 #### Target Architecture
 
-```
+```console
 Host (Python)                    Containers
 ──────────────                   ──────────
 download          ─── pure Python (no container)
