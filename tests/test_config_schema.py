@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from datetime import date, datetime
 from pathlib import Path
 
@@ -31,7 +32,7 @@ class TestSlurmConfig:
     def test_defaults(self):
         cfg = SlurmConfig()
         assert cfg.job_name == "coastal_calibration"
-        assert cfg.user is None
+        assert cfg.user == os.environ.get("USER")
 
     def test_custom_values(self):
         cfg = SlurmConfig(
