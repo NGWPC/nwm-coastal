@@ -244,7 +244,7 @@ def get_default_sources(
             ("nwm_retro", "tpxo"),
         ]
     else:
-        combos = [
+        combos: list[tuple[MeteoSource, BoundarySource]] = [
             ("nwm_retro", "stofs"),
             ("nwm_ana", "stofs"),
             ("nwm_retro", "tpxo"),
