@@ -78,7 +78,7 @@ DATA_SOURCE_DATE_RANGES: dict[str, dict[str, DateRange]] = {
             description="NWM Retrospective 3.0 (Alaska)",
         ),
         "hawaii": DateRange(
-            start=datetime(1994, 1, 1),
+            start=datetime(1994, 1, 2),
             end=datetime(2013, 12, 31),
             description="NWM Retrospective 3.0 (Hawaii)",
         ),
