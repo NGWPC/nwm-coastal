@@ -8,6 +8,9 @@
 
 CONFIG_FILE="/tmp/coastal_config_${SLURM_JOB_ID}.yaml"
 
+# On the INT cluster, /ngwpc-coastal is not available, so
+# on compute nodes and we need to use the one in /ngen-test.
+# On the UAT cluster, remove paths and parm_dir
 cat > "${CONFIG_FILE}" <<'EOF'
 model: sfincs
 
@@ -20,8 +23,11 @@ simulation:
 boundary:
   source: tpxo
 
+paths:
+  parm_dir: /ngen-test/coastal/ngwpc-coastal
+
 model_config:
-  prebuilt_dir: /absolute/path/to/prebuilt/sfincs/model
+  prebuilt_dir: /ngen-dev/taher.chegini/nwm-coastal-dev/docs/examples/texas
   include_noaa_gages: true
   forcing_to_mesh_offset_m: 0.171
   vdatum_mesh_to_msl_m: 0.171
@@ -30,5 +36,15 @@ model_config:
   include_pressure: true
 EOF
 
-coastal-calibration run "${CONFIG_FILE}"
+# For production only this line is needed
+# coastal-calibration run "${CONFIG_FILE}"
+
+# For running the dev version we use pixi. 
+# For production comment out these three lines.
+# For making uv to work well on NSF mounted locations
+# we need to set these envs
+export UV_CACHE_DIR=$HOME/.uv-cache
+export UV_LINK_MODE=copy
+pixi r -e dev coastal-calibration run "${CONFIG_FILE}"
+
 rm -f "${CONFIG_FILE}"
