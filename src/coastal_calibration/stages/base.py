@@ -272,17 +272,39 @@ class WorkflowStage(ABC):
                 continue
             singularity_env[f"SINGULARITYENV_{key}"] = value
 
-        result = subprocess.run(
-            sing_cmd,
-            env=singularity_env,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        # For MPI commands we must NOT use capture_output=True.
+        # With many ranks (e.g. 36) the pipe buffer (64 KB on Linux)
+        # fills up and the child processes block on write while
+        # subprocess.run waits for them to exit — a classic deadlock.
+        # Discard stdout and pipe stderr to a temp file so error
+        # messages are still available without polluting the SLURM log.
+        if use_mpi:
+            import tempfile
+
+            with tempfile.TemporaryFile(mode="w+t") as stderr_file:
+                result = subprocess.run(
+                    sing_cmd,
+                    env=singularity_env,
+                    stdout=subprocess.DEVNULL,
+                    stderr=stderr_file,
+                    text=True,
+                    check=False,
+                )
+                stderr_file.seek(0)
+                result.stderr = stderr_file.read()
+        else:
+            result = subprocess.run(
+                sing_cmd,
+                env=singularity_env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
 
         if result.returncode != 0:
-            self._log(f"Singularity command failed: {result.stderr[-2000:]}", "error")
-            raise RuntimeError(f"Singularity command failed: {result.stderr}")
+            stderr = result.stderr or ""
+            self._log(f"Singularity command failed: {stderr[-2000:]}", "error")
+            raise RuntimeError(f"Singularity command failed: {stderr}")
 
         return result
 
