@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -59,7 +60,7 @@ class SlurmConfig:
     time_limit: str | None = None
     account: str | None = None
     qos: str | None = None
-    user: str | None = None
+    user: str | None = field(default_factory=lambda: os.environ.get("USER"))
 
 
 @dataclass
@@ -824,8 +825,6 @@ def _build_interpolation_context(data: dict[str, Any]) -> dict[str, Any]:
     dict
         Flat dictionary with keys like "slurm.user", "simulation.coastal_domain".
     """
-    import os
-
     context: dict[str, Any] = {}
     for section, values in data.items():
         if isinstance(values, dict):

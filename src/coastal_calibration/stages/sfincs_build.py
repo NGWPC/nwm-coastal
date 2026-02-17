@@ -173,8 +173,8 @@ def _meteo_dst_res(config: CoastalCalibConfig, model: SfincsModel) -> float:
     # the grid NetCDF records them.  Fall back to the grid dataset.
     try:
         grid_ds = model.quadtree_grid.data
-        dx = float(grid_ds.attrs.get("dx", 0))
-        dy = float(grid_ds.attrs.get("dy", 0))
+        dx = float(getattr(grid_ds, "attrs", {}).get("dx", 0))
+        dy = float(getattr(grid_ds, "attrs", {}).get("dy", 0))
         if dx > 0 and dy > 0:
             return max(dx, dy)
     except Exception:  # noqa: S110
@@ -900,6 +900,8 @@ class SfincsForcingStage(_SfincsStageBase):
         k = min(k, len(src_xy))
         tree = KDTree(src_xy)
         dists, idxs = tree.query(target_xy, k=k)
+        dists = np.asarray(dists)
+        idxs = np.asarray(idxs)
 
         n_times, _ = values.shape
         n_targets = len(target_xy)
