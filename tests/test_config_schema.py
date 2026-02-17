@@ -159,9 +159,8 @@ class TestPathConfig:
 
     def test_derived_paths(self, tmp_work_dir):
         cfg = PathConfig(work_dir=tmp_work_dir)
-        assert "nwm.v3.0.6" in str(cfg.nwm_version_dir)
-        assert "ush" in str(cfg.ush_nwm)
-        assert "exec" in str(cfg.exec_nwm)
+        assert cfg.ush_nwm == cfg.nwm_dir / "ush"
+        assert cfg.exec_nwm == cfg.nwm_dir / "exec"
         assert "parm" in str(cfg.parm_nwm)
 
     def test_geogrid_file(self, tmp_work_dir, sample_simulation_config):
@@ -183,20 +182,19 @@ class TestPathConfig:
             work_dir="/tmp/work",
             parm_dir="./parm",
             nfs_mount="./nfs",
-            singularity_image="./images/coastal.sif",
-            ngen_app_dir="./ngen",
+            nwm_dir="./nwm",
             hot_start_file="./hotstart.nc",
         )
         assert cfg.parm_dir.is_absolute()
         assert cfg.nfs_mount.is_absolute()
-        assert cfg.singularity_image.is_absolute()
-        assert cfg.ngen_app_dir.is_absolute()
+        assert cfg.nwm_dir.is_absolute()
         assert cfg.hot_start_file.is_absolute()
 
 
 class TestSchismModelConfig:
     def test_defaults(self):
         cfg = SchismModelConfig()
+        assert cfg.singularity_image.is_absolute()
         assert cfg.nodes == 2
         assert cfg.ntasks_per_node == 18
         assert cfg.exclusive is True
@@ -204,6 +202,10 @@ class TestSchismModelConfig:
         assert cfg.omp_num_threads == 2
         assert cfg.oversubscribe is False
         assert cfg.include_noaa_gages is False
+
+    def test_relative_singularity_image_resolved(self):
+        cfg = SchismModelConfig(singularity_image="./images/coastal.sif")
+        assert cfg.singularity_image.is_absolute()
 
     def test_total_tasks(self):
         cfg = SchismModelConfig(nodes=3, ntasks_per_node=10)
@@ -505,10 +507,10 @@ class TestCoastalCalibConfig:
         errors = sample_config.validate()
         assert any("duration_hours" in e for e in errors)
 
-    def test_validate_user_required(self, sample_config):
+    def test_validate_user_optional(self, sample_config):
         sample_config.slurm.user = None
         errors = sample_config.validate()
-        assert any("user" in e for e in errors)
+        assert not any("user" in e for e in errors)
 
     def test_validate_nodes_positive(self, sample_config):
         """SchismModelConfig validates nodes must be at least 1."""

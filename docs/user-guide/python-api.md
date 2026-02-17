@@ -65,7 +65,6 @@ from coastal_calibration import (
 config = CoastalCalibConfig(
     slurm=SlurmConfig(
         job_name="my_simulation",
-        user="your_username",
     ),
     simulation=SimulationConfig(
         start_date=datetime(2021, 6, 11),
@@ -98,7 +97,6 @@ model configuration:
 config = CoastalCalibConfig(
     slurm=SlurmConfig(
         job_name="hawaii_with_obs",
-        user="your_username",
     ),
     simulation=SimulationConfig(
         start_date=datetime(2021, 6, 11),
@@ -144,7 +142,7 @@ from coastal_calibration import (
 TEXAS_DIR = Path("/path/to/texas/model")
 
 config = CoastalCalibConfig(
-    slurm=SlurmConfig(user="your_username"),
+    slurm=SlurmConfig(),
     simulation=SimulationConfig(
         start_date=datetime(2025, 6, 1),
         duration_hours=168,

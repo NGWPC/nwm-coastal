@@ -26,7 +26,6 @@ HPC clusters with Singularity containers and SLURM job scheduling.
 # config.yaml - minimal SCHISM configuration
 slurm:
   job_name: my_schism_run
-  user: your_username
 
 simulation:
   start_date: 2021-06-11

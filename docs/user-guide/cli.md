@@ -192,6 +192,60 @@ coastal-calibration run config.yaml --stop-after sfincs_write
 coastal-calibration run config.yaml --start-from sfincs_run
 ```
 
+#### Using `run` Inside a SLURM Job (sbatch)
+
+The `run` command is designed for use inside sbatch scripts where you control the
+resource allocation directly. Write an inline YAML configuration and pass it to `run`:
+
+```bash
+#!/usr/bin/env bash
+#SBATCH --job-name=coastal_schism
+#SBATCH --partition=c5n-18xlarge
+#SBATCH -N 2
+#SBATCH --ntasks-per-node=18
+#SBATCH --exclusive
+#SBATCH --output=slurm-%j.out
+
+CONFIG_FILE="/tmp/coastal_config_${SLURM_JOB_ID}.yaml"
+
+cat > "${CONFIG_FILE}" <<'EOF'
+model: schism
+
+simulation:
+  start_date: 2021-01-01
+  duration_hours: 12
+  coastal_domain: hawaii
+  meteo_source: nwm_retro
+
+boundary:
+  source: tpxo
+
+model_config:
+  include_noaa_gages: true
+EOF
+
+coastal-calibration run "${CONFIG_FILE}"
+rm -f "${CONFIG_FILE}"
+```
+
+Key points:
+
+- **Use `run`, not `submit`**: Inside a SLURM job, `run` executes all stages locally on
+    the allocated nodes. Using `submit` would create a nested SLURM job.
+- **Use `$SLURM_JOB_ID` in the config filename**: Ensures uniqueness when multiple jobs
+    run concurrently.
+- **Use `<<'EOF'`** (single-quoted heredoc): Prevents shell variable expansion inside
+    the YAML content.
+- **SCHISM uses multi-node MPI**: `-N 2 --ntasks-per-node=18` matches the default
+    `model_config` values (2 nodes, 18 tasks/node).
+- **SFINCS uses single-node OpenMP**: `-N 1 --ntasks=1` is sufficient since SFINCS is
+    OpenMP-only (parallelism is controlled by `model_config.omp_num_threads`).
+
+Complete examples for both models are available in `docs/examples/`:
+
+- [`schism.sh`](../../examples/schism.sh) — SCHISM multi-node MPI
+- [`sfincs.sh`](../../examples/sfincs.sh) — SFINCS single-node OpenMP
+
 ### stages
 
 List all available workflow stages.

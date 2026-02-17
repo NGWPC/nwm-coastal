@@ -12,7 +12,6 @@ The simplest valid SCHISM configuration only requires:
 ```yaml
 slurm:
   job_name: my_run
-  user: your_username
 
 simulation:
   start_date: 2021-06-11
@@ -36,7 +35,6 @@ model: sfincs
 
 slurm:
   job_name: my_sfincs_run
-  user: your_username
 
 simulation:
   start_date: 2025-06-01
@@ -50,6 +48,13 @@ boundary:
 model_config:
   prebuilt_dir: /path/to/prebuilt/sfincs/model
 ```
+
+!!! tip "Running inside a SLURM job"
+
+    You can embed the YAML configuration directly in a sbatch script using a heredoc and use
+    `coastal-calibration run` to execute it. See the
+    [CLI reference](cli.md#using-run-inside-a-slurm-job-sbatch) for details and complete
+    examples in `docs/examples/`.
 
 ## Variable Interpolation
 
@@ -96,21 +101,21 @@ live in the `model_config` section.
 ```yaml
 slurm:
   job_name: coastal_calibration  # Job name shown in squeue
-  user: your_username            # Required: your SLURM username
+  user: your_username            # Optional: defaults to $USER
   partition: c5n-18xlarge        # SLURM partition
   time_limit:                    # Time limit (HH:MM:SS), null for no limit
   account:                       # SLURM account for billing
   qos:                           # Quality of Service
 ```
 
-| Parameter    | Type   | Default               | Description         |
-| ------------ | ------ | --------------------- | ------------------- |
-| `job_name`   | string | `coastal_calibration` | SLURM job name      |
-| `user`       | string | **required**          | Your SLURM username |
-| `partition`  | string | `c5n-18xlarge`        | SLURM partition     |
-| `time_limit` | string | null                  | Time limit          |
-| `account`    | string | null                  | SLURM account       |
-| `qos`        | string | null                  | Quality of Service  |
+| Parameter    | Type   | Default               | Description                          |
+| ------------ | ------ | --------------------- | ------------------------------------ |
+| `job_name`   | string | `coastal_calibration` | SLURM job name                       |
+| `user`       | string | `$USER`               | SLURM username (defaults to `$USER`) |
+| `partition`  | string | `c5n-18xlarge`        | SLURM partition                      |
+| `time_limit` | string | null                  | Time limit                           |
+| `account`    | string | null                  | SLURM account                        |
+| `qos`        | string | null                  | Quality of Service                   |
 
 ### Simulation Settings
 
@@ -171,23 +176,21 @@ paths:
   work_dir: /path/to/work         # Working directory (auto-generated if not set)
   raw_download_dir: /path/to/data # Download directory (auto-generated if not set)
   nfs_mount: /ngen-test           # NFS mount point
-  singularity_image: /ngencerf-app/singularity/ngen-coastal.sif
-  ngen_app_dir: /ngen-app
+  nwm_dir: /ngen-app/nwm.v3.0.6
   hot_start_file:                 # Hot restart file for warm start
   conda_env_name: ngen_forcing_coastal
   parm_dir: /ngen-test/coastal/ngwpc-coastal
 ```
 
-| Parameter           | Type   | Default                                      |
-| ------------------- | ------ | -------------------------------------------- |
-| `work_dir`          | path   | Auto-generated from template                 |
-| `raw_download_dir`  | path   | Auto-generated from template                 |
-| `nfs_mount`         | path   | `/ngen-test`                                 |
-| `singularity_image` | path   | `/ngencerf-app/singularity/ngen-coastal.sif` |
-| `ngen_app_dir`      | path   | `/ngen-app`                                  |
-| `hot_start_file`    | path   | null                                         |
-| `conda_env_name`    | string | `ngen_forcing_coastal`                       |
-| `parm_dir`          | path   | `/ngen-test/coastal/ngwpc-coastal`           |
+| Parameter          | Type   | Default                            |
+| ------------------ | ------ | ---------------------------------- |
+| `work_dir`         | path   | Auto-generated from template       |
+| `raw_download_dir` | path   | Auto-generated from template       |
+| `nfs_mount`        | path   | `/ngen-test`                       |
+| `nwm_dir`          | path   | `/ngen-app/nwm.v3.0.6`             |
+| `hot_start_file`   | path   | null                               |
+| `conda_env_name`   | string | `ngen_forcing_coastal`             |
+| `parm_dir`         | path   | `/ngen-test/coastal/ngwpc-coastal` |
 
 ### Model Configuration
 
@@ -199,6 +202,7 @@ Model-specific parameters live in the `model_config` section. The contents depen
 ```yaml
 # model: schism (default, can be omitted)
 model_config:
+  singularity_image: /ngencerf-app/singularity/ngen-coastal.sif
   nodes: 2                        # Number of compute nodes
   ntasks_per_node: 18             # MPI tasks per node
   exclusive: true                 # Request exclusive node access
@@ -209,16 +213,17 @@ model_config:
   include_noaa_gages: true        # Enable NOAA observation stations & comparison plots
 ```
 
-| Parameter            | Type   | Default                                     | Description                                  |
-| -------------------- | ------ | ------------------------------------------- | -------------------------------------------- |
-| `nodes`              | int    | 2                                           | Number of compute nodes                      |
-| `ntasks_per_node`    | int    | 18                                          | MPI tasks per node                           |
-| `exclusive`          | bool   | true                                        | Request exclusive node access                |
-| `nscribes`           | int    | 2                                           | SCHISM I/O scribes                           |
-| `omp_num_threads`    | int    | 2                                           | OpenMP threads                               |
-| `oversubscribe`      | bool   | false                                       | Allow MPI oversubscription                   |
-| `binary`             | string | `pschism_wcoss2_NO_PARMETIS_TVD-VL.openmpi` | SCHISM executable name                       |
-| `include_noaa_gages` | bool   | false                                       | Enable NOAA station discovery and comparison |
+| Parameter            | Type   | Default                                      | Description                                  |
+| -------------------- | ------ | -------------------------------------------- | -------------------------------------------- |
+| `singularity_image`  | path   | `/ngencerf-app/singularity/ngen-coastal.sif` | Singularity/Apptainer SIF image for SCHISM   |
+| `nodes`              | int    | 2                                            | Number of compute nodes                      |
+| `ntasks_per_node`    | int    | 18                                           | MPI tasks per node                           |
+| `exclusive`          | bool   | true                                         | Request exclusive node access                |
+| `nscribes`           | int    | 2                                            | SCHISM I/O scribes                           |
+| `omp_num_threads`    | int    | 2                                            | OpenMP threads                               |
+| `oversubscribe`      | bool   | false                                        | Allow MPI oversubscription                   |
+| `binary`             | string | `pschism_wcoss2_NO_PARMETIS_TVD-VL.openmpi`  | SCHISM executable name                       |
+| `include_noaa_gages` | bool   | false                                        | Enable NOAA station discovery and comparison |
 
 #### NOAA Observation Stations (`include_noaa_gages`)
 
@@ -345,7 +350,6 @@ Use `_base` to inherit settings from another configuration file:
 # base.yaml - shared settings
 slurm:
   job_name: coastal_sim
-  user: your_username
 
 simulation:
   duration_hours: 24
