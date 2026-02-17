@@ -84,7 +84,7 @@ class TestGetDateRange:
     def test_retro_hawaii(self):
         dr = get_date_range("nwm_retro", "hawaii")
         assert dr is not None
-        assert dr.start == datetime(1994, 1, 1)
+        assert dr.start == datetime(1994, 1, 2)
 
     def test_retro_atlgulf_maps_to_conus(self):
         dr = get_date_range("nwm_retro", "atlgulf")
