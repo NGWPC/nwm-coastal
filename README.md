@@ -56,7 +56,6 @@ source):
 ```yaml
 slurm:
   job_name: my_schism_run
-  user: your_username
 
 simulation:
   start_date: 2021-06-11
@@ -76,7 +75,6 @@ model: sfincs
 
 slurm:
   job_name: my_sfincs_run
-  user: your_username
 
 simulation:
   start_date: 2025-06-01
@@ -134,6 +132,22 @@ coastal-calibration submit config.yaml --start-from boundary_conditions
 coastal-calibration submit config.yaml --stop-after post_forcing -i
 ```
 
+### Running Inside a SLURM Job (sbatch)
+
+For full control over resource allocation, you can write your own sbatch script with an
+inline configuration and use `coastal-calibration run` to execute it. The `run` command
+executes all stages locally (no nested SLURM submissions), making it ideal for use
+inside a manually crafted sbatch script.
+
+Complete examples are provided in [`docs/examples/`](docs/examples/):
+
+- [`schism.sh`](docs/examples/schism.sh) — SCHISM workflow (multi-node MPI)
+- [`sfincs.sh`](docs/examples/sfincs.sh) — SFINCS workflow (single-node OpenMP)
+
+```bash
+sbatch docs/examples/schism.sh
+```
+
 ## Python API
 
 ```python
@@ -177,16 +191,17 @@ present.
 
 #### SCHISM (`SchismModelConfig`)
 
-| Parameter            | Type | Default                                     | Description                                  |
-| -------------------- | ---- | ------------------------------------------- | -------------------------------------------- |
-| `nodes`              | int  | 2                                           | Number of compute nodes                      |
-| `ntasks_per_node`    | int  | 18                                          | MPI tasks per node                           |
-| `exclusive`          | bool | true                                        | Request exclusive nodes                      |
-| `nscribes`           | int  | 2                                           | Number of SCHISM I/O scribes                 |
-| `omp_num_threads`    | int  | 2                                           | OpenMP threads                               |
-| `oversubscribe`      | bool | false                                       | Allow MPI oversubscription                   |
-| `binary`             | str  | `pschism_wcoss2_NO_PARMETIS_TVD-VL.openmpi` | SCHISM executable name                       |
-| `include_noaa_gages` | bool | false                                       | Enable NOAA station discovery and comparison |
+| Parameter            | Type | Default                                      | Description                                  |
+| -------------------- | ---- | -------------------------------------------- | -------------------------------------------- |
+| `singularity_image`  | path | `/ngencerf-app/singularity/ngen-coastal.sif` | Singularity/Apptainer SIF image              |
+| `nodes`              | int  | 2                                            | Number of compute nodes                      |
+| `ntasks_per_node`    | int  | 18                                           | MPI tasks per node                           |
+| `exclusive`          | bool | true                                         | Request exclusive nodes                      |
+| `nscribes`           | int  | 2                                            | Number of SCHISM I/O scribes                 |
+| `omp_num_threads`    | int  | 2                                            | OpenMP threads                               |
+| `oversubscribe`      | bool | false                                        | Allow MPI oversubscription                   |
+| `binary`             | str  | `pschism_wcoss2_NO_PARMETIS_TVD-VL.openmpi`  | SCHISM executable name                       |
+| `include_noaa_gages` | bool | false                                        | Enable NOAA station discovery and comparison |
 
 #### SFINCS (`SfincsModelConfig`)
 
@@ -228,13 +243,12 @@ present.
 All path fields support `~` (tilde) expansion, so you can write `~/my_data` instead of
 the full home directory path.
 
-| Parameter           | Type | Default                                      | Description                        |
-| ------------------- | ---- | -------------------------------------------- | ---------------------------------- |
-| `work_dir`          | path | -                                            | Working directory for outputs      |
-| `raw_download_dir`  | path | null                                         | Directory with downloaded NWM data |
-| `nfs_mount`         | path | `/ngen-test`                                 | NFS mount point                    |
-| `singularity_image` | path | `/ngencerf-app/singularity/ngen-coastal.sif` | Singularity image                  |
-| `hot_start_file`    | path | null                                         | Hot restart file for warm start    |
+| Parameter          | Type | Default      | Description                        |
+| ------------------ | ---- | ------------ | ---------------------------------- |
+| `work_dir`         | path | -            | Working directory for outputs      |
+| `raw_download_dir` | path | null         | Directory with downloaded NWM data |
+| `nfs_mount`        | path | `/ngen-test` | NFS mount point                    |
+| `hot_start_file`   | path | null         | Hot restart file for warm start    |
 
 ## Supported Domains and Data Sources
 
@@ -293,7 +307,6 @@ simulation across different domains or time periods:
 # base.yaml - shared settings
 slurm:
   job_name: coastal_sim
-  user: your_username
 
 simulation:
   duration_hours: 24

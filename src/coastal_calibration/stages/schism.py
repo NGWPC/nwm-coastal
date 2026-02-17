@@ -366,6 +366,7 @@ class PreSCHISMStage(WorkflowStage):
 
         self.run_singularity_command(
             [str(script_path)],
+            sif_path=self.config.model_config.singularity_image,
             env=env,
         )
 
@@ -435,6 +436,7 @@ class SCHISMRunStage(WorkflowStage):
 
         self.run_singularity_command(
             ["/bin/bash", "-c", f"{schism_binary} {nscribes}"],
+            sif_path=self.model.singularity_image,
             env=env,
             pwd=self.config.paths.work_dir,
             use_mpi=True,
@@ -481,6 +483,7 @@ class PostSCHISMStage(WorkflowStage):
 
         self.run_singularity_command(
             [str(script_path)],
+            sif_path=self.model.singularity_image,
             env=env,
         )
 

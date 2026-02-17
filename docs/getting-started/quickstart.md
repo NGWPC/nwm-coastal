@@ -26,12 +26,11 @@ This generates a template configuration file with sensible defaults.
 
 ### Step 2: Edit the Configuration
 
-Open `config.yaml` and set your SLURM username:
+Open `config.yaml` and set your simulation parameters:
 
 ```yaml
 slurm:
   job_name: my_schism_run
-  user: your_username  # Replace with your SLURM username
 
 simulation:
   start_date: 2021-06-11
@@ -106,6 +105,58 @@ coastal-calibration submit config.yaml --start-from boundary_conditions -i
 coastal-calibration submit config.yaml --stop-after post_forcing
 ```
 
+#### Option D: Run Inside a Custom sbatch Script
+
+For full control over SLURM resource allocation, write your own sbatch script with an
+inline YAML configuration and use `coastal-calibration run`:
+
+```bash
+#!/usr/bin/env bash
+#SBATCH --job-name=coastal_schism
+#SBATCH --partition=c5n-18xlarge
+#SBATCH -N 2
+#SBATCH --ntasks-per-node=18
+#SBATCH --exclusive
+#SBATCH --output=slurm-%j.out
+
+CONFIG_FILE="/tmp/coastal_config_${SLURM_JOB_ID}.yaml"
+
+cat > "${CONFIG_FILE}" <<'EOF'
+model: schism
+
+simulation:
+  start_date: 2021-01-01
+  duration_hours: 12
+  coastal_domain: hawaii
+  meteo_source: nwm_retro
+
+boundary:
+  source: tpxo
+
+model_config:
+  include_noaa_gages: true
+EOF
+
+coastal-calibration run "${CONFIG_FILE}"
+rm -f "${CONFIG_FILE}"
+```
+
+Save this as `my_run.sh` and submit with `sbatch my_run.sh`.
+
+!!! tip "run vs submit"
+
+    Use `run` (not `submit`) inside sbatch scripts. The `run` command executes all stages
+    locally on the allocated compute nodes. Using `submit` would create a nested SLURM job,
+    which is not what you want.
+
+!!! tip "Unique config filenames"
+
+    The config filename uses `$SLURM_JOB_ID` to avoid collisions when multiple jobs run
+    concurrently.
+
+Complete SCHISM and SFINCS sbatch examples are provided in
+[`docs/examples/`](../examples/).
+
 ### Step 5: Check Results
 
 After the job completes, find your outputs in the work directory:
@@ -132,14 +183,13 @@ coastal-calibration init sfincs_config.yaml --domain atlgulf --model sfincs
 
 ### Step 2: Edit the Configuration
 
-Set your username and the path to a pre-built SFINCS model:
+Set the path to a pre-built SFINCS model:
 
 ```yaml
 model: sfincs
 
 slurm:
   job_name: my_sfincs_run
-  user: your_username
 
 simulation:
   start_date: 2025-06-01

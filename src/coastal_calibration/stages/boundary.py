@@ -28,6 +28,7 @@ class UpdateParamsStage(WorkflowStage):
 
         self.run_singularity_command(
             [str(script_path)],
+            sif_path=self.config.model_config.singularity_image,
             env=env,
         )
 
@@ -57,6 +58,7 @@ class TPXOBoundaryStage(WorkflowStage):
 
         self.run_singularity_command(
             [str(script_path)],
+            sif_path=self.config.model_config.singularity_image,
             env=env,
         )
 
@@ -114,6 +116,7 @@ class STOFSBoundaryStage(WorkflowStage):
 
         result = self.run_singularity_command(
             [str(pre_script)],
+            sif_path=self.config.model_config.singularity_image,
             env=env,
         )
 
@@ -146,6 +149,7 @@ class STOFSBoundaryStage(WorkflowStage):
                 env["OPEN_BNDS_HGRID_FILE"],
                 env["SCHISM_OUTPUT_FILE"],
             ],
+            sif_path=self.config.model_config.singularity_image,
             env=env,
             use_mpi=True,
         )
@@ -157,6 +161,7 @@ class STOFSBoundaryStage(WorkflowStage):
 
         self.run_singularity_command(
             [str(post_script)],
+            sif_path=self.config.model_config.singularity_image,
             env=env,
         )
 

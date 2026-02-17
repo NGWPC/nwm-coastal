@@ -103,7 +103,7 @@ class WorkflowStage(ABC):
         env["COASTAL_WORK_DIR"] = str(paths.work_dir)
         env["DATAexec"] = str(paths.work_dir)
         env["NFS_MOUNT"] = str(paths.nfs_mount)
-        env["NGEN_APP_DIR"] = str(paths.ngen_app_dir)
+        env["NWM_DIR"] = str(paths.nwm_dir)
         env["OTPSDIR"] = str(paths.otps_dir)
         env["CONDA_ENV_NAME"] = paths.conda_env_name
 
@@ -201,6 +201,7 @@ class WorkflowStage(ABC):
     def run_singularity_command(
         self,
         command: list[str],
+        sif_path: Path | str,
         bindings: list[str] | None = None,
         pwd: Path | None = None,
         env: dict[str, str] | None = None,
@@ -208,6 +209,11 @@ class WorkflowStage(ABC):
         mpi_tasks: int | None = None,
     ) -> subprocess.CompletedProcess[str]:
         """Run a command inside the Singularity container.
+
+        Parameters
+        ----------
+        sif_path : Path or str
+            Path to the Singularity SIF image.
 
         Environment variables are passed to the container using the
         SINGULARITYENV_ prefix, which ensures they are available inside
@@ -217,7 +223,7 @@ class WorkflowStage(ABC):
         if env is None:
             env = self.build_environment()
 
-        sif_path = str(self.config.paths.singularity_image)
+        sif_path = str(sif_path)
 
         if bindings is None:
             bindings = self._get_default_bindings()
@@ -225,7 +231,9 @@ class WorkflowStage(ABC):
         bind_str = ",".join(bindings)
 
         if pwd is None:
-            pwd = self.config.paths.ngen_app_dir / "ngen-forcing" / "coastal" / "calib"
+            from coastal_calibration.config.schema import DEFAULT_CONTAINER_PWD
+
+            pwd = DEFAULT_CONTAINER_PWD
 
         sing_cmd = ["singularity", "exec", "-B", bind_str, "--pwd", str(pwd), sif_path]
         sing_cmd.extend(command)

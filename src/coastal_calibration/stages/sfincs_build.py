@@ -655,7 +655,14 @@ class SfincsForcingStage(_SfincsStageBase):
         """Run the OTPS ``predict_tide`` binary inside Singularity.
 
         Returns the path to the ``otps_out.txt`` output file.
+
+        .. note::
+           This uses the SCHISM Singularity container for the OTPS
+           binary.  A pure-Python TPXO implementation will replace
+           this shortly.
         """
+        from coastal_calibration.config.schema import DEFAULT_SING_IMAGE_PATH
+
         env = self.build_environment()
         otps_dir = str(self.config.paths.otps_dir)
 
@@ -674,6 +681,7 @@ class SfincsForcingStage(_SfincsStageBase):
             bindings=bindings,
             pwd=model_root,
             env=env,
+            sif_path=DEFAULT_SING_IMAGE_PATH,
         )
 
         otps_out = model_root / "otps_out.txt"

@@ -20,14 +20,15 @@ ModelType = Literal["schism", "sfincs"]
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 DEFAULT_SING_IMAGE_PATH = Path("/ngencerf-app/singularity/ngen-coastal.sif")
-DEFAULT_PARM_DIR = Path("/ngen-test/coastal/ngwpc-coastal")
-DEFAULT_NGEN_APP_DIR = Path("/ngen-app")
+DEFAULT_PARM_DIR = Path("/ngwpc-coastal")
 DEFAULT_NFS_MOUNT = Path("/ngen-test")
 DEFAULT_CONDA_ENV_NAME = "ngen_forcing_coastal"
-DEFAULT_NWM_VERSION = "v3.0.6"
+DEFAULT_NWM_DIR = Path("/ngen-app/nwm.v3.0.6")
 DEFAULT_SLURM_PARTITION = "c5n-18xlarge"
 # TPXO binary directory inside the Singularity container (not user-configurable)
 DEFAULT_OTPS_DIR = Path("/ngen-app/OTPSnc")
+# Default working directory inside the Singularity container (not user-configurable)
+DEFAULT_CONTAINER_PWD = Path("/ngen-app/ngen-forcing/coastal/calib")
 
 # Default SCHISM binary name (used as default for SchismModelConfig.binary)
 _DEFAULT_SCHISM_BINARY = "pschism_wcoss2_NO_PARMETIS_TVD-VL.openmpi"
@@ -142,8 +143,7 @@ class PathConfig:
     work_dir: Path
     raw_download_dir: Path | None = None
     nfs_mount: Path = field(default_factory=lambda: DEFAULT_NFS_MOUNT)
-    singularity_image: Path = field(default_factory=lambda: DEFAULT_SING_IMAGE_PATH)
-    ngen_app_dir: Path = field(default_factory=lambda: DEFAULT_NGEN_APP_DIR)
+    nwm_dir: Path = field(default_factory=lambda: DEFAULT_NWM_DIR)
     hot_start_file: Path | None = None
     conda_env_name: str = DEFAULT_CONDA_ENV_NAME
     parm_dir: Path = field(default_factory=lambda: DEFAULT_PARM_DIR)
@@ -158,8 +158,7 @@ class PathConfig:
         self.work_dir = Path(self.work_dir).expanduser().resolve()
         self.parm_dir = Path(self.parm_dir).expanduser().resolve()
         self.nfs_mount = Path(self.nfs_mount).expanduser().resolve()
-        self.singularity_image = Path(self.singularity_image).expanduser().resolve()
-        self.ngen_app_dir = Path(self.ngen_app_dir).expanduser().resolve()
+        self.nwm_dir = Path(self.nwm_dir).expanduser().resolve()
         if self.raw_download_dir:
             self.raw_download_dir = Path(self.raw_download_dir).expanduser().resolve()
         if self.hot_start_file:
@@ -176,19 +175,14 @@ class PathConfig:
         return self.parm_dir / "TPXO10_atlas_v2_nc"
 
     @property
-    def nwm_version_dir(self) -> Path:
-        """NWM version directory (ush, exec live here)."""
-        return self.ngen_app_dir / f"nwm.{DEFAULT_NWM_VERSION}"
-
-    @property
     def ush_nwm(self) -> Path:
         """USH scripts directory."""
-        return self.nwm_version_dir / "ush"
+        return self.nwm_dir / "ush"
 
     @property
     def exec_nwm(self) -> Path:
         """Executables directory."""
-        return self.nwm_version_dir / "exec"
+        return self.nwm_dir / "exec"
 
     @property
     def parm_nwm(self) -> Path:
@@ -307,6 +301,11 @@ class SchismModelConfig(ModelConfig):
 
     Parameters
     ----------
+    singularity_image : Path
+        Path to the Singularity/Apptainer SIF image used to run
+        SCHISM and its pre-/post-processing scripts inside a
+        container.  SFINCS manages its own container independently
+        (see :attr:`SfincsModelConfig.container_tag`).
     nodes : int
         Number of SLURM nodes.
     ntasks_per_node : int
@@ -330,6 +329,7 @@ class SchismModelConfig(ModelConfig):
         Requires the ``plot`` optional dependencies.
     """
 
+    singularity_image: Path = field(default_factory=lambda: DEFAULT_SING_IMAGE_PATH)
     nodes: int = 2
     ntasks_per_node: int = 18
     exclusive: bool = True
@@ -338,6 +338,9 @@ class SchismModelConfig(ModelConfig):
     oversubscribe: bool = False
     binary: str = _DEFAULT_SCHISM_BINARY
     include_noaa_gages: bool = False
+
+    def __post_init__(self) -> None:
+        self.singularity_image = Path(self.singularity_image).expanduser().resolve()
 
     @property
     def model_name(self) -> str:  # noqa: D102
@@ -400,9 +403,6 @@ class SchismModelConfig(ModelConfig):
     def validate(self, config: CoastalCalibConfig) -> list[str]:  # noqa: D102
         errors: list[str] = []
 
-        if not config.slurm.user:
-            errors.append("slurm.user is required")
-
         if self.nodes < 1:
             errors.append("model_config.nodes must be at least 1")
 
@@ -418,8 +418,8 @@ class SchismModelConfig(ModelConfig):
         if not config.paths.raw_download_dir:
             errors.append("paths.raw_download_dir is required")
 
-        if not config.paths.singularity_image.exists():
-            errors.append(f"Singularity image not found: {config.paths.singularity_image}")
+        if not self.singularity_image.exists():
+            errors.append(f"Singularity image not found: {self.singularity_image}")
 
         return errors
 
@@ -472,6 +472,7 @@ class SchismModelConfig(ModelConfig):
     def to_dict(self) -> dict[str, Any]:  # noqa: D102
         return {
             "nodes": self.nodes,
+            "singularity_image": str(self.singularity_image),
             "ntasks_per_node": self.ntasks_per_node,
             "exclusive": self.exclusive,
             "nscribes": self.nscribes,
@@ -997,8 +998,12 @@ class CoastalCalibConfig:
         boundary = BoundaryConfig(**boundary_data)
 
         paths_data = data.get("paths", {})
-        # Remove deprecated otps_dir - it's now hardcoded inside the container
+        # Remove deprecated keys that have moved elsewhere
         paths_data.pop("otps_dir", None)
+        # singularity_image moved to model_config (SchismModelConfig)
+        simg = paths_data.pop("singularity_image", None)
+        if simg and model_type == "schism":
+            model_config_data.setdefault("singularity_image", simg)
         paths = PathConfig(**paths_data)
 
         monitoring_data = data.get("monitoring", {})
@@ -1122,8 +1127,7 @@ class CoastalCalibConfig:
                     str(self.paths.raw_download_dir) if self.paths.raw_download_dir else None
                 ),
                 "nfs_mount": str(self.paths.nfs_mount),
-                "singularity_image": str(self.paths.singularity_image),
-                "ngen_app_dir": str(self.paths.ngen_app_dir),
+                "nwm_dir": str(self.paths.nwm_dir),
                 "hot_start_file": (
                     str(self.paths.hot_start_file) if self.paths.hot_start_file else None
                 ),

@@ -36,6 +36,7 @@ class PreForcingStage(WorkflowStage):
 
         self.run_singularity_command(
             [str(script_path)],
+            sif_path=self.config.model_config.singularity_image,
             env=env,
         )
 
@@ -101,6 +102,7 @@ class NWMForcingStage(WorkflowStage):
         self._update_substep("Running workflow_driver.py with MPI")
         self.run_singularity_command(
             [python_path, workflow_script],
+            sif_path=self.config.model_config.singularity_image,
             env=env,
             use_mpi=True,
         )
@@ -132,6 +134,7 @@ class PostForcingStage(WorkflowStage):
 
         self.run_singularity_command(
             [str(script_path)],
+            sif_path=self.config.model_config.singularity_image,
             env=env,
         )
 

@@ -290,7 +290,6 @@ slurm:
 
 paths:
   nfs_mount: /ngen-test
-  singularity_image: /ngencerf-app/singularity/ngen-coastal.sif
 
 ---
 # hawaii_run.yaml - Inherits from base
@@ -641,7 +640,6 @@ model: sfincs
 
 slurm:
   job_name: sfincs_texas
-  user: your_username
 
 simulation:
   start_date: 2025-06-01
@@ -686,7 +684,60 @@ coastal-calibration submit config.yaml --interactive
 coastal-calibration submit config.yaml -i
 ```
 
-### 5. Stable Public API with Incremental Internal Rewrite
+### 5. Direct Execution Inside SLURM Jobs (`run` Command)
+
+**Decision**: Provide a `run` command for direct, in-process execution alongside the
+`submit` command.
+
+**Rationale**:
+
+The `submit` command handles job submission automatically, but users often need full
+control over SLURM resource allocation—for example when using non-default partitions,
+requesting specific hardware, or embedding the workflow in a larger pipeline. The `run`
+command fills this gap: it executes all stages locally on whatever resources are already
+allocated, making it ideal for use inside manually written sbatch scripts.
+
+**Usage pattern**:
+
+Users write a sbatch script that creates a YAML configuration inline (using a heredoc)
+and passes it to `coastal-calibration run`. The SLURM directives in the sbatch script
+control resource allocation, while the YAML controls workflow configuration:
+
+```bash
+#!/usr/bin/env bash
+#SBATCH --job-name=coastal_schism
+#SBATCH -N 2
+#SBATCH --ntasks-per-node=18
+
+CONFIG_FILE="/tmp/coastal_config_${SLURM_JOB_ID}.yaml"
+
+cat > "${CONFIG_FILE}" <<'EOF'
+model: schism
+
+simulation:
+  start_date: 2021-01-01
+  duration_hours: 12
+  coastal_domain: hawaii
+  meteo_source: nwm_retro
+boundary:
+  source: tpxo
+EOF
+
+coastal-calibration run "${CONFIG_FILE}"
+rm -f "${CONFIG_FILE}"
+```
+
+**Design choices**:
+
+- The config filename includes `$SLURM_JOB_ID` to avoid collisions when multiple jobs
+    run concurrently
+- Single-quoted heredoc (`<<'EOF'`) prevents accidental shell variable expansion inside
+    the YAML
+- `run` reuses the same stage pipeline as `submit`—the only difference is execution
+    context (in-process vs. SLURM job submission)
+- Complete examples for both SCHISM and SFINCS are provided in `docs/examples/`
+
+### 6. Stable Public API with Incremental Internal Rewrite
 
 **Decision**: Establish a clean, stable public API while embedding existing scripts as a
 transitional measure.
@@ -735,7 +786,7 @@ This allows:
 1. Deprecate bash scripts as Python replacements are validated
 1. Optimize performance-critical paths (file I/O, data processing)
 
-### 6. Strict Type Checking with `pyright`
+### 7. Strict Type Checking with `pyright`
 
 **Decision**: Use strict `pyright` mode for static type analysis.
 

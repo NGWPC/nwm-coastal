@@ -21,8 +21,8 @@ boundary:
   source: stofs
 
 # paths:
-  # work_dir: ./docs/examples/sfincs_texas/sfincs_stofs_ana
-  # raw_download_dir: ./docs/examples/sfincs_texas/downloads
+#   work_dir: ./docs/examples/sfincs_texas/sfincs_stofs_ana
+#   raw_download_dir: ./docs/examples/sfincs_texas/downloads
 
 download:
   enabled: true
