@@ -88,6 +88,12 @@ class WorkflowStage(ABC):
 
         env = os.environ.copy()
 
+        # HDF5 file locking (fcntl) is unreliable on NFS-mounted
+        # filesystems and causes PermissionError when netCDF4/HDF5
+        # tries to create files.  Disable it unless the user has
+        # already set the variable.
+        env.setdefault("HDF5_USE_FILE_LOCKING", "FALSE")
+
         env["STARTPDY"] = sim.start_pdy
         env["STARTCYC"] = sim.start_cyc
         env["FCST_LENGTH_HRS"] = str(int(sim.duration_hours))
