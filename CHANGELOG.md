@@ -154,6 +154,11 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     `FORCINGS_SCRIPTS_DIR` in the `submit` path's generated runner script — these
     variables were only set in the `run` path, causing `$COASTAL_SCRIPTS_DIR/makeAtmo.py`
     (and similar) to resolve to just `/makeAtmo.py` and fail silently.
+- Export date-component variables (`FORCING_START_YEAR`, `FORCING_START_MONTH`,
+    `FORCING_START_DAY`, `FORCING_START_HOUR`, `PDY`, `cyc`, `FORCING_BEGIN_DATE`,
+    `FORCING_END_DATE`, `END_DATETIME`) in the `submit` path header so that
+    `makeAtmo.py`, `makeDischarge.py`, and other Python scripts inside the container
+    have access to them across all stages.
 - Add `set -e` to all inner bash scripts (`post_nwm_forcing_coastal.bash`,
     `initial_discharge.bash`, `merge_source_sink.bash`, `combine_sink_source.bash`,
     `pre_nwm_forcing_coastal.bash`, `post_regrid_stofs.bash`, `pre_regrid_stofs.bash`,
