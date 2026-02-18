@@ -697,17 +697,26 @@ requesting specific hardware, or embedding the workflow in a larger pipeline. Th
 command fills this gap: it executes all stages locally on whatever resources are already
 allocated, making it ideal for use inside manually written `sbatch` scripts.
 
-**Usage pattern**:
+**Usage pattern (preferred on clusters)**:
 
-Users write a `sbatch` script that creates a YAML configuration inline (using a heredoc)
-and passes it to `coastal-calibration run`. The SLURM directives in the `sbatch` script
-control resource allocation, while the YAML controls workflow configuration:
+The recommended approach on clusters is to write an `sbatch` script that creates a YAML
+configuration inline using a heredoc and passes it to `coastal-calibration run`. This is
+the preferred method because:
+
+- The SLURM directives in the `sbatch` script control resource allocation, while the
+    YAML controls workflow configuration
+- Everything is contained in a single file that can be submitted with `sbatch`
+- No separate YAML file needs to be managed or kept in sync with SLURM settings
+- The heredoc is self-documenting — reviewers can see the exact configuration used
 
 ```bash
 #!/usr/bin/env bash
 #SBATCH --job-name=coastal_schism
+#SBATCH --partition=c5n-18xlarge
 #SBATCH -N 2
 #SBATCH --ntasks-per-node=18
+#SBATCH --exclusive
+#SBATCH --output=slurm-%j.out
 
 CONFIG_FILE="/tmp/coastal_config_${SLURM_JOB_ID}.yaml"
 
@@ -719,8 +728,12 @@ simulation:
   duration_hours: 12
   coastal_domain: hawaii
   meteo_source: nwm_retro
+
 boundary:
   source: tpxo
+
+model_config:
+  include_noaa_gages: true
 EOF
 
 coastal-calibration run "${CONFIG_FILE}"

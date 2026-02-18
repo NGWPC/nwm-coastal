@@ -192,10 +192,11 @@ coastal-calibration run config.yaml --stop-after sfincs_write
 coastal-calibration run config.yaml --start-from sfincs_run
 ```
 
-#### Using `run` Inside a SLURM Job (sbatch)
+#### Using `run` Inside a SLURM Job — Heredoc (Recommended)
 
-The `run` command is designed for use inside sbatch scripts where you control the
-resource allocation directly. Write an inline YAML configuration and pass it to `run`:
+The recommended way to run workflows on a cluster is to write an `sbatch` script with an
+inline YAML configuration using a heredoc. This keeps everything in a single,
+self-contained file and gives you full control over SLURM resource allocation:
 
 ```bash
 #!/usr/bin/env bash

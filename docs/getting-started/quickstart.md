@@ -64,51 +64,11 @@ This checks for:
 
 ### Step 4: Submit the Job
 
-#### Option A: Submit and Return Immediately (Default)
+#### Option A: Heredoc sbatch Script (Recommended)
 
-```bash
-coastal-calibration submit config.yaml
-```
-
-This will:
-
-1. Run Python-only pre-job stages on the login node (download, observation stations)
-1. Generate a SLURM job script for container stages
-1. Submit the job and return immediately
-
-```console
-INFO  Running download stage on login node...
-INFO  meteo/nwm_ana: 4/4 [OK]
-INFO  hydro/nwm: 16/16 [OK]
-INFO  coastal/stofs: 1/1 [OK]
-INFO  Total: 21/21 (failed: 0)
-INFO  Download stage completed
-INFO  Job 167 submitted.
-INFO  Check job status with: squeue -j 167
-```
-
-#### Option B: Submit and Wait for Completion
-
-Use the `--interactive` flag to monitor the job until it completes:
-
-```bash
-coastal-calibration submit config.yaml --interactive
-```
-
-#### Option C: Submit a Partial Pipeline
-
-Use `--start-from` and `--stop-after` (same options as `run`) to submit only part of the
-workflow:
-
-```bash
-coastal-calibration submit config.yaml --start-from boundary_conditions -i
-coastal-calibration submit config.yaml --stop-after post_forcing
-```
-
-#### Option D: Run Inside a Custom sbatch Script
-
-For full control over SLURM resource allocation, write your own sbatch script with an
-inline YAML configuration and use `coastal-calibration run`:
+The preferred approach on clusters is to write an `sbatch` script with an inline YAML
+configuration using a heredoc. This keeps the SLURM directives and workflow
+configuration in a single, self-contained file:
 
 ```bash
 #!/usr/bin/env bash
@@ -154,8 +114,54 @@ Save this as `my_run.sh` and submit with `sbatch my_run.sh`.
     The config filename uses `$SLURM_JOB_ID` to avoid collisions when multiple jobs run
     concurrently.
 
+!!! tip "Single-quoted heredoc"
+
+    Use `<<'EOF'` (single-quoted) to prevent the shell from expanding `$` variables inside
+    the YAML content. This ensures the YAML is written exactly as written.
+
 Complete SCHISM and SFINCS sbatch examples are provided in
 [`docs/examples/`](../examples/).
+
+#### Option B: Submit and Return Immediately
+
+```bash
+coastal-calibration submit config.yaml
+```
+
+This will:
+
+1. Run Python-only pre-job stages on the login node (download, observation stations)
+1. Generate a SLURM job script for container stages
+1. Submit the job and return immediately
+
+```console
+INFO  Running download stage on login node...
+INFO  meteo/nwm_ana: 4/4 [OK]
+INFO  hydro/nwm: 16/16 [OK]
+INFO  coastal/stofs: 1/1 [OK]
+INFO  Total: 21/21 (failed: 0)
+INFO  Download stage completed
+INFO  Job 167 submitted.
+INFO  Check job status with: squeue -j 167
+```
+
+#### Option C: Submit and Wait for Completion
+
+Use the `--interactive` flag to monitor the job until it completes:
+
+```bash
+coastal-calibration submit config.yaml --interactive
+```
+
+#### Option D: Submit a Partial Pipeline
+
+Use `--start-from` and `--stop-after` (same options as `run`) to submit only part of the
+workflow:
+
+```bash
+coastal-calibration submit config.yaml --start-from boundary_conditions -i
+coastal-calibration submit config.yaml --stop-after post_forcing
+```
 
 ### Step 5: Check Results
 
