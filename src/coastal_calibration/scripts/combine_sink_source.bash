@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -ex
+
 #--------------------------------------------------------------
 #This task combines sink and source data found in:
 #

@@ -1,6 +1,6 @@
-#!/usr/bin/bash
+#!/usr/bin/env bash
 
-set -x
+set -ex
 
 source "$SCRIPTS_DIR/initial_discharge.bash"
 source "$SCRIPTS_DIR/combine_sink_source.bash"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -x
+set -ex
 
 #--------------------------------------------------------------
 #This task regrids ESTOFS forecasts to the coastal domain, and fills in water level forecasts as needed for the

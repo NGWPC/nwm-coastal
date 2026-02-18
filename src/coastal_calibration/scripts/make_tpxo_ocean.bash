@@ -1,6 +1,6 @@
-#!/usr/bin/bash
+#!/usr/bin/env bash
 
-set -x
+set -ex
 
 make_tpxo_ocean() {
    #

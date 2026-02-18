@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -x
+set -ex
 
 #--------------------------------------------------------------
 #This task updates coastal parameter files found in the

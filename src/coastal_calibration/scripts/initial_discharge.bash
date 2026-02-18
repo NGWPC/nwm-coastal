@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -ex
+
 #--------------------------------------------------------------
 #This task creates the initial coastal discharge using CHRT files found in:
 #
