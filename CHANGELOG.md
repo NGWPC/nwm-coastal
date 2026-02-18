@@ -30,6 +30,11 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 
+- Per-stage completion tracking in the `submit` path's generated runner script:
+    each container stage is recorded in `.pipeline_status.json` as it finishes,
+    enabling mid-pipeline restarts after a SLURM job failure without re-running
+    expensive stages (e.g., `predict_tide`). On resubmit, completed stages are
+    automatically skipped.
 - `meteo_res` option in `SfincsModelConfig` to control the output resolution (m) of
     gridded meteorological forcing (precipitation, wind, pressure). When not set, the
     resolution is derived from the SFINCS quadtree grid base cell size.
@@ -178,6 +183,9 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     `update_param.bash` can patch `param.nml` with the correct simulation start/end
     dates — without these, `param.nml` retains its template defaults (2000-01-01) and
     SCHISM aborts with a time mismatch against `sflux` forcing files.
+- Report accurately which container stages completed vs failed when a SLURM job
+    ends with a non-zero exit status, instead of marking all container stages as
+    failed.
 
 ### Removed
 
