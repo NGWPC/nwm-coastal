@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -x
+set -ex
 
 #--------------------------------------------------------------
 #This task merges source and sink data found in:

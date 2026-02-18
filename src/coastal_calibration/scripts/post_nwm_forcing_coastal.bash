@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -x
+set -ex
 
 #--------------------------------------------------------------
 #This task runs the coastal forcing engine, which creates coastal forcing data using LDASIN files found in:
