@@ -147,6 +147,9 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Use `srun` instead of bare `mpiexec` for MPI stages in the `run` path when a SLURM
     allocation is detected (`SLURM_JOB_ID` set), preventing hangs caused by `mpiexec`
     lacking PMI bootstrap context outside a SLURM job script.
+- Source inner bash scripts from `$SCRIPTS_DIR` instead of `./` in all wrapper scripts,
+    so that the bind-mounted (package) versions are used rather than the stale copies
+    baked into the container image.
 
 ### Removed
 
