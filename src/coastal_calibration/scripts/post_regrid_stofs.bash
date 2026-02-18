@@ -45,7 +45,7 @@ post_nwm_coastal_regrid_estofs() {
            export TIDAL_CONSTANTS_DIR=$COASTAL_ROOT_DIR/Tides/TidalConst
            export COASTAL_DOMAIN_GR3=$PARMnwm/coastal/$COASTAL_DOMAIN/hgrid.gr3
 
-           python $COASTAL_SCRIPTS_DIR/Tides/makeOceanTide.py >> $DATAlogs/regrid_stofs.{PDY}${cyc}.log 2>&1
+           python $COASTAL_SCRIPTS_DIR/Tides/makeOceanTide.py >> $DATAlogs/regrid_stofs.${PDY}${cyc}.log 2>&1
            export LENGTH_HRS=${old_length_hrs}
 
    fi
