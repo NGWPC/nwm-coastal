@@ -4,6 +4,6 @@
 
 source ./post_schism.bash
 
-export NSCRIBES=2
+export NSCRIBES=${NSCRIBES:-2}
 
 post_nwm_coastal

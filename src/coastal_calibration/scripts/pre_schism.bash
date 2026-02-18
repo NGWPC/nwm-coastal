@@ -30,7 +30,7 @@ pre_nwm_coastal() {
 
    nwm_coastal_merge_source_sink "" "forecast" "forecast"
 
-   export NSCRIBES=2
+   export NSCRIBES=${NSCRIBES:-2}
 
    #create offline partition
    create_offline_partition $NPROCS "${NSCRIBES}"
