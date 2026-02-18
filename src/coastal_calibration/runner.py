@@ -715,6 +715,10 @@ class CoastalCalibRunner:
             "",
             "# Bind paths for Singularity (includes scripts directory)",
             f"export SCRIPTS_DIR={scripts_dir}",
+            "export WRF_HYDRO_DIR=$SCRIPTS_DIR/wrf_hydro_workflow_dev",
+            "export COASTAL_SCRIPTS_DIR=$WRF_HYDRO_DIR/coastal",
+            "export TPXO_SCRIPTS_DIR=$SCRIPTS_DIR/tpxo_to_open_bnds_hgrid",
+            "export FORCINGS_SCRIPTS_DIR=$WRF_HYDRO_DIR/forcings",
             'export BINDINGS="$NFS_MOUNT,$CONDA_ENVS_PATH,$NGWPC_COASTAL_PARM_DIR,$SCRIPTS_DIR,/usr/bin/bc,/usr/bin/srun,'
             "/usr/lib64/libpmi2.so,/usr/lib64/libefa.so,/usr/lib64/libibmad.so,/usr/lib64/libibnetdisc.so,"
             "/usr/lib64/libibumad.so,/usr/lib64/libibverbs.so,/usr/lib64/libmana.so,/usr/lib64/libmlx4.so,"
