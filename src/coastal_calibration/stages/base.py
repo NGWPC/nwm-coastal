@@ -266,6 +266,39 @@ class WorkflowStage(ABC):
 
         self._log(f"Running Singularity command: {' '.join(command[:3])}...")
         # TODO(debug): remove once nwm_forcing hang is resolved
+        if use_mpi:
+            import shutil
+
+            launcher = sing_cmd[0]
+            self._log(f"  which {launcher}: {shutil.which(launcher, path=env.get('PATH'))}")
+            # Write a repro script so the command can be tested from
+            # bash inside the same SLURM allocation.
+            repro = self.config.paths.work_dir / "repro_nwm_forcing.sh"
+            repro_env_keys = {
+                "LENGTH_HRS", "FORCING_BEGIN_DATE", "FORCING_END_DATE",
+                "NWM_FORCING_OUTPUT_DIR", "COASTAL_FORCING_OUTPUT_DIR",
+                "COASTAL_FORCING_INPUT_DIR", "COASTAL_WORK_DIR",
+                "FORCING_START_YEAR", "FORCING_START_MONTH",
+                "FORCING_START_DAY", "FORCING_START_HOUR",
+                "FECPP_JOB_INDEX", "FECPP_JOB_COUNT",
+                "MPICH_OFI_STARTUP_CONNECT", "MPICH_COLL_SYNC",
+                "MPICH_REDUCE_NO_SMP", "FI_OFI_RXM_SAR_LIMIT",
+                "FI_MR_CACHE_MAX_COUNT", "FI_EFA_RECVWIN_SIZE",
+                "OMP_NUM_THREADS", "HDF5_USE_FILE_LOCKING",
+                "NFS_MOUNT", "CONDA_ENVS_PATH", "CONDA_ENV_NAME",
+                "USHnwm", "PARMnwm", "NWM_FORCING_DIR",
+                "STARTPDY", "STARTCYC", "FCST_LENGTH_HRS",
+            }
+            import shlex
+
+            with open(repro, "w") as f:
+                f.write("#!/usr/bin/env bash\nset -x\n")
+                for k in sorted(repro_env_keys):
+                    v = env.get(k, "")
+                    f.write(f"export {k}={shlex.quote(v)}\n")
+                f.write(" ".join(shlex.quote(c) for c in sing_cmd) + "\n")
+            repro.chmod(0o755)
+            self._log(f"  repro script: {repro}")
         self._log(f"  Full command: {' '.join(sing_cmd)}")
 
         # Redirect both stdout and stderr to files instead of pipes.
