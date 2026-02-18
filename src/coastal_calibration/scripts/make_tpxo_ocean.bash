@@ -27,8 +27,8 @@ make_tpxo_ocean() {
 	  $PDY$cyc $END_DATETIME $TIME_STEP_IN_SECS  \
 	  $DATAexec/otps_lat_lon_time.txt
 
-   cp ./setup_tpxo.txt $DATAexec/
-   cp ./Model_tpxo10_atlas $DATAexec/
+   cp "$SCRIPTS_DIR/setup_tpxo.txt" $DATAexec/
+   cp "$SCRIPTS_DIR/Model_tpxo10_atlas" $DATAexec/
 
    cd $DATAexec
 
