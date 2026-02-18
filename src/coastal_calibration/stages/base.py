@@ -248,10 +248,19 @@ class WorkflowStage(ABC):
             if mpi_tasks is None:
                 msg = "mpi_tasks must be specified when use_mpi=True"
                 raise ValueError(msg)
-            mpi_cmd = ["mpiexec", "-n", str(mpi_tasks)]
-            oversubscribe = getattr(self.config.model_config, "oversubscribe", False)
-            if oversubscribe:
-                mpi_cmd.append("--oversubscribe")
+
+            # Inside a SLURM allocation, use srun so that the MPI
+            # processes are launched via SLURM's PMI and correctly
+            # distributed across the allocated nodes.  Without srun,
+            # bare mpiexec hangs waiting for a bootstrap service that
+            # only SLURM can provide.
+            if os.environ.get("SLURM_JOB_ID"):
+                mpi_cmd = ["srun", "-n", str(mpi_tasks)]
+            else:
+                mpi_cmd = ["mpiexec", "-n", str(mpi_tasks)]
+                oversubscribe = getattr(self.config.model_config, "oversubscribe", False)
+                if oversubscribe:
+                    mpi_cmd.append("--oversubscribe")
             sing_cmd = [*mpi_cmd, *sing_cmd]
 
         self._log(f"Running Singularity command: {' '.join(command[:3])}...")
