@@ -826,7 +826,7 @@ class CoastalCalibRunner:
             "",
             "# SCHISM date variables used by update_param.bash",
             "if [[ $FCST_LENGTH_HRS -le 0 ]]; then",
-            '    schism_begin_itime=$(( $start_itime + $FCST_LENGTH_HRS * 3600 ))',
+            "    schism_begin_itime=$(( $start_itime + $FCST_LENGTH_HRS * 3600 ))",
             '    export SCHISM_BEGIN_DATE=$(date -u -d "@${schism_begin_itime}" +"%Y%m%d%H00")',
             "    export SCHISM_END_DATE=${STARTPDY}${STARTCYC}00",
             "else",
