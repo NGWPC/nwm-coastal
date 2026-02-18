@@ -64,6 +64,15 @@ log("Reading precip_source.nc")
 precip = nc.Dataset(path.join(output_path, "precip_source.nc"), "r")
 so2 = precip.variables["vsource"][:]
 
+# The discharge files (vsource.th.1 / vsink.th.1) may contain one more
+# timestep than the precipitation forcing (precip_source.nc) because
+# makeDischarge writes an extra trailing step.  Truncate the discharge
+# arrays to match the precipitation time dimension so the merge works.
+ntime = so2.shape[0]
+if so1.shape[0] > ntime:
+    so1 = so1[:ntime, :]
+    si = si[:ntime, :]
+    time = time[:ntime]
 
 log("Merging sources...")
 for i in range(len(soel1)):
