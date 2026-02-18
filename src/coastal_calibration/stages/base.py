@@ -6,7 +6,6 @@ import importlib.resources
 import os
 import subprocess
 import tempfile
-import time  # TODO(debug): remove once nwm_forcing hang is resolved
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -133,9 +132,7 @@ class WorkflowStage(ABC):
         conda_lib = f"{paths.nfs_mount}/ngen-app/conda/lib"
         conda_envs_lib = f"{paths.conda_envs_path}/lib"
         env["PATH"] = f"{conda_bin}:{conda_base_bin}:{env.get('PATH', '')}"
-        env["LD_LIBRARY_PATH"] = (
-            f"{conda_lib}:{conda_envs_lib}:{env.get('LD_LIBRARY_PATH', '')}"
-        )
+        env["LD_LIBRARY_PATH"] = f"{conda_lib}:{conda_envs_lib}:{env.get('LD_LIBRARY_PATH', '')}"
 
         env["INLAND_DOMAIN"] = sim.inland_domain
         env["NWM_DOMAIN"] = sim.nwm_domain
@@ -276,99 +273,34 @@ class WorkflowStage(ABC):
             sing_cmd = [*mpi_cmd, *sing_cmd]
 
         self._log(f"Running Singularity command: {' '.join(command[:3])}...")
-        # TODO(debug): remove once nwm_forcing hang is resolved
-        if use_mpi:
-            import shutil
-
-            launcher = sing_cmd[0]
-            self._log(f"  which {launcher}: {shutil.which(launcher, path=env.get('PATH'))}")
-            # Write a repro script so the command can be tested from
-            # bash inside the same SLURM allocation.
-            repro = self.config.paths.work_dir / "repro_nwm_forcing.sh"
-            repro_env_keys = {
-                "LENGTH_HRS", "FORCING_BEGIN_DATE", "FORCING_END_DATE",
-                "NWM_FORCING_OUTPUT_DIR", "COASTAL_FORCING_OUTPUT_DIR",
-                "COASTAL_FORCING_INPUT_DIR", "COASTAL_WORK_DIR",
-                "FORCING_START_YEAR", "FORCING_START_MONTH",
-                "FORCING_START_DAY", "FORCING_START_HOUR",
-                "FECPP_JOB_INDEX", "FECPP_JOB_COUNT",
-                "MPICH_OFI_STARTUP_CONNECT", "MPICH_COLL_SYNC",
-                "MPICH_REDUCE_NO_SMP", "FI_OFI_RXM_SAR_LIMIT",
-                "FI_MR_CACHE_MAX_COUNT", "FI_EFA_RECVWIN_SIZE",
-                "OMP_NUM_THREADS", "HDF5_USE_FILE_LOCKING",
-                "NFS_MOUNT", "CONDA_ENVS_PATH", "CONDA_ENV_NAME",
-                "USHnwm", "PARMnwm", "NWM_FORCING_DIR",
-                "STARTPDY", "STARTCYC", "FCST_LENGTH_HRS",
-            }
-            import shlex
-
-            with open(repro, "w") as f:
-                f.write("#!/usr/bin/env bash\nset -x\n")
-                for k in sorted(repro_env_keys):
-                    v = env.get(k, "")
-                    f.write(f"export {k}={shlex.quote(v)}\n")
-                f.write(" ".join(shlex.quote(c) for c in sing_cmd) + "\n")
-            repro.chmod(0o755)
-            self._log(f"  repro script: {repro}")
-        self._log(f"  Full command: {' '.join(sing_cmd)}")
 
         # Redirect both stdout and stderr to files instead of pipes.
-        # MPI launches (srun / mpiexec → singularity) create a deep
-        # process tree where intermediate daemons (slurmstepd) can
-        # inherit pipe file-descriptors.  Even with Popen.communicate()
-        # draining on background threads, the inherited fds in child
-        # processes can fill the OS pipe buffer (64 KB on Linux) and
-        # deadlock the entire tree.  Writing to files avoids the
-        # problem entirely and matches how the generated submit scripts
-        # handle output (stderr → SLURM log, stdout → /dev/null).
-        stderr_file = tempfile.NamedTemporaryFile(
-            mode="w",
+        # MPI launches (mpiexec → singularity) create a deep process
+        # tree where intermediate processes can inherit pipe fds.
+        # Writing to a file avoids pipe-buffer deadlocks and matches
+        # how the generated submit scripts handle output.
+        fd, stderr_name = tempfile.mkstemp(
             prefix="singularity_",
             suffix=".stderr",
             dir=self.config.paths.work_dir,
-            delete=False,
         )
-        stderr_path = Path(stderr_file.name)
-        # TODO(debug): remove once nwm_forcing hang is resolved
-        self._log(f"  stderr -> {stderr_path}  (tail -f to monitor)")
+        stderr_path = Path(stderr_name)
         try:
-            t0 = time.monotonic()
-            proc = subprocess.Popen(
-                sing_cmd,
-                env=env,
-                stdout=subprocess.DEVNULL,
-                stderr=stderr_file,
-            )
-            # TODO(debug): remove once nwm_forcing hang is resolved
-            self._log(f"  PID={proc.pid}")
-
-            # Poll with a heartbeat so the log shows the process is
-            # still alive.  This is temporary debug instrumentation.
-            # TODO(debug): remove once nwm_forcing hang is resolved
-            while proc.poll() is None:
-                time.sleep(30)
-                elapsed = time.monotonic() - t0
-                try:
-                    sz = stderr_path.stat().st_size
-                except OSError:
-                    sz = -1
-                self._log(f"  ... waiting (elapsed={elapsed:.0f}s, stderr={sz}B)")
-
-            elapsed = time.monotonic() - t0
-            # TODO(debug): remove once nwm_forcing hang is resolved
-            self._log(f"  exited rc={proc.returncode} in {elapsed:.1f}s")
-
-            stderr_file.close()
+            with os.fdopen(fd, "w") as stderr_file:
+                proc = subprocess.Popen(
+                    sing_cmd,
+                    env=env,
+                    stdout=subprocess.DEVNULL,
+                    stderr=stderr_file,
+                )
+                proc.wait()
             stderr = stderr_path.read_text(errors="replace")
             stderr_path.unlink(missing_ok=True)
         except BaseException:
-            stderr_file.close()
             stderr_path.unlink(missing_ok=True)
             raise
 
-        result = subprocess.CompletedProcess(
-            sing_cmd, proc.returncode, stdout="", stderr=stderr
-        )
+        result = subprocess.CompletedProcess(sing_cmd, proc.returncode, stdout="", stderr=stderr)
 
         if result.returncode != 0:
             stderr = result.stderr or ""

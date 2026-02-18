@@ -1116,6 +1116,78 @@ class CoastalCalibRunner:
         else:
             self._generate_sfincs_runner_script(container_stages)
 
+    def _wait_for_slurm_job(
+        self,
+        *,
+        job_id: str,
+        job: list[str],
+        post_job: list[str],
+        start_time: datetime,
+        stages_completed: list[str],
+        errors: list[str],
+    ) -> WorkflowResult:
+        """Wait for a SLURM job and collect results."""
+        final_status = self.slurm.wait_for_job(job_id)
+
+        success = final_status.state == JobState.COMPLETED
+
+        # The generated bash script marks each stage in the status
+        # file as it completes.  Read it back so we know exactly which
+        # stages finished — both for the success and failure paths.
+        status = self._load_status()
+        completed_set = set(status.get("completed_stages", []))
+        completed_in_job = [s for s in job if s in completed_set]
+        failed_in_job = [s for s in job if s not in completed_set]
+
+        if not success:
+            errors.append(f"Job ended with state: {final_status.state.value}")
+            if final_status.reason and final_status.reason.lower() != "none":
+                errors.append(f"Reason: {final_status.reason}")
+            stages_completed.extend(completed_in_job)
+            for stage_name in completed_in_job:
+                self.monitor.mark_stage_completed(stage_name)
+            self.monitor.end_workflow(success=False)
+            return WorkflowResult(
+                success=False,
+                job_id=job_id,
+                start_time=start_time,
+                end_time=datetime.now(),
+                stages_completed=stages_completed,
+                stages_failed=failed_in_job,
+                outputs={"slurm_status": final_status.state.value},
+                errors=errors,
+            )
+
+        stages_completed.extend(completed_in_job)
+
+        # Mark container stages as completed in the monitor so the
+        # timing summary shows checkmarks instead of "?" for stages
+        # that ran inside the SLURM job.
+        for stage_name in completed_in_job:
+            self.monitor.mark_stage_completed(stage_name)
+
+        # --- Run post-job stages on login node ---
+        if post_job:
+            self.monitor.info("-" * 40)
+        try:
+            post_completed = self._run_stages_on_login_node(post_job)
+            stages_completed.extend(post_completed)
+        except Exception as e:
+            self.monitor.warning(f"Post-job stage failed: {e}")
+            # Post-job failures are non-fatal (job succeeded)
+
+        self.monitor.end_workflow(success=True)
+        return WorkflowResult(
+            success=True,
+            job_id=job_id,
+            start_time=start_time,
+            end_time=datetime.now(),
+            stages_completed=stages_completed,
+            stages_failed=[],
+            outputs={"slurm_status": final_status.state.value},
+            errors=errors,
+        )
+
     def submit(
         self,
         wait: bool = False,
@@ -1240,65 +1312,12 @@ class CoastalCalibRunner:
                 errors=[],
             )
 
-        # --- Wait for SLURM job ---
-        final_status = self.slurm.wait_for_job(job_id)
-
-        success = final_status.state == JobState.COMPLETED
-
-        # The generated bash script marks each stage in the status
-        # file as it completes.  Read it back so we know exactly which
-        # stages finished — both for the success and failure paths.
-        status = self._load_status()
-        completed_set = set(status.get("completed_stages", []))
-        completed_in_job = [s for s in job if s in completed_set]
-        failed_in_job = [s for s in job if s not in completed_set]
-
-        if not success:
-            errors.append(f"Job ended with state: {final_status.state.value}")
-            if final_status.reason and final_status.reason.lower() != "none":
-                errors.append(f"Reason: {final_status.reason}")
-            stages_completed.extend(completed_in_job)
-            for stage_name in completed_in_job:
-                self.monitor.mark_stage_completed(stage_name)
-            self.monitor.end_workflow(success=False)
-            return WorkflowResult(
-                success=False,
-                job_id=job_id,
-                start_time=start_time,
-                end_time=datetime.now(),
-                stages_completed=stages_completed,
-                stages_failed=failed_in_job,
-                outputs={"slurm_status": final_status.state.value},
-                errors=errors,
-            )
-
-        stages_completed.extend(completed_in_job)
-
-        # Mark container stages as completed in the monitor so the
-        # timing summary shows checkmarks instead of "?" for stages
-        # that ran inside the SLURM job.
-        for stage_name in completed_in_job:
-            self.monitor.mark_stage_completed(stage_name)
-
-        # --- Run post-job stages on login node ---
-        if post_job:
-            self.monitor.info("-" * 40)
-        try:
-            post_completed = self._run_stages_on_login_node(post_job)
-            stages_completed.extend(post_completed)
-        except Exception as e:
-            self.monitor.warning(f"Post-job stage failed: {e}")
-            # Post-job failures are non-fatal (job succeeded)
-
-        self.monitor.end_workflow(success=True)
-        return WorkflowResult(
-            success=True,
+        return self._wait_for_slurm_job(
             job_id=job_id,
+            job=job,
+            post_job=post_job,
             start_time=start_time,
-            end_time=datetime.now(),
             stages_completed=stages_completed,
-            stages_failed=[],
-            outputs={"slurm_status": final_status.state.value},
             errors=errors,
         )
 
