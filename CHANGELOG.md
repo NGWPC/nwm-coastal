@@ -152,8 +152,9 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     baked into the container image.
 - Export `COASTAL_SCRIPTS_DIR`, `WRF_HYDRO_DIR`, `TPXO_SCRIPTS_DIR`, and
     `FORCINGS_SCRIPTS_DIR` in the `submit` path's generated runner script — these
-    variables were only set in the `run` path, causing `$COASTAL_SCRIPTS_DIR/makeAtmo.py`
-    (and similar) to resolve to just `/makeAtmo.py` and fail silently.
+    variables were only set in the `run` path, causing
+    `$COASTAL_SCRIPTS_DIR/makeAtmo.py` (and similar) to resolve to just `/makeAtmo.py`
+    and fail silently.
 - Export date-component variables (`FORCING_START_YEAR`, `FORCING_START_MONTH`,
     `FORCING_START_DAY`, `FORCING_START_HOUR`, `PDY`, `cyc`, `FORCING_BEGIN_DATE`,
     `FORCING_END_DATE`, `END_DATETIME`) in the `submit` path header so that
@@ -165,8 +166,8 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     `make_tpxo_ocean.bash`, `pre_schism.bash`, `post_schism.bash`, `update_param.bash`)
     so that command failures (e.g., `python` file-not-found or import errors) propagate
     instead of being silently swallowed.
-- Correct shebang in `make_tpxo_ocean.bash` and `pre_schism.bash`
-    (`#!/usr/bin/bash` → `#!/usr/bin/env bash`).
+- Correct shebang in `make_tpxo_ocean.bash` and `pre_schism.bash` (`#!/usr/bin/bash` →
+    `#!/usr/bin/env bash`).
 
 ### Removed
 
