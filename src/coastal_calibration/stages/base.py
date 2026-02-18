@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.resources
 import os
 import subprocess
+import tempfile
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -221,10 +222,9 @@ class WorkflowStage(ABC):
         sif_path : Path or str
             Path to the Singularity SIF image.
 
-        Environment variables are passed to the container using the
-        SINGULARITYENV_ prefix, which ensures they are available inside
-        the container regardless of Singularity's default environment
-        handling.
+        Environment variables are inherited by the container through
+        Singularity's default pass-through behaviour (the host
+        environment is visible inside the container).
         """
         if env is None:
             env = self.build_environment()
@@ -265,40 +265,41 @@ class WorkflowStage(ABC):
 
         self._log(f"Running Singularity command: {' '.join(command[:3])}...")
 
-        # Singularity passes environment variables that are prefixed with
-        # SINGULARITYENV_ to the container. We need to add this prefix to
-        # all our workflow environment variables so they're available inside.
-        # Some variables cannot be overridden (HOME, USER, etc.) and some
-        # variable names from the host environment may be invalid.
-        singularity_protected = {"HOME", "USER", "SHELL", "TERM", "PATH", "LD_LIBRARY_PATH"}
-        singularity_env = env.copy()
-        for key, value in env.items():
-            # Skip protected variables that Singularity won't allow overriding
-            if key in singularity_protected:
-                continue
-            # Skip variables with invalid names (must be alphanumeric + underscore)
-            if not key.replace("_", "").isalnum():
-                continue
-            singularity_env[f"SINGULARITYENV_{key}"] = value
-
-        # Never use capture_output=True for container commands.
-        # MPI ranks, Fortran binaries, and bash scripts with set -x
-        # can all produce enough output to fill the OS pipe buffer
-        # (64 KB on Linux), causing a deadlock: the child blocks on
-        # write while subprocess.run waits for it to exit.
-        # Popen.communicate() drains pipes on background threads,
-        # avoiding the deadlock.  stdout is discarded; stderr is
-        # kept for error reporting.
-        proc = subprocess.Popen(
-            sing_cmd,
-            env=singularity_env,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-            text=True,
+        # Redirect both stdout and stderr to files instead of pipes.
+        # MPI launches (srun / mpiexec → singularity) create a deep
+        # process tree where intermediate daemons (slurmstepd) can
+        # inherit pipe file-descriptors.  Even with Popen.communicate()
+        # draining on background threads, the inherited fds in child
+        # processes can fill the OS pipe buffer (64 KB on Linux) and
+        # deadlock the entire tree.  Writing to files avoids the
+        # problem entirely and matches how the generated submit scripts
+        # handle output (stderr → SLURM log, stdout → /dev/null).
+        stderr_file = tempfile.NamedTemporaryFile(
+            mode="w",
+            prefix="singularity_",
+            suffix=".stderr",
+            dir=self.config.paths.work_dir,
+            delete=False,
         )
-        _, stderr = proc.communicate()
+        try:
+            proc = subprocess.Popen(
+                sing_cmd,
+                env=env,
+                stdout=subprocess.DEVNULL,
+                stderr=stderr_file,
+            )
+            proc.wait()
+            stderr_file.close()
+            stderr_path = Path(stderr_file.name)
+            stderr = stderr_path.read_text(errors="replace")
+            stderr_path.unlink(missing_ok=True)
+        except BaseException:
+            stderr_file.close()
+            Path(stderr_file.name).unlink(missing_ok=True)
+            raise
+
         result = subprocess.CompletedProcess(
-            sing_cmd, proc.returncode, stdout="", stderr=stderr or ""
+            sing_cmd, proc.returncode, stdout="", stderr=stderr
         )
 
         if result.returncode != 0:
