@@ -90,6 +90,42 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     containing `~` are correctly expanded to the user's home directory.
 - Call `monitor.end_workflow()` before returning early in no-wait mode (`submit` with
     `wait=False`), so that the workflow timing summary is always closed.
+- Set `HDF5_USE_FILE_LOCKING=FALSE` in container environment to prevent
+    `PermissionError` on NFS-mounted filesystems.
+- Add MPI/EFA fabric tuning variables (`MPICH_OFI_STARTUP_CONNECT`,
+    `FI_OFI_RXM_SAR_LIMIT`, etc.) to the `run` path's SCHISM environment, matching the
+    `submit` path and preventing hangs on AWS `c5n` nodes.
+- Suppress ESMF diagnostic output from SLURM logs by redirecting stdout to `/dev/null`
+    for MPI stages and setting `ESMF.Manager(debug=False)`.
+- Drain container stdout/stderr via `Popen.communicate()` instead of
+    `capture_output=True` to prevent pipe-buffer deadlocks with MPI ranks, Fortran
+    binaries, and `set -x` bash scripts.
+- Use `$COASTAL_DOMAIN` instead of hardcoded `prvi` in `make_tpxo_ocean.bash` so the
+    correct open-boundary mesh is used for all domains.
+- Add missing `$` in `${PDY}` variable expansion in `post_regrid_stofs.bash` log
+    filename.
+- Correct malformed shebangs (`#/usr/bin/evn`) in `pre_nwm_forcing_coastal.bash` and
+    `post_nwm_forcing_coastal.bash`.
+- Use integer division (`//`) for the netCDF array index in `WrfHydroFECPP/fecpp/app.py`
+    to avoid `float` index errors.
+- Use numeric comparison (`-gt`) instead of string comparison (`>`) for `LENGTH_HRS` in
+    `update_param.bash`.
+- Add missing sub-hourly CHRTOUT symlinks for Hawaii in the last-timestep block of
+    `initial_discharge.bash`.
+- Read `NSCRIBES` from the environment with a fallback default instead of hardcoding it
+    in `pre_schism.bash` and `run_sing_coastal_workflow_post_schism.bash`.
+- Compute `LENGTH_HRS` in `STOFSBoundaryStage` directly instead of parsing stdout from
+    the pre-script, which was silently lost after the `Popen.communicate()` fix
+    redirected stdout to `/dev/null`.
+- Remove duplicate domain-to-inland/geogrid mappings in `runner.py` and use the
+    canonical properties from `SimulationConfig` to prevent the two copies from drifting
+    out of sync.
+- Correct shebangs (`#!/usr/bin/bash` → `#!/usr/bin/env bash`) in
+    `pre_regrid_stofs.bash` and `post_regrid_stofs.bash` for consistency and
+    portability.
+- Use `srun` instead of bare `mpiexec` for MPI stages in the `run` path when a SLURM
+    allocation is detected (`SLURM_JOB_ID` set), preventing hangs caused by `mpiexec`
+    lacking PMI bootstrap context outside a SLURM job script.
 
 ### Removed
 
