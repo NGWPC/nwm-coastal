@@ -96,14 +96,20 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     `wait=False`), so that the workflow timing summary is always closed.
 - Set `HDF5_USE_FILE_LOCKING=FALSE` in container environment to prevent
     `PermissionError` on NFS-mounted filesystems.
+- Add conda environment paths (`PATH`, `LD_LIBRARY_PATH`) to the `run` path's
+    `build_environment()` so that `mpiexec` and MPI shared libraries from the conda
+    environment are found, matching the environment set up by the generated `submit`
+    scripts. Without these paths, the `run` path could not locate `mpiexec`, causing MPI
+    stages to hang or fail.
 - Add MPI/EFA fabric tuning variables (`MPICH_OFI_STARTUP_CONNECT`,
     `FI_OFI_RXM_SAR_LIMIT`, etc.) to the `run` path's SCHISM environment, matching the
     `submit` path and preventing hangs on AWS `c5n` nodes.
 - Suppress ESMF diagnostic output from SLURM logs by redirecting stdout to `/dev/null`
     for MPI stages and setting `ESMF.Manager(debug=False)`.
-- Drain container stdout/stderr via `Popen.communicate()` instead of
-    `capture_output=True` to prevent pipe-buffer deadlocks with MPI ranks, Fortran
-    binaries, and `set -x` bash scripts.
+- Redirect container stdout/stderr to temporary files instead of pipes to prevent
+    pipe-buffer deadlocks with MPI process trees (`mpiexec` → `singularity`), where
+    inherited pipe file-descriptors in child processes can fill the OS pipe buffer (64
+    KB on Linux) and deadlock the entire tree.
 - Use `$COASTAL_DOMAIN` instead of hardcoded `prvi` in `make_tpxo_ocean.bash` so the
     correct open-boundary mesh is used for all domains.
 - Add missing `$` in `${PDY}` variable expansion in `post_regrid_stofs.bash` log
@@ -127,9 +133,6 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Correct shebangs (`#!/usr/bin/bash` → `#!/usr/bin/env bash`) in
     `pre_regrid_stofs.bash` and `post_regrid_stofs.bash` for consistency and
     portability.
-- Use `srun` instead of bare `mpiexec` for MPI stages in the `run` path when a SLURM
-    allocation is detected (`SLURM_JOB_ID` set), preventing hangs caused by `mpiexec`
-    lacking PMI bootstrap context outside a SLURM job script.
 - Source inner bash scripts from `$SCRIPTS_DIR` instead of `./` in all wrapper scripts,
     so that the bind-mounted (package) versions are used rather than the stale copies
     baked into the container image.

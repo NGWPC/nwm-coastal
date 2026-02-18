@@ -22,11 +22,20 @@ HPC clusters with Singularity containers and SLURM job scheduling.
 
 ## Quick Example
 
-```yaml
-# config.yaml - minimal SCHISM configuration
-slurm:
-  job_name: my_schism_run
+On clusters, the recommended approach is to use a heredoc sbatch script:
 
+```bash
+#!/usr/bin/env bash
+#SBATCH --job-name=coastal_schism
+#SBATCH --partition=c5n-18xlarge
+#SBATCH -N 2
+#SBATCH --ntasks-per-node=18
+#SBATCH --exclusive
+#SBATCH --output=slurm-%j.out
+
+CONFIG_FILE="/tmp/coastal_config_${SLURM_JOB_ID}.yaml"
+
+cat > "${CONFIG_FILE}" <<'EOF'
 simulation:
   start_date: 2021-06-11
   duration_hours: 24
@@ -35,12 +44,14 @@ simulation:
 
 boundary:
   source: stofs
+EOF
+
+coastal-calibration run "${CONFIG_FILE}"
+rm -f "${CONFIG_FILE}"
 ```
 
-```bash
-# Submit and monitor the job
-coastal-calibration submit config.yaml --interactive
-```
+Submit with `sbatch my_run.sh`. See the [Quick Start](getting-started/quickstart.md) for
+more options.
 
 ## Supported Models
 
