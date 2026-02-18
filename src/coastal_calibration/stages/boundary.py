@@ -114,15 +114,18 @@ class STOFSBoundaryStage(WorkflowStage):
         self._update_substep("Pre-processing STOFS data")
         pre_script = self._get_scripts_dir() / "run_sing_coastal_workflow_pre_make_stofs_ocean.bash"
 
-        result = self.run_singularity_command(
+        self.run_singularity_command(
             [str(pre_script)],
             sif_path=self.config.model_config.singularity_image,
             env=env,
         )
 
-        length_hrs = (
-            result.stdout.strip() if result.stdout else str(self.config.simulation.duration_hours)
-        )
+        # The pre-script computes LENGTH_HRS as abs(duration) + 1 and
+        # exports it inside the container.  Since run_singularity_command
+        # discards stdout (to avoid pipe-buffer deadlocks), we replicate
+        # the same arithmetic here instead of parsing the echo output.
+        raw_hrs = int(self.config.simulation.duration_hours)
+        length_hrs = str(abs(raw_hrs) + 1)
 
         self._update_substep("Running regrid_estofs.py with MPI")
         work_dir = self.config.paths.work_dir
