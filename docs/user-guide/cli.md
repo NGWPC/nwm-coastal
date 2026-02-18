@@ -225,12 +225,15 @@ model_config:
   include_noaa_gages: true
 EOF
 
-coastal-calibration run "${CONFIG_FILE}"
+/ngen-test/coastal-calibration/coastal-calibration run "${CONFIG_FILE}"
 rm -f "${CONFIG_FILE}"
 ```
 
 Key points:
 
+- **Use the full NFS path**: Compute nodes may not have `coastal-calibration` in their
+    `PATH`. Using the full path to the wrapper on the shared filesystem ensures the
+    command is always found.
 - **Use `run`, not `submit`**: Inside a SLURM job, `run` executes all stages locally on
     the allocated nodes. Using `submit` would create a nested SLURM job.
 - **Use `$SLURM_JOB_ID` in the config filename**: Ensures uniqueness when multiple jobs

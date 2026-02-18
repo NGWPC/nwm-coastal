@@ -30,13 +30,12 @@ model_config:
   include_pressure: true
 EOF
 
-# For production only this line is needed
-coastal-calibration run "${CONFIG_FILE}"
+# Use the full NFS path so the command is found on compute nodes
+# regardless of PATH setup.
+/ngen-test/coastal-calibration/coastal-calibration run "${CONFIG_FILE}"
 
-# For running the dev version we use pixi.
-# For production comment out these three lines.
-# For making uv work well on NSF mounted locations
-# we need to set these envs
+# For running the dev version we use pixi instead.
+# Comment out the line above and uncomment the three lines below.
 # export UV_CACHE_DIR=/var/tmp/uv-cache
 # export UV_LINK_MODE=copy
 # pixi r -e dev coastal-calibration run "${CONFIG_FILE}"

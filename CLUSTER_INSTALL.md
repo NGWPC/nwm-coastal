@@ -91,10 +91,31 @@ preserves any user-set values.
 
 ### 5. Make it available to all users
 
-Symlink into a shared bin directory:
+The wrapper script lives on the shared NFS filesystem, so it is already accessible from
+every compute node. To make it available as a bare `coastal-calibration` command, add
+the install directory to the system `PATH` on **all nodes** (login and compute) via a
+profile drop-in:
 
 ```bash
-sudo ln -sf /ngen-test/coastal-calibration/coastal-calibration /usr/local/bin/coastal-calibration
+sudo tee /etc/profile.d/coastal-calibration.sh > /dev/null <<'PROFILE'
+export PATH="/ngen-test/coastal-calibration:$PATH"
+PROFILE
+```
+
+On most clusters `/etc/profile.d/` is on a shared filesystem or provisioned identically
+across nodes, so this single file makes the command available everywhere.
+
+!!! warning "Node-local symlinks don't work"
+
+    Do **not** symlink into `/usr/local/bin/` — that directory is node-local and will only
+    exist on the node where the admin ran the command. Compute nodes launched by SLURM will
+    not have the symlink and jobs will fail with `command not found`.
+
+Alternatively, use the full NFS path directly in sbatch scripts (this always works
+regardless of PATH setup):
+
+```bash
+/ngen-test/coastal-calibration/coastal-calibration run "${CONFIG_FILE}"
 ```
 
 ## Updating (when a new version is pushed)
@@ -123,7 +144,7 @@ coastal-calibration --help
 
 ```bash
 rm -rf /ngen-test/coastal-calibration
-sudo rm -f /usr/local/bin/coastal-calibration
+sudo rm -f /etc/profile.d/coastal-calibration.sh
 ```
 
 ## How it works

@@ -736,7 +736,7 @@ model_config:
   include_noaa_gages: true
 EOF
 
-coastal-calibration run "${CONFIG_FILE}"
+/ngen-test/coastal-calibration/coastal-calibration run "${CONFIG_FILE}"
 rm -f "${CONFIG_FILE}"
 ```
 
