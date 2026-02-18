@@ -6,6 +6,7 @@ import importlib.resources
 import os
 import subprocess
 import tempfile
+import time  # TODO(debug): remove once nwm_forcing hang is resolved
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -264,6 +265,8 @@ class WorkflowStage(ABC):
             sing_cmd = [*mpi_cmd, *sing_cmd]
 
         self._log(f"Running Singularity command: {' '.join(command[:3])}...")
+        # TODO(debug): remove once nwm_forcing hang is resolved
+        self._log(f"  Full command: {' '.join(sing_cmd)}")
 
         # Redirect both stdout and stderr to files instead of pipes.
         # MPI launches (srun / mpiexec → singularity) create a deep
@@ -281,21 +284,42 @@ class WorkflowStage(ABC):
             dir=self.config.paths.work_dir,
             delete=False,
         )
+        stderr_path = Path(stderr_file.name)
+        # TODO(debug): remove once nwm_forcing hang is resolved
+        self._log(f"  stderr -> {stderr_path}  (tail -f to monitor)")
         try:
+            t0 = time.monotonic()
             proc = subprocess.Popen(
                 sing_cmd,
                 env=env,
                 stdout=subprocess.DEVNULL,
                 stderr=stderr_file,
             )
-            proc.wait()
+            # TODO(debug): remove once nwm_forcing hang is resolved
+            self._log(f"  PID={proc.pid}")
+
+            # Poll with a heartbeat so the log shows the process is
+            # still alive.  This is temporary debug instrumentation.
+            # TODO(debug): remove once nwm_forcing hang is resolved
+            while proc.poll() is None:
+                time.sleep(30)
+                elapsed = time.monotonic() - t0
+                try:
+                    sz = stderr_path.stat().st_size
+                except OSError:
+                    sz = -1
+                self._log(f"  ... waiting (elapsed={elapsed:.0f}s, stderr={sz}B)")
+
+            elapsed = time.monotonic() - t0
+            # TODO(debug): remove once nwm_forcing hang is resolved
+            self._log(f"  exited rc={proc.returncode} in {elapsed:.1f}s")
+
             stderr_file.close()
-            stderr_path = Path(stderr_file.name)
             stderr = stderr_path.read_text(errors="replace")
             stderr_path.unlink(missing_ok=True)
         except BaseException:
             stderr_file.close()
-            Path(stderr_file.name).unlink(missing_ok=True)
+            stderr_path.unlink(missing_ok=True)
             raise
 
         result = subprocess.CompletedProcess(
