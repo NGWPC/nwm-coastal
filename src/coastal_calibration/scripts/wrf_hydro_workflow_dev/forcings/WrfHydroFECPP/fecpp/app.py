@@ -302,7 +302,7 @@ class CoastalPreprocessorApp:
             # self.schism_prev_time = step_time
 
             output_ts = int(step_time - self.schism_first_timestep)
-            output_idx = output_ts / 3600
+            output_idx = output_ts // 3600
             self.schism_vsource["time_vsource"][output_idx] = output_ts
             self.schism_vsource["vsource"][output_idx, :] = all_elements
             self.schism_vsource.sync()
