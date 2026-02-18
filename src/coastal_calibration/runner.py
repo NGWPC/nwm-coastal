@@ -622,20 +622,10 @@ class CoastalCalibRunner:
         nprocs = model.total_tasks
         nscribes = min(model.nscribes, nprocs - 1) if nprocs > 1 else 0
 
-        domain_to_inland = {
-            "hawaii": "domain_hawaii",
-            "prvi": "domain_puertorico",
-            "atlgulf": "domain",
-            "pacific": "domain",
-        }
-        domain_to_geo_grid = {
-            "hawaii": "geo_em_HI.nc",
-            "prvi": "geo_em_PRVI.nc",
-            "atlgulf": "geo_em_CONUS.nc",
-            "pacific": "geo_em_CONUS.nc",
-        }
-        inland_domain = domain_to_inland.get(sim.coastal_domain, sim.coastal_domain)
-        geo_grid = domain_to_geo_grid.get(sim.coastal_domain, "geo_em.d01.nc")
+        # Use the canonical mappings from SimulationConfig to avoid
+        # maintaining duplicate domain lookup tables.
+        inland_domain = sim.inland_domain
+        geo_grid = sim.geo_grid
         work_dir = paths.work_dir
 
         return [
