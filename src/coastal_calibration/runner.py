@@ -497,6 +497,56 @@ class CoastalCalibRunner:
             "",
         ]
 
+    @staticmethod
+    def _stage_tracking_helpers() -> list[str]:
+        """Return bash functions for per-stage completion tracking.
+
+        These helpers allow the generated runner script to mark stages as
+        completed in ``.pipeline_status.json`` and to skip stages that
+        have already finished — enabling mid-pipeline restarts after a
+        SLURM job failure without re-running expensive stages.
+
+        Must be placed **after** the environment section that exports
+        ``COASTAL_WORK_DIR``, since the status-file path depends on it.
+        """
+        return [
+            "# --- Stage completion tracking ---",
+            'PIPELINE_STATUS_FILE="${COASTAL_WORK_DIR}/.pipeline_status.json"',
+            "",
+            "mark_stage_complete() {",
+            "    local stage=$1",
+            '    python3 -c "',
+            "import json, pathlib",
+            "p = pathlib.Path('${PIPELINE_STATUS_FILE}')",
+            "d = json.loads(p.read_text()) if p.exists() else {}",
+            "c = d.get('completed_stages', [])",
+            "if '${stage}' not in c:",
+            "    c.append('${stage}')",
+            "d['completed_stages'] = c",
+            "p.write_text(json.dumps(d, indent=2) + '\\\\n')",
+            '"',
+            "}",
+            "",
+            "is_stage_complete() {",
+            "    local stage=$1",
+            '    python3 -c "',
+            "import json, pathlib, sys",
+            "p = pathlib.Path('${PIPELINE_STATUS_FILE}')",
+            "if not p.exists(): sys.exit(1)",
+            "d = json.loads(p.read_text())",
+            "sys.exit(0 if '${stage}' in d.get('completed_stages', []) else 1)",
+            '"',
+            "}",
+            "",
+            "log_stage_skip() {",
+            "    local name=$1",
+            '    echo "$(log_ts) INFO     Stage: ${name}"',
+            '    echo "$(log_ts) INFO       [⏭] SKIPPED (already completed)"',
+            '    echo "$(log_ts) INFO     ----------------------------------------"',
+            "}",
+            "",
+        ]
+
     def _generate_sfincs_runner_script(self, container_stages: list[str]) -> None:
         """Generate a SFINCS runner script for SLURM.
 
@@ -532,7 +582,15 @@ class CoastalCalibRunner:
         script_lines.extend(
             [
                 f"export OMP_NUM_THREADS={self.config.model_config.omp_num_threads}",
+                # SFINCS doesn't export COASTAL_WORK_DIR — set it so
+                # _stage_tracking_helpers() can derive the status file path.
+                f'export COASTAL_WORK_DIR="{work_dir}"',
                 "",
+            ]
+        )
+        script_lines.extend(self._stage_tracking_helpers())
+        script_lines.extend(
+            [
                 "log_workflow_start",
                 "",
             ]
@@ -544,10 +602,16 @@ class CoastalCalibRunner:
                 # Native executable — no Singularity required
                 script_lines.extend(
                     [
-                        'log_stage_start "sfincs_run" "Run SFINCS model (native)"',
-                        f'cd "{model_root}"',
-                        f'"{sfincs_exe}"',
-                        'log_stage_end "sfincs_run"',
+                        "# === Stage: sfincs_run ===",
+                        'if is_stage_complete "sfincs_run"; then',
+                        '    log_stage_skip "sfincs_run"',
+                        "else",
+                        '    log_stage_start "sfincs_run" "Run SFINCS model (native)"',
+                        f'    cd "{model_root}"',
+                        f'    "{sfincs_exe}"',
+                        '    log_stage_end "sfincs_run"',
+                        '    mark_stage_complete "sfincs_run"',
+                        "fi",
                         "",
                     ]
                 )
@@ -564,10 +628,16 @@ class CoastalCalibRunner:
                 script_lines.extend(pull_lines)
                 script_lines.extend(
                     [
-                        'log_stage_start "sfincs_run" "Run SFINCS model (Singularity)"',
-                        f'cd "{model_root}"',
-                        f"singularity run -B{model_root}:/data {sif_path}",
-                        'log_stage_end "sfincs_run"',
+                        "# === Stage: sfincs_run ===",
+                        'if is_stage_complete "sfincs_run"; then',
+                        '    log_stage_skip "sfincs_run"',
+                        "else",
+                        '    log_stage_start "sfincs_run" "Run SFINCS model (Singularity)"',
+                        f'    cd "{model_root}"',
+                        f"    singularity run -B{model_root}:/data {sif_path}",
+                        '    log_stage_end "sfincs_run"',
+                        '    mark_stage_complete "sfincs_run"',
+                        "fi",
                         "",
                     ]
                 )
@@ -774,7 +844,12 @@ class CoastalCalibRunner:
         model: SchismModelConfig,
         work_dir: Path,
     ) -> list[str]:
-        """Return bash lines for SCHISM container stage blocks."""
+        """Return bash lines for SCHISM container stage blocks.
+
+        Each stage is wrapped with skip-if-complete / mark-complete
+        logic so that a resubmitted SLURM job resumes from the first
+        incomplete stage rather than re-running everything.
+        """
         lines: list[str] = []
         schism_binary = model.binary
 
@@ -782,9 +857,14 @@ class CoastalCalibRunner:
             lines.extend(
                 [
                     "# === Stage: pre_forcing ===",
-                    'log_stage_start "pre_forcing" "Prepare NWM forcing data"',
-                    "run_in_container $SCRIPTS_DIR/run_sing_coastal_workflow_pre_forcing_coastal.bash",
-                    'log_stage_end "pre_forcing"',
+                    'if is_stage_complete "pre_forcing"; then',
+                    '    log_stage_skip "pre_forcing"',
+                    "else",
+                    '    log_stage_start "pre_forcing" "Prepare NWM forcing data"',
+                    "    run_in_container $SCRIPTS_DIR/run_sing_coastal_workflow_pre_forcing_coastal.bash",
+                    '    log_stage_end "pre_forcing"',
+                    '    mark_stage_complete "pre_forcing"',
+                    "fi",
                     "",
                 ]
             )
@@ -793,18 +873,23 @@ class CoastalCalibRunner:
             lines.extend(
                 [
                     "# === Stage: nwm_forcing ===",
-                    'log_stage_start "nwm_forcing" "Generate NWM atmospheric forcing (MPI)"',
-                    "export LENGTH_HRS=$FCST_LENGTH_HRS",
-                    "export NWM_FORCING_OUTPUT_DIR=$DATAexec/forcing_input",
-                    "export COASTAL_FORCING_OUTPUT_DIR=$DATAexec/coastal_forcing_output",
-                    "export FECPP_JOB_INDEX=0",
-                    "export FECPP_JOB_COUNT=1",
+                    'if is_stage_complete "nwm_forcing"; then',
+                    '    log_stage_skip "nwm_forcing"',
+                    "else",
+                    '    log_stage_start "nwm_forcing" "Generate NWM atmospheric forcing (MPI)"',
+                    "    export LENGTH_HRS=$FCST_LENGTH_HRS",
+                    "    export NWM_FORCING_OUTPUT_DIR=$DATAexec/forcing_input",
+                    "    export COASTAL_FORCING_OUTPUT_DIR=$DATAexec/coastal_forcing_output",
+                    "    export FECPP_JOB_INDEX=0",
+                    "    export FECPP_JOB_COUNT=1",
                     "",
-                    "run_in_container_mpi \\",
-                    "    $CONDA_ENVS_PATH/$CONDA_ENV_NAME/bin/python \\",
-                    "    $USHnwm/wrf_hydro_workflow_dev/forcings/WrfHydroFECPP/workflow_driver.py \\",
-                    "    > /dev/null",
-                    'log_stage_end "nwm_forcing"',
+                    "    run_in_container_mpi \\",
+                    "        $CONDA_ENVS_PATH/$CONDA_ENV_NAME/bin/python \\",
+                    "        $USHnwm/wrf_hydro_workflow_dev/forcings/WrfHydroFECPP/workflow_driver.py \\",
+                    "        > /dev/null",
+                    '    log_stage_end "nwm_forcing"',
+                    '    mark_stage_complete "nwm_forcing"',
+                    "fi",
                     "",
                 ]
             )
@@ -813,9 +898,14 @@ class CoastalCalibRunner:
             lines.extend(
                 [
                     "# === Stage: post_forcing ===",
-                    'log_stage_start "post_forcing" "Post-process forcing data"',
-                    "run_in_container $SCRIPTS_DIR/run_sing_coastal_workflow_post_forcing_coastal.bash",
-                    'log_stage_end "post_forcing"',
+                    'if is_stage_complete "post_forcing"; then',
+                    '    log_stage_skip "post_forcing"',
+                    "else",
+                    '    log_stage_start "post_forcing" "Post-process forcing data"',
+                    "    run_in_container $SCRIPTS_DIR/run_sing_coastal_workflow_post_forcing_coastal.bash",
+                    '    log_stage_end "post_forcing"',
+                    '    mark_stage_complete "post_forcing"',
+                    "fi",
                     "",
                 ]
             )
@@ -824,8 +914,11 @@ class CoastalCalibRunner:
             lines.extend(
                 [
                     "# === Stage: update_params ===",
-                    'log_stage_start "update_params" "Create SCHISM param.nml"',
-                    "run_in_container $SCRIPTS_DIR/run_sing_coastal_workflow_update_params.bash",
+                    'if is_stage_complete "update_params"; then',
+                    '    log_stage_skip "update_params"',
+                    "else",
+                    '    log_stage_start "update_params" "Create SCHISM param.nml"',
+                    "    run_in_container $SCRIPTS_DIR/run_sing_coastal_workflow_update_params.bash",
                 ]
             )
             # Patch param.nml to enable station output when station.in was
@@ -836,19 +929,21 @@ class CoastalCalibRunner:
             if model.include_noaa_gages:
                 lines.extend(
                     [
-                        f'if [[ -f "{work_dir}/station.in" ]]; then',
-                        '    log_info "Patching param.nml: iout_sta = 1, nspool_sta = 18"',
-                        f'    sed -i "s/^\\(\\s*\\)iout_sta\\s*=.*/\\1iout_sta = 1/" "{work_dir}/param.nml"',
-                        f'    sed -i "s/^\\(\\s*\\)nspool_sta\\s*=.*/\\1nspool_sta = 18/" "{work_dir}/param.nml"',
-                        f'    if ! grep -q "nspool_sta" "{work_dir}/param.nml"; then',
-                        f'        sed -i "/^\\s*iout_sta/a\\  nspool_sta = 18" "{work_dir}/param.nml"',
+                        f'    if [[ -f "{work_dir}/station.in" ]]; then',
+                        '        log_info "Patching param.nml: iout_sta = 1, nspool_sta = 18"',
+                        f'        sed -i "s/^\\(\\s*\\)iout_sta\\s*=.*/\\1iout_sta = 1/" "{work_dir}/param.nml"',
+                        f'        sed -i "s/^\\(\\s*\\)nspool_sta\\s*=.*/\\1nspool_sta = 18/" "{work_dir}/param.nml"',
+                        f'        if ! grep -q "nspool_sta" "{work_dir}/param.nml"; then',
+                        f'            sed -i "/^\\s*iout_sta/a\\  nspool_sta = 18" "{work_dir}/param.nml"',
+                        "        fi",
                         "    fi",
-                        "fi",
                     ]
                 )
             lines.extend(
                 [
-                    'log_stage_end "update_params"',
+                    '    log_stage_end "update_params"',
+                    '    mark_stage_complete "update_params"',
+                    "fi",
                     "",
                 ]
             )
@@ -857,28 +952,33 @@ class CoastalCalibRunner:
             lines.extend(
                 [
                     "# === Stage: boundary_conditions ===",
-                    'log_stage_start "boundary_conditions" "Create boundary forcing"',
-                    'if [[ $USE_TPXO == "YES" ]]; then',
-                    '    log_info "Using TPXO tidal atlas"',
-                    "    run_in_container $SCRIPTS_DIR/run_sing_coastal_workflow_make_tpxo_ocean.bash",
+                    'if is_stage_complete "boundary_conditions"; then',
+                    '    log_stage_skip "boundary_conditions"',
                     "else",
-                    '    log_info "Using STOFS data"',
-                    "    export CYCLE_DATE=$STARTPDY",
-                    "    export CYCLE_TIME=${STARTCYC}00",
-                    "    export LENGTH_HRS=$(run_in_container $SCRIPTS_DIR/run_sing_coastal_workflow_pre_make_stofs_ocean.bash)",
+                    '    log_stage_start "boundary_conditions" "Create boundary forcing"',
+                    '    if [[ $USE_TPXO == "YES" ]]; then',
+                    '        log_info "Using TPXO tidal atlas"',
+                    "        run_in_container $SCRIPTS_DIR/run_sing_coastal_workflow_make_tpxo_ocean.bash",
+                    "    else",
+                    '        log_info "Using STOFS data"',
+                    "        export CYCLE_DATE=$STARTPDY",
+                    "        export CYCLE_TIME=${STARTCYC}00",
+                    "        export LENGTH_HRS=$(run_in_container $SCRIPTS_DIR/run_sing_coastal_workflow_pre_make_stofs_ocean.bash)",
                     "",
-                    "    export ESTOFS_INPUT_FILE=$STOFS_FILE",
-                    "    export SCHISM_OUTPUT_FILE=$DATAexec/elev2D.th.nc",
-                    "    export OPEN_BNDS_HGRID_FILE=$DATAexec/open_bnds_hgrid.nc",
+                    "        export ESTOFS_INPUT_FILE=$STOFS_FILE",
+                    "        export SCHISM_OUTPUT_FILE=$DATAexec/elev2D.th.nc",
+                    "        export OPEN_BNDS_HGRID_FILE=$DATAexec/open_bnds_hgrid.nc",
                     "",
-                    "    run_in_container_mpi \\",
-                    "        $CONDA_ENVS_PATH/$CONDA_ENV_NAME/bin/python \\",
-                    "        $USHnwm/wrf_hydro_workflow_dev/coastal/regrid_estofs.py $ESTOFS_INPUT_FILE $OPEN_BNDS_HGRID_FILE $SCHISM_OUTPUT_FILE \\",
-                    "        > /dev/null",
+                    "        run_in_container_mpi \\",
+                    "            $CONDA_ENVS_PATH/$CONDA_ENV_NAME/bin/python \\",
+                    "            $USHnwm/wrf_hydro_workflow_dev/coastal/regrid_estofs.py $ESTOFS_INPUT_FILE $OPEN_BNDS_HGRID_FILE $SCHISM_OUTPUT_FILE \\",
+                    "            > /dev/null",
                     "",
-                    "    run_in_container $SCRIPTS_DIR/run_sing_coastal_workflow_post_make_stofs_ocean.bash",
+                    "        run_in_container $SCRIPTS_DIR/run_sing_coastal_workflow_post_make_stofs_ocean.bash",
+                    "    fi",
+                    '    log_stage_end "boundary_conditions"',
+                    '    mark_stage_complete "boundary_conditions"',
                     "fi",
-                    'log_stage_end "boundary_conditions"',
                     "",
                 ]
             )
@@ -887,9 +987,14 @@ class CoastalCalibRunner:
             lines.extend(
                 [
                     "# === Stage: pre_schism ===",
-                    'log_stage_start "pre_schism" "Prepare SCHISM run directory"',
-                    "run_in_container $SCRIPTS_DIR/run_sing_coastal_workflow_pre_schism.bash",
-                    'log_stage_end "pre_schism"',
+                    'if is_stage_complete "pre_schism"; then',
+                    '    log_stage_skip "pre_schism"',
+                    "else",
+                    '    log_stage_start "pre_schism" "Prepare SCHISM run directory"',
+                    "    run_in_container $SCRIPTS_DIR/run_sing_coastal_workflow_pre_schism.bash",
+                    '    log_stage_end "pre_schism"',
+                    '    mark_stage_complete "pre_schism"',
+                    "fi",
                     "",
                 ]
             )
@@ -898,16 +1003,21 @@ class CoastalCalibRunner:
             lines.extend(
                 [
                     "# === Stage: schism_run ===",
-                    'log_stage_start "schism_run" "Run SCHISM model (MPI)"',
-                    "# Switch to NFS OpenMPI for SCHISM",
-                    "export PATH=$NFS_MOUNT/openmpi/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin",
-                    "export LD_LIBRARY_PATH=$NFS_MOUNT/openmpi/lib:$LD_LIBRARY_PATH",
-                    "export OMPI_ALLOW_RUN_AS_ROOT=1",
-                    "export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1",
+                    'if is_stage_complete "schism_run"; then',
+                    '    log_stage_skip "schism_run"',
+                    "else",
+                    '    log_stage_start "schism_run" "Run SCHISM model (MPI)"',
+                    "    # Switch to NFS OpenMPI for SCHISM",
+                    "    export PATH=$NFS_MOUNT/openmpi/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin",
+                    "    export LD_LIBRARY_PATH=$NFS_MOUNT/openmpi/lib:$LD_LIBRARY_PATH",
+                    "    export OMPI_ALLOW_RUN_AS_ROOT=1",
+                    "    export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1",
                     "",
-                    '${MPICOMMAND} singularity exec -B "$BINDINGS" --pwd "$COASTAL_WORK_DIR" "$SIF_PATH" \\',
-                    f'    /bin/bash -c "${{EXECnwm}}/{schism_binary} $NSCRIBES"',
-                    'log_stage_end "schism_run"',
+                    '    ${MPICOMMAND} singularity exec -B "$BINDINGS" --pwd "$COASTAL_WORK_DIR" "$SIF_PATH" \\',
+                    f'        /bin/bash -c "${{EXECnwm}}/{schism_binary} $NSCRIBES"',
+                    '    log_stage_end "schism_run"',
+                    '    mark_stage_complete "schism_run"',
+                    "fi",
                     "",
                 ]
             )
@@ -916,9 +1026,14 @@ class CoastalCalibRunner:
             lines.extend(
                 [
                     "# === Stage: post_schism ===",
-                    'log_stage_start "post_schism" "Post-process SCHISM outputs"',
-                    "run_in_container $SCRIPTS_DIR/run_sing_coastal_workflow_post_schism.bash",
-                    'log_stage_end "post_schism"',
+                    'if is_stage_complete "post_schism"; then',
+                    '    log_stage_skip "post_schism"',
+                    "else",
+                    '    log_stage_start "post_schism" "Post-process SCHISM outputs"',
+                    "    run_in_container $SCRIPTS_DIR/run_sing_coastal_workflow_post_schism.bash",
+                    '    log_stage_end "post_schism"',
+                    '    mark_stage_complete "post_schism"',
+                    "fi",
                     "",
                 ]
             )
@@ -967,6 +1082,7 @@ class CoastalCalibRunner:
         script_lines.extend(
             self._schism_env_lines(sim, paths, model, scripts_dir, use_tpxo, stofs_file)
         )
+        script_lines.extend(self._stage_tracking_helpers())
 
         script_lines.extend(self._schism_stage_lines(container_stages, model, work_dir))
 
@@ -1128,10 +1244,22 @@ class CoastalCalibRunner:
         final_status = self.slurm.wait_for_job(job_id)
 
         success = final_status.state == JobState.COMPLETED
+
+        # The generated bash script marks each stage in the status
+        # file as it completes.  Read it back so we know exactly which
+        # stages finished — both for the success and failure paths.
+        status = self._load_status()
+        completed_set = set(status.get("completed_stages", []))
+        completed_in_job = [s for s in job if s in completed_set]
+        failed_in_job = [s for s in job if s not in completed_set]
+
         if not success:
             errors.append(f"Job ended with state: {final_status.state.value}")
             if final_status.reason and final_status.reason.lower() != "none":
                 errors.append(f"Reason: {final_status.reason}")
+            stages_completed.extend(completed_in_job)
+            for stage_name in completed_in_job:
+                self.monitor.mark_stage_completed(stage_name)
             self.monitor.end_workflow(success=False)
             return WorkflowResult(
                 success=False,
@@ -1139,19 +1267,18 @@ class CoastalCalibRunner:
                 start_time=start_time,
                 end_time=datetime.now(),
                 stages_completed=stages_completed,
-                stages_failed=job,
+                stages_failed=failed_in_job,
                 outputs={"slurm_status": final_status.state.value},
                 errors=errors,
             )
 
-        stages_completed.extend(job)
+        stages_completed.extend(completed_in_job)
 
         # Mark container stages as completed in the monitor so the
         # timing summary shows checkmarks instead of "?" for stages
         # that ran inside the SLURM job.
-        for stage_name in job:
+        for stage_name in completed_in_job:
             self.monitor.mark_stage_completed(stage_name)
-            self._save_stage_status(stage_name)
 
         # --- Run post-job stages on login node ---
         if post_job:
