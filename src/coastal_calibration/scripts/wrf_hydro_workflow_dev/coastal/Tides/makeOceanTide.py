@@ -155,15 +155,30 @@ def test():
 
 
 def workflow_driver():
+    """Extend ESTOFS boundary conditions with tidal predictions.
+
+    In the NWM operational medium-range forecast, ESTOFS/STOFS water
+    level data covers only the first 180 hours.  For longer forecasts
+    (up to 241 h) this function fills hours 181+ with tidal predictions
+    generated from harmonic constituents via pytides.  The result is
+    appended to the existing ``elev2D.th.nc`` produced by the ESTOFS
+    regridding step.
+
+    The constants 181 and 182 originate from NWM's medium-range
+    configuration and should be parameterized when this script is
+    rewritten.
+    """
     consts_path = os.environ["TIDAL_CONSTANTS_DIR"]
     grid_file = os.environ["COASTAL_DOMAIN_GR3"]
     output_file = os.environ["SCHISM_OUTPUT_FILE"]
     cdate = os.environ["CYCLE_DATE"]
     ctime = os.environ["CYCLE_TIME"]
     total_hours = int(os.environ.get("LENGTH_HRS", 241))
+    # ESTOFS covers hours 0-180; nothing to fill for short forecasts
     if total_hours < 182:
         return
 
+    # Start tidal prediction at hour 181 (first hour beyond ESTOFS)
     start_time = datetime.strptime(cdate + ctime, "%Y%m%d%H%M") + timedelta(hours=181)
     hour_range = range(total_hours - 181)
     generate_tidal_levels(consts_path, grid_file, output_file, start_time, hour_range)
