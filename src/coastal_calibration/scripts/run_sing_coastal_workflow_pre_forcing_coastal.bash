@@ -6,7 +6,7 @@
 if [[ ! -d $DATAexec ]]; then
    mkdir -p $DATAexec
 fi
-source ./pre_nwm_forcing_coastal.bash
+source "$SCRIPTS_DIR/pre_nwm_forcing_coastal.bash"
 
 pre_nwm_forcing_coastal ${STARTPDY}${STARTCYC} \
 	$DATAexec/coastal_forcing_output \

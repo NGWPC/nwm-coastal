@@ -21,7 +21,7 @@ unset __conda_setup
 #conda activate ${CONDA_ENVS_PATH}/$CONDA_ENV_NAME
 conda activate $CONDA_ENV_NAME
 
-source ./make_tpxo_ocean.bash
+source "$SCRIPTS_DIR/make_tpxo_ocean.bash"
 
 ngen_forcing_dir=$(pwd)/../../
 make_tpxo_ocean ${STARTPDY}${STARTCYC} $FCST_LENGTH_HRS \

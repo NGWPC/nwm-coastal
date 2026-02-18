@@ -2,7 +2,7 @@
 #
 
 
-source ./post_schism.bash
+source "$SCRIPTS_DIR/post_schism.bash"
 
 export NSCRIBES=${NSCRIBES:-2}
 

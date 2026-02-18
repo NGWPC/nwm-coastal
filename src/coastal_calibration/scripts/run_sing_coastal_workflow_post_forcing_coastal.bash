@@ -21,7 +21,7 @@ unset __conda_setup
 #conda activate ${CONDA_ENVS_PATH}/$CONDA_ENV_NAME
 conda activate $CONDA_ENV_NAME
 
-source ./post_nwm_forcing_coastal.bash
+source "$SCRIPTS_DIR/post_nwm_forcing_coastal.bash"
 
 
 post_nwm_forcing_coastal ${STARTPDY}${STARTCYC} \

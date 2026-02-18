@@ -21,7 +21,7 @@ unset __conda_setup
 #conda activate ${CONDA_ENVS_PATH}/$CONDA_ENV_NAME
 conda activate $CONDA_ENV_NAME
 
-source ./pre_regrid_stofs.bash
+source "$SCRIPTS_DIR/pre_regrid_stofs.bash"
 
 pre_nwm_coastal_regrid_estofs ${STARTPDY}${STARTCYC} $FCST_LENGTH_HRS \
 	$STOFS_FILE

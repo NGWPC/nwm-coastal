@@ -21,7 +21,7 @@ unset __conda_setup
 #conda activate ${CONDA_ENVS_PATH}/$CONDA_ENV_NAME
 conda activate $CONDA_ENV_NAME
 
-source ./update_param.bash
+source "$SCRIPTS_DIR/update_param.bash"
 
 export RESTART_WRITE_HR=2
 

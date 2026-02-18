@@ -21,6 +21,6 @@ unset __conda_setup
 #conda activate ${CONDA_ENVS_PATH}/$CONDA_ENV_NAME
 conda activate $CONDA_ENV_NAME
 
-source ./pre_schism.bash
+source "$SCRIPTS_DIR/pre_schism.bash"
 
 pre_nwm_coastal

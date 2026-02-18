@@ -2,9 +2,9 @@
 
 set -x
 
-source ./initial_discharge.bash
-source ./combine_sink_source.bash
-source ./merge_source_sink.bash
+source "$SCRIPTS_DIR/initial_discharge.bash"
+source "$SCRIPTS_DIR/combine_sink_source.bash"
+source "$SCRIPTS_DIR/merge_source_sink.bash"
 
 #--------------------------------------------------------------
 #
