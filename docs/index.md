@@ -22,7 +22,7 @@ HPC clusters with Singularity containers and SLURM job scheduling.
 
 ## Quick Example
 
-On clusters, the recommended approach is to use a heredoc sbatch script:
+On clusters, the recommended approach is to use a heredoc `sbatch` script:
 
 ```bash
 #!/usr/bin/env bash
@@ -46,12 +46,12 @@ boundary:
   source: stofs
 EOF
 
-coastal-calibration run "${CONFIG_FILE}"
+/ngen-test/coastal-calibration/coastal-calibration run "${CONFIG_FILE}"
 rm -f "${CONFIG_FILE}"
 ```
 
-Submit with `sbatch my_run.sh`. See the [Quick Start](getting-started/quickstart.md) for
-more options.
+Submit with `sbatch my_run.sh`. The full NFS path ensures the command is found on
+compute nodes. See the [Quick Start](getting-started/quickstart.md) for more options.
 
 ## Supported Models
 

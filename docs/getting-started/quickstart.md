@@ -97,11 +97,18 @@ model_config:
   include_noaa_gages: true
 EOF
 
-coastal-calibration run "${CONFIG_FILE}"
+/ngen-test/coastal-calibration/coastal-calibration run "${CONFIG_FILE}"
 rm -f "${CONFIG_FILE}"
 ```
 
 Save this as `my_run.sh` and submit with `sbatch my_run.sh`.
+
+!!! tip "Use the full NFS path"
+
+    Compute nodes may not have `coastal-calibration` in their `PATH`. Using the full path to
+    the wrapper on the shared filesystem
+    (`/ngen-test/coastal-calibration/coastal-calibration`) ensures the command is always
+    found.
 
 !!! tip "run vs submit"
 
