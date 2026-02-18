@@ -272,32 +272,25 @@ class WorkflowStage(ABC):
                 continue
             singularity_env[f"SINGULARITYENV_{key}"] = value
 
-        # For MPI commands we must NOT use capture_output=True.
-        # With many ranks (e.g. 36) the pipe buffer (64 KB on Linux)
-        # fills up and the child processes block on write while
-        # subprocess.run waits for them to exit — a classic deadlock.
-        # Popen.communicate() avoids this by draining stdout and
-        # stderr on separate threads while the process runs.
-        if use_mpi:
-            proc = subprocess.Popen(
-                sing_cmd,
-                env=singularity_env,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-            _, stderr = proc.communicate()
-            result = subprocess.CompletedProcess(
-                sing_cmd, proc.returncode, stdout="", stderr=stderr
-            )
-        else:
-            result = subprocess.run(
-                sing_cmd,
-                env=singularity_env,
-                capture_output=True,
-                text=True,
-                check=False,
-            )
+        # Never use capture_output=True for container commands.
+        # MPI ranks, Fortran binaries, and bash scripts with set -x
+        # can all produce enough output to fill the OS pipe buffer
+        # (64 KB on Linux), causing a deadlock: the child blocks on
+        # write while subprocess.run waits for it to exit.
+        # Popen.communicate() drains pipes on background threads,
+        # avoiding the deadlock.  stdout is discarded; stderr is
+        # kept for error reporting.
+        proc = subprocess.Popen(
+            sing_cmd,
+            env=singularity_env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        _, stderr = proc.communicate()
+        result = subprocess.CompletedProcess(
+            sing_cmd, proc.returncode, stdout="", stderr=stderr or ""
+        )
 
         if result.returncode != 0:
             stderr = result.stderr or ""
