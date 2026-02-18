@@ -122,6 +122,21 @@ class WorkflowStage(ABC):
 
         env["CONDA_ENVS_PATH"] = str(paths.conda_envs_path)
 
+        # Prepend the conda environment's bin directory and the base
+        # conda bin directory to PATH so that ``mpiexec`` and other
+        # conda-provided tools are found.  Also add the conda lib
+        # directory to LD_LIBRARY_PATH for MPI shared libraries.
+        # This mirrors the environment set up by the generated submit
+        # scripts (runner.py lines 774-777).
+        conda_bin = f"{paths.conda_envs_path}/{paths.conda_env_name}/bin"
+        conda_base_bin = f"{paths.nfs_mount}/ngen-app/conda/bin"
+        conda_lib = f"{paths.nfs_mount}/ngen-app/conda/lib"
+        conda_envs_lib = f"{paths.conda_envs_path}/lib"
+        env["PATH"] = f"{conda_bin}:{conda_base_bin}:{env.get('PATH', '')}"
+        env["LD_LIBRARY_PATH"] = (
+            f"{conda_lib}:{conda_envs_lib}:{env.get('LD_LIBRARY_PATH', '')}"
+        )
+
         env["INLAND_DOMAIN"] = sim.inland_domain
         env["NWM_DOMAIN"] = sim.nwm_domain
         env["GEO_GRID"] = sim.geo_grid
@@ -250,18 +265,14 @@ class WorkflowStage(ABC):
                 msg = "mpi_tasks must be specified when use_mpi=True"
                 raise ValueError(msg)
 
-            # Inside a SLURM allocation, use srun so that the MPI
-            # processes are launched via SLURM's PMI and correctly
-            # distributed across the allocated nodes.  Without srun,
-            # bare mpiexec hangs waiting for a bootstrap service that
-            # only SLURM can provide.
-            if os.environ.get("SLURM_JOB_ID"):
-                mpi_cmd = ["srun", "-n", str(mpi_tasks)]
-            else:
-                mpi_cmd = ["mpiexec", "-n", str(mpi_tasks)]
-                oversubscribe = getattr(self.config.model_config, "oversubscribe", False)
-                if oversubscribe:
-                    mpi_cmd.append("--oversubscribe")
+            # Always use mpiexec from the conda environment (added to
+            # PATH by build_environment).  ``srun`` hangs when wrapping
+            # ``singularity exec`` because SLURM's PMI bootstrap cannot
+            # reach the containerised MPI processes.
+            mpi_cmd = ["mpiexec", "-n", str(mpi_tasks)]
+            oversubscribe = getattr(self.config.model_config, "oversubscribe", False)
+            if oversubscribe:
+                mpi_cmd.append("--oversubscribe")
             sing_cmd = [*mpi_cmd, *sing_cmd]
 
         self._log(f"Running Singularity command: {' '.join(command[:3])}...")
