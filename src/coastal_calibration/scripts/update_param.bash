@@ -110,7 +110,7 @@ nwm_coastal_update_params() {
         sed -i "s|^  ihot .*|  ihot = 0|;" ${coastal_param}
      fi
   # this is a cold-start reanalysis cycle
-  elif [[ "$NWM_RESTART_CYCLE" == "reanalysis" && $LENGTH_HRS > 0 ]]; then
+  elif [[ "$NWM_RESTART_CYCLE" == "reanalysis" && $LENGTH_HRS -gt 0 ]]; then
      sed -i "s|^  ihot .*|  ihot = 0|;" ${coastal_param}
      sed -i "s|^  nhot .*|  nhot = 0|;" ${coastal_param}
      sed -i "s|^  nhot_write .*|  nhot_write = 72|;" ${coastal_param}
