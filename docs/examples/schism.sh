@@ -25,14 +25,14 @@ model_config:
 EOF
 
 # For production only this line is needed
-# coastal-calibration run "${CONFIG_FILE}"
+coastal-calibration run "${CONFIG_FILE}"
 
 # For running the dev version we use pixi.
 # For production comment out these three lines.
 # For making uv work well on NSF mounted locations
 # we need to set these envs
-export UV_CACHE_DIR=$HOME/.uv-cache
-export UV_LINK_MODE=copy
-pixi r -e dev coastal-calibration run "${CONFIG_FILE}"
+# export UV_CACHE_DIR=/var/tmp/uv-cache
+# export UV_LINK_MODE=copy
+# pixi r -e dev coastal-calibration run "${CONFIG_FILE}"
 
 rm -f "${CONFIG_FILE}"

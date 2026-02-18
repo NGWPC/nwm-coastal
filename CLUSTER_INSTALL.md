@@ -57,21 +57,37 @@ EOF
 ### 3. Install
 
 ```bash
-UV_LINK_MODE=copy pixi install
+UV_CACHE_DIR=/var/tmp/uv-cache UV_LINK_MODE=copy pixi install
 ```
 
 This creates a fully isolated environment under `/ngen-test/coastal-calibration/.pixi/`
 with all conda and PyPI dependencies resolved together.
+
+!!! note "NFS compatibility"
+
+    Both `UV_LINK_MODE=copy` and `UV_CACHE_DIR` are needed on NFS shared filesystems.
+    `UV_LINK_MODE=copy` prevents hardlink failures across filesystem boundaries, and
+    `UV_CACHE_DIR` redirects uv's cache to a node-local directory to avoid lock-file and
+    performance issues on NFS. We use `/var/tmp` rather than `$HOME` because the admin's
+    home directory is not accessible to other users, and on some clusters compute nodes may
+    not mount user home directories at all. `/var/tmp` is node-local, writable by all users,
+    and persists across reboots (unlike `/tmp`).
 
 ### 4. Create a wrapper script
 
 ```bash
 cat > /ngen-test/coastal-calibration/coastal-calibration <<'WRAPPER'
 #!/bin/sh
+export UV_CACHE_DIR="${UV_CACHE_DIR:-/var/tmp/uv-cache}"
+export UV_LINK_MODE="${UV_LINK_MODE:-copy}"
 exec /ngen-test/coastal-calibration/.pixi/envs/default/bin/coastal-calibration "$@"
 WRAPPER
 chmod +x /ngen-test/coastal-calibration/coastal-calibration
 ```
+
+The wrapper exports `UV_CACHE_DIR` and `UV_LINK_MODE` so that any internal `uv`
+invocations at runtime also work correctly on NFS. The `${VAR:-default}` syntax
+preserves any user-set values.
 
 ### 5. Make it available to all users
 
@@ -85,14 +101,17 @@ sudo ln -sf /ngen-test/coastal-calibration/coastal-calibration /usr/local/bin/co
 
 ```bash
 cd /ngen-test/coastal-calibration
-UV_LINK_MODE=copy pixi update
-UV_LINK_MODE=copy pixi run uv pip install --reinstall-package coastal-calibration \
+UV_CACHE_DIR=/var/tmp/uv-cache UV_LINK_MODE=copy pixi update
+UV_CACHE_DIR=/var/tmp/uv-cache UV_LINK_MODE=copy pixi run uv pip install \
+  --reinstall-package coastal-calibration \
   "coastal-calibration[sfincs,plot] @ git+https://github.com/cheginit/nwm-coastal.git"
 ```
 
 `UV_LINK_MODE=copy` is required on NFS shared filesystems where hardlinks (the default)
-don't work across filesystem boundaries. The `--reinstall-package` flag forces `uv` to
-re-fetch and rebuild the package from the latest commit on the remote repository.
+don't work across filesystem boundaries. `UV_CACHE_DIR` redirects the uv cache to a
+local directory to avoid lock-file and performance issues on NFS. The
+`--reinstall-package` flag forces `uv` to re-fetch and rebuild the package from the
+latest commit on the remote repository.
 
 ## Verifying the installation
 
