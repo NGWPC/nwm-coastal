@@ -419,7 +419,7 @@ class SCHISMRunStage(WorkflowStage):
 
         self._update_substep("Setting up MPI environment")
         nfs_mount = str(self.config.paths.nfs_mount)
-        env["PATH"] = f"{nfs_mount}/openmpi/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin"
+        env["PATH"] = f"{nfs_mount}/openmpi/bin:{env.get('PATH', '/usr/local/bin:/usr/bin')}"
         env["LD_LIBRARY_PATH"] = f"{nfs_mount}/openmpi/lib:{env.get('LD_LIBRARY_PATH', '')}"
         env["OMPI_ALLOW_RUN_AS_ROOT"] = "1"
         env["OMPI_ALLOW_RUN_AS_ROOT_CONFIRM"] = "1"

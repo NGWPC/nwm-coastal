@@ -134,9 +134,6 @@ class WorkflowStage(ABC):
         env["PATH"] = f"{conda_bin}:{conda_base_bin}:{env.get('PATH', '')}"
         env["LD_LIBRARY_PATH"] = f"{conda_lib}:{conda_envs_lib}:{env.get('LD_LIBRARY_PATH', '')}"
 
-        env["INLAND_DOMAIN"] = sim.inland_domain
-        env["NWM_DOMAIN"] = sim.nwm_domain
-        env["GEO_GRID"] = sim.geo_grid
         env["GEOGRID_FILE"] = str(paths.geogrid_file(sim))
 
         env["NWM_FORCING_DIR"] = str(paths.meteo_dir(sim.meteo_source))
