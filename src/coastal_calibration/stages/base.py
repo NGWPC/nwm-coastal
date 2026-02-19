@@ -126,7 +126,7 @@ class WorkflowStage(ABC):
         # conda-provided tools are found.  Also add the conda lib
         # directory to LD_LIBRARY_PATH for MPI shared libraries.
         # This mirrors the environment set up by the generated submit
-        # scripts (runner.py lines 774-777).
+        # scripts (runner.py lines 765-766).
         conda_bin = f"{paths.conda_envs_path}/{paths.conda_env_name}/bin"
         conda_base_bin = f"{paths.nfs_mount}/ngen-app/conda/bin"
         conda_lib = f"{paths.nfs_mount}/ngen-app/conda/lib"
