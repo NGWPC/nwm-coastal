@@ -205,21 +205,26 @@ present.
 
 #### SFINCS (`SfincsModelConfig`)
 
-| Parameter                    | Type  | Default  | Description                                        |
-| ---------------------------- | ----- | -------- | -------------------------------------------------- |
-| `prebuilt_dir`               | path  | required | Path to pre-built SFINCS model                     |
-| `observation_points`         | list  | `[]`     | Observation point coordinates                      |
-| `observation_locations_file` | path  | null     | Observation locations file                         |
-| `merge_observations`         | bool  | false    | Merge observations into model                      |
-| `discharge_locations_file`   | path  | null     | Discharge source locations file                    |
-| `merge_discharge`            | bool  | false    | Merge discharge into model                         |
-| `include_noaa_gages`         | bool  | false    | Enable NOAA station discovery and comparison plots |
-| `forcing_to_mesh_offset_m`   | float | 0.0      | Vertical offset (m) added to boundary forcing      |
-| `vdatum_mesh_to_msl_m`       | float | 0.0      | Vertical offset (m) converting model output to MSL |
-| `meteo_res`                  | float | null     | Meteo forcing output resolution (m)                |
-| `omp_num_threads`            | int   | auto     | OpenMP threads (defaults to CPU count)             |
-| `container_tag`              | str   | latest   | SFINCS container tag                               |
-| `container_image`            | path  | null     | Singularity image path                             |
+| Parameter                    | Type  | Default  | Description                                              |
+| ---------------------------- | ----- | -------- | -------------------------------------------------------- |
+| `prebuilt_dir`               | path  | required | Path to pre-built SFINCS model                           |
+| `model_root`                 | path  | null     | Output directory (defaults to `{work_dir}/sfincs_model`) |
+| `observation_points`         | list  | `[]`     | Observation point coordinates                            |
+| `observation_locations_file` | path  | null     | Observation locations file                               |
+| `merge_observations`         | bool  | false    | Merge observations into model                            |
+| `discharge_locations_file`   | path  | null     | Discharge source locations file                          |
+| `merge_discharge`            | bool  | false    | Merge discharge into model                               |
+| `include_noaa_gages`         | bool  | false    | Enable NOAA station discovery and comparison plots       |
+| `include_precip`             | bool  | false    | Add precipitation forcing                                |
+| `include_wind`               | bool  | false    | Add wind forcing                                         |
+| `include_pressure`           | bool  | false    | Add atmospheric pressure forcing                         |
+| `forcing_to_mesh_offset_m`   | float | 0.0      | Vertical offset (m) added to boundary forcing            |
+| `vdatum_mesh_to_msl_m`       | float | 0.0      | Vertical offset (m) converting model output to MSL       |
+| `meteo_res`                  | float | null     | Meteo forcing output resolution (m)                      |
+| `sfincs_exe`                 | path  | null     | Local SFINCS executable (bypasses container)             |
+| `omp_num_threads`            | int   | auto     | OpenMP threads (defaults to CPU count)                   |
+| `container_tag`              | str   | latest   | SFINCS container tag                                     |
+| `container_image`            | path  | null     | Singularity image path                                   |
 
 ### Simulation Settings
 
