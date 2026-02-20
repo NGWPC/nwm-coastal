@@ -80,7 +80,7 @@ Or with errors:
 
 ```console
 ✗ Configuration has errors:
-  - slurm.user is required
+  - simulation.duration_hours must be positive
   - Simulation dates outside nwm_ana range (2018-09-17 to present)
 ```
 

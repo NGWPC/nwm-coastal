@@ -349,10 +349,12 @@ flowchart TD
     B --> C[nwm_forcing]
     C --> D[post_forcing]
     D --> E[update_params]
-    E --> F[boundary_conditions]
-    F --> G[pre_schism]
-    G --> H[schism_run]
-    H --> I[post_schism]
+    E --> F[schism_obs]
+    F --> G[boundary_conditions]
+    G --> H[pre_schism]
+    H --> I[schism_run]
+    I --> J[post_schism]
+    J --> K[schism_plot]
 ```
 
 **SFINCS pipeline:**
@@ -1005,17 +1007,19 @@ ______________________________________________________________________
 
 ### SCHISM Workflow Stages
 
-| Stage                 | Class                    | Description                              |
-| --------------------- | ------------------------ | ---------------------------------------- |
-| `download`            | `DownloadStage`          | Download NWM/STOFS/GLOFS data            |
-| `pre_forcing`         | `PreForcingStage`        | Prepare forcing directories and symlinks |
-| `nwm_forcing`         | `NWMForcingStage`        | Run WRF-Hydro forcing engine (MPI)       |
-| `post_forcing`        | `PostForcingStage`       | Post-process forcing files               |
-| `update_params`       | `UpdateParamsStage`      | Generate SCHISM `param.nml`              |
-| `boundary_conditions` | `BoundaryConditionStage` | TPXO or STOFS boundary generation        |
-| `pre_schism`          | `PreSCHISMStage`         | Prepare SCHISM inputs                    |
-| `schism_run`          | `SCHISMRunStage`         | Execute `pschism` binary (MPI)           |
-| `post_schism`         | `PostSCHISMStage`        | Validate and post-process outputs        |
+| Stage                 | Class                    | Description                                                     |
+| --------------------- | ------------------------ | --------------------------------------------------------------- |
+| `download`            | `DownloadStage`          | Download NWM/STOFS/GLOFS data                                   |
+| `pre_forcing`         | `PreForcingStage`        | Prepare forcing directories and symlinks                        |
+| `nwm_forcing`         | `NWMForcingStage`        | Run WRF-Hydro forcing engine (MPI)                              |
+| `post_forcing`        | `PostForcingStage`       | Post-process forcing files                                      |
+| `update_params`       | `UpdateParamsStage`      | Generate SCHISM `param.nml`                                     |
+| `schism_obs`          | `SchismObsStage`         | Discover NOAA stations and write `station.in`                   |
+| `boundary_conditions` | `BoundaryConditionStage` | TPXO or STOFS boundary generation                               |
+| `pre_schism`          | `PreSCHISMStage`         | Prepare SCHISM inputs                                           |
+| `schism_run`          | `SCHISMRunStage`         | Execute `pschism` binary (MPI)                                  |
+| `post_schism`         | `PostSCHISMStage`        | Validate and post-process outputs                               |
+| `schism_plot`         | `SchismPlotStage`        | Plot simulated vs observed water levels (with datum conversion) |
 
 ### SFINCS Workflow Stages
 
