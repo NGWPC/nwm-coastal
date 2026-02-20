@@ -35,7 +35,7 @@ repos:
     name: Sort top level statements with ssort
 
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.15.1
+  rev: v0.15.2
   hooks:
   - id: ruff
     name: Linting with Ruff
@@ -61,7 +61,7 @@ repos:
     - tomli
 
 - repo: https://github.com/tox-dev/pyproject-fmt
-  rev: v2.16.0
+  rev: v2.16.1
   hooks:
   - id: pyproject-fmt
     name: Apply a consistent format to pyproject.toml
