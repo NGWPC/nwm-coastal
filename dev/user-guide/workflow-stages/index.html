@@ -1,0 +1,2005 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Coastal model (SCHISM, SFINCS) workflow on HPC clusters">
+      
+      
+        <meta name="author" content="Taher Chegini">
+      
+      
+        <link rel="canonical" href="https://NGWPC.github.io/nwm-coastal/latest/user-guide/workflow-stages/">
+      
+      
+        <link rel="prev" href="../python-api/">
+      
+      
+        <link rel="next" href="../../DESIGN/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.2">
+    
+    
+      
+        <title>Workflow Stages - NWM Coastal</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#workflow-stages" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NWM Coastal" class="md-header__button md-logo" aria-label="NWM Coastal" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NWM Coastal
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Workflow Stages
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="prefix-light" data-md-color-accent="prefix-light"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="prefix" data-md-color-accent="prefix"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/NGWPC/nwm-coastal" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    NGWPC/nwm-coastal
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/installation/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../configuration/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  User Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../DESIGN/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Design
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/api/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../CONTRIBUTING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../CHANGELOG/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Changelog
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NWM Coastal" class="md-nav__button md-logo" aria-label="NWM Coastal" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NWM Coastal
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/NGWPC/nwm-coastal" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    NGWPC/nwm-coastal
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../python-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow Stages
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow Stages
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#schism-stage-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SCHISM Stage Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sfincs-stage-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SFINCS Stage Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#schism-stage-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SCHISM Stage Details
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SCHISM Stage Details">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-download" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. download
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-pre_forcing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. pre_forcing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-nwm_forcing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. nwm_forcing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-post_forcing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. post_forcing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-update_params" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. update_params
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-schism_obs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. schism_obs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#7-boundary_conditions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. boundary_conditions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#8-pre_schism" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. pre_schism
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#9-schism_run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. schism_run
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#10-post_schism" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. post_schism
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#11-schism_plot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. schism_plot
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sfincs-stage-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SFINCS Stage Details
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SFINCS Stage Details">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-download_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. download
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-sfincs_symlinks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. sfincs_symlinks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-sfincs_data_catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. sfincs_data_catalog
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-sfincs_init" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. sfincs_init
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-sfincs_timing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. sfincs_timing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-sfincs_forcing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. sfincs_forcing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#7-sfincs_obs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. sfincs_obs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#8-sfincs_discharge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. sfincs_discharge
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#9-sfincs_precip" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. sfincs_precip
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#10-sfincs_wind" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. sfincs_wind
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#11-sfincs_pressure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. sfincs_pressure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-sfincs_write" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. sfincs_write
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-sfincs_run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13. sfincs_run
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#14-sfincs_plot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14. sfincs_plot
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#running-partial-workflows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running Partial Workflows
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Running Partial Workflows">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python API
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#error-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error Handling
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stage-timing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage Timing
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../DESIGN/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CONTRIBUTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CHANGELOG/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../.." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    Home
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../configuration/" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    User Guide
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+
+
+
+                  
+
+
+  
+    <a href="https://github.com/NGWPC/nwm-coastal/edit/main/docs/user-guide/workflow-stages.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="workflow-stages">Workflow Stages<a class="headerlink" href="#workflow-stages" title="Permanent link">#</a></h1>
+<p>The coastal calibration workflow consists of sequential stages, each performing a
+specific task in the simulation pipeline. The stage order depends on the selected model
+(SCHISM or SFINCS).</p>
+<p>Both <code>run</code> and <code>submit</code> execute the same stage pipeline. Each stage is classified as
+either <strong>Python-only</strong> or <strong>container</strong> (requires Singularity/MPI). When using <code>submit</code>,
+Python-only stages run on the login node while container stages are submitted as a SLURM
+job. When using <code>run</code>, all stages execute locally (e.g., inside an interactive compute
+session).</p>
+<h2 id="schism-stage-overview">SCHISM Stage Overview<a class="headerlink" href="#schism-stage-overview" title="Permanent link">#</a></h2>
+<pre class="mermaid"><code>flowchart TD
+    A[download] --&gt; B[pre_forcing]
+    B --&gt; C[nwm_forcing]
+    C --&gt; D[post_forcing]
+    D --&gt; E[update_params]
+    E --&gt; F[schism_obs]
+    F --&gt; G[boundary_conditions]
+    G --&gt; H[pre_schism]
+    H --&gt; I[schism_run]
+    I --&gt; J[post_schism]
+    J --&gt; K[schism_plot]</code></pre>
+<h2 id="sfincs-stage-overview">SFINCS Stage Overview<a class="headerlink" href="#sfincs-stage-overview" title="Permanent link">#</a></h2>
+<pre class="mermaid"><code>flowchart TD
+    A[download] --&gt; B[sfincs_symlinks]
+    B --&gt; C[sfincs_data_catalog]
+    C --&gt; D[sfincs_init]
+    D --&gt; E[sfincs_timing]
+    E --&gt; F[sfincs_forcing]
+    F --&gt; G[sfincs_obs]
+    G --&gt; H[sfincs_discharge]
+    H --&gt; I[sfincs_precip]
+    I --&gt; J[sfincs_wind]
+    J --&gt; K[sfincs_pressure]
+    K --&gt; L[sfincs_write]
+    L --&gt; M[sfincs_run]
+    M --&gt; N[sfincs_plot]</code></pre>
+<h2 id="schism-stage-details">SCHISM Stage Details<a class="headerlink" href="#schism-stage-details" title="Permanent link">#</a></h2>
+<h3 id="1-download">1. download<a class="headerlink" href="#1-download" title="Permanent link">#</a></h3>
+<p><strong>Purpose:</strong> Download required input data from remote sources.</p>
+<p><strong>Data Sources:</strong></p>
+<ul>
+<li>NWM meteorological forcing (LDASIN files)</li>
+<li>NWM streamflow data (CHRTOUT files)</li>
+<li>STOFS or GLOFS water level data (when applicable)</li>
+</ul>
+<p><strong>Runs On:</strong> Login node (before SLURM job submission)</p>
+<p><strong>Outputs:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>raw_download_dir/
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>├── meteo/nwm_ana/
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>│   └── *.LDASIN_DOMAIN1.nc
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>├── hydro/nwm/
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>│   └── *.CHRTOUT_DOMAIN1.nc
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>└── coastal/stofs/
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    └── *.fields.cwl.nc
+</span></code></pre></div>
+<h3 id="2-pre_forcing">2. pre_forcing<a class="headerlink" href="#2-pre_forcing" title="Permanent link">#</a></h3>
+<p><strong>Purpose:</strong> Prepare NWM forcing data for SCHISM.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>Copy and organize downloaded NWM files</li>
+<li>Set up directory structure for forcing generation</li>
+<li>Validate input data integrity</li>
+</ul>
+<p><strong>Runs On:</strong> Compute node (inside Singularity)</p>
+<h3 id="3-nwm_forcing">3. nwm_forcing<a class="headerlink" href="#3-nwm_forcing" title="Permanent link">#</a></h3>
+<p><strong>Purpose:</strong> Generate atmospheric forcing files using MPI.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>Regrid NWM data to SCHISM mesh</li>
+<li>Interpolate forcing variables</li>
+<li>Generate SCHISM-compatible forcing files</li>
+</ul>
+<p><strong>Runs On:</strong> Compute node (MPI parallel, inside Singularity)</p>
+<p><strong>Outputs:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>work_dir/
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>└── sflux/
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    ├── sflux_air_1.*.nc
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    ├── sflux_prc_1.*.nc
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    └── sflux_rad_1.*.nc
+</span></code></pre></div>
+<h3 id="4-post_forcing">4. post_forcing<a class="headerlink" href="#4-post_forcing" title="Permanent link">#</a></h3>
+<p><strong>Purpose:</strong> Post-process forcing data.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>Validate generated forcing files</li>
+<li>Create forcing summary</li>
+<li>Clean up temporary files</li>
+</ul>
+<p><strong>Runs On:</strong> Compute node (inside Singularity)</p>
+<h3 id="5-update_params">5. update_params<a class="headerlink" href="#5-update_params" title="Permanent link">#</a></h3>
+<p><strong>Purpose:</strong> Generate SCHISM parameter file and symlink mesh files.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>Symlink <code>hgrid.gr3</code> and other mesh files into the work directory</li>
+<li>Create <code>param.nml</code> with simulation parameters</li>
+<li>Set time stepping configuration</li>
+<li>Configure output options</li>
+</ul>
+<p><strong>Runs On:</strong> Compute node (inside Singularity)</p>
+<p><strong>Outputs:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>work_dir/
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>├── hgrid.gr3 (symlink)
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>└── param.nml
+</span></code></pre></div>
+<h3 id="6-schism_obs">6. schism_obs<a class="headerlink" href="#6-schism_obs" title="Permanent link">#</a></h3>
+<p><strong>Purpose:</strong> Automatically discover NOAA CO-OPS water level stations within the model
+domain and generate a SCHISM <code>station.in</code> file so that SCHISM writes time-series output
+at those locations.</p>
+<p><strong>Enabled by:</strong> <code>model_config.include_noaa_gages: true</code> (disabled by default)</p>
+<p><strong>Depends on:</strong> <code>update_params</code> (which symlinks <code>hgrid.gr3</code> into the work directory).
+When running via <code>submit</code>, this stage is promoted to the login node and the dependency
+on <code>hgrid.gr3</code> is resolved automatically via a symlink from the parameter directory.</p>
+<p><strong>How it works:</strong></p>
+<ol>
+<li>Parses <code>hgrid.gr3</code> to extract the coordinates of all open boundary nodes.</li>
+<li>Computes a concave hull around the boundary points (using <code>shapely.concave_hull</code> with
+    <code>ratio=0.05</code>).</li>
+<li>Queries the NOAA CO-OPS API to find active water level stations that fall inside the
+    hull polygon.</li>
+<li>Writes <code>station.in</code> (SCHISM station definition file with elevation-only output flag)
+    and a companion <code>station_noaa_ids.txt</code> that maps each station index to its NOAA
+    station ID.</li>
+</ol>
+<p><strong>Runs On:</strong> Login node (in <code>submit</code> mode) or compute node (in <code>run</code> mode). Requires
+network access for the CO-OPS API call.</p>
+<p><strong>Outputs:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>work_dir/
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>├── station.in             # SCHISM station definition file
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>└── station_noaa_ids.txt   # Index-to-NOAA-ID mapping
+</span></code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">param.nml patching</p>
+<p>When <code>station.in</code> exists, the <code>pre_schism</code> stage automatically patches <code>param.nml</code> to
+set <code>iout_sta = 1</code> (enable station output) and <code>nspool_sta = 18</code> (output interval in
+time-steps). The value <code>nspool_sta = 18</code> is chosen because it divides all <code>nhot_write</code>
+values used across domain templates (162, 324, 8640, etc.), satisfying the SCHISM
+constraint <code>mod(nhot_write, nspool_sta) == 0</code>.</p>
+</div>
+<h3 id="7-boundary_conditions">7. boundary_conditions<a class="headerlink" href="#7-boundary_conditions" title="Permanent link">#</a></h3>
+<p><strong>Purpose:</strong> Generate boundary conditions from TPXO or STOFS.</p>
+<p><strong>Tasks (TPXO):</strong></p>
+<ul>
+<li>Extract tidal constituents at boundary nodes</li>
+<li>Generate harmonic boundary files</li>
+<li>Create <code>bctides.in</code> file</li>
+</ul>
+<p><strong>Tasks (STOFS):</strong></p>
+<ul>
+<li>Interpolate STOFS water levels to boundary</li>
+<li>Generate time-varying boundary files</li>
+<li>Create <code>elev2D.th.nc</code> file</li>
+</ul>
+<p><strong>Runs On:</strong> Compute node (inside Singularity)</p>
+<h3 id="8-pre_schism">8. pre_schism<a class="headerlink" href="#8-pre_schism" title="Permanent link">#</a></h3>
+<p><strong>Purpose:</strong> Final preparation before SCHISM execution.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>Validate all input files present</li>
+<li>Set up symbolic links</li>
+<li>Configure MPI environment</li>
+</ul>
+<p><strong>Runs On:</strong> Compute node (inside Singularity)</p>
+<h3 id="9-schism_run">9. schism_run<a class="headerlink" href="#9-schism_run" title="Permanent link">#</a></h3>
+<p><strong>Purpose:</strong> Execute the SCHISM model.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>Run SCHISM with MPI</li>
+<li>Monitor progress</li>
+<li>Handle I/O scribes</li>
+</ul>
+<p><strong>Runs On:</strong> Compute node (MPI parallel, inside Singularity)</p>
+<p><strong>Configuration:</strong></p>
+<ul>
+<li>Uses <code>nscribes</code> I/O processes from model config</li>
+<li>OpenMP threads configured via <code>omp_num_threads</code></li>
+<li>Total processes = <code>nodes * ntasks_per_node</code></li>
+</ul>
+<h3 id="10-post_schism">10. post_schism<a class="headerlink" href="#10-post_schism" title="Permanent link">#</a></h3>
+<p><strong>Purpose:</strong> Post-process SCHISM outputs.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>Combine output files</li>
+<li>Generate statistics</li>
+<li>Create visualization-ready files</li>
+</ul>
+<p><strong>Runs On:</strong> Compute node (inside Singularity)</p>
+<h3 id="11-schism_plot">11. schism_plot<a class="headerlink" href="#11-schism_plot" title="Permanent link">#</a></h3>
+<p><strong>Purpose:</strong> Compare SCHISM-simulated water levels against NOAA CO-OPS observations at
+every station discovered by the <code>schism_obs</code> stage.</p>
+<p><strong>Enabled by:</strong> <code>model_config.include_noaa_gages: true</code></p>
+<p><strong>How it works:</strong></p>
+<ol>
+<li>Reads the SCHISM station time-series from <code>outputs/staout_1</code>.</li>
+<li>Loads the station-to-NOAA-ID mapping from <code>station_noaa_ids.txt</code>.</li>
+<li>Fetches observed water levels from the CO-OPS API in the MLLW datum and converts to
+    MSL using per-station datum offsets retrieved from the API.</li>
+<li>Generates 2×2 comparison plots (four stations per figure) showing simulated vs
+    observed water levels.</li>
+<li>Saves PNG figures to the <code>figs/</code> subdirectory.</li>
+</ol>
+<p><strong>Runs On:</strong> Login node (in <code>submit</code> mode, after SLURM job completes) or compute node
+(in <code>run</code> mode). Requires network access for the CO-OPS API call.</p>
+<p><strong>Outputs:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>work_dir/
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>└── figs/
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    ├── stations_comparison_001.png
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    ├── stations_comparison_002.png
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    └── ...
+</span></code></pre></div>
+<div class="admonition tip">
+<p class="admonition-title">Datum conversion</p>
+<p>Observations are fetched in MLLW (Mean Lower Low Water) and converted to MSL (Mean Sea
+Level) so they share the same vertical reference as the SCHISM simulation output. The
+conversion offset is obtained from the CO-OPS datums endpoint for each station.</p>
+</div>
+<h2 id="sfincs-stage-details">SFINCS Stage Details<a class="headerlink" href="#sfincs-stage-details" title="Permanent link">#</a></h2>
+<h3 id="1-download_1">1. download<a class="headerlink" href="#1-download_1" title="Permanent link">#</a></h3>
+<p>Same as SCHISM download stage. Downloads NWM meteorological forcing, streamflow, and
+STOFS water level data.</p>
+<h3 id="2-sfincs_symlinks">2. sfincs_symlinks<a class="headerlink" href="#2-sfincs_symlinks" title="Permanent link">#</a></h3>
+<p><strong>Purpose:</strong> Create .nc symlinks for NWM data.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>Create symlinks in the working directory pointing to downloaded NWM files</li>
+<li>Organize files by type (meteo, hydro)</li>
+</ul>
+<h3 id="3-sfincs_data_catalog">3. sfincs_data_catalog<a class="headerlink" href="#3-sfincs_data_catalog" title="Permanent link">#</a></h3>
+<p><strong>Purpose:</strong> Generate a HydroMT data catalog.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>Build YAML data catalog for HydroMT-SFINCS</li>
+<li>Register NWM meteo, streamflow, and STOFS data sources</li>
+</ul>
+<h3 id="4-sfincs_init">4. sfincs_init<a class="headerlink" href="#4-sfincs_init" title="Permanent link">#</a></h3>
+<p><strong>Purpose:</strong> Initialise the SFINCS model from a pre-built template.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>Copy pre-built SFINCS model from <code>prebuilt_dir</code> into the work directory</li>
+<li>Remove stale netCDF output files from any previous run (prevents HDF5 segfaults when
+    <code>write_netcdf_safely</code> encounters files with an incompatible schema)</li>
+<li>Set up model directory structure</li>
+</ul>
+<h3 id="5-sfincs_timing">5. sfincs_timing<a class="headerlink" href="#5-sfincs_timing" title="Permanent link">#</a></h3>
+<p><strong>Purpose:</strong> Set SFINCS model timing.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>Configure simulation start/end times</li>
+<li>Set output intervals</li>
+</ul>
+<h3 id="6-sfincs_forcing">6. sfincs_forcing<a class="headerlink" href="#6-sfincs_forcing" title="Permanent link">#</a></h3>
+<p><strong>Purpose:</strong> Add water level forcing.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>Read boundary point locations from <code>sfincs.bnd</code></li>
+<li>For TPXO: synthesize tidal water levels from TPXO constituents using harmonic
+    reconstruction</li>
+<li>For geodataset sources (STOFS): load the geodataset clipped around the boundary
+    points, spatially interpolate to boundary locations using inverse-distance weighting
+    (IDW), and inject into the HydroMT model</li>
+<li>Apply <code>forcing_to_mesh_offset_m</code> to anchor the forcing signal to the correct height on
+    the mesh datum (see note below)</li>
+<li>Emit a warning if the adjusted water levels fall outside the ±15 m sanity range</li>
+<li>Write boundary forcing netCDF (<code>sfincs_netbndbzsbzifile.nc</code>) with a zero-filled <code>bzi</code>
+    (infragravity) variable required by the SFINCS binary</li>
+</ul>
+<div class="admonition tip">
+<p class="admonition-title">Forcing vertical datum offset</p>
+<p>Tidal-only sources like TPXO provide oscillations centred on zero (MSL) but carry no
+information about where MSL sits on the mesh's vertical datum. The
+<code>forcing_to_mesh_offset_m</code> parameter anchors the tidal signal to the correct geodetic
+height on the mesh. For sources already in the mesh datum (e.g. STOFS on a NAVD88 mesh),
+set this to <code>0.0</code>. The offset can be obtained from the
+<a href="https://vdatum.noaa.gov/vdatumweb/api/convert">NOAA VDatum API</a>.</p>
+</div>
+<h3 id="7-sfincs_obs">7. sfincs_obs<a class="headerlink" href="#7-sfincs_obs" title="Permanent link">#</a></h3>
+<p><strong>Purpose:</strong> Add observation points.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>Add tide gauge locations from <code>observation_points</code></li>
+<li>Configure observation output</li>
+</ul>
+<h3 id="8-sfincs_discharge">8. sfincs_discharge<a class="headerlink" href="#8-sfincs_discharge" title="Permanent link">#</a></h3>
+<p><strong>Purpose:</strong> Add discharge sources.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>Add NWM streamflow discharge points from <code>discharge_locations_file</code></li>
+<li>Filter out source points that fall on inactive grid cells (prevents a SFINCS Fortran
+    segfault caused by out-of-bounds array access)</li>
+<li>Generate discharge forcing time series</li>
+</ul>
+<h3 id="9-sfincs_precip">9. sfincs_precip<a class="headerlink" href="#9-sfincs_precip" title="Permanent link">#</a></h3>
+<p><strong>Purpose:</strong> Add precipitation forcing.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>Add NWM precipitation data as spatially distributed forcing</li>
+<li>Set the output resolution to <code>meteo_res</code> (or auto-derive from the quadtree grid)</li>
+<li>Clip the reprojected grid to the model domain to prevent CONUS-scale inflation</li>
+</ul>
+<h3 id="10-sfincs_wind">10. sfincs_wind<a class="headerlink" href="#10-sfincs_wind" title="Permanent link">#</a></h3>
+<p><strong>Purpose:</strong> Add wind forcing.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>Add NWM wind data as spatially distributed forcing</li>
+<li>Set the output resolution to <code>meteo_res</code> (or auto-derive from the quadtree grid)</li>
+<li>Clip the reprojected grid to the model domain to prevent CONUS-scale inflation</li>
+</ul>
+<p><strong>Runs On:</strong> Login node (Python-only)</p>
+<h3 id="11-sfincs_pressure">11. sfincs_pressure<a class="headerlink" href="#11-sfincs_pressure" title="Permanent link">#</a></h3>
+<p><strong>Purpose:</strong> Add atmospheric pressure forcing.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>Add NWM atmospheric pressure data as spatially distributed forcing</li>
+<li>Set the output resolution to <code>meteo_res</code> (or auto-derive from the quadtree grid)</li>
+<li>Clip the reprojected grid to the model domain to prevent CONUS-scale inflation</li>
+<li>Enable barometric pressure correction (<code>baro=1</code>)</li>
+</ul>
+<p><strong>Runs On:</strong> Login node (Python-only)</p>
+<h3 id="12-sfincs_write">12. sfincs_write<a class="headerlink" href="#12-sfincs_write" title="Permanent link">#</a></h3>
+<p><strong>Purpose:</strong> Write the final SFINCS model.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>Write all SFINCS input files (<code>sfincs.inp</code>, <code>sfincs.bnd</code>, etc.)</li>
+<li>Generate boundary and forcing NetCDF files</li>
+</ul>
+<p><strong>Runs On:</strong> Login node (Python-only)</p>
+<h3 id="13-sfincs_run">13. sfincs_run<a class="headerlink" href="#13-sfincs_run" title="Permanent link">#</a></h3>
+<p><strong>Purpose:</strong> Execute the SFINCS model.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>Run SFINCS inside Singularity container</li>
+<li>Uses single-node OpenMP parallelism (<code>omp_num_threads</code>)</li>
+</ul>
+<p><strong>Runs On:</strong> Compute node (OpenMP, inside Singularity)</p>
+<h3 id="14-sfincs_plot">14. sfincs_plot<a class="headerlink" href="#14-sfincs_plot" title="Permanent link">#</a></h3>
+<p><strong>Purpose:</strong> Compare simulated water levels against observations.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>Read SFINCS output at observation points</li>
+<li>Apply <code>vdatum_mesh_to_msl_m</code> to convert model output from the mesh datum to MSL</li>
+<li>Fetch NOAA CO-OPS observed water levels (MLLW converted to MSL using per-station datum
+    offsets from the CO-OPS API)</li>
+<li>Generate comparison plots (simulated vs observed)</li>
+<li>Save figures to the <code>figs/</code> directory</li>
+</ul>
+<p><strong>Runs On:</strong> Login node or compute node (Python, requires network access)</p>
+<div class="admonition tip">
+<p class="admonition-title">Output datum conversion</p>
+<p>SFINCS output inherits the vertical datum of the mesh (e.g. NAVD88). The
+<code>vdatum_mesh_to_msl_m</code> offset converts the simulated water levels to MSL so they can be
+compared with NOAA CO-OPS observations. This value can be obtained from the
+<a href="https://vdatum.noaa.gov/vdatumweb/api/convert">NOAA VDatum API</a>.</p>
+</div>
+<h2 id="running-partial-workflows">Running Partial Workflows<a class="headerlink" href="#running-partial-workflows" title="Permanent link">#</a></h2>
+<p>Both <code>run</code> and <code>submit</code> support <code>--start-from</code> and <code>--stop-after</code>.</p>
+<h3 id="cli">CLI<a class="headerlink" href="#cli" title="Permanent link">#</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># SCHISM examples (run)</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>coastal-calibration<span class="w"> </span>run<span class="w"> </span>config.yaml<span class="w"> </span>--stop-after<span class="w"> </span>download
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>coastal-calibration<span class="w"> </span>run<span class="w"> </span>config.yaml<span class="w"> </span>--start-from<span class="w"> </span>pre_forcing<span class="w"> </span>--stop-after<span class="w"> </span>post_forcing
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>coastal-calibration<span class="w"> </span>run<span class="w"> </span>config.yaml<span class="w"> </span>--start-from<span class="w"> </span>boundary_conditions
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="c1"># SCHISM examples (submit)</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>coastal-calibration<span class="w"> </span>submit<span class="w"> </span>config.yaml<span class="w"> </span>--start-from<span class="w"> </span>boundary_conditions<span class="w"> </span>-i
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>coastal-calibration<span class="w"> </span>submit<span class="w"> </span>config.yaml<span class="w"> </span>--stop-after<span class="w"> </span>post_forcing
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="c1"># SFINCS examples</span>
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>coastal-calibration<span class="w"> </span>run<span class="w"> </span>config.yaml<span class="w"> </span>--stop-after<span class="w"> </span>sfincs_write
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>coastal-calibration<span class="w"> </span>submit<span class="w"> </span>config.yaml<span class="w"> </span>--start-from<span class="w"> </span>sfincs_run<span class="w"> </span>-i
+</span></code></pre></div>
+<h3 id="python-api">Python API<a class="headerlink" href="#python-api" title="Permanent link">#</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">coastal_calibration</span><span class="w"> </span><span class="kn">import</span> <span class="n">CoastalCalibConfig</span><span class="p">,</span> <span class="n">CoastalCalibRunner</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">config</span> <span class="o">=</span> <span class="n">CoastalCalibConfig</span><span class="o">.</span><span class="n">from_yaml</span><span class="p">(</span><span class="s2">&quot;config.yaml&quot;</span><span class="p">)</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="n">runner</span> <span class="o">=</span> <span class="n">CoastalCalibRunner</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="c1"># Run specific stages locally</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">start_from</span><span class="o">=</span><span class="s2">&quot;pre_forcing&quot;</span><span class="p">,</span> <span class="n">stop_after</span><span class="o">=</span><span class="s2">&quot;post_forcing&quot;</span><span class="p">)</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="c1"># Submit partial pipeline to SLURM</span>
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="n">wait</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">start_from</span><span class="o">=</span><span class="s2">&quot;boundary_conditions&quot;</span><span class="p">)</span>
+</span></code></pre></div>
+<h2 id="error-handling">Error Handling<a class="headerlink" href="#error-handling" title="Permanent link">#</a></h2>
+<p>If a stage fails:</p>
+<ol>
+<li>The workflow stops at the failed stage</li>
+<li>Error details are logged</li>
+<li>Subsequent stages are not executed</li>
+<li>Exit code indicates failure</li>
+</ol>
+<p>To resume after fixing an issue:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># Resume from the failed stage</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>coastal-calibration<span class="w"> </span>run<span class="w"> </span>config.yaml<span class="w"> </span>--start-from<span class="w"> </span>&lt;failed_stage&gt;
+</span></code></pre></div>
+<h2 id="stage-timing">Stage Timing<a class="headerlink" href="#stage-timing" title="Permanent link">#</a></h2>
+<p>When <code>enable_timing</code> is true in the monitoring configuration, stage durations are
+tracked and reported:</p>
+<div class="language-console highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="go">Stage timing:</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="go">  download: 45.2s</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="go">  pre_forcing: 12.3s</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="go">  nwm_forcing: 234.5s</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="go">  post_forcing: 8.7s</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="go">  update_params: 2.1s</span>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="go">  schism_obs: 3.8s</span>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="go">  boundary_conditions: 156.8s</span>
+</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="go">  pre_schism: 5.4s</span>
+</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="go">  schism_run: 1823.6s</span>
+</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="go">  post_schism: 67.2s</span>
+</span><span id="__span-8-12"><a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="go">  schism_plot: 15.4s</span>
+</span><span id="__span-8-13"><a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a><span class="go">Total: 2375.0s</span>
+</span></code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../python-api/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Python API">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Python API
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../../DESIGN/" class="md-footer__link md-footer__link--next" aria-label="Next: Design">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Design
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2025 Raytheon Company. BSD-2-Clause License.
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/NGWPC/nwm-coastal" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.action.edit", "content.code.annotate", "content.code.copy", "content.tabs.link", "navigation.collapse", "navigation.expand", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.instant.progress", "navigation.path", "navigation.sections", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "search.suggest", "toc.follow", "toc.integrate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
