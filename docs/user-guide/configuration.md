@@ -54,7 +54,7 @@ model_config:
     The preferred approach on clusters is to embed the YAML configuration directly in a
     sbatch script using a heredoc and use `coastal-calibration run` to execute it. This
     keeps the SLURM directives and workflow configuration in a single, self-contained file.
-    See the [CLI reference](cli.md#using-run-inside-a-slurm-job--heredoc-recommended) for
+    See the [CLI reference](cli.md#using-run-inside-a-slurm-job-heredoc-recommended) for
     details and complete examples in `docs/examples/`.
 
 ## Variable Interpolation

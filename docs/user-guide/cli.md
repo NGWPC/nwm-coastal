@@ -247,8 +247,8 @@ Key points:
 
 Complete examples for both models are available in `docs/examples/`:
 
-- [`schism.sh`](../../examples/schism.sh) — SCHISM multi-node MPI
-- [`sfincs.sh`](../../examples/sfincs.sh) — SFINCS single-node OpenMP
+- [`schism.sh`](https://github.com/NGWPC/nwm-coastal/blob/main/docs/examples/schism.sh) — SCHISM multi-node MPI
+- [`sfincs.sh`](https://github.com/NGWPC/nwm-coastal/blob/main/docs/examples/sfincs.sh) — SFINCS single-node OpenMP
 
 ### stages
 
