@@ -300,7 +300,9 @@ def silence_third_party_loggers(*, file_level: int = logging.DEBUG) -> None:
     root = logging.getLogger()
     # Remove any pre-existing root console handlers
     for handler in root.handlers[:]:
-        if isinstance(handler, (logging.StreamHandler, RichHandler)):
+        if isinstance(handler, logging.StreamHandler) and not isinstance(
+            handler, logging.FileHandler
+        ):
             root.removeHandler(handler)
     root.addHandler(logging.NullHandler())
 

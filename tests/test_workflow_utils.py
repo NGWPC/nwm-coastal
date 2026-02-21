@@ -118,7 +118,7 @@ class TestPreNwmForcingCoastal:
         )
 
         forcing_input = data_exec / "forcing_input" / "2021061100"
-        symlinks = list(forcing_input.iterdir())
+        symlinks = sorted(forcing_input.iterdir())
         assert len(symlinks) == 1
         assert symlinks[0].name == "2021061100.LDASIN_DOMAIN1"
         assert str(symlinks[0].resolve()).endswith("2021061100.LDASIN_DOMAIN1")
