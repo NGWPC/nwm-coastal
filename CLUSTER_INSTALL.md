@@ -49,7 +49,7 @@ libnetcdf = "*"
 ffmpeg = "*"
 
 [pypi-dependencies]
-coastal-calibration = { git = "https://github.com/cheginit/nwm-coastal.git", extras = ["sfincs", "plot"] }
+coastal-calibration = { git = "https://github.com/NGWPC/nwm-coastal.git", tag = "v0.2.0", extras = ["sfincs", "plot"] }
 hydromt-sfincs = { git = "https://github.com/Deltares/hydromt_sfincs", rev = "41aac0a3980fc2714ec28eafb0463d40abfc979a" }
 EOF
 ```
@@ -118,21 +118,19 @@ regardless of PATH setup):
 /ngen-test/coastal-calibration/coastal-calibration run "${CONFIG_FILE}"
 ```
 
-## Updating (when a new version is pushed)
+## Updating (when a new version is released)
+
+Update the pinned tag in `pixi.toml` to the desired release, then reinstall:
 
 ```bash
 cd /ngen-test/coastal-calibration
-UV_CACHE_DIR=/var/tmp/uv-cache UV_LINK_MODE=copy pixi update
-UV_CACHE_DIR=/var/tmp/uv-cache UV_LINK_MODE=copy pixi run uv pip install \
-  --reinstall-package coastal-calibration \
-  "coastal-calibration[sfincs,plot] @ git+https://github.com/cheginit/nwm-coastal.git"
+# Edit pixi.toml: update the `tag` for coastal-calibration to the new version
+UV_CACHE_DIR=/var/tmp/uv-cache UV_LINK_MODE=copy pixi install
 ```
 
 `UV_LINK_MODE=copy` is required on NFS shared filesystems where hardlinks (the default)
 don't work across filesystem boundaries. `UV_CACHE_DIR` redirects the uv cache to a
-local directory to avoid lock-file and performance issues on NFS. The
-`--reinstall-package` flag forces `uv` to re-fetch and rebuild the package from the
-latest commit on the remote repository.
+local directory to avoid lock-file and performance issues on NFS.
 
 ## Verifying the installation
 
