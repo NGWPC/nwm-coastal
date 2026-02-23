@@ -10,9 +10,6 @@ documents all available configuration options.
 The simplest valid SCHISM configuration only requires:
 
 ```yaml
-slurm:
-  job_name: my_run
-
 simulation:
   start_date: 2021-06-11
   duration_hours: 24
@@ -32,9 +29,6 @@ A minimal SFINCS configuration requires a `model` key and a `model_config` secti
 
 ```yaml
 model: sfincs
-
-slurm:
-  job_name: my_sfincs_run
 
 simulation:
   start_date: 2025-06-01
@@ -62,25 +56,24 @@ model_config:
 Configuration values support variable interpolation using `${section.key}` syntax:
 
 ```yaml
-slurm:
-  user: john
-
 simulation:
   coastal_domain: hawaii
 
 paths:
-  work_dir: /data/${slurm.user}/${simulation.coastal_domain}
-  # Resolves to: /data/john/hawaii
+  work_dir: /data/${user}/${simulation.coastal_domain}
+  # Resolves to: /data/<your_username>/hawaii
 ```
+
+The `${user}` variable is automatically resolved from the `$USER` environment variable.
 
 ### Default Path Templates
 
 If not specified, paths are automatically generated using model-aware templates:
 
-| Path               | Default Template                                                                                                                                         |
-| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `work_dir`         | `/ngen-test/coastal/${slurm.user}/${model}_${simulation.coastal_domain}_${boundary.source}_${simulation.meteo_source}/${model}_${simulation.start_date}` |
-| `raw_download_dir` | `/ngen-test/coastal/${slurm.user}/${model}_${simulation.coastal_domain}_${boundary.source}_${simulation.meteo_source}/raw_data`                          |
+| Path               | Default Template                                                                                                                                   |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `work_dir`         | `/ngen-test/coastal/${user}/${model}_${simulation.coastal_domain}_${boundary.source}_${simulation.meteo_source}/${model}_${simulation.start_date}` |
+| `raw_download_dir` | `/ngen-test/coastal/${user}/${model}_${simulation.coastal_domain}_${boundary.source}_${simulation.meteo_source}/raw_data`                          |
 
 The `${model}` variable resolves to `schism` or `sfincs` based on the `model` key.
 
@@ -93,30 +86,6 @@ The top-level `model` key selects the model type. It defaults to `schism` if omi
 ```yaml
 model: sfincs  # or "schism" (default)
 ```
-
-### SLURM Settings
-
-Configure SLURM job scheduling. Compute resources (nodes, tasks) are model-specific and
-live in the `model_config` section.
-
-```yaml
-slurm:
-  job_name: coastal_calibration  # Job name shown in squeue
-  user: your_username            # Optional: defaults to $USER
-  partition: c5n-18xlarge        # SLURM partition
-  time_limit:                    # Time limit (HH:MM:SS), null for no limit
-  account:                       # SLURM account for billing
-  qos:                           # Quality of Service
-```
-
-| Parameter    | Type   | Default               | Description                          |
-| ------------ | ------ | --------------------- | ------------------------------------ |
-| `job_name`   | string | `coastal_calibration` | SLURM job name                       |
-| `user`       | string | `$USER`               | SLURM username (defaults to `$USER`) |
-| `partition`  | string | `c5n-18xlarge`        | SLURM partition                      |
-| `time_limit` | string | null                  | Time limit                           |
-| `account`    | string | null                  | SLURM account                        |
-| `qos`        | string | null                  | Quality of Service                   |
 
 ### Simulation Settings
 
@@ -241,7 +210,7 @@ When set to `true`, two additional stages are activated in the SCHISM pipeline:
     MLLW to MSL datum), and generates 2×2 comparison plots saved to `figs/`.
 
 Both stages require network access for NOAA CO-OPS API calls and are classified as
-Python-only stages (they run on the login node in `submit` mode).
+Python-only stages.
 
 #### SFINCS Model Configuration
 
@@ -359,9 +328,6 @@ Use `_base` to inherit settings from another configuration file:
 
 ```yaml
 # base.yaml - shared settings
-slurm:
-  job_name: coastal_sim
-
 simulation:
   duration_hours: 24
   meteo_source: nwm_ana
@@ -407,6 +373,5 @@ The validation checks:
 - All required fields are present
 - Date ranges are valid for selected data sources
 - File paths exist (for required files)
-- SLURM parameters are valid
 - Model-specific configuration is consistent (e.g., nscribes < total MPI tasks for
     SCHISM)

@@ -16,10 +16,6 @@ This page provides detailed documentation for the NWM Coastal Python API.
         - validate
         - model
 
-### SlurmConfig
-
-::: coastal_calibration.config.schema.SlurmConfig
-
 ### SimulationConfig
 
 ::: coastal_calibration.config.schema.SimulationConfig
@@ -61,7 +57,6 @@ This page provides detailed documentation for the NWM Coastal Python API.
       show_source: true
       members:
         - validate
-        - submit
         - run
 
 ### WorkflowResult
@@ -126,20 +121,19 @@ DEFAULT_NFS_MOUNT = Path("/ngen-test")
 DEFAULT_CONDA_ENV_NAME = "ngen_forcing_coastal"
 DEFAULT_NWM_DIR = Path("/ngen-app/nwm.v3.0.6")
 DEFAULT_OTPS_DIR = Path("/ngen-app/OTPSnc")
-DEFAULT_SLURM_PARTITION = "c5n-18xlarge"
 ```
 
 ### Default Path Templates
 
 ```python
 DEFAULT_WORK_DIR_TEMPLATE = (
-    "/ngen-test/coastal/${slurm.user}/"
+    "/ngen-test/coastal/${user}/"
     "${model}_${simulation.coastal_domain}_${boundary.source}_${simulation.meteo_source}/"
     "${model}_${simulation.start_date}"
 )
 
 DEFAULT_RAW_DOWNLOAD_DIR_TEMPLATE = (
-    "/ngen-test/coastal/${slurm.user}/"
+    "/ngen-test/coastal/${user}/"
     "${model}_${simulation.coastal_domain}_${boundary.source}_${simulation.meteo_source}/"
     "raw_data"
 )

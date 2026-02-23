@@ -84,48 +84,9 @@ Or with errors:
   - Simulation dates outside nwm_ana range (2018-09-17 to present)
 ```
 
-### submit
-
-Submit a workflow as a SLURM job. Python-only stages run on the login node; container
-stages are submitted as a SLURM job. The same stage pipeline is used as the `run`
-command.
-
-```bash
-coastal-calibration submit <config> [OPTIONS]
-```
-
-**Arguments:**
-
-| Argument | Description                    |
-| -------- | ------------------------------ |
-| `config` | Path to the configuration file |
-
-**Options:**
-
-| Option                | Description                          | Default |
-| --------------------- | ------------------------------------ | ------- |
-| `--interactive`, `-i` | Wait for job completion with updates | False   |
-| `--start-from`        | Stage to start from (skip earlier)   | First   |
-| `--stop-after`        | Stage to stop after (skip later)     | Last    |
-
-**Examples:**
-
-```bash
-# Submit and return immediately
-coastal-calibration submit config.yaml
-
-# Submit and wait for completion
-coastal-calibration submit config.yaml --interactive
-coastal-calibration submit config.yaml -i
-
-# Submit partial pipeline
-coastal-calibration submit config.yaml --start-from boundary_conditions -i
-coastal-calibration submit config.yaml --stop-after post_forcing
-```
-
 ### run
 
-Run the workflow directly (for testing or inside a SLURM job).
+Run the workflow directly (inside a SLURM job or for local testing).
 
 ```bash
 coastal-calibration run <config> [OPTIONS]
@@ -234,8 +195,8 @@ Key points:
 - **Use the full NFS path**: Compute nodes may not have `coastal-calibration` in their
     `PATH`. Using the full path to the wrapper on the shared filesystem ensures the
     command is always found.
-- **Use `run`, not `submit`**: Inside a SLURM job, `run` executes all stages locally on
-    the allocated nodes. Using `submit` would create a nested SLURM job.
+- **`run` executes all stages sequentially**: All stages execute locally on the
+    allocated nodes.
 - **Use `$SLURM_JOB_ID` in the config filename**: Ensures uniqueness when multiple jobs
     run concurrently.
 - **Use `<<'EOF'`** (single-quoted heredoc): Prevents shell variable expansion inside
@@ -247,8 +208,10 @@ Key points:
 
 Complete examples for both models are available in `docs/examples/`:
 
-- [`schism.sh`](https://github.com/NGWPC/nwm-coastal/blob/main/docs/examples/schism.sh) — SCHISM multi-node MPI
-- [`sfincs.sh`](https://github.com/NGWPC/nwm-coastal/blob/main/docs/examples/sfincs.sh) — SFINCS single-node OpenMP
+- [`schism.sh`](https://github.com/NGWPC/nwm-coastal/blob/main/docs/examples/schism.sh)
+    — SCHISM multi-node MPI
+- [`sfincs.sh`](https://github.com/NGWPC/nwm-coastal/blob/main/docs/examples/sfincs.sh)
+    — SFINCS single-node OpenMP
 
 ### stages
 
@@ -317,8 +280,7 @@ SFINCS workflow stages:
 | 0    | Success                        |
 | 1    | Configuration validation error |
 | 2    | Runtime error                  |
-| 3    | Job submission failed          |
-| 4    | Job execution failed           |
+| 3    | Runtime error (stage failure)  |
 
 ## Environment Variables
 

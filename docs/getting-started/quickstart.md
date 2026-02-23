@@ -29,9 +29,6 @@ This generates a template configuration file with sensible defaults.
 Open `config.yaml` and set your simulation parameters:
 
 ```yaml
-slurm:
-  job_name: my_schism_run
-
 simulation:
   start_date: 2021-06-11
   duration_hours: 24
@@ -49,7 +46,7 @@ boundary:
 
 ### Step 3: Validate the Configuration
 
-Before submitting, validate your configuration:
+Before running, validate your configuration:
 
 ```bash
 coastal-calibration validate config.yaml
@@ -60,11 +57,11 @@ This checks for:
 - Required fields
 - Valid date ranges for data sources
 - File and directory existence
-- SLURM configuration validity
+- Model-specific configuration validity
 
-### Step 4: Submit the Job
+### Step 4: Run the Workflow
 
-#### Option A: Heredoc sbatch Script (Recommended)
+#### Heredoc sbatch Script (Recommended)
 
 The preferred approach on clusters is to write an `sbatch` script with an inline YAML
 configuration using a heredoc. This keeps the SLURM directives and workflow
@@ -110,12 +107,6 @@ Save this as `my_run.sh` and submit with `sbatch my_run.sh`.
     (`/ngen-test/coastal-calibration/coastal-calibration`) ensures the command is always
     found.
 
-!!! tip "run vs submit"
-
-    Use `run` (not `submit`) inside sbatch scripts. The `run` command executes all stages
-    locally on the allocated compute nodes. Using `submit` would create a nested SLURM job,
-    which is not what you want.
-
 !!! tip "Unique config filenames"
 
     The config filename uses `$SLURM_JOB_ID` to avoid collisions when multiple jobs run
@@ -128,47 +119,6 @@ Save this as `my_run.sh` and submit with `sbatch my_run.sh`.
 
 Complete SCHISM and SFINCS sbatch examples are provided in
 [`docs/examples/`](../examples/).
-
-#### Option B: Submit and Return Immediately
-
-```bash
-coastal-calibration submit config.yaml
-```
-
-This will:
-
-1. Run Python-only pre-job stages on the login node (download, observation stations)
-1. Generate a SLURM job script for container stages
-1. Submit the job and return immediately
-
-```console
-INFO  Running download stage on login node...
-INFO  meteo/nwm_ana: 4/4 [OK]
-INFO  hydro/nwm: 16/16 [OK]
-INFO  coastal/stofs: 1/1 [OK]
-INFO  Total: 21/21 (failed: 0)
-INFO  Download stage completed
-INFO  Job 167 submitted.
-INFO  Check job status with: squeue -j 167
-```
-
-#### Option C: Submit and Wait for Completion
-
-Use the `--interactive` flag to monitor the job until it completes:
-
-```bash
-coastal-calibration submit config.yaml --interactive
-```
-
-#### Option D: Submit a Partial Pipeline
-
-Use `--start-from` and `--stop-after` (same options as `run`) to submit only part of the
-workflow:
-
-```bash
-coastal-calibration submit config.yaml --start-from boundary_conditions -i
-coastal-calibration submit config.yaml --stop-after post_forcing
-```
 
 ### Step 5: Check Results
 
@@ -201,9 +151,6 @@ Set the path to a pre-built SFINCS model:
 ```yaml
 model: sfincs
 
-slurm:
-  job_name: my_sfincs_run
-
 simulation:
   start_date: 2025-06-01
   duration_hours: 168
@@ -221,8 +168,9 @@ model_config:
 
 ```bash
 coastal-calibration validate sfincs_config.yaml
-coastal-calibration submit sfincs_config.yaml --interactive
 ```
+
+Then write an sbatch script using `coastal-calibration run sfincs_config.yaml`.
 
 ## Using the Python API
 
@@ -234,14 +182,14 @@ from coastal_calibration import CoastalCalibConfig, CoastalCalibRunner
 # Load configuration
 config = CoastalCalibConfig.from_yaml("config.yaml")
 
-# Create runner and submit
+# Create runner and execute
 runner = CoastalCalibRunner(config)
-result = runner.submit(wait=True)
+result = runner.run()
 
 if result.success:
-    print(f"Job completed in {result.duration_seconds:.1f}s")
+    print(f"Completed in {result.duration_seconds:.1f}s")
 else:
-    print(f"Job failed: {result.errors}")
+    print(f"Failed: {result.errors}")
 ```
 
 ## Next Steps

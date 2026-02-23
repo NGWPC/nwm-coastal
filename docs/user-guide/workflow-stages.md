@@ -4,11 +4,9 @@ The coastal calibration workflow consists of sequential stages, each performing 
 specific task in the simulation pipeline. The stage order depends on the selected model
 (SCHISM or SFINCS).
 
-Both `run` and `submit` execute the same stage pipeline. Each stage is classified as
-either **Python-only** or **container** (requires Singularity/MPI). When using `submit`,
-Python-only stages run on the login node while container stages are submitted as a SLURM
-job. When using `run`, all stages execute locally (e.g., inside an interactive compute
-session).
+The `run` command executes all stages sequentially. Each stage is classified as either
+**Python-only** or **container** (requires Singularity/MPI). All stages execute locally
+on the allocated compute nodes (e.g., inside an `sbatch` script).
 
 ## SCHISM Stage Overview
 
@@ -57,7 +55,7 @@ flowchart TD
 - NWM streamflow data (CHRTOUT files)
 - STOFS or GLOFS water level data (when applicable)
 
-**Runs On:** Login node (before SLURM job submission)
+**Runs On:** Compute node (Python-only, no container needed)
 
 **Outputs:**
 
@@ -147,8 +145,6 @@ at those locations.
 **Enabled by:** `model_config.include_noaa_gages: true` (disabled by default)
 
 **Depends on:** `update_params` (which symlinks `hgrid.gr3` into the work directory).
-When running via `submit`, this stage is promoted to the login node and the dependency
-on `hgrid.gr3` is resolved automatically via a symlink from the parameter directory.
 
 **How it works:**
 
@@ -161,8 +157,8 @@ on `hgrid.gr3` is resolved automatically via a symlink from the parameter direct
     and a companion `station_noaa_ids.txt` that maps each station index to its NOAA
     station ID.
 
-**Runs On:** Login node (in `submit` mode) or compute node (in `run` mode). Requires
-network access for the CO-OPS API call.
+**Runs On:** Compute node (Python-only). Requires network access for the CO-OPS API
+call.
 
 **Outputs:**
 
@@ -257,8 +253,8 @@ every station discovered by the `schism_obs` stage.
     observed water levels.
 1. Saves PNG figures to the `figs/` subdirectory.
 
-**Runs On:** Login node (in `submit` mode, after SLURM job completes) or compute node
-(in `run` mode). Requires network access for the CO-OPS API call.
+**Runs On:** Compute node (Python-only). Requires network access for the CO-OPS API
+call.
 
 **Outputs:**
 
@@ -449,23 +445,19 @@ STOFS water level data.
 
 ## Running Partial Workflows
 
-Both `run` and `submit` support `--start-from` and `--stop-after`.
+The `run` command supports `--start-from` and `--stop-after`.
 
 ### CLI
 
 ```bash
-# SCHISM examples (run)
+# SCHISM examples
 coastal-calibration run config.yaml --stop-after download
 coastal-calibration run config.yaml --start-from pre_forcing --stop-after post_forcing
 coastal-calibration run config.yaml --start-from boundary_conditions
 
-# SCHISM examples (submit)
-coastal-calibration submit config.yaml --start-from boundary_conditions -i
-coastal-calibration submit config.yaml --stop-after post_forcing
-
 # SFINCS examples
 coastal-calibration run config.yaml --stop-after sfincs_write
-coastal-calibration submit config.yaml --start-from sfincs_run -i
+coastal-calibration run config.yaml --start-from sfincs_run
 ```
 
 ### Python API
@@ -476,11 +468,8 @@ from coastal_calibration import CoastalCalibConfig, CoastalCalibRunner
 config = CoastalCalibConfig.from_yaml("config.yaml")
 runner = CoastalCalibRunner(config)
 
-# Run specific stages locally
+# Run specific stages
 result = runner.run(start_from="pre_forcing", stop_after="post_forcing")
-
-# Submit partial pipeline to SLURM
-result = runner.submit(wait=True, start_from="boundary_conditions")
 ```
 
 ## Error Handling

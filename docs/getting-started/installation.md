@@ -3,7 +3,7 @@
 ## Requirements
 
 - Python >= 3.11
-- Access to an HPC cluster with SLURM and Singularity
+- Access to an HPC cluster with Singularity
 - NFS mount point (default: `/ngen-test`)
 - Singularity image with SCHISM and/or SFINCS and dependencies pre-compiled
 
@@ -11,7 +11,7 @@
 
     This package orchestrates SCHISM and SFINCS workflows on HPC clusters where the models
     are **already compiled and available** (typically inside a Singularity container). You
-    do not need to install SCHISM or SFINCS locally to use this package for job submission.
+    do not need to install SCHISM or SFINCS locally to use this package.
 
 ## Install from PyPI
 
@@ -113,7 +113,6 @@ Usage: coastal-calibration [OPTIONS] COMMAND [ARGS]...
 Commands:
   init      Generate a new configuration file.
   validate  Validate a configuration file.
-  submit    Submit workflow as a SLURM job.
   run       Run workflow directly.
   stages    List available workflow stages.
 ```

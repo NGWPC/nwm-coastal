@@ -1,7 +1,7 @@
 # NWM Coastal
 
 A Python package for running SCHISM and SFINCS coastal model calibration workflows on
-HPC clusters with Singularity containers and SLURM job scheduling.
+HPC clusters with Singularity containers.
 
 ## Features
 
@@ -9,15 +9,14 @@ HPC clusters with Singularity containers and SLURM job scheduling.
     polymorphic `ModelConfig` architecture
 - **YAML Configuration**: Simple, human-readable configuration files with variable
     interpolation
-- **SLURM Integration**: Automatic job script generation and submission
 - **Data Download**: Automated download of NWM and STOFS boundary data
 - **Multiple Domains**: Support for Hawaii, Puerto Rico/Virgin Islands, Atlantic/Gulf,
     and Pacific
 - **Boundary Conditions**: TPXO tidal model and STOFS water level support
 - **NOAA Observation Stations**: Automatic discovery of CO-OPS water level stations
     within the model domain, with post-run comparison plots (simulated vs observed)
-- **Workflow Control**: Unified `run` and `submit` pipelines with `--start-from` /
-    `--stop-after` support for partial workflows
+- **Workflow Control**: `run` pipeline with `--start-from` / `--stop-after` support for
+    partial workflows
 - **Configuration Inheritance**: Share common settings across multiple runs
 
 ## Quick Example
