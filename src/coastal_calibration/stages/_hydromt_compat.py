@@ -68,12 +68,12 @@ def patch_serialize_crs() -> None:
     except ImportError:
         return
 
-    _original = _crs_mod._serialize_crs  # type: ignore[reportPrivateUsage]
+    _original = _crs_mod._serialize_crs
 
     if getattr(_original, "_patched", False):
         return
 
-    def _safe_serialize_crs(crs):  # type: ignore[no-untyped-def]
+    def _safe_serialize_crs(crs: Any) -> Any:
         epsg = crs.to_epsg()
         if epsg:
             return epsg
@@ -107,7 +107,7 @@ def patch_boundary_conditions_index_dim() -> None:
     except ImportError:
         return
 
-    _original_validate = SfincsBoundaryBase._validate_and_prepare_gdf  # type: ignore[reportPrivateUsage]
+    _original_validate = SfincsBoundaryBase._validate_and_prepare_gdf
 
     if getattr(_original_validate, "_patched", False):
         return
@@ -211,7 +211,7 @@ def patch_meteo_write_gridded() -> None:
         finally:
             nc.close()
 
-    SfincsMeteo.write_gridded = _write_gridded_lazy
+    SfincsMeteo.write_gridded = _write_gridded_lazy  # type: ignore[assignment]
     SfincsMeteo.write_gridded._patched = True  # type: ignore[attr-defined]
     _log.info("Patched hydromt-sfincs write_gridded to stream time-steps lazily.")
 

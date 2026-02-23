@@ -4,9 +4,13 @@ from __future__ import annotations
 
 import shutil
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from coastal_calibration.stages.base import WorkflowStage
+
+if TYPE_CHECKING:
+    from coastal_calibration.config.schema import CoastalCalibConfig, SchismModelConfig
+    from coastal_calibration.utils.logging import WorkflowMonitor
 
 
 class PreForcingStage(WorkflowStage):
@@ -15,6 +19,10 @@ class PreForcingStage(WorkflowStage):
     name = "pre_forcing"
     description = "Prepare NWM forcing data"
     requires_container = True
+
+    def __init__(self, config: CoastalCalibConfig, monitor: WorkflowMonitor | None = None) -> None:
+        super().__init__(config, monitor)
+        self.model: SchismModelConfig = cast("SchismModelConfig", config.model_config)
 
     def run(self) -> dict[str, Any]:
         """Execute pre-forcing preparation."""
@@ -36,7 +44,7 @@ class PreForcingStage(WorkflowStage):
 
         self.run_singularity_command(
             [str(script_path)],
-            sif_path=self.config.model_config.singularity_image,
+            sif_path=self.model.singularity_image,
             env=env,
         )
 
@@ -53,6 +61,10 @@ class NWMForcingStage(WorkflowStage):
     name = "nwm_forcing"
     description = "Generate NWM atmospheric forcing (MPI)"
     requires_container = True
+
+    def __init__(self, config: CoastalCalibConfig, monitor: WorkflowMonitor | None = None) -> None:
+        super().__init__(config, monitor)
+        self.model: SchismModelConfig = cast("SchismModelConfig", config.model_config)
 
     def run(self) -> dict[str, Any]:
         """Execute NWM forcing generation with MPI."""
@@ -102,10 +114,10 @@ class NWMForcingStage(WorkflowStage):
         self._update_substep("Running workflow_driver.py with MPI")
         self.run_singularity_command(
             [python_path, workflow_script],
-            sif_path=self.config.model_config.singularity_image,
+            sif_path=self.model.singularity_image,
             env=env,
             use_mpi=True,
-            mpi_tasks=self.config.model_config.total_tasks,
+            mpi_tasks=self.model.total_tasks,
         )
 
         self._log(f"NWM forcing generated in {nwm_forcing_output}")
@@ -122,6 +134,10 @@ class PostForcingStage(WorkflowStage):
     description = "Post-process forcing data"
     requires_container = True
 
+    def __init__(self, config: CoastalCalibConfig, monitor: WorkflowMonitor | None = None) -> None:
+        super().__init__(config, monitor)
+        self.model: SchismModelConfig = cast("SchismModelConfig", config.model_config)
+
     def run(self) -> dict[str, Any]:
         """Execute post-forcing cleanup."""
         self._update_substep("Building environment")
@@ -135,7 +151,7 @@ class PostForcingStage(WorkflowStage):
 
         self.run_singularity_command(
             [str(script_path)],
-            sif_path=self.config.model_config.singularity_image,
+            sif_path=self.model.singularity_image,
             env=env,
         )
 

@@ -405,15 +405,14 @@ class COOPSAPIClient:
         import numpy as np
 
         single_input = isinstance(station_ids, str)
-        if single_input:
-            station_ids = [station_ids]
+        ids: list[str] = [station_ids] if isinstance(station_ids, str) else list(station_ids)
 
         datum_base_url = "https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations"
-        urls = [f"{datum_base_url}/{sid}/datums.json" for sid in station_ids]
-        logger.info("Fetching datum information for %d station(s)", len(station_ids))
+        urls = [f"{datum_base_url}/{sid}/datums.json" for sid in ids]
+        logger.info("Fetching datum information for %d station(s)", len(ids))
         responses = self.fetch_data(urls)
         datum_objects = []
-        for station_id, response in zip(station_ids, responses, strict=False):
+        for station_id, response in zip(ids, responses, strict=False):
             if response is None:
                 logger.warning("No datum data returned for station %s", station_id)
                 continue

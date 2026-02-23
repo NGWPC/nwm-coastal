@@ -5,11 +5,10 @@ from __future__ import annotations
 import math
 import re
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
-from coastal_calibration.config.schema import SchismModelConfig
 from coastal_calibration.stages.base import WorkflowStage
 
 if TYPE_CHECKING:
@@ -17,7 +16,7 @@ if TYPE_CHECKING:
 
     from numpy.typing import NDArray
 
-    from coastal_calibration.config.schema import CoastalCalibConfig
+    from coastal_calibration.config.schema import CoastalCalibConfig, SchismModelConfig
     from coastal_calibration.utils.logging import WorkflowMonitor
 
 # Buffer size for reading large hgrid.gr3 files (8 MB).
@@ -230,8 +229,7 @@ class SchismObservationStage(WorkflowStage):
         monitor: WorkflowMonitor | None = None,
     ) -> None:
         super().__init__(config, monitor)
-        assert isinstance(config.model_config, SchismModelConfig)  # noqa: S101
-        self.model: SchismModelConfig = config.model_config
+        self.model: SchismModelConfig = cast("SchismModelConfig", config.model_config)
 
     def run(self) -> dict[str, Any]:
         """Discover stations and write station.in."""
@@ -352,8 +350,7 @@ class PreSCHISMStage(WorkflowStage):
         monitor: WorkflowMonitor | None = None,
     ) -> None:
         super().__init__(config, monitor)
-        assert isinstance(config.model_config, SchismModelConfig)  # noqa: S101
-        self.model: SchismModelConfig = config.model_config
+        self.model: SchismModelConfig = cast("SchismModelConfig", config.model_config)
 
     def run(self) -> dict[str, Any]:
         """Execute SCHISM pre-processing."""
@@ -366,7 +363,7 @@ class PreSCHISMStage(WorkflowStage):
 
         self.run_singularity_command(
             [str(script_path)],
-            sif_path=self.config.model_config.singularity_image,
+            sif_path=self.model.singularity_image,
             env=env,
         )
 
@@ -409,8 +406,7 @@ class SCHISMRunStage(WorkflowStage):
         monitor: WorkflowMonitor | None = None,
     ) -> None:
         super().__init__(config, monitor)
-        assert isinstance(config.model_config, SchismModelConfig)  # noqa: S101
-        self.model: SchismModelConfig = config.model_config
+        self.model: SchismModelConfig = cast("SchismModelConfig", config.model_config)
 
     def run(self) -> dict[str, Any]:
         """Execute SCHISM model run."""
@@ -463,8 +459,7 @@ class PostSCHISMStage(WorkflowStage):
         monitor: WorkflowMonitor | None = None,
     ) -> None:
         super().__init__(config, monitor)
-        assert isinstance(config.model_config, SchismModelConfig)  # noqa: S101
-        self.model: SchismModelConfig = config.model_config
+        self.model: SchismModelConfig = cast("SchismModelConfig", config.model_config)
 
     def run(self) -> dict[str, Any]:
         """Execute SCHISM post-processing."""
@@ -520,8 +515,7 @@ class SchismPlotStage(WorkflowStage):
         monitor: WorkflowMonitor | None = None,
     ) -> None:
         super().__init__(config, monitor)
-        assert isinstance(config.model_config, SchismModelConfig)  # noqa: S101
-        self.model: SchismModelConfig = config.model_config
+        self.model: SchismModelConfig = cast("SchismModelConfig", config.model_config)
 
     def _fetch_observations_msl(
         self,

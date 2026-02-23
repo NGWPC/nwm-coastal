@@ -45,7 +45,7 @@ _console_handler: logging.Handler | None = None
 
 if not logger.handlers:
     _console_handler = RichHandler(
-        console=Console(stderr=True, force_jupyter=False, soft_wrap=True),
+        console=Console(stderr=True, force_jupyter=False, soft_wrap=True, width=300),
         show_time=True,
         show_level=True,
         show_path=False,
@@ -233,7 +233,8 @@ def configure_logger(
         logger.addHandler(_file_handler)
 
         # Flush after each log message for immediate visibility (useful for tail -f)
-        _file_handler.stream.reconfigure(line_buffering=True)  # type: ignore[union-attr]
+        if _file_handler.stream is not None:
+            _file_handler.stream.reconfigure(line_buffering=True)
 
         # Disable console logging if file_only is True
         if file_only and _console_handler is not None:
@@ -381,11 +382,9 @@ class WorkflowMonitor:
 
         # File: full detail
         if _file_handler is None:
-            log_file = self.config.log_file
-            if not log_file and hasattr(self, "_work_dir") and self._work_dir:
-                log_file = str(generate_log_path(self._work_dir))
+            log_file: str | Path | None = self.config.log_file
             if log_file:
-                configure_logger(file=log_file, file_level="DEBUG")
+                configure_logger(file=str(log_file), file_level="DEBUG")
 
         # Mute noisy third-party console output
         silence_third_party_loggers()

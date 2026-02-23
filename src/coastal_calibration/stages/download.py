@@ -14,8 +14,8 @@ class DownloadStage(WorkflowStage):
 
     name = "download"
 
-    @property  # type: ignore[override]
-    def description(self) -> str:  # type: ignore[override]
+    @property
+    def description(self) -> str:
         """Build description from the actual configured data sources."""
         sources = ["NWM"]
         try:
