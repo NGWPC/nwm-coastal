@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from datetime import date, datetime
 from pathlib import Path
 
@@ -18,7 +17,6 @@ from coastal_calibration.config.schema import (
     SchismModelConfig,
     SfincsModelConfig,
     SimulationConfig,
-    SlurmConfig,
     _build_interpolation_context,
     _deep_merge,
     _interpolate_config,
@@ -26,25 +24,6 @@ from coastal_calibration.config.schema import (
 )
 from coastal_calibration.utils.system import get_cpu_count
 from coastal_calibration.utils.time import parse_datetime as _parse_datetime
-
-
-class TestSlurmConfig:
-    def test_defaults(self):
-        cfg = SlurmConfig()
-        assert cfg.job_name == "coastal_calibration"
-        assert cfg.user == os.environ.get("USER")
-
-    def test_custom_values(self):
-        cfg = SlurmConfig(
-            job_name="my_job",
-            partition="gpu",
-            user="alice",
-            time_limit="12:00:00",
-            account="my_account",
-            qos="normal",
-        )
-        assert cfg.time_limit == "12:00:00"
-        assert cfg.user == "alice"
 
 
 class TestSimulationConfig:
@@ -248,13 +227,6 @@ class TestSchismModelConfig:
         assert "binary" in d
         assert d["include_noaa_gages"] is False
 
-    def test_generate_job_script_lines(self, sample_config):
-        cfg = SchismModelConfig()
-        lines = cfg.generate_job_script_lines(sample_config)
-        assert any("-N 2" in line for line in lines)
-        assert any("ntasks-per-node=18" in line for line in lines)
-        assert any("exclusive" in line for line in lines)
-
 
 class TestSfincsModelConfig:
     def test_defaults(self, tmp_path):
@@ -312,13 +284,6 @@ class TestSfincsModelConfig:
         """Explicit omp_num_threads is preserved (e.g., cluster YAML)."""
         cfg = SfincsModelConfig(prebuilt_dir=tmp_path, omp_num_threads=36)
         assert cfg.omp_num_threads == 36
-
-    def test_generate_job_script_lines(self, tmp_path, sample_config):
-        cfg = SfincsModelConfig(prebuilt_dir=tmp_path)
-        lines = cfg.generate_job_script_lines(sample_config)
-        assert any("-N 1" in line for line in lines)
-        assert any("ntasks=1" in line for line in lines)
-        assert any("cpus-per-task" in line for line in lines)
 
     def test_relative_paths_resolved_to_absolute(self):
         """Regression: relative paths must be resolved to prevent doubled paths."""
@@ -403,13 +368,13 @@ class TestParseDatetime:
 
 class TestInterpolation:
     def test_interpolate_value(self):
-        ctx = {"slurm.user": "john", "simulation.coastal_domain": "hawaii"}
-        result = _interpolate_value("/data/${slurm.user}/${simulation.coastal_domain}", ctx)
+        ctx = {"user": "john", "simulation.coastal_domain": "hawaii"}
+        result = _interpolate_value("/data/${user}/${simulation.coastal_domain}", ctx)
         assert result == "/data/john/hawaii"
 
     def test_interpolate_value_unresolved(self):
-        ctx = {"slurm.user": "john"}
-        result = _interpolate_value("/data/${slurm.user}/${missing.key}", ctx)
+        ctx = {"user": "john"}
+        result = _interpolate_value("/data/${user}/${missing.key}", ctx)
         assert result == "/data/john/${missing.key}"
 
     def test_interpolate_non_string(self):
@@ -417,6 +382,16 @@ class TestInterpolation:
         assert _interpolate_value(None, {}) is None
 
     def test_build_interpolation_context(self):
+        data = {
+            "simulation": {"coastal_domain": "hawaii"},
+        }
+        ctx = _build_interpolation_context(data)
+        assert ctx["simulation.coastal_domain"] == "hawaii"
+        # $USER env var is injected automatically
+        assert "user" in ctx
+
+    def test_build_interpolation_context_backward_compat(self):
+        """Legacy slurm.user key in YAML still populates context."""
         data = {
             "slurm": {"user": "john", "partition": "default"},
             "simulation": {"coastal_domain": "hawaii"},
@@ -426,6 +401,15 @@ class TestInterpolation:
         assert ctx["simulation.coastal_domain"] == "hawaii"
 
     def test_interpolate_config(self):
+        data = {
+            "simulation": {"coastal_domain": "hawaii"},
+            "paths": {"work_dir": "/data/${user}/${simulation.coastal_domain}"},
+        }
+        result = _interpolate_config(data)
+        assert result["paths"]["work_dir"].endswith("/hawaii")
+
+    def test_interpolate_config_legacy_slurm_user(self):
+        """Backward compat: ${slurm.user} still works in templates."""
         data = {
             "slurm": {"user": "john"},
             "simulation": {"coastal_domain": "hawaii"},
@@ -437,18 +421,16 @@ class TestInterpolation:
     def test_model_variable_interpolation(self):
         data = {
             "model": "sfincs",
-            "slurm": {"user": "john"},
             "simulation": {"coastal_domain": "hawaii"},
-            "paths": {"work_dir": "/data/${model}/${slurm.user}"},
+            "paths": {"work_dir": "/data/${model}/${user}"},
         }
         result = _interpolate_config(data)
-        assert result["paths"]["work_dir"] == "/data/sfincs/john"
+        assert "/data/sfincs/" in result["paths"]["work_dir"]
 
 
 class TestCoastalCalibConfig:
     def test_from_yaml(self, minimal_config_yaml):
         cfg = CoastalCalibConfig.from_yaml(minimal_config_yaml)
-        assert cfg.slurm.user == "testuser"
         assert cfg.simulation.coastal_domain == "pacific"
         assert cfg.simulation.duration_hours == 3
 
@@ -464,7 +446,7 @@ class TestCoastalCalibConfig:
 
     def test_to_dict(self, sample_config):
         d = sample_config.to_dict()
-        assert "slurm" in d
+        assert "slurm" not in d
         assert "simulation" in d
         assert "boundary" in d
         assert "paths" in d
@@ -481,7 +463,6 @@ class TestCoastalCalibConfig:
         sample_config.to_yaml(yaml_path)
         assert yaml_path.exists()
         loaded = CoastalCalibConfig.from_yaml(yaml_path)
-        assert loaded.slurm.user == sample_config.slurm.user
         assert loaded.simulation.duration_hours == sample_config.simulation.duration_hours
         assert loaded.simulation.coastal_domain == sample_config.simulation.coastal_domain
 
@@ -500,17 +481,12 @@ class TestCoastalCalibConfig:
 
         cfg = CoastalCalibConfig.from_yaml(child_path)
         assert cfg.simulation.duration_hours == 12
-        assert cfg.slurm.user == "testuser"  # inherited
+        assert cfg.simulation.coastal_domain == "pacific"  # inherited
 
     def test_validate_positive_duration(self, sample_config):
         sample_config.simulation.duration_hours = 0
         errors = sample_config.validate()
         assert any("duration_hours" in e for e in errors)
-
-    def test_validate_user_optional(self, sample_config):
-        sample_config.slurm.user = None
-        errors = sample_config.validate()
-        assert not any("user" in e for e in errors)
 
     def test_validate_nodes_positive(self, sample_config):
         """SchismModelConfig validates nodes must be at least 1."""
@@ -543,7 +519,6 @@ class TestCoastalCalibConfig:
         """YAML with model: schism creates SchismModelConfig."""
         config_dict = {
             "model": "schism",
-            "slurm": {"user": "test"},
             "simulation": {
                 "start_date": "2021-06-11",
                 "duration_hours": 3,
@@ -566,7 +541,6 @@ class TestCoastalCalibConfig:
         """YAML with model: sfincs creates SfincsModelConfig."""
         config_dict = {
             "model": "sfincs",
-            "slurm": {"user": "test"},
             "simulation": {
                 "start_date": "2021-06-11",
                 "duration_hours": 3,
@@ -592,7 +566,6 @@ class TestCoastalCalibConfig:
         """forcing_to_mesh_offset_m and vdatum_mesh_to_msl_m round-trip through YAML."""
         config_dict = {
             "model": "sfincs",
-            "slurm": {"user": "test"},
             "simulation": {
                 "start_date": "2021-06-11",
                 "duration_hours": 3,
@@ -637,7 +610,6 @@ class TestCoastalCalibConfig:
 
         config_dict = {
             "model": "sfincs",
-            "slurm": {"user": "test"},
             "simulation": {
                 "start_date": "2021-06-11",
                 "duration_hours": 3,
@@ -680,7 +652,6 @@ class TestCoastalCalibConfig:
         """Unknown model type raises ValueError."""
         config_dict = {
             "model": "unknown_model",
-            "slurm": {"user": "test"},
             "simulation": {
                 "start_date": "2021-06-11",
                 "duration_hours": 3,

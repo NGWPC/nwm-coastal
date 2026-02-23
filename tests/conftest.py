@@ -15,7 +15,6 @@ from coastal_calibration.config.schema import (
     PathConfig,
     SchismModelConfig,
     SimulationConfig,
-    SlurmConfig,
 )
 
 
@@ -33,16 +32,6 @@ def tmp_download_dir(tmp_path):
     dl_dir = tmp_path / "downloads"
     dl_dir.mkdir()
     return dl_dir
-
-
-@pytest.fixture
-def sample_slurm_config():
-    """Create a sample SlurmConfig."""
-    return SlurmConfig(
-        job_name="test_job",
-        partition="test-partition",
-        user="testuser",
-    )
 
 
 @pytest.fixture
@@ -73,14 +62,12 @@ def sample_path_config(tmp_work_dir, tmp_download_dir):
 
 @pytest.fixture
 def sample_config(
-    sample_slurm_config,
     sample_simulation_config,
     sample_boundary_config,
     sample_path_config,
 ):
     """Create a complete sample CoastalCalibConfig."""
     return CoastalCalibConfig(
-        slurm=sample_slurm_config,
         simulation=sample_simulation_config,
         boundary=sample_boundary_config,
         paths=sample_path_config,
@@ -103,7 +90,6 @@ def minimal_config_dict(tmp_work_dir, tmp_download_dir):
     """Return a minimal config dictionary."""
     return {
         "model": "schism",
-        "slurm": {"user": "testuser"},
         "simulation": {
             "start_date": "2021-06-11",
             "duration_hours": 3,

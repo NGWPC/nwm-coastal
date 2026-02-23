@@ -18,7 +18,6 @@ from coastal_calibration.config.schema import (
     PathConfig,
     SchismModelConfig,
     SimulationConfig,
-    SlurmConfig,
 )
 from coastal_calibration.stages.sfincs import (
     CatalogEntry,
@@ -169,7 +168,6 @@ class TestGenerateDataCatalog:
         dl_dir.mkdir()
 
         return CoastalCalibConfig(
-            slurm=SlurmConfig(user="test"),
             simulation=SimulationConfig(
                 start_date=datetime(2021, 6, 11),
                 duration_hours=3,
@@ -244,7 +242,6 @@ class TestGenerateDataCatalog:
         dl_dir.mkdir()
 
         cfg = CoastalCalibConfig(
-            slurm=SlurmConfig(user="test"),
             simulation=SimulationConfig(
                 start_date=datetime(2021, 6, 11),
                 duration_hours=3,
