@@ -2905,7 +2905,7 @@ packages:
   requires_python: '>=3.8'
 - pypi: ./
   name: coastal-calibration
-  version: 0.2.1.dev5+g4c3f2e7bb.d20260223
+  version: 0.2.1.dev10+g2f153f334.d20260223
   sha256: cf4a8472fe09375d2226f471b253a1d6e5406de34196770256789447622c4bbe
   requires_dist:
   - pyyaml>=6
