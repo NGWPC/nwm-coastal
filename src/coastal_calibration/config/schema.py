@@ -24,7 +24,6 @@ DEFAULT_PARM_DIR = Path("/ngen-test/coastal/ngwpc-coastal")
 DEFAULT_NFS_MOUNT = Path("/ngen-test")
 DEFAULT_CONDA_ENV_NAME = "ngen_forcing_coastal"
 DEFAULT_NWM_DIR = Path("/ngen-app/nwm.v3.0.6")
-DEFAULT_SLURM_PARTITION = "c5n-18xlarge"
 # TPXO binary directory inside the Singularity container (not user-configurable)
 DEFAULT_OTPS_DIR = Path("/ngen-app/OTPSnc")
 # Default working directory inside the Singularity container (not user-configurable)
@@ -35,33 +34,17 @@ _DEFAULT_SCHISM_BINARY = "pschism_wcoss2_NO_PARMETIS_TVD-VL.openmpi"
 
 # Default path templates using interpolation syntax.
 # ${model} resolves to "schism" or "sfincs" based on the top-level ``model`` key.
+# ${user} resolves from $USER environment variable.
 DEFAULT_WORK_DIR_TEMPLATE = (
-    "/ngen-test/coastal/${slurm.user}/"
+    "/ngen-test/coastal/${user}/"
     "${model}_${simulation.coastal_domain}_${boundary.source}_${simulation.meteo_source}/"
     "${model}_${simulation.start_date}"
 )
 DEFAULT_RAW_DOWNLOAD_DIR_TEMPLATE = (
-    "/ngen-test/coastal/${slurm.user}/"
+    "/ngen-test/coastal/${user}/"
     "${model}_${simulation.coastal_domain}_${boundary.source}_${simulation.meteo_source}/"
     "raw_data"
 )
-
-
-@dataclass
-class SlurmConfig:
-    """SLURM job scheduling configuration.
-
-    Contains only parameters related to job scheduling (partition, account,
-    time limits).  Compute resources (nodes, tasks) are model-specific and
-    live on the concrete :class:`ModelConfig` subclasses.
-    """
-
-    job_name: str = "coastal_calibration"
-    partition: str = DEFAULT_SLURM_PARTITION
-    time_limit: str | None = None
-    account: str | None = None
-    qos: str | None = None
-    user: str | None = field(default_factory=lambda: os.environ.get("USER"))
 
 
 @dataclass
@@ -284,10 +267,6 @@ class ModelConfig(ABC):
         """Construct and return the ``{name: stage}`` dictionary."""
 
     @abstractmethod
-    def generate_job_script_lines(self, config: CoastalCalibConfig) -> list[str]:
-        """Return ``#SBATCH`` directives specific to this model's compute needs."""
-
-    @abstractmethod
     def to_dict(self) -> dict[str, Any]:
         """Serialize model-specific fields to a dictionary."""
 
@@ -296,8 +275,7 @@ class ModelConfig(ABC):
 class SchismModelConfig(ModelConfig):
     """SCHISM model configuration.
 
-    Contains compute parameters (MPI layout, SCHISM binary) that were
-    previously split across ``MPIConfig`` and ``SlurmConfig``.
+    Contains compute parameters (MPI layout, SCHISM binary).
 
     Parameters
     ----------
@@ -468,17 +446,6 @@ class SchismModelConfig(ModelConfig):
             "post_schism": PostSCHISMStage(config, monitor),
             "schism_plot": SchismPlotStage(config, monitor),
         }
-
-    def generate_job_script_lines(  # noqa: D102
-        self, config: CoastalCalibConfig
-    ) -> list[str]:
-        lines = [
-            f"#SBATCH -N {self.nodes}",
-            f"#SBATCH --ntasks-per-node={self.ntasks_per_node}",
-        ]
-        if self.exclusive:
-            lines.append("#SBATCH --exclusive")
-        return lines
 
     def to_dict(self) -> dict[str, Any]:  # noqa: D102
         return {
@@ -729,16 +696,6 @@ class SfincsModelConfig(ModelConfig):
             "sfincs_plot": SfincsPlotStage(config, monitor),
         }
 
-    def generate_job_script_lines(  # noqa: D102
-        self, config: CoastalCalibConfig
-    ) -> list[str]:
-        return [
-            "#SBATCH -N 1",
-            "#SBATCH --ntasks=1",
-            f"#SBATCH --cpus-per-task={self.omp_num_threads}",
-            "#SBATCH --exclusive",
-        ]
-
     def to_dict(self) -> dict[str, Any]:  # noqa: D102
         return {
             "prebuilt_dir": str(self.prebuilt_dir),
@@ -795,7 +752,7 @@ def _interpolate_value(value: Any, context: dict[str, Any]) -> Any:
     value : Any
         The value to interpolate. If not a string, returns unchanged.
     context : dict
-        Flat dictionary of available variables (e.g., {"slurm.user": "john"}).
+        Flat dictionary of available variables (e.g., {"user": "john"}).
 
     Returns
     -------
@@ -804,8 +761,8 @@ def _interpolate_value(value: Any, context: dict[str, Any]) -> Any:
 
     Examples
     --------
-    >>> ctx = {"slurm.user": "john", "simulation.coastal_domain": "hawaii"}
-    >>> _interpolate_value("/data/${slurm.user}/${simulation.coastal_domain}", ctx)
+    >>> ctx = {"user": "john", "simulation.coastal_domain": "hawaii"}
+    >>> _interpolate_value("/data/${user}/${simulation.coastal_domain}", ctx)
     '/data/john/hawaii'
     """
     if not isinstance(value, str):
@@ -835,7 +792,7 @@ def _build_interpolation_context(data: dict[str, Any]) -> dict[str, Any]:
     Returns
     -------
     dict
-        Flat dictionary with keys like "slurm.user", "simulation.coastal_domain".
+        Flat dictionary with keys like "user", "simulation.coastal_domain".
     """
     context: dict[str, Any] = {}
     for section, values in data.items():
@@ -846,10 +803,12 @@ def _build_interpolation_context(data: dict[str, Any]) -> dict[str, Any]:
     # Top-level scalar keys (e.g., "model") are available without a section prefix.
     if "model" in data:
         context["model"] = data["model"]
-    # Fall back to $USER env var when slurm.user is not provided, so that
-    # default path templates (which reference ${slurm.user}) resolve correctly.
+    # Resolve ${user} from $USER env var for default path templates.
+    if "user" not in context:
+        context["user"] = os.environ.get("USER", "unknown")
+    # Backward compat: old templates may still reference ${slurm.user}.
     if "slurm.user" not in context:
-        context["slurm.user"] = os.environ.get("USER", "unknown")
+        context["slurm.user"] = context["user"]
     return context
 
 
@@ -910,10 +869,8 @@ def _migrate_model_config_data(
 
     Handles two legacy patterns:
 
-    1. **SCHISM** — fields were split across top-level ``mpi`` and ``slurm``
-       sections.  We pull compute fields (``nodes``, ``ntasks_per_node``,
-       ``exclusive``) from ``slurm`` and all fields from ``mpi`` into the
-       model config dict.
+    1. **SCHISM** — fields lived in a top-level ``mpi`` section.
+       We pull all fields from ``mpi`` into the model config dict.
     2. **SFINCS** — the model config lived under a top-level ``sfincs`` key
        and used different field names.
 
@@ -931,12 +888,6 @@ def _migrate_model_config_data(
                     model_config_data[new_key] = mpi_data.pop(old_key)
             # Remaining mpi fields map directly (nscribes, omp_num_threads, etc.)
             model_config_data.update(mpi_data)
-
-        # Migrate compute fields from old slurm section
-        slurm_data = data.get("slurm", {})
-        for compute_key in ("nodes", "ntasks_per_node", "exclusive"):
-            if compute_key in slurm_data:
-                model_config_data.setdefault(compute_key, slurm_data.pop(compute_key))
 
     elif model_type == "sfincs":
         # Migrate old top-level sfincs section
@@ -969,7 +920,6 @@ class CoastalCalibConfig:
     :data:`MODEL_REGISTRY`.
     """
 
-    slurm: SlurmConfig
     simulation: SimulationConfig
     boundary: BoundaryConfig
     paths: PathConfig
@@ -995,8 +945,8 @@ class CoastalCalibConfig:
         # Migrate legacy keys into model_config
         model_config_data = _migrate_model_config_data(model_type, data)
 
-        slurm_data = data.get("slurm", {})
-        slurm = SlurmConfig(**slurm_data)
+        # Silently ignore legacy 'slurm' section for backward compat.
+        data.pop("slurm", None)
 
         sim_data = data.get("simulation", {})
         if "start_date" in sim_data:
@@ -1035,7 +985,6 @@ class CoastalCalibConfig:
         model_config = model_cls(**model_config_data)
 
         return cls(
-            slurm=slurm,
             simulation=simulation,
             boundary=boundary,
             paths=paths,
@@ -1052,7 +1001,7 @@ class CoastalCalibConfig:
         Supports variable interpolation using ${section.key} syntax.
         Variables are resolved from other config values, e.g.:
 
-        - ``${slurm.user}`` -> value of ``slurm.user``
+        - ``${user}`` -> value of ``$USER`` environment variable
         - ``${simulation.coastal_domain}`` -> value of ``simulation.coastal_domain``
         - ``${model}`` -> the model type string (``"schism"`` or ``"sfincs"``)
 
@@ -1113,14 +1062,6 @@ class CoastalCalibConfig:
         """Convert config to dictionary."""
         return {
             "model": self.model,
-            "slurm": {
-                "job_name": self.slurm.job_name,
-                "partition": self.slurm.partition,
-                "time_limit": self.slurm.time_limit,
-                "account": self.slurm.account,
-                "qos": self.slurm.qos,
-                "user": self.slurm.user,
-            },
             "simulation": {
                 "start_date": self.simulation.start_date.isoformat(),
                 "duration_hours": self.simulation.duration_hours,

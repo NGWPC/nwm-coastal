@@ -15,7 +15,6 @@ from coastal_calibration.config.schema import (
     SchismModelConfig,
     SfincsModelConfig,
     SimulationConfig,
-    SlurmConfig,
 )
 
 __all__ = [
@@ -31,5 +30,4 @@ __all__ = [
     "SchismModelConfig",
     "SfincsModelConfig",
     "SimulationConfig",
-    "SlurmConfig",
 ]

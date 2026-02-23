@@ -88,79 +88,6 @@ def run(
 
 @cli.command()
 @click.argument("config", type=click.Path(exists=True, path_type=Path))
-@click.option(
-    "-i",
-    "--interactive",
-    is_flag=True,
-    help="Wait for job completion and show status updates.",
-)
-@click.option(
-    "--start-from",
-    type=str,
-    help="Stage to start from (skip earlier stages).",
-)
-@click.option(
-    "--stop-after",
-    type=str,
-    help="Stage to stop after (skip later stages).",
-)
-def submit(
-    config: Path,
-    interactive: bool,
-    start_from: str | None,
-    stop_after: str | None,
-) -> None:
-    """Submit workflow as a SLURM job.
-
-    CONFIG is the path to a YAML configuration file.
-
-    By default, submits the job and returns immediately after submission.
-    Use --interactive to wait and monitor the job until completion.
-    Python-only stages run on the login node; container stages are
-    submitted as a SLURM job.
-    """
-    config_path = config.resolve()
-
-    try:
-        cfg = CoastalCalibConfig.from_yaml(config_path)
-        cfg.paths.work_dir.mkdir(parents=True, exist_ok=True)
-
-        runner = CoastalCalibRunner(cfg)
-        configure_logger(level="INFO")
-        result = runner.submit(
-            wait=interactive,
-            log_file=None,
-            start_from=start_from,
-            stop_after=stop_after,
-        )
-
-        if result.success:
-            if interactive:
-                logger.info(f"Job {result.job_id} completed successfully.")
-            else:
-                # Job submitted, show where to find SLURM output
-                slurm_log_path = cfg.paths.work_dir / f"slurm-{result.job_id}.out"
-                logger.info(f"Job {result.job_id} submitted.")
-                logger.info(
-                    f"Once the job starts running, SLURM logs will be written to: {slurm_log_path}"
-                )
-                logger.info(f"Check job status with: squeue -j {result.job_id}")
-        else:
-            for error in result.errors:
-                logger.error(f"  - {error}")
-            if result.job_id:
-                slurm_err_path = cfg.paths.work_dir / f"slurm-{result.job_id}.err"
-                logger.error(f"Check SLURM error log for details: {slurm_err_path}")
-            _raise_cli_error("Job failed (see above).")
-
-    except CLIError:
-        raise
-    except Exception as e:
-        _raise_cli_error(str(e))
-
-
-@cli.command()
-@click.argument("config", type=click.Path(exists=True, path_type=Path))
 def validate(config: Path) -> None:
     """Validate a configuration file.
 
@@ -228,30 +155,23 @@ def init(output: Path, domain: CoastalDomain, force: bool, model: ModelType) -> 
     ):
         raise click.Abort()
 
-    import os
-
     meteo_source, boundary_source, start_date = get_default_sources(domain)
     start_date_str = start_date.strftime("%Y-%m-%d")
-    username = os.environ.get("USER", "YOUR_USERNAME")
 
     if model == "sfincs":
         config_content = f"""\
 # Minimal SFINCS configuration for {domain} domain
 #
-# Paths are auto-generated based on user, domain, and source:
-#   work_dir: /ngen-test/coastal/${{slurm.user}}/sfincs_${{simulation.coastal_domain}}_${{boundary.source}}_${{simulation.meteo_source}}/sfincs_${{simulation.start_date}}
-#   raw_download_dir: /ngen-test/coastal/${{slurm.user}}/sfincs_${{simulation.coastal_domain}}_${{boundary.source}}_${{simulation.meteo_source}}/raw_data
+# Paths are auto-generated based on $USER, domain, and source:
+#   work_dir: /ngen-test/coastal/${{user}}/sfincs_${{simulation.coastal_domain}}_${{boundary.source}}_${{simulation.meteo_source}}/sfincs_${{simulation.start_date}}
+#   raw_download_dir: /ngen-test/coastal/${{user}}/sfincs_${{simulation.coastal_domain}}_${{boundary.source}}_${{simulation.meteo_source}}/raw_data
 #
 # Usage:
 #   coastal-calibration validate {output_path.name}
-#   coastal-calibration submit {output_path.name}
-#   coastal-calibration submit {output_path.name} -i  # wait for completion
+#   coastal-calibration run {output_path.name}
+#   coastal-calibration run {output_path.name} --dry-run
 
 model: sfincs
-
-slurm:
-  job_name: coastal_calibration
-  user: {username}
 
 simulation:
   start_date: {start_date_str}
@@ -269,20 +189,16 @@ model_config:
         config_content = f"""\
 # Minimal SCHISM configuration for {domain} domain
 #
-# Paths are auto-generated based on user, domain, and source:
-#   work_dir: /ngen-test/coastal/${{slurm.user}}/schism_${{simulation.coastal_domain}}_${{boundary.source}}_${{simulation.meteo_source}}/schism_${{simulation.start_date}}
-#   raw_download_dir: /ngen-test/coastal/${{slurm.user}}/schism_${{simulation.coastal_domain}}_${{boundary.source}}_${{simulation.meteo_source}}/raw_data
+# Paths are auto-generated based on $USER, domain, and source:
+#   work_dir: /ngen-test/coastal/${{user}}/schism_${{simulation.coastal_domain}}_${{boundary.source}}_${{simulation.meteo_source}}/schism_${{simulation.start_date}}
+#   raw_download_dir: /ngen-test/coastal/${{user}}/schism_${{simulation.coastal_domain}}_${{boundary.source}}_${{simulation.meteo_source}}/raw_data
 #
 # Usage:
 #   coastal-calibration validate {output_path.name}
-#   coastal-calibration submit {output_path.name}
-#   coastal-calibration submit {output_path.name} -i  # wait for completion
+#   coastal-calibration run {output_path.name}
+#   coastal-calibration run {output_path.name} --dry-run
 
 model: schism
-
-slurm:
-  job_name: coastal_calibration
-  user: {username}
 
 simulation:
   start_date: {start_date_str}
