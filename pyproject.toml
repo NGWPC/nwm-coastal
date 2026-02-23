@@ -51,7 +51,7 @@ dev = [
 docs = [
   "mike>=2",
   "mkdocs>=1.6",
-  "mkdocs-material>=9.5",
+  "mkdocs-materialx",
   "mkdocstrings[python]>=0.27",
   "ruff",
 ]
@@ -84,7 +84,7 @@ test = [
   "pytest-sugar",
 ]
 typecheck = [
-  "pyright",
+  "ty",
   "types-pyyaml",
 ]
 [project.scripts]
@@ -299,6 +299,18 @@ reportAttributeAccessIssue = false
 reportInvalidTypeForm = false
 typeCheckingMode = "strict"
 
+[tool.ty.environment]
+python-version = "3.11"
+[tool.ty.rules]
+all = "error"
+[tool.ty.src]
+include = [ "src/coastal_calibration" ]
+exclude = [
+  "**/__pycache__",
+  "**/__init__.py",
+  "src/coastal_calibration/scripts/**",
+]
+
 [tool.pixi.environments]
 test311 = { features = [ "test", "plot", "py311" ] }
 test314 = { features = [ "test", "plot", "py314" ] }
@@ -353,7 +365,7 @@ test = { cmd = [
 report = { cmd = [ "coverage", "report" ], depends-on = [ "test" ] }
 html = { cmd = [ "coverage", "html" ], depends-on = [ "report" ] }
 [tool.pixi.feature.typecheck.tasks]
-typecheck = "pyright"
+typecheck = "ty check"
 [tool.pixi.pypi-dependencies]
 coastal_calibration = { path = ".", editable = true }
 [tool.pixi.workspace]

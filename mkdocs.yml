@@ -10,7 +10,7 @@ edit_uri: edit/main/docs/
 copyright: Copyright &copy; 2025 Raytheon Company. BSD-2-Clause License.
 
 theme:
-  name: material
+  name: materialx
   custom_dir: docs/overrides
   palette:
   - media: (prefers-color-scheme)
