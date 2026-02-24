@@ -45,14 +45,14 @@ _console_handler: logging.Handler | None = None
 
 if not logger.handlers:
     _console_handler = RichHandler(
-        console=Console(stderr=True, force_jupyter=False, soft_wrap=True, width=300),
-        show_time=True,
-        show_level=True,
+        console=Console(stderr=True, force_jupyter=False, soft_wrap=True),
+        show_time=False,
+        show_level=False,
         show_path=False,
         rich_tracebacks=True,
         tracebacks_show_locals=True,
-        log_time_format="[%Y/%m/%d %H:%M:%S]",
-        omit_repeated_times=False,
+        # log_time_format="[%Y/%m/%d %H:%M:%S]",
+        # omit_repeated_times=False,
     )
     _console_handler.setFormatter(logging.Formatter("%(message)s"))
 
@@ -397,6 +397,8 @@ class WorkflowMonitor:
         self.workflow_start: datetime | None = None
         self.workflow_end: datetime | None = None
         self.logger = self._setup_logger()
+        self.double_divider = "=" * 40
+        self.single_divider = "-" * 40
 
     def register_stages(self, stage_names: list[str]) -> None:
         """Register workflow stages for tracking."""
@@ -406,15 +408,16 @@ class WorkflowMonitor:
     def start_workflow(self) -> None:
         """Mark workflow as started."""
         self.workflow_start = datetime.now()
-        self.logger.info("=" * 60)
-        self.logger.info("Coastal Calibration Workflow Started")
-        self.logger.info("=" * 60)
+        self.logger.info(self.double_divider)
+        self.logger.info("Coastal Calibration Workflow")
+        self.logger.info(f"Start Time: {self.workflow_start.strftime('%Y-%m-%d %H:%M:%S')}")
+        self.logger.info(self.double_divider)
 
     def _log_timing_summary(self) -> None:
         """Log timing summary for all stages."""
         self.logger.info("")
         self.logger.info("Timing Summary:")
-        self.logger.info("-" * 40)
+        self.logger.info(self.single_divider)
         for name, stage in self.stages.items():
             status_sym = {
                 StageStatus.COMPLETED: "\u2713",
@@ -432,9 +435,9 @@ class WorkflowMonitor:
         duration = self.workflow_end - self.workflow_start if self.workflow_start else None
         duration_str = str(duration).split(".")[0] if duration else "-"
 
-        self.logger.info("=" * 60)
+        self.logger.info(self.double_divider)
         self.logger.info(f"Workflow {status} | Total Duration: {duration_str}")
-        self.logger.info("=" * 60)
+        self.logger.info(self.double_divider)
 
         if self.config.enable_timing:
             self._log_timing_summary()
@@ -450,6 +453,7 @@ class WorkflowMonitor:
         stage.message = message
 
         self.logger.info(f"Stage: {name}")
+        self.logger.info(f"Start Time: {stage.start_time.strftime('%Y-%m-%d %H:%M:%S')}")
         if message:
             self.logger.info(f"  {message}")
 
