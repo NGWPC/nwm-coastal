@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import zipfile
 from datetime import datetime
+from pathlib import Path
 
 import pytest
 import yaml
@@ -16,6 +18,26 @@ from coastal_calibration.config.schema import (
     SchismModelConfig,
     SimulationConfig,
 )
+
+# Path to the pre-built SFINCS model archive
+_TEXAS_ZIP = Path(__file__).resolve().parent.parent / "docs" / "examples" / "texas.zip"
+
+
+@pytest.fixture
+def sfincs_model_dir(tmp_path):
+    """Extract the pre-built Texas SFINCS model into a temp directory.
+
+    The archive extracts to ``texas/`` which contains:
+    ``sfincs.nc``, ``sfincs.bnd``, ``sfincs.obs``, ``sfincs.inp``,
+    ``sfincs_nwm.src``, ``sfincs_ngen.src``.
+
+    Returns the ``tmp_path / "texas"`` directory.
+    """
+    if not _TEXAS_ZIP.exists():
+        pytest.skip(f"Pre-built model not found: {_TEXAS_ZIP}")
+    with zipfile.ZipFile(_TEXAS_ZIP, "r") as zf:
+        zf.extractall(tmp_path)
+    return tmp_path / "texas"
 
 
 @pytest.fixture

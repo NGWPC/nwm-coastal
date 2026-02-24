@@ -251,6 +251,9 @@ filterwarnings = [
   "ignore:.*Ensure you extract a single element.*",
   "ignore:.*Deprecated in Pydantic V2.0.*",
 ]
+markers = [
+  "sfincs: SFINCS workflow integration tests (require HydroMT-SFINCS + plot deps)",
+]
 testpaths = [
   "tests",
 ]
@@ -312,8 +315,8 @@ exclude = [
 ]
 
 [tool.pixi.environments]
-test311 = { features = [ "test", "plot", "py311" ] }
-test314 = { features = [ "test", "plot", "py314" ] }
+test311 = { features = [ "test", "sfincs", "plot", "py311" ] }
+test314 = { features = [ "test", "sfincs", "plot", "py314" ] }
 dev = { features = [ "dev", "sfincs", "plot", "test", "py314" ] }
 schism = { features = [ "schism", "py314" ] }
 sfincs = { features = [ "sfincs", "plot", "py314" ] }
