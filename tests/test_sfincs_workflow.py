@@ -13,11 +13,9 @@ Run with::
 
 from __future__ import annotations
 
-import shutil
 import textwrap
 from datetime import datetime
 from pathlib import Path
-from typing import Any
 from unittest.mock import MagicMock, patch
 
 import geopandas as gpd
@@ -185,11 +183,13 @@ def dummy_sfincs_exe(tmp_path: Path) -> Path:
     exe = tmp_path / "sfincs_dummy"
     # The script writes a minimal sfincs_his.nc in the current directory
     # so the plot stage can find model output.
-    exe.write_text(textwrap.dedent("""\
+    exe.write_text(
+        textwrap.dedent("""\
         #!/usr/bin/env bash
         echo "SFINCS mock run"
         exit 0
-    """))
+    """)
+    )
     exe.chmod(0o755)
     return exe
 
@@ -280,12 +280,12 @@ def _mock_coops_client() -> MagicMock:
     # Mock datum objects for the plot stage
     datum_8772985 = MagicMock()
     datum_8772985.station_id = "8772985"
-    datum_8772985.get_datum_value.side_effect = lambda name: {"MSL": 0.404, "MLLW": 0.0}.get(name)
+    datum_8772985.get_datum_value.side_effect = {"MSL": 0.404, "MLLW": 0.0}.get
     datum_8772985.units = "meters"
 
     datum_8773037 = MagicMock()
     datum_8773037.station_id = "8773037"
-    datum_8773037.get_datum_value.side_effect = lambda name: {"MSL": 0.213, "MLLW": 0.0}.get(name)
+    datum_8773037.get_datum_value.side_effect = {"MSL": 0.213, "MLLW": 0.0}.get
     datum_8773037.units = "meters"
 
     mock_client.get_datums.return_value = [datum_8772985, datum_8773037]
@@ -651,14 +651,12 @@ class TestSfincsPlotStage:
         # Count observation points from sfincs.obs
         model_root = get_model_root(sfincs_workflow_config)
         obs_file = model_root / "sfincs.obs"
-        n_stations = sum(
-            1 for ln in obs_file.read_text().splitlines() if ln.strip()
-        )
+        n_stations = sum(1 for ln in obs_file.read_text().splitlines() if ln.strip())
 
         times = pd.date_range("2025-06-01", periods=6, freq="10min")
-        point_zs = np.random.default_rng(42).normal(
-            0.2, 0.05, (len(times), n_stations)
-        ).astype(np.float32)
+        point_zs = (
+            np.random.default_rng(42).normal(0.2, 0.05, (len(times), n_stations)).astype(np.float32)
+        )
 
         his_ds = xr.Dataset(
             {
@@ -693,9 +691,7 @@ class TestSfincsPlotStage:
         for sid in matched_ids:
             d = MagicMock()
             d.station_id = sid
-            d.get_datum_value.side_effect = (
-                lambda name, _s=sid: {"MSL": 0.3, "MLLW": 0.0}.get(name)
-            )
+            d.get_datum_value.side_effect = lambda name, _s=sid: {"MSL": 0.3, "MLLW": 0.0}.get(name)
             d.units = "meters"
             datums.append(d)
         mock_client.get_datums.return_value = datums

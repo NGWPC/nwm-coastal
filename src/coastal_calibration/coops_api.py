@@ -894,7 +894,7 @@ def query_coops_bygeometry(
     import shapely
 
     client = COOPSAPIClient()
-    if not all(shapely.is_valid(np.atleast_1d(geometry))):  # pyright: ignore[reportCallIssue,reportArgumentType]
+    if not all(shapely.is_valid(np.atleast_1d(geometry))):
         raise ValueError("Invalid geometry provided.")
 
     stations_gdf = client.stations_metadata

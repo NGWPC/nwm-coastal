@@ -540,6 +540,9 @@ class WorkflowMonitor:
     @contextmanager
     def stage_context(self, name: str, message: str = "") -> Iterator[StageProgress]:
         """Context manager for stage execution with automatic status updates."""
+        # Re-silence third-party loggers in case libraries (e.g. hydromt)
+        # re-added console handlers during import or initialisation.
+        silence_third_party_loggers()
         self.start_stage(name, message)
         stage = self.stages[name]
         try:

@@ -75,8 +75,11 @@ schism = [
   "xarray",
 ]
 sfincs = [
+  "dotenv",
   "hydromt>=1.3",
+  "icechunk>=1.0.2",
   # "hydromt-sfincs>=2.0.0rc1",
+  "rioxarray>=0.17",
 ]
 test = [
   "coverage[toml]",
@@ -230,7 +233,7 @@ pydocstyle.convention = "numpy"
 
 [tool.codespell]
 skip = "__pycache__,_build,.git,./htmlcov,pixi.lock"
-ignore-words-list = "gages,parm,oce,gage"
+ignore-words-list = "gages,parm,oce,gage,nd"
 
 [tool.pyproject-fmt]
 table_format = "long"
@@ -323,6 +326,8 @@ sfincs = { features = [ "sfincs", "plot", "py314" ] }
 typecheck = { features = [ "typecheck", "sfincs", "plot", "py314" ] }
 lint = { features = [ "lint", "py314" ], no-default-feature = true }
 docs = { features = [ "docs", "py314" ] }
+[tool.pixi.feature.dev.dependencies]
+s3fs = ">=2026.2.0,<2027"
 [tool.pixi.feature.docs.tasks]
 docs-build = "mkdocs build"
 docs-serve = "mike serve"
