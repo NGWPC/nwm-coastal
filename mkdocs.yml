@@ -1,0 +1,162 @@
+site_name: NWM Coastal
+site_description: Coastal model (SCHISM, SFINCS) workflow on HPC clusters
+site_author: Taher Chegini
+site_url: https://NGWPC.github.io/nwm-coastal
+
+repo_name: NGWPC/nwm-coastal
+repo_url: https://github.com/NGWPC/nwm-coastal
+edit_uri: edit/main/docs/
+
+copyright: Copyright &copy; 2025 Raytheon Company. BSD-2-Clause License.
+
+theme:
+  name: material
+  custom_dir: docs/overrides
+  palette:
+  - media: (prefers-color-scheme)
+    toggle:
+      icon: material/brightness-auto
+      name: Switch to light mode
+  - media: '(prefers-color-scheme: light)'
+    scheme: default
+    primary: prefix-light
+    accent: prefix-light
+    toggle:
+      icon: material/brightness-7
+      name: Switch to dark mode
+  - media: '(prefers-color-scheme: dark)'
+    scheme: slate
+    primary: prefix
+    accent: prefix
+    toggle:
+      icon: material/brightness-4
+      name: Switch to system preference
+  icon:
+    edit: material/pencil
+    view: material/eye
+    repo: fontawesome/brands/github
+  font:
+    text: Roboto
+    code: Roboto Mono
+  features:
+  - content.action.edit
+  - content.code.annotate
+  - content.code.copy
+  - content.tabs.link
+  - navigation.collapse
+  - navigation.expand
+  - navigation.footer
+  - navigation.indexes
+  - navigation.instant
+  - navigation.instant.progress
+  - navigation.path
+  - navigation.sections
+  - navigation.tabs
+  - navigation.tabs.sticky
+  - navigation.top
+  - navigation.tracking
+  - search.highlight
+  - search.share
+  - search.suggest
+  - toc.follow
+  - toc.integrate
+
+hooks:
+- docs/hooks.py
+
+plugins:
+- search
+- mike:
+    alias_type: symlink
+    canonical_version: latest
+- mkdocstrings:
+    default_handler: python
+    handlers:
+      python:
+        paths:
+        - src
+        options:
+          docstring_style: numpy
+          docstring_section_style: spacy
+          show_source: true
+          show_root_heading: true
+          show_root_full_path: false
+          show_symbol_type_heading: true
+          show_symbol_type_toc: true
+          members_order: source
+          merge_init_into_class: true
+          separate_signature: true
+          signature_crossrefs: true
+
+markdown_extensions:
+- abbr
+- admonition
+- attr_list
+- def_list
+- footnotes
+- md_in_html
+- tables
+- toc:
+    toc_depth: 3
+    permalink: '#'
+- pymdownx.arithmatex:
+    generic: true
+- pymdownx.betterem:
+    smart_enable: all
+- pymdownx.caret
+- pymdownx.critic
+- pymdownx.details
+- pymdownx.highlight:
+    anchor_linenums: true
+    line_spans: __span
+    pygments_lang_class: true
+- pymdownx.inlinehilite
+- pymdownx.keys
+- pymdownx.magiclink:
+    normalize_issue_symbols: true
+    repo_url_shorthand: true
+    user: NGWPC
+    repo: nwm-coastal
+- pymdownx.mark
+- pymdownx.smartsymbols
+- pymdownx.snippets
+- pymdownx.superfences:
+    custom_fences:
+    - name: mermaid
+      class: mermaid
+      format: !!python/name:pymdownx.superfences.fence_code_format
+- pymdownx.tabbed:
+    alternate_style: true
+- pymdownx.tasklist:
+    custom_checkbox: true
+- pymdownx.tilde
+
+extra:
+  version:
+    provider: mike
+  social:
+  - icon: fontawesome/brands/github
+    link: https://github.com/NGWPC/nwm-coastal
+
+extra_css:
+- stylesheets/extra.css
+
+extra_javascript:
+- javascripts/mathjax.js
+- https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+
+nav:
+- Home: index.md
+- Getting Started:
+  - Installation: getting-started/installation.md
+  - Quick Start: getting-started/quickstart.md
+- User Guide:
+  - Configuration: user-guide/configuration.md
+  - CLI Reference: user-guide/cli.md
+  - Python API: user-guide/python-api.md
+  - Workflow Stages: user-guide/workflow-stages.md
+- Design: DESIGN.md
+- Reference:
+  - API Reference: reference/api.md
+- Contributing: CONTRIBUTING.md
+- Changelog: CHANGELOG.md

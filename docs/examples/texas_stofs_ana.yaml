@@ -1,0 +1,41 @@
+# Texas coastal SFINCS — full pipeline configuration
+#
+# Pre-built quadtree mesh (~378K cells, 4 refinement levels)
+# EPSG:32614 (UTM zone 14N), domain ~140 x 90 km at 1024 m base resolution
+# 15 water level boundary points, 7 NOAA tide gauges, 48 NWM discharge sources
+#
+# Usage:
+#   coastal-calibration run texas.yaml
+#   coastal-calibration run texas.yaml --stop-after sfincs_write   # skip Singularity run
+#   coastal-calibration run texas.yaml --start-from sfincs_run     # re-run model only
+
+model: sfincs
+
+simulation:
+  start_date: 2025-06-01
+  duration_hours: 168     # 7 days
+  coastal_domain: atlgulf
+  meteo_source: nwm_ana   # nwm_retro ends 2023-01-31
+
+boundary:
+  source: stofs
+
+# paths:
+#   work_dir: ./docs/examples/sfincs_texas/sfincs_stofs_ana
+#   raw_download_dir: ./docs/examples/sfincs_texas/downloads
+
+download:
+  enabled: true
+
+model_config:
+  prebuilt_dir: ./docs/examples/texas
+  discharge_locations_file: ./docs/examples/texas/sfincs_nwm.src
+  merge_observations: false
+  merge_discharge: false
+  include_noaa_gages: true
+  forcing_to_mesh_offset_m: 0.0    # STOFS already in NAVD88
+  vdatum_mesh_to_msl_m: 0.171      # NAVD88 mesh → MSL observations
+  include_precip: true
+  include_wind: true
+  include_pressure: true
+  # sfincs_exe: ~/.local/bin/sfincs
