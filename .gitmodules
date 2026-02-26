@@ -1,0 +1,6 @@
+[submodule "schism"]
+	path = schism
+	url = https://github.com/schism-dev/schism.git
+[submodule "SFINCS"]
+	path = SFINCS
+	url = https://github.com/Deltares/SFINCS.git
