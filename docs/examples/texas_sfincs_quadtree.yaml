@@ -1,0 +1,51 @@
+# Texas coastal SFINCS — full pipeline configuration (created model)
+#
+# Uses the model created from scratch via:
+#   coastal-calibration create docs/examples/create_texas.yaml
+#
+# Quadtree mesh, EPSG:32614 (UTM zone 14N), 1024 m base resolution
+#
+# Usage:
+#   coastal-calibration run docs/examples/texas_full_stofs_ana.yaml
+#   coastal-calibration run docs/examples/texas_full_stofs_ana.yaml --stop-after sfincs_write
+#   coastal-calibration run docs/examples/texas_full_stofs_ana.yaml --start-from sfincs_run
+
+model: sfincs
+
+simulation:
+  start_date: 2025-06-01
+  duration_hours: 10
+  coastal_domain: atlgulf
+  meteo_source: nwm_ana  # nwm_retro ends 2023 and stofs starts from 2021
+
+boundary:
+  source: stofs
+
+paths:
+  work_dir: ./docs/examples/sfincs_texas/sfincs_quadtree
+  raw_download_dir: ./docs/examples/sfincs_texas/downloads
+
+download:
+  enabled: true
+
+model_config:
+  prebuilt_dir: ./docs/examples/texas_quadtree
+  discharge_locations_file: ./docs/examples/texas_quadtree/sfincs_nwm.src
+  merge_observations: true
+  merge_discharge: true
+  include_noaa_gages: true
+  snap_obs_to_wet_cell: true        # relocate obs points on land cells to nearest wet cell
+  forcing_to_mesh_offset_m: 0.0    # STOFS already in NAVD88
+  vdatum_mesh_to_msl_m: 0.30       # NAVD88 mesh -> MSL (0.17 datum + ~0.13 model bias correction)
+  include_precip: true
+  include_wind: true
+  include_pressure: true
+  sfincs_exe: ~/.local/bin/sfincs
+  inp_overrides:
+    tspinup: 10800            # 3 h spin-up (tidal signal must propagate ~8 km through shallow bay)
+    advection: 0              # disable momentum advection (not needed for tidal-scale flows)
+    viscosity: 0              # disable SFINCS built-in viscosity model
+    nuvisc: 0.01              # explicit horizontal viscosity (m²/s)
+    cdnrb: 3                  # number of wind-drag breakpoints
+    cdwnd: [0.0, 28.0, 50.0]  # wind speed breakpoints (m/s)
+    cdval: [0.001, 0.0025, 0.0025]  # drag coefficient at each breakpoint

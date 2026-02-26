@@ -1,0 +1,24 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Texas Gulf Coast AOI",
+        "description": "AOI for SFINCS model covering Texas coast (~140x90 km, EPSG:32614)"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-96.83834, 28.287981],
+            [-95.378479, 28.257058],
+            [-95.349778, 29.08725],
+            [-96.82118, 29.119252],
+            [-96.83834, 28.287981]
+          ]
+        ]
+      }
+    }
+  ]
+}

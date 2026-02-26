@@ -1,0 +1,101 @@
+# Texas Gulf Coast — SFINCS model creation from AOI
+#
+# Recreates the pre-built quadtree mesh from scratch using
+# HydroMT-SFINCS.  The resulting model directory can be used as
+# ``prebuilt_dir`` in the run workflow configuration.
+#
+# Usage:
+#   coastal-calibration create docs/examples/create_texas_quadtree.yaml
+#   coastal-calibration create docs/examples/create_texas_quadtree.yaml --dry-run
+
+aoi: ./texas_aoi.geojson
+output_dir: ./texas_quadtree
+
+grid:
+  resolution: 1024        # base resolution in metres (matching existing mesh)
+  crs: utm                # auto-detect UTM zone (→ EPSG:32614)
+  rotated: false
+  refinement:
+    - polygon: ./texas_aoi.geojson   # refine interior to 128 m (1024 / 2^3)
+      level: 3                       # 3 refinement steps: 1024→512→256→128 m
+      buffer_m: -5120                # shrink ~5 base cells inward for transitions
+
+elevation:
+  datasets:
+    - name: nws_topobathy   # NWS 30 m topo+bathy composite (land + ocean)
+      zmin: -20000
+  buffer_cells: 1
+
+mask:
+  zmin: -50.0             # minimum elevation for active cells (include deep channels/bays)
+  boundary_zmax: -1.0     # max elevation for waterlevel boundary cells (allow shallower inlets)
+  reset_bounds: true
+
+subgrid:
+  nr_subgrid_pixels: 4
+  lulc_dataset: esa_worldcover
+  manning_land: 0.04
+  manning_sea: 0.02
+
+nwm_discharge:
+  hydrofabric_gpkg: /Volumes/data/hydrography/reference_fabric.gpkg
+  flowpaths_layer: flowpaths
+  flowpath_id_column: flowpath_id
+  coastal_domain: atlgulf
+  flowpath_ids:
+    - 1612350
+    - 1612376
+    - 1612394
+    - 1614480
+    - 1614576
+    - 1614584
+    - 1614588
+    - 1614604
+    - 1614622
+    - 1614624
+    - 1614632
+    - 1614648
+    - 1614660
+    - 1614692
+    - 1614710
+    - 3765394
+    - 3765398
+    - 3765414
+    - 3765432
+    - 3765766
+    - 7842817
+    - 7842859
+    - 7846485
+    - 7847373
+    - 7847403
+    - 7847415
+    - 7847427
+    - 9349289
+    - 9349291
+    - 9349323
+    - 9349389
+    - 9349449
+    - 9349989
+    - 9350001
+    - 9355300
+    - 9355310
+    - 9355372
+    - 9355388
+    - 9355398
+    - 9355410
+    - 9355422
+    - 9355446
+    - 9355456
+    - 9355512
+    - 9355524
+    - 9355544
+    - 9355622
+    - 9355778
+
+data_catalog:
+  data_libs:
+    - ./cache/texas_data_catalog.yml
+    - ./cache/nws_topobathy_catalog.yml
+
+monitoring:
+  log_level: INFO
