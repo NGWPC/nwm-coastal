@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from importlib.metadata import PackageNotFoundError, version
 
+from coastal_calibration.config.create_schema import SfincsCreateConfig
 from coastal_calibration.config.schema import (
     BoundaryConfig,
     BoundarySource,
@@ -19,6 +20,7 @@ from coastal_calibration.config.schema import (
     SfincsModelConfig,
     SimulationConfig,
 )
+from coastal_calibration.creator import SfincsCreator
 from coastal_calibration.downloader import (
     DATA_SOURCE_DATE_RANGES,
     CoastalSource,
@@ -86,6 +88,9 @@ __all__ = [
     "MonitoringConfig",
     "PathConfig",
     "SchismModelConfig",
+    # SFINCS creation
+    "SfincsCreateConfig",
+    "SfincsCreator",
     "SfincsModelConfig",
     "SimulationConfig",
     "WorkflowResult",
