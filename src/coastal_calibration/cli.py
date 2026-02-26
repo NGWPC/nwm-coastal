@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import atexit
+import contextlib
+import sys
 from pathlib import Path
 
 import rich_click as click
@@ -9,6 +12,36 @@ import rich_click as click
 from coastal_calibration.config.schema import CoastalCalibConfig, CoastalDomain, ModelType
 from coastal_calibration.runner import CoastalCalibRunner
 from coastal_calibration.utils.logging import configure_logger, logger
+
+
+# --- Suppress "Error in sys.excepthook" cascade at shutdown -----------
+# During interpreter teardown, Rich / hydromt destructors may raise while
+# stderr is already half-closed.  A no-op hook installed via atexit
+# (which runs *before* module globals are set to None) prevents the
+# cascade entirely.  The lambda uses no module globals so it survives
+# teardown even if the cli module's namespace is already cleared.
+def _silence_shutdown_stderr() -> None:
+    """Redirect stderr to ``/dev/null`` at the OS level.
+
+    During interpreter teardown ``sys.__dict__`` is cleared, so any
+    Python-level ``sys.excepthook`` we install is gone by the time
+    destructors run.  CPython's C code writes ``Error in
+    sys.excepthook:`` directly to fd 2 — the only way to suppress it
+    is to redirect the file descriptor itself.
+    """
+    import os as _os
+
+    with contextlib.suppress(Exception):
+        sys.stderr.flush()
+    try:
+        _devnull = _os.open(_os.devnull, _os.O_WRONLY)
+        _os.dup2(_devnull, 2)
+        _os.close(_devnull)
+    except OSError:
+        pass
+
+
+atexit.register(_silence_shutdown_stderr)
 
 
 class CLIError(click.ClickException):
@@ -88,6 +121,85 @@ def run(
 
 @cli.command()
 @click.argument("config", type=click.Path(exists=True, path_type=Path))
+@click.option(
+    "--start-from",
+    type=str,
+    help="Stage to start from (skip earlier stages).",
+)
+@click.option(
+    "--stop-after",
+    type=str,
+    help="Stage to stop after (skip later stages).",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Validate configuration without executing.",
+)
+def create(
+    config: Path,
+    start_from: str | None,
+    stop_after: str | None,
+    dry_run: bool,
+) -> None:
+    """Create a SFINCS model from an AOI polygon.
+
+    CONFIG is the path to a YAML configuration file.
+    """
+    import os
+
+    from coastal_calibration.config.create_schema import SfincsCreateConfig
+    from coastal_calibration.creator import SfincsCreator
+
+    config_path = config.resolve()
+
+    # Redirect stdout to /dev/null for the entire create workflow.
+    # hydromt-sfincs's quadtree builders use raw print() calls that
+    # cannot be silenced through the logging system.  All our own
+    # output goes to stderr via RichHandler so nothing is lost.
+    _devnull = os.open(os.devnull, os.O_WRONLY)
+    _saved_stdout = os.dup(1)
+    os.dup2(_devnull, 1)
+    os.close(_devnull)
+
+    try:
+        cfg = SfincsCreateConfig.from_yaml(config_path)
+        creator = SfincsCreator(cfg)
+        configure_logger(level="INFO")
+
+        if dry_run:
+            logger.info("Dry run mode - validating configuration...")
+
+        result = creator.run(
+            start_from=start_from,
+            stop_after=stop_after,
+            dry_run=dry_run,
+        )
+
+        if result.success:
+            logger.info("Model creation completed successfully.")
+            if not dry_run:
+                logger.info(f"Output directory: {cfg.output_dir}")
+        else:
+            for error in result.errors:
+                logger.error(f"  - {error}")
+            _raise_cli_error("Model creation failed with errors (see above).")
+
+    except CLIError:
+        raise
+    except Exception as e:
+        _raise_cli_error(str(e))
+    finally:
+        # Do NOT restore stdout — leave it redirected to /dev/null.
+        # hydromt-sfincs's quadtree builder fires raw print() calls
+        # during lazy XUGrid construction triggered by SfincsModel
+        # garbage collection after this function returns.  All our
+        # own output goes to stderr (RichHandler), so nothing is lost.
+        os.close(_saved_stdout)
+
+
+@cli.command()
+@click.argument("config", type=click.Path(exists=True, path_type=Path))
 def validate(config: Path) -> None:
     """Validate a configuration file.
 
@@ -111,6 +223,74 @@ def validate(config: Path) -> None:
         raise
     except Exception as e:
         _raise_cli_error(str(e))
+
+
+@cli.command("prepare-topobathy")
+@click.argument("aoi", type=click.Path(exists=True, path_type=Path))
+@click.option(
+    "--domain",
+    type=str,
+    required=True,
+    help="Coastal domain (atlgulf, hi, prvi, pacific, ak).",
+)
+@click.option(
+    "--output-dir",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Output directory for GeoTIFF + catalog (default: same as AOI).",
+)
+@click.option(
+    "--buffer-deg",
+    type=float,
+    default=0.1,
+    help="BBox buffer in degrees (default: 0.1).",
+)
+def prepare_topobathy(
+    aoi: Path,
+    domain: str,
+    output_dir: Path | None,
+    buffer_deg: float,
+) -> None:
+    """Download NWS topobathy DEM clipped to an AOI bounding box.
+
+    Fetches the NWS 30 m topo-bathymetric DEM from icechunk (S3),
+    clips it to the AOI extent, saves a local GeoTIFF, and writes a
+    HydroMT data-catalog YAML so the ``create`` workflow can use it
+    as an elevation source.
+
+    Requires AWS credentials (via environment or ~/.aws) and the
+    ``icechunk`` Python package.
+    """
+    from coastal_calibration.utils.topobathy import fetch_topobathy
+
+    if output_dir is None:
+        output_dir = aoi.resolve().parent
+
+    configure_logger(level="INFO")
+
+    try:
+        tif_path, cat_path = fetch_topobathy(
+            domain=domain,
+            aoi=aoi.resolve(),
+            output_dir=output_dir.resolve(),
+            buffer_deg=buffer_deg,
+        )
+    except Exception as e:
+        _raise_cli_error(str(e))
+        return  # unreachable, but helps type-checkers
+
+    click.echo(f"\nSaved:   {tif_path}")
+    click.echo(f"Catalog: {cat_path}")
+    click.echo(
+        "\nUpdate your create config:\n"
+        "  elevation:\n"
+        "    datasets:\n"
+        "      - name: nws_topobathy\n"
+        "        zmin: -20000\n"
+        "  data_catalog:\n"
+        "    data_libs:\n"
+        f"      - {cat_path}\n"
+    )
 
 
 @cli.command()
@@ -220,9 +400,9 @@ model_config:
 @cli.command()
 @click.option(
     "--model",
-    type=click.Choice(["schism", "sfincs"]),
+    type=click.Choice(["schism", "sfincs", "create"]),
     default=None,
-    help="Show stages for a specific model (default: show all).",
+    help="Show stages for a specific model/workflow (default: show all).",
 )
 def stages(model: str | None) -> None:
     """List available workflow stages."""
@@ -257,6 +437,15 @@ def stages(model: str | None) -> None:
         ("sfincs_plot", "Plot simulated vs observed water levels"),
     ]
 
+    create_stages_list = [
+        ("create_grid", "Create SFINCS grid from AOI polygon"),
+        ("create_elevation", "Add elevation and bathymetry data"),
+        ("create_mask", "Create active cell mask"),
+        ("create_boundary", "Create water level boundary cells"),
+        ("create_subgrid", "Create subgrid tables"),
+        ("create_write", "Write SFINCS model to disk"),
+    ]
+
     def _print_stages(title: str, stage_list: list[tuple[str, str]]) -> None:
         click.echo(f"{title}:")
         for i, (name, desc) in enumerate(stage_list, 1):
@@ -266,10 +455,14 @@ def stages(model: str | None) -> None:
         _print_stages("SCHISM workflow stages", schism_stages)
     elif model == "sfincs":
         _print_stages("SFINCS workflow stages", sfincs_stages)
+    elif model == "create":
+        _print_stages("SFINCS creation stages (create subcommand)", create_stages_list)
     else:
         _print_stages("SCHISM workflow stages", schism_stages)
         click.echo()
         _print_stages("SFINCS workflow stages", sfincs_stages)
+        click.echo()
+        _print_stages("SFINCS creation stages (create subcommand)", create_stages_list)
 
 
 def main() -> None:
