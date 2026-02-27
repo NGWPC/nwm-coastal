@@ -198,7 +198,7 @@ Ready to contribute? Here's how to set up NWM Coastal for local development.
 
     ```console
     git fetch upstream
-    git merge upstream/main
+    git merge upstream/master
     ```
 
 1. Then run linting, type checking, and tests:

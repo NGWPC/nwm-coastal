@@ -49,7 +49,7 @@ libnetcdf = "*"
 ffmpeg = "*"
 
 [pypi-dependencies]
-coastal-calibration = { git = "https://github.com/NGWPC/nwm-coastal.git", tag = "v0.2.0", extras = ["sfincs", "plot"] }
+coastal-calibration = { git = "https://github.com/NGWPC/nwm-coastal.git", tag = "3.1.1.0.0", extras = ["sfincs", "plot"] }
 hydromt-sfincs = { git = "https://github.com/Deltares/hydromt_sfincs", rev = "41aac0a3980fc2714ec28eafb0463d40abfc979a" }
 EOF
 ```
@@ -111,7 +111,7 @@ across nodes, so this single file makes the command available everywhere.
     exist on the node where the admin ran the command. Compute nodes launched by SLURM will
     not have the symlink and jobs will fail with `command not found`.
 
-Alternatively, use the full NFS path directly in sbatch scripts (this always works
+Alternatively, use the full NFS path directly in `sbatch` scripts (this always works
 regardless of PATH setup):
 
 ```bash
