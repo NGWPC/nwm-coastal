@@ -330,7 +330,7 @@ docs = { features = [ "docs", "py314" ] }
 s3fs = ">=2026.2.0,<2027"
 [tool.pixi.feature.docs.tasks]
 docs-build = "mkdocs build"
-docs-serve = "mike serve"
+docs-serve = { cmd = [ "mike", "serve" ], depends-on = [ "docs-build" ] }
 docs-deploy = "mike deploy --push dev"
 [tool.pixi.feature.lint.tasks]
 lint = "pre-commit run --all-files"
