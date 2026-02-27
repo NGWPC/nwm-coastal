@@ -356,6 +356,12 @@ coastal-calibration stages --model sfincs
 coastal-calibration stages --model create
 ```
 
+## Credits and references
+
+1. [NextGen Water Modeling Framework Prototype](https://github.com/NOAA-OWP/ngen)
+1. [schism-dev](https://ccrm.vims.edu/schismweb/) community
+1. [Deltares](https://www.deltares.nl/en/software-and-data/products/sfincs) community
+
 ## License
 
 BSD-2-Clause. See [LICENSE](LICENSE) for details.
