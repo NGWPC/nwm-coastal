@@ -1323,7 +1323,8 @@ class SfincsObservationPointsStage(_SfincsStageBase):
 
         face_nodes_raw = grid_ds["mesh2d_face_nodes"].values
         fn_valid = ~np.isnan(face_nodes_raw)
-        fn_int = np.where(fn_valid, face_nodes_raw.astype(int), 0)
+        fn_int = np.zeros(face_nodes_raw.shape, dtype=int)
+        fn_int[fn_valid] = face_nodes_raw[fn_valid].astype(int)
         nodes_x = grid_ds.coords["mesh2d_node_x"].values
         nodes_y = grid_ds.coords["mesh2d_node_y"].values
         fx = np.nanmean(np.where(fn_valid, nodes_x[fn_int], np.nan), axis=1)
