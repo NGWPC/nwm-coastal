@@ -5,12 +5,12 @@ site_url: https://NGWPC.github.io/nwm-coastal
 
 repo_name: NGWPC/nwm-coastal
 repo_url: https://github.com/NGWPC/nwm-coastal
-edit_uri: edit/main/docs/
+edit_uri: edit/development/docs/
 
 copyright: Copyright &copy; 2025 Raytheon Company. BSD-2-Clause License.
 
 theme:
-  name: material
+  name: materialx
   custom_dir: docs/overrides
   palette:
   - media: (prefers-color-scheme)
@@ -50,7 +50,7 @@ theme:
   - navigation.instant
   - navigation.instant.progress
   - navigation.path
-  - navigation.sections
+  - navigation.indexes
   - navigation.tabs
   - navigation.tabs.sticky
   - navigation.top
@@ -68,7 +68,7 @@ plugins:
 - search
 - mike:
     alias_type: symlink
-    canonical_version: latest
+    canonical_version: stable
 - mkdocstrings:
     default_handler: python
     handlers:
@@ -160,3 +160,4 @@ nav:
   - API Reference: reference/api.md
 - Contributing: CONTRIBUTING.md
 - Changelog: CHANGELOG.md
+- License: LICENSE

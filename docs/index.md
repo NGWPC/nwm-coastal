@@ -1,7 +1,16 @@
-# NWM Coastal
+# NWM Coastal: Coastal Model Workflow
 
-A Python package for running SCHISM and SFINCS coastal model calibration workflows on
-HPC clusters with Singularity containers and SLURM job scheduling.
+`nwm-coastal` is a collection of tools designed to implement skill assessments for
+coastal model runs and execute National Water Model (NWM) hindcast/forecast runs for
+standalone coastal models utilized in NWMv4 operations. This includes the Semi-implicit
+Cross-scale Hydroscience Integrated System Model (SCHISM) and Super-Fast INundation of
+CoastS (SFINCS) as the intended coastal models for implementation in NWMv4 operations.
+This repository stores symlinks to both coastal modeling development groups, which are
+used to compile and run the NWMv4 coastal models. The coastal modeling output for NWMv4
+operations is the Total Water Level (TWL) fields. These fields are the focus of the
+coastal tools in this repository for skill assessments across NWM domains, as well as
+the end result to retrieve from tools in this repository that set up and execute NWMv4
+hindcast and operational forecast runs.
 
 ## Features
 
@@ -9,15 +18,17 @@ HPC clusters with Singularity containers and SLURM job scheduling.
     polymorphic `ModelConfig` architecture
 - **YAML Configuration**: Simple, human-readable configuration files with variable
     interpolation
-- **SLURM Integration**: Automatic job script generation and submission
 - **Data Download**: Automated download of NWM and STOFS boundary data
 - **Multiple Domains**: Support for Hawaii, Puerto Rico/Virgin Islands, Atlantic/Gulf,
     and Pacific
 - **Boundary Conditions**: TPXO tidal model and STOFS water level support
 - **NOAA Observation Stations**: Automatic discovery of CO-OPS water level stations
     within the model domain, with post-run comparison plots (simulated vs observed)
-- **Workflow Control**: Unified `run` and `submit` pipelines with `--start-from` /
-    `--stop-after` support for partial workflows
+- **SFINCS Model Creation**: Build SFINCS quadtree models from an AOI polygon with
+    automatic NOAA DEM discovery, elevation/bathymetry, boundary cells, and subgrid
+    tables
+- **Workflow Control**: `run` pipeline with `--start-from` / `--stop-after` support for
+    partial workflows
 - **Configuration Inheritance**: Share common settings across multiple runs
 
 ## Quick Example
@@ -46,7 +57,7 @@ boundary:
   source: stofs
 EOF
 
-/ngen-test/coastal-calibration/coastal-calibration run "${CONFIG_FILE}"
+coastal-calibration run "${CONFIG_FILE}"
 rm -f "${CONFIG_FILE}"
 ```
 
@@ -67,8 +78,3 @@ pip install coastal-calibration
 ```
 
 See the [Installation Guide](getting-started/installation.md) for detailed instructions.
-
-## License
-
-This project is licensed under the BSD-2-Clause License. See
-[LICENSE](https://github.com/NGWPC/nwm-coastal/blob/main/LICENSE) for details.

@@ -16,7 +16,6 @@ from coastal_calibration.config.schema import (
     PathConfig,
     SfincsModelConfig,
     SimulationConfig,
-    SlurmConfig,
 )
 from coastal_calibration.stages.sfincs_build import (
     SfincsObservationPointsStage,
@@ -32,7 +31,6 @@ def sfincs_config(tmp_path):
     (prebuilt / "sfincs.inp").write_text("")
 
     return CoastalCalibConfig(
-        slurm=SlurmConfig(user="test"),
         simulation=SimulationConfig(
             start_date=datetime(2021, 6, 11),
             duration_hours=3,

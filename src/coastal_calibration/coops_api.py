@@ -146,12 +146,12 @@ class COOPSAPIClient:
         cache_file = cache_dir / "coops_stations_metadata.json"
 
         if cache_file.exists():
-            logger.info("Loading cached station metadata from %s", cache_file)
+            logger.info("  Loading cached station metadata from %s", cache_file)
             stations = json.loads(cache_file.read_text())
         else:
             metadata_url = "https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations.json?type=waterlevels"
 
-            logger.info("Fetching metadata for all water level stations")
+            logger.info("  Fetching metadata for all water level stations")
             response = fetch(
                 metadata_url,
                 "json",
@@ -165,8 +165,8 @@ class COOPSAPIClient:
 
             stations = response["stations"]
             cache_file.write_text(json.dumps(stations))
-            logger.info("Retrieved metadata for %d stations", len(stations))
-            logger.info("Saved station metadata to cache: %s", cache_file)
+            logger.info("  Retrieved metadata for %d stations", len(stations))
+            logger.info("  Saved station metadata to cache: %s", cache_file)
 
         return gpd.GeoDataFrame(
             (
@@ -367,7 +367,7 @@ class COOPSAPIClient:
         list[dict | None]
             List of JSON responses (None for failed requests)
         """
-        logger.info("Fetching data from %d station(s)", len(urls))
+        logger.info("  Fetching data from %d station(s)", len(urls))
 
         return fetch(
             urls,
@@ -405,22 +405,21 @@ class COOPSAPIClient:
         import numpy as np
 
         single_input = isinstance(station_ids, str)
-        if single_input:
-            station_ids = [station_ids]
+        ids: list[str] = [station_ids] if isinstance(station_ids, str) else list(station_ids)
 
         datum_base_url = "https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations"
-        urls = [f"{datum_base_url}/{sid}/datums.json" for sid in station_ids]
-        logger.info("Fetching datum information for %d station(s)", len(station_ids))
+        urls = [f"{datum_base_url}/{sid}/datums.json" for sid in ids]
+        logger.info("  Fetching datum information for %d station(s)", len(ids))
         responses = self.fetch_data(urls)
         datum_objects = []
-        for station_id, response in zip(station_ids, responses, strict=False):
+        for station_id, response in zip(ids, responses, strict=False):
             if response is None:
-                logger.warning("No datum data returned for station %s", station_id)
+                logger.warning("  No datum data returned for station %s", station_id)
                 continue
 
             if "error" in response:
                 logger.warning(
-                    "Datum API error for station %s: %s",
+                    "  Datum API error for station %s: %s",
                     station_id,
                     response["error"].get("message", "Unknown error"),
                 )
@@ -612,22 +611,22 @@ def _process_responses(  # noqa: PLR0912, PLR0915
 
     for station_id, response in zip(station_ids, responses, strict=False):
         if response is None:
-            logger.warning("No data returned for station %s", station_id)
+            logger.warning("  No data returned for station %s", station_id)
             continue
 
         if "error" in response:
             error_msg = response["error"].get("message", "Unknown error")
-            logger.warning("API error for station %s: %s", station_id, error_msg)
+            logger.warning("  API error for station %s: %s", station_id, error_msg)
             continue
 
         data_key = "predictions" if product == "predictions" else "data"
         if data_key not in response:
-            logger.warning("No %s in response for station %s", data_key, station_id)
+            logger.warning("  No %s in response for station %s", data_key, station_id)
             continue
 
         data_list = response[data_key]
         if not data_list:
-            logger.warning("Empty data for station %s", station_id)
+            logger.warning("  Empty data for station %s", station_id)
             continue
 
         df = pd.DataFrame(data_list)
@@ -646,7 +645,7 @@ def _process_responses(  # noqa: PLR0912, PLR0915
     if not station_data:
         raise ValueError("No valid data returned for any station")
 
-    logger.info("Successfully retrieved data for %d station(s)", len(station_data))
+    logger.info("  Successfully retrieved data for %d station(s)", len(station_data))
 
     unique_times = sorted(set(all_times))
     time_index = pd.DatetimeIndex(unique_times)
@@ -818,7 +817,7 @@ def query_coops_byids(
     end_str = end_dt.strftime("%Y%m%d %H:%M")
 
     logger.info(
-        "Requesting %s data for %d station(s) from %s to %s",
+        "  Requesting %s data for %d station(s) from %s to %s",
         product,
         len(station_ids),
         begin_str,
@@ -895,7 +894,7 @@ def query_coops_bygeometry(
     import shapely
 
     client = COOPSAPIClient()
-    if not all(shapely.is_valid(np.atleast_1d(geometry))):  # pyright: ignore[reportCallIssue,reportArgumentType]
+    if not all(shapely.is_valid(np.atleast_1d(geometry))):
         raise ValueError("Invalid geometry provided.")
 
     stations_gdf = client.stations_metadata

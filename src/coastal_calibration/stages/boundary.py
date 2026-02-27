@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from coastal_calibration.stages.base import WorkflowStage
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from coastal_calibration.config.schema import CoastalCalibConfig, SchismModelConfig
+    from coastal_calibration.utils.logging import WorkflowMonitor
 
 
 class UpdateParamsStage(WorkflowStage):
@@ -16,6 +19,10 @@ class UpdateParamsStage(WorkflowStage):
     name = "update_params"
     description = "Create SCHISM param.nml"
     requires_container = True
+
+    def __init__(self, config: CoastalCalibConfig, monitor: WorkflowMonitor | None = None) -> None:
+        super().__init__(config, monitor)
+        self.model: SchismModelConfig = cast("SchismModelConfig", config.model_config)
 
     def run(self) -> dict[str, Any]:
         """Execute parameter file creation."""
@@ -28,7 +35,7 @@ class UpdateParamsStage(WorkflowStage):
 
         self.run_singularity_command(
             [str(script_path)],
-            sif_path=self.config.model_config.singularity_image,
+            sif_path=self.model.singularity_image,
             env=env,
         )
 
@@ -47,6 +54,10 @@ class TPXOBoundaryStage(WorkflowStage):
     description = "Create boundary forcing from TPXO"
     requires_container = True
 
+    def __init__(self, config: CoastalCalibConfig, monitor: WorkflowMonitor | None = None) -> None:
+        super().__init__(config, monitor)
+        self.model: SchismModelConfig = cast("SchismModelConfig", config.model_config)
+
     def run(self) -> dict[str, Any]:
         """Execute TPXO boundary condition generation."""
         self._update_substep("Building environment")
@@ -58,7 +69,7 @@ class TPXOBoundaryStage(WorkflowStage):
 
         self.run_singularity_command(
             [str(script_path)],
-            sif_path=self.config.model_config.singularity_image,
+            sif_path=self.model.singularity_image,
             env=env,
         )
 
@@ -76,6 +87,10 @@ class STOFSBoundaryStage(WorkflowStage):
     name = "stofs_boundary"
     description = "Regrid STOFS boundary data"
     requires_container = True
+
+    def __init__(self, config: CoastalCalibConfig, monitor: WorkflowMonitor | None = None) -> None:
+        super().__init__(config, monitor)
+        self.model: SchismModelConfig = cast("SchismModelConfig", config.model_config)
 
     def _resolve_stofs_file(self) -> Path:
         """Resolve STOFS file path from config or download directory."""
@@ -116,7 +131,7 @@ class STOFSBoundaryStage(WorkflowStage):
 
         self.run_singularity_command(
             [str(pre_script)],
-            sif_path=self.config.model_config.singularity_image,
+            sif_path=self.model.singularity_image,
             env=env,
         )
 
@@ -152,10 +167,10 @@ class STOFSBoundaryStage(WorkflowStage):
                 env["OPEN_BNDS_HGRID_FILE"],
                 env["SCHISM_OUTPUT_FILE"],
             ],
-            sif_path=self.config.model_config.singularity_image,
+            sif_path=self.model.singularity_image,
             env=env,
             use_mpi=True,
-            mpi_tasks=self.config.model_config.total_tasks,
+            mpi_tasks=self.model.total_tasks,
         )
 
         self._update_substep("Post-processing STOFS data")
@@ -165,7 +180,7 @@ class STOFSBoundaryStage(WorkflowStage):
 
         self.run_singularity_command(
             [str(post_script)],
-            sif_path=self.config.model_config.singularity_image,
+            sif_path=self.model.singularity_image,
             env=env,
         )
 

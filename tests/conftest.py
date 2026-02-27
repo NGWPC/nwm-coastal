@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import zipfile
 from datetime import datetime
+from pathlib import Path
 
 import pytest
 import yaml
@@ -15,8 +17,27 @@ from coastal_calibration.config.schema import (
     PathConfig,
     SchismModelConfig,
     SimulationConfig,
-    SlurmConfig,
 )
+
+# Path to the pre-built SFINCS model archive
+_TEXAS_ZIP = Path(__file__).resolve().parent.parent / "docs" / "examples" / "texas.zip"
+
+
+@pytest.fixture
+def sfincs_model_dir(tmp_path):
+    """Extract the pre-built Texas SFINCS model into a temp directory.
+
+    The archive extracts to ``texas/`` which contains:
+    ``sfincs.nc``, ``sfincs.bnd``, ``sfincs.obs``, ``sfincs.inp``,
+    ``sfincs_nwm.src``, ``sfincs_ngen.src``.
+
+    Returns the ``tmp_path / "texas"`` directory.
+    """
+    if not _TEXAS_ZIP.exists():
+        pytest.skip(f"Pre-built model not found: {_TEXAS_ZIP}")
+    with zipfile.ZipFile(_TEXAS_ZIP, "r") as zf:
+        zf.extractall(tmp_path)
+    return tmp_path / "texas"
 
 
 @pytest.fixture
@@ -33,16 +54,6 @@ def tmp_download_dir(tmp_path):
     dl_dir = tmp_path / "downloads"
     dl_dir.mkdir()
     return dl_dir
-
-
-@pytest.fixture
-def sample_slurm_config():
-    """Create a sample SlurmConfig."""
-    return SlurmConfig(
-        job_name="test_job",
-        partition="test-partition",
-        user="testuser",
-    )
 
 
 @pytest.fixture
@@ -73,14 +84,12 @@ def sample_path_config(tmp_work_dir, tmp_download_dir):
 
 @pytest.fixture
 def sample_config(
-    sample_slurm_config,
     sample_simulation_config,
     sample_boundary_config,
     sample_path_config,
 ):
     """Create a complete sample CoastalCalibConfig."""
     return CoastalCalibConfig(
-        slurm=sample_slurm_config,
         simulation=sample_simulation_config,
         boundary=sample_boundary_config,
         paths=sample_path_config,
@@ -103,7 +112,6 @@ def minimal_config_dict(tmp_work_dir, tmp_download_dir):
     """Return a minimal config dictionary."""
     return {
         "model": "schism",
-        "slurm": {"user": "testuser"},
         "simulation": {
             "start_date": "2021-06-11",
             "duration_hours": 3,

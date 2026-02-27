@@ -11,6 +11,7 @@ module-level registry keyed by config ``id``.
 
 from __future__ import annotations
 
+import contextlib
 import math
 import os
 import shutil
@@ -28,7 +29,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     import xarray as xr
-    from hydromt_sfincs import SfincsModel  # pyright: ignore[reportMissingImports]
+    from hydromt_sfincs import SfincsModel
     from numpy.typing import NDArray
 
     from coastal_calibration.config.schema import CoastalCalibConfig
@@ -126,7 +127,7 @@ def _get_model(config: CoastalCalibConfig) -> SfincsModel:
             f"{root}.  Ensure the 'sfincs_init' stage runs first."
         )
 
-    from hydromt_sfincs import SfincsModel as _Sfincs  # pyright: ignore[reportMissingImports]
+    from hydromt_sfincs import SfincsModel as _Sfincs
 
     data_libs: list[str] = []
     catalog_path = _data_catalog_path(config)
@@ -149,9 +150,9 @@ def _meteo_dst_res(config: CoastalCalibConfig, model: SfincsModel) -> float:
 
     When the user specifies ``meteo_res`` in the configuration it is
     returned directly.  Otherwise the base (coarsest) cell size of the
-    SFINCS quadtree grid is used: meteorological fields vary slowly in
-    space, so there is no benefit to a meteo grid finer than the
-    coarsest computational cell.
+    SFINCS grid is used: meteorological fields vary slowly in space, so
+    there is no benefit to a meteo grid finer than the coarsest
+    computational cell.
 
     This also avoids the LCC → UTM reprojection inflation problem where
     ``rioxarray.reproject`` produces an output grid spanning the entire
@@ -161,18 +162,17 @@ def _meteo_dst_res(config: CoastalCalibConfig, model: SfincsModel) -> float:
     if sfincs.meteo_res is not None:
         return sfincs.meteo_res
 
-    # Read the base cell size from the quadtree grid stored in sfincs.nc.
-    # The grid structure stores ``dx`` and ``dy`` as attributes of the
-    # mesh topology variable, or can be inferred from sfincs.inp.
+    # Read the base cell size from the grid.  For both regular and
+    # quadtree grids ``dx`` / ``dy`` are usually recorded in sfincs.inp.
     dx = float(model.config.get("dx", 0))
     dy = float(model.config.get("dy", 0))
     if dx > 0 and dy > 0:
         return max(dx, dy)
 
-    # Quadtree grids: ``dx`` / ``dy`` are not always in the config but
-    # the grid NetCDF records them.  Fall back to the grid dataset.
+    # ``dx`` / ``dy`` are not always in the config; fall back to the
+    # grid dataset where the values are stored as attributes.
     try:
-        grid_ds = model.quadtree_grid.data
+        grid_ds = model.quadtree_grid.data if model.grid_type == "quadtree" else model.grid.data
         dx = float(getattr(grid_ds, "attrs", {}).get("dx", 0))
         dy = float(getattr(grid_ds, "attrs", {}).get("dy", 0))
         if dx > 0 and dy > 0:
@@ -228,7 +228,6 @@ def _clip_meteo_to_domain(
 
     # rio.clip_box handles CRS-aware clipping and automatically deals
     # with descending y-coordinates, unlike a raw ds.sel() slice.
-    import rioxarray  # noqa: F401  # pyright: ignore[reportUnusedImport]  # activate .rio accessor
 
     # Ensure the CRS is set — hydromt's reproject → rename → set chain
     # can lose the spatial_ref coordinate.
@@ -443,11 +442,11 @@ class SfincsInitStage(_SfincsStageBase):
         "netamuamvfile",
     )
 
-    #: Generated NetCDF files that downstream stages will recreate.
+    #: Generated files that downstream stages will recreate.
     #: Stale files from a previous run can crash the HDF5 library when
     #: ``write_netcdf_safely`` (or a lazy ``model.read()``) tries to open
     #: them, so we delete them at the start of every fresh initialisation.
-    _GENERATED_NC_FILES: tuple[str, ...] = (
+    _STALE_OUTPUT_FILES: tuple[str, ...] = (
         "sfincs_netbndbzsbzifile.nc",
         "sfincs_netamuv.nc",
         "sfincs_netamp.nc",
@@ -458,8 +457,21 @@ class SfincsInitStage(_SfincsStageBase):
         "sfincs_his.nc",
     )
 
+    #: Files that must be restored from the pre-built model on every
+    #: re-run.  Core model definition files (``sfincs.inp``,
+    #: ``sfincs.nc``, ``sfincs.bnd``) are included so that updates to
+    #: the pre-built model are always picked up.  Without overwriting,
+    #: a stale file from a previous run would persist and cause silent
+    #: errors (e.g. wrong boundary cells, wrong grid, etc.).
+    _ALWAYS_OVERWRITE_FILES: tuple[str, ...] = (
+        "sfincs.inp",
+        "sfincs.nc",
+        "sfincs.bnd",
+        "sfincs.obs",
+    )
+
     def _remove_stale_outputs(self, root: Path) -> None:
-        """Delete generated netCDF files left over from a previous run.
+        """Delete generated files left over from a previous run.
 
         The HydroMT ``write_netcdf_safely`` helper opens existing files to
         check whether the data changed.  If a previous run produced files
@@ -468,7 +480,7 @@ class SfincsInitStage(_SfincsStageBase):
         issue entirely; every downstream stage will regenerate its files.
         """
         removed: list[str] = []
-        for name in self._GENERATED_NC_FILES:
+        for name in self._STALE_OUTPUT_FILES:
             p = root / name
             if p.exists():
                 p.unlink()
@@ -491,7 +503,7 @@ class SfincsInitStage(_SfincsStageBase):
 
     def run(self) -> dict[str, Any]:
         """Load a pre-built SFINCS model and register it for subsequent stages."""
-        from hydromt_sfincs import SfincsModel  # pyright: ignore[reportMissingImports]
+        from hydromt_sfincs import SfincsModel
 
         root = get_model_root(self.config)
 
@@ -506,10 +518,11 @@ class SfincsInitStage(_SfincsStageBase):
         source_dir = self.sfincs.prebuilt_dir
         if source_dir.resolve() != root.resolve():
             root.mkdir(parents=True, exist_ok=True)
+            overwrite = {f.lower() for f in self._ALWAYS_OVERWRITE_FILES}
             for src_file in source_dir.iterdir():
                 if src_file.is_file():
                     dst_file = root / src_file.name
-                    if not dst_file.exists():
+                    if not dst_file.exists() or src_file.name.lower() in overwrite:
                         shutil.copy2(src_file, dst_file)
             self._log(f"Copied pre-built model from {source_dir} to {root}")
 
@@ -556,13 +569,22 @@ class SfincsTimingStage(WorkflowStage):
 
         self._update_substep("Setting simulation timing")
 
-        model.config.update(
-            {
-                "tref": start,
-                "tstart": start,
-                "tstop": stop,
-            }
-        )
+        timing: dict[str, object] = {
+            "tref": start,
+            "tstart": start,
+            "tstop": stop,
+        }
+
+        # Add a 1-hour spinup period when the simulation is long enough.
+        # During spinup, SFINCS gradually ramps the boundary forcing from
+        # zero to the actual value, avoiding shock waves in the domain.
+        spinup_seconds = 3600
+        total_seconds = int(sim.duration_hours * 3600)
+        if total_seconds > spinup_seconds:
+            timing["tspinup"] = spinup_seconds
+            self._log(f"Spinup: {spinup_seconds} s")
+
+        model.config.update(timing)
 
         self._log(f"Timing set: {start} to {stop}")
 
@@ -608,6 +630,132 @@ class SfincsForcingStage(_SfincsStageBase):
             x, y = float(coords[0]), float(coords[1])
             points.append((x, y, name))
         return points
+
+    @staticmethod
+    def _parse_quadtree_bnd(nc_path: Path) -> list[tuple[float, float, str]]:
+        """Extract boundary-cell face centres from a quadtree ``sfincs.nc``.
+
+        For quadtree grids HydroMT-SFINCS stores boundary info in the
+        mask array (value 2) inside ``sfincs.nc`` instead of writing a
+        separate ``.bnd`` file.  This helper reads the UGRID mesh
+        connectivity, computes face centres for boundary cells, and
+        returns them in the same ``(x, y, name)`` format as
+        :meth:`_parse_bnd_file`.
+        """
+        import numpy as np
+        import xarray as xr
+
+        ds = xr.open_dataset(nc_path)
+        try:
+            mask = ds["mask"].values
+            bnd_idx = np.where(mask == 2)[0]
+            if len(bnd_idx) == 0:
+                return []
+
+            node_x = ds["mesh2d_node_x"].values
+            node_y = ds["mesh2d_node_y"].values
+            face_nodes = ds["mesh2d_face_nodes"].values  # (nFaces, max_nodes)
+
+            face_x = np.array(
+                [
+                    node_x[face_nodes[i][~np.isnan(face_nodes[i])].astype(int)].mean()
+                    for i in bnd_idx
+                ]
+            )
+            face_y = np.array(
+                [
+                    node_y[face_nodes[i][~np.isnan(face_nodes[i])].astype(int)].mean()
+                    for i in bnd_idx
+                ]
+            )
+
+            # Sort bottom-left → top-right for a deterministic order
+            order = np.lexsort((face_x, face_y))
+            face_x = face_x[order]
+            face_y = face_y[order]
+        finally:
+            ds.close()
+
+        return [(float(face_x[i]), float(face_y[i]), f"bnd_{i}") for i in range(len(face_x))]
+
+    @staticmethod
+    def _parse_regular_grid_bnd(
+        model: SfincsModel,
+    ) -> list[tuple[float, float, str]]:
+        """Extract boundary-cell centres from a regular-grid mask.
+
+        HydroMT-SFINCS marks boundary cells as ``mask==2`` but does not
+        always write a separate ``.bnd`` file for regular grids.  This
+        helper reads the mask :class:`~xarray.Dataset` via the HydroMT
+        component, finds cells with value 2, and returns their grid
+        coordinates in the same ``(x, y, name)`` format as
+        :meth:`_parse_bnd_file`.
+        """
+        import numpy as np
+
+        msk_var = model.mask.data["mask"]
+        bnd_mask = msk_var.values == 2
+        y_idx, x_idx = np.where(bnd_mask)
+        if len(y_idx) == 0:
+            return []
+
+        x_coords = msk_var.coords["x"].values
+        y_coords = msk_var.coords["y"].values
+        bnd_x = x_coords[x_idx]
+        bnd_y = y_coords[y_idx]
+
+        # Sort bottom-left → top-right for a deterministic order
+        order = np.lexsort((bnd_x, bnd_y))
+        bnd_x = bnd_x[order]
+        bnd_y = bnd_y[order]
+
+        return [(float(bnd_x[i]), float(bnd_y[i]), f"bnd_{i}") for i in range(len(bnd_x))]
+
+    def _get_boundary_points(
+        self,
+        model: SfincsModel,
+    ) -> list[tuple[float, float, str]]:
+        """Return boundary point coordinates.
+
+        For regular grids the points are read from ``sfincs.bnd``;
+        when the file is absent the boundary cells (``mask==2``) are
+        extracted directly from the mask.
+        For quadtree grids the points are extracted from the mask
+        array (value 2) in ``sfincs.nc`` when no ``.bnd`` file exists.
+        """
+        model_root = get_model_root(self.config)
+        bnd_path = model_root / "sfincs.bnd"
+
+        if bnd_path.exists():
+            points = self._parse_bnd_file(bnd_path)
+            if points:
+                self._log(f"Read {len(points)} boundary point(s) from {bnd_path}")
+                return points
+
+        # Fall back to mask-based extraction
+        if model.grid_type == "quadtree":
+            qtr_name = model.config.get("qtrfile", "sfincs.nc")
+            nc_path = model_root / qtr_name
+            if nc_path.exists():
+                points = self._parse_quadtree_bnd(nc_path)
+                if points:
+                    self._log(
+                        f"Extracted {len(points)} boundary point(s) "
+                        f"from quadtree mask in {nc_path.name}"
+                    )
+                    return points
+        else:
+            points = self._parse_regular_grid_bnd(model)
+            if points:
+                self._log(f"Extracted {len(points)} boundary point(s) from regular grid mask")
+                return points
+
+        raise FileNotFoundError(
+            f"No boundary points found.  For regular grids provide "
+            f"sfincs.bnd in {model_root} or ensure boundary cells "
+            f"(mask==2) exist in the mask.  For quadtree grids ensure "
+            f"boundary cells (mask==2) exist in sfincs.nc."
+        )
 
     @staticmethod
     def _write_otps_input(
@@ -728,13 +876,27 @@ class SfincsForcingStage(_SfincsStageBase):
                 raise ValueError(
                     f"No OTPS output for boundary point {idx} (lat={lat:.4f}, lon={lon:.4f})"
                 )
-            series = subset.set_index("datetime")["z(m)"].astype(float)
+            series = subset.set_index("datetime")["z(m)"].astype(np.float64)
             series.name = idx
             point_dfs.append(series)
 
         df_ts = pd.concat(point_dfs, axis=1)
         df_ts.index.name = "time"
         return df_ts
+
+    @staticmethod
+    def _write_bnd_file(bnd_path: Path, gdf_bnd: Any) -> None:
+        """Write a ``sfincs.bnd`` file from a boundary-point GeoDataFrame.
+
+        Each line contains the X and Y coordinates of a boundary point
+        in the model CRS, matching the column order in the
+        ``netbndbzsbzifile`` NetCDF.
+        """
+        lines: list[str] = []
+        for _, row in gdf_bnd.iterrows():
+            geom = row.geometry
+            lines.append(f"    {geom.x:.1f}   {geom.y:.1f}")
+        bnd_path.write_text("\n".join(lines) + "\n")
 
     def _inject_water_level(
         self,
@@ -744,12 +906,11 @@ class SfincsForcingStage(_SfincsStageBase):
     ) -> None:
         """Inject water-level forcing into the HydroMT model.
 
-        SFINCS needs *both* ``bndfile`` (boundary point locations on the
-        grid) and ``netbndbzsbzifile`` (time-varying water levels at those
-        points).  We temporarily clear all boundary file refs so that the
-        lazy initialisation of the water_level component starts with an
-        empty dataset, then restore ``bndfile`` before writing so the
-        SFINCS binary can find boundary locations.
+        For regular grids SFINCS needs *both* ``bndfile`` (boundary point
+        locations) and ``netbndbzsbzifile`` (time-varying water levels).
+        For quadtree grids the boundary cell locations are already encoded
+        in the mask (value 2) inside ``sfincs.nc``, so ``bndfile`` is only
+        restored when a ``.bnd`` file is present on disk.
 
         A zero-filled ``bzi`` (infragravity) variable is added because the
         SFINCS binary unconditionally queries ``zi`` in the netCDF file
@@ -792,9 +953,18 @@ class SfincsForcingStage(_SfincsStageBase):
         if "bzi" not in ds.data_vars:
             ds["bzi"] = xr_.zeros_like(ds["bzs"])
 
-        # Restore bndfile so the SFINCS binary can locate boundary cells,
-        # and set netCDF output for the water level timeseries.
+        model_root = get_model_root(self.config)
+        bnd_path = model_root / "sfincs.bnd"
+
+        # Ensure a sfincs.bnd file exists.  For quadtree grids the
+        # boundary cells are encoded in the mask, but SFINCS still
+        # needs ``bndfile`` to map the netbndbzsbzifile columns to
+        # boundary cells.  Write one from the GeoDataFrame if missing.
+        if not bnd_path.exists():
+            self._write_bnd_file(bnd_path, gdf_bnd)
+
         model.config.set("bndfile", "sfincs.bnd")
+        model.config.set("bndtype", 1)
         nc_name = "sfincs_netbndbzsbzifile.nc"
         model.config.set("netbndbzsbzifile", nc_name)
         model.water_level.write()
@@ -815,18 +985,9 @@ class SfincsForcingStage(_SfincsStageBase):
         from shapely.geometry import Point
 
         model_root = get_model_root(self.config)
-        bnd_path = model_root / "sfincs.bnd"
-        if not bnd_path.exists():
-            raise FileNotFoundError(
-                f"Boundary file {bnd_path} not found.  "
-                "Ensure the pre-built model includes sfincs.bnd."
-            )
 
-        # 1. Read boundary points
-        bnd_points = self._parse_bnd_file(bnd_path)
-        if not bnd_points:
-            raise ValueError("No boundary points found in sfincs.bnd")
-        self._log(f"Read {len(bnd_points)} boundary point(s) from {bnd_path}")
+        # 1. Read boundary points (sfincs.bnd or quadtree mask fallback)
+        bnd_points = self._get_boundary_points(model)
 
         # 2. Transform to lon/lat
         model_crs = model.crs
@@ -936,18 +1097,14 @@ class SfincsForcingStage(_SfincsStageBase):
     ) -> xr.DataArray | xr.Dataset:
         """Load a geodataset clipped around the boundary point locations."""
         import geopandas as gpd
-        from pyproj import Transformer
-        from shapely.geometry import Point
 
         self._update_substep(f"Loading {geodataset_name} data")
         tstart, tstop = model.get_model_time()
 
-        transformer = Transformer.from_crs(model.crs, 4326, always_xy=True)
-        bnd_lonlats = [transformer.transform(x, y) for x, y, _ in bnd_points]
+        xx, yy, _ = zip(*bnd_points, strict=False)
         bbox_gdf = gpd.GeoDataFrame(
-            geometry=[Point(lon, lat) for lon, lat in bnd_lonlats],
-            crs=4326,
-        )
+            geometry=gpd.points_from_xy(list(xx), list(yy), crs=model.crs),
+        ).to_crs(4326)
 
         da = model.data_catalog.get_geodataset(
             geodataset_name,
@@ -956,7 +1113,8 @@ class SfincsForcingStage(_SfincsStageBase):
             variables=["waterlevel"],
             time_range=(tstart, tstop),
         )
-        self._log(f"Loaded {geodataset_name}: {da.sizes} dimensions")
+        dims = ", ".join(f"{dim}={size}" for dim, size in da.sizes.items())
+        self._log(f"Loaded {geodataset_name}: {dims}")
         return da
 
     def _interpolate_to_bnd(
@@ -976,7 +1134,8 @@ class SfincsForcingStage(_SfincsStageBase):
         src_crs = da.vector.crs
         if src_crs is not None and src_crs != model_crs:
             tr = Transformer.from_crs(model_crs, src_crs, always_xy=True)
-            bnd_in_src = [tr.transform(x, y) for x, y, _ in bnd_points]
+            xx, yy, _ = zip(*bnd_points, strict=False)
+            bnd_in_src = list(zip(*tr.transform(xx, yy), strict=False))
         else:
             bnd_in_src = [(x, y) for x, y, _ in bnd_points]
         target_xy = np.array(bnd_in_src)
@@ -999,7 +1158,8 @@ class SfincsForcingStage(_SfincsStageBase):
         (incompatible with SFINCS when a ``.bnd`` file defines explicit
         boundary points), this method:
 
-        1. Reads boundary locations from ``sfincs.bnd``.
+        1. Reads boundary locations from ``sfincs.bnd`` (regular grids) or
+           from the quadtree mask in ``sfincs.nc`` (quadtree grids).
         2. Loads the geodataset (e.g. STOFS water levels).
         3. Spatially interpolates the geodataset to the boundary points
            using inverse-distance weighting from the nearest source nodes.
@@ -1008,20 +1168,9 @@ class SfincsForcingStage(_SfincsStageBase):
         import geopandas as gpd
         from shapely.geometry import Point
 
-        model_root = get_model_root(self.config)
-        bnd_path = model_root / "sfincs.bnd"
-        if not bnd_path.exists():
-            raise FileNotFoundError(
-                f"Boundary file {bnd_path} not found.  "
-                "Ensure the pre-built model includes sfincs.bnd."
-            )
-
-        # 1. Read boundary points (in model CRS, typically UTM)
-        bnd_points = self._parse_bnd_file(bnd_path)
-        if not bnd_points:
-            raise ValueError("No boundary points found in sfincs.bnd")
+        # 1. Read boundary points (sfincs.bnd or quadtree mask fallback)
+        bnd_points = self._get_boundary_points(model)
         n_bnd = len(bnd_points)
-        self._log(f"Read {n_bnd} boundary point(s) from {bnd_path}")
 
         # 2. Load the geodataset clipped around the boundary points
         da = self._load_geodataset_for_bnd(model, geodataset_name, bnd_points)
@@ -1072,6 +1221,11 @@ class SfincsObservationPointsStage(_SfincsStageBase):
     name = "sfincs_obs"
     description = "Add observation points"
 
+    #: Bed-elevation threshold (m): cells at or above this are "dry".
+    _SNAP_DEPTH_THRESHOLD: float = -0.1
+    #: Maximum search radius (m) when looking for a replacement wet cell.
+    _SNAP_SEARCH_RADIUS_M: float = 1000.0
+
     def _add_noaa_gages(self, model: SfincsModel) -> int:
         """Query NOAA CO-OPS and add water-level stations as observation points.
 
@@ -1120,17 +1274,207 @@ class SfincsObservationPointsStage(_SfincsStageBase):
             self._log("No NOAA CO-OPS stations with valid datum data in domain")
             return 0
 
+        # Skip stations that already have an observation point nearby.
+        # Pre-built models may use a different naming convention
+        # (e.g. ``Sargent (8772985)`` vs ``noaa_8772985``), so we
+        # compare projected coordinates rather than names.  Two points
+        # within ``dedup_distance_m`` metres are considered the same
+        # location.
+        dedup_distance_m = 100.0
+        existing_points: list[tuple[float, float]] = []
+        try:
+            gdf = model.observation_points.data
+            if gdf is not None and not gdf.empty:
+                existing_points = [(geom.x, geom.y) for geom in gdf.geometry if geom is not None]
+        except Exception:  # noqa: S110
+            pass
+
         # Project selected stations into the model CRS
         selected_projected = selected.to_crs(model_crs)
 
+        added = 0
         for _, row in selected_projected.iterrows():
-            model.observation_points.add_point(
-                x=row.geometry.x,
-                y=row.geometry.y,
-                name=f"noaa_{row['station_id']}",
-            )
+            cx, cy = row.geometry.x, row.geometry.y
+            if any(math.hypot(cx - ex, cy - ey) < dedup_distance_m for ex, ey in existing_points):
+                continue
+            sid = row["station_id"]
+            model.observation_points.add_point(x=cx, y=cy, name=f"noaa_{sid}")
+            # Track the new point so subsequent iterations can dedup
+            # against it within the same batch.
+            existing_points.append((cx, cy))
+            added += 1
 
-        return len(selected_projected)
+        return added
+
+    # ------------------------------------------------------------------
+    # Observation-point snapping
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _grid_face_centres(grid_ds: xr.Dataset) -> tuple[Any, Any, Any, Any]:
+        """Compute face centres, bed elevations, and mask from a UGRID mesh.
+
+        Returns ``(fx, fy, z_elev, mask_arr)`` as numpy arrays.
+        """
+        import numpy as np
+
+        z_elev = grid_ds["z"].values
+        mask_arr = grid_ds["mask"].values
+
+        face_nodes_raw = grid_ds["mesh2d_face_nodes"].values
+        fn_valid = ~np.isnan(face_nodes_raw)
+        fn_int = np.zeros(face_nodes_raw.shape, dtype=int)
+        fn_int[fn_valid] = face_nodes_raw[fn_valid].astype(int)
+        nodes_x = grid_ds.coords["mesh2d_node_x"].values
+        nodes_y = grid_ds.coords["mesh2d_node_y"].values
+        fx = np.nanmean(np.where(fn_valid, nodes_x[fn_int], np.nan), axis=1)
+        fy = np.nanmean(np.where(fn_valid, nodes_y[fn_int], np.nan), axis=1)
+        return fx, fy, z_elev, mask_arr
+
+    def _try_snap_point(
+        self,
+        obs_gdf: Any,
+        idx: int,
+        tree: Any,
+        fx: Any,
+        fy: Any,
+        z_elev: Any,
+        mask_arr: Any,
+        depth_threshold: float,
+        search_radius: float,
+    ) -> bool | None:
+        """Snap a single observation point if its cell is dry.
+
+        Returns ``True`` if the point was moved, ``None`` otherwise.
+        """
+        import numpy as np
+        from shapely.geometry import Point
+
+        geom = obs_gdf.geometry.iloc[idx]
+        if geom is None:
+            return None
+        ox, oy = geom.x, geom.y
+        name = obs_gdf.index[idx] if obs_gdf.index.name else str(idx)
+        with contextlib.suppress(KeyError, IndexError):
+            name = obs_gdf["name"].iloc[idx]
+
+        _, cell_idx = tree.query([ox, oy])
+        cell_z = z_elev[cell_idx]
+        if cell_z < depth_threshold:
+            return None  # already wet
+
+        candidates = tree.query_ball_point([ox, oy], r=search_radius)
+        cand_arr = np.array(candidates) if candidates else np.array([], dtype=int)
+        if len(cand_arr) == 0:
+            self._log(
+                f"  {name}: z={cell_z:.3f} m (dry), no cells within {search_radius:.0f} m",
+                "warning",
+            )
+            return None
+
+        wet = (z_elev[cand_arr] < depth_threshold) & (mask_arr[cand_arr] > 0)
+        if not np.any(wet):
+            self._log(
+                f"  {name}: z={cell_z:.3f} m (dry), no wet cell within {search_radius:.0f} m",
+                "warning",
+            )
+            return None
+
+        wet_idxs = cand_arr[wet]
+        wet_dists = np.sqrt((fx[wet_idxs] - ox) ** 2 + (fy[wet_idxs] - oy) ** 2)
+        best = wet_idxs[np.argmin(wet_dists)]
+        new_z = z_elev[best]
+        move_dist = float(np.min(wet_dists))
+
+        obs_gdf.geometry.iloc[idx] = Point(float(fx[best]), float(fy[best]))
+        self._log(
+            f"  {name}: snapped from z={cell_z:.3f} m to z={new_z:.3f} m ({move_dist:.0f} m away)"
+        )
+        return True
+
+    def _snap_obs_to_wet_cells(self, model: SfincsModel) -> int:
+        """Relocate observation points on dry cells to the nearest wet cell.
+
+        A cell is considered "dry" when its bed elevation is at or above
+        ``_SNAP_DEPTH_THRESHOLD``.
+
+        Returns the number of points that were relocated.
+        """
+        import numpy as np
+        import xarray as xr
+        from scipy.spatial import KDTree
+
+        depth_threshold = self._SNAP_DEPTH_THRESHOLD
+        search_radius = self._SNAP_SEARCH_RADIUS_M
+
+        obs_gdf = model.observation_points.data
+        if obs_gdf is None or obs_gdf.empty:
+            return 0
+
+        # Read the combined grid file (sfincs.nc) directly — the model
+        # splits grid/elevation/mask into separate HydroMT components,
+        # but the written NetCDF merges them into one file.
+        grid_path = get_model_root(self.config) / "sfincs.nc"
+        if not grid_path.exists():
+            self._log("sfincs.nc not found - cannot snap observation points", "warning")
+            return 0
+
+        with xr.open_dataset(grid_path) as grid_ds:
+            fx, fy, z_elev, mask_arr = self._grid_face_centres(grid_ds)
+        tree = KDTree(np.column_stack([fx, fy]))
+
+        snapped = 0
+        for idx in range(len(obs_gdf)):
+            result = self._try_snap_point(
+                obs_gdf, idx, tree, fx, fy, z_elev, mask_arr, depth_threshold, search_radius
+            )
+            if result is not None:
+                snapped += 1
+
+        if snapped > 0:
+            model.observation_points._data = obs_gdf
+        return snapped
+
+    def _write_obs_station_map(self, model: SfincsModel) -> None:
+        """Write ``obs_station_map.json`` mapping obs indices to station IDs.
+
+        The file is written next to the model files so the plot stage
+        can read it instead of re-discovering the mapping via name
+        parsing or spatial proximity.
+        """
+        import json
+
+        obs_gdf = model.observation_points.data
+        if obs_gdf is None or obs_gdf.empty:
+            return
+
+        station_map: list[dict[str, Any]] = []
+        for idx in range(len(obs_gdf)):
+            name = ""
+            with contextlib.suppress(KeyError, IndexError):
+                name = str(obs_gdf["name"].iloc[idx])
+            if not name:
+                with contextlib.suppress(Exception):
+                    name = str(obs_gdf.index[idx])
+
+            # Extract NOAA station ID from the "noaa_<id>" naming convention.
+            station_id = ""
+            if name.startswith("noaa_"):
+                station_id = name[len("noaa_") :]
+
+            geom = obs_gdf.geometry.iloc[idx]
+            entry: dict[str, Any] = {
+                "index": idx,
+                "name": name,
+                "x": float(geom.x) if geom else None,
+                "y": float(geom.y) if geom else None,
+            }
+            if station_id:
+                entry["station_id"] = station_id
+            station_map.append(entry)
+
+        map_path = get_model_root(self.config) / "obs_station_map.json"
+        map_path.write_text(json.dumps(station_map, indent=2))
 
     def run(self) -> dict[str, Any]:
         """Add observation points from config, file, and/or NOAA gages."""
@@ -1177,6 +1521,17 @@ class SfincsObservationPointsStage(_SfincsStageBase):
             noaa_count = self._add_noaa_gages(model)
             self._log(f"Added {noaa_count} NOAA CO-OPS observation point(s)")
 
+        # Snap observation points that sit on dry cells to the nearest
+        # wet cell so that they produce dynamic water-level output.
+        snapped = self._snap_obs_to_wet_cells(model)
+        if snapped:
+            self._log(f"Snapped {snapped} observation point(s) to nearest wet cell")
+
+        # Persist obs-index → station-ID mapping so downstream stages
+        # (e.g. plotting) can look it up directly instead of re-matching
+        # by name or spatial proximity.
+        self._write_obs_station_map(model)
+
         return {"status": "completed", "noaa_stations": noaa_count}
 
 
@@ -1212,7 +1567,13 @@ class SfincsDischargeStage(_SfincsStageBase):
         maps to an inactive cell (``mask != 1``), because the cell index
         is left at 0 and the code later accesses ``zs(0)`` without any
         bounds check.  This filter prevents the crash by dropping points
-        that do not land on an active face of the quadtree mesh.
+        that do not land on an active cell.
+
+        Supports both quadtree (unstructured) and regular (structured)
+        SFINCS grids.  For regular grids the cell index is computed
+        arithmetically via ``SfincsGrid.get_indices_at_points`` (O(1)
+        per point, handles rotated grids).  For quadtree grids a KDTree
+        lookup over face centres is used.
 
         Returns
         -------
@@ -1221,22 +1582,41 @@ class SfincsDischargeStage(_SfincsStageBase):
             ``dropped`` are the names of the removed points.
         """
         import numpy as np
-        from scipy.spatial import KDTree
 
-        grid_ds = model.quadtree_grid.data
-        ugrid = grid_ds.ugrid.grid
-        face_xy = np.column_stack([ugrid.face_x, ugrid.face_y])
-        mask = grid_ds["mask"].values
-
-        tree = KDTree(face_xy)
         kept: list[tuple[float, float, str]] = []
         dropped: list[str] = []
-        for x, y, name in points:
-            _, idx = tree.query([x, y])
-            if mask[idx] == 1:
-                kept.append((x, y, name))
-            else:
-                dropped.append(name)
+
+        if model.grid_type == "quadtree":
+            from scipy.spatial import KDTree
+
+            grid_ds = model.quadtree_grid.data
+            ugrid = grid_ds.ugrid.grid
+            face_xy = np.column_stack([ugrid.face_x, ugrid.face_y])
+            mask = grid_ds["mask"].to_numpy()
+
+            tree = KDTree(face_xy)
+            for x, y, name in points:
+                _, idx = tree.query([x, y])
+                if mask[idx] == 1:
+                    kept.append((x, y, name))
+                else:
+                    dropped.append(name)
+        else:
+            # Regular grid: direct index computation (no KDTree needed).
+            # ``get_indices_at_points`` returns flat indices into the
+            # (mmax, nmax) grid; the mask must be ravelled in Fortran
+            # order to match.
+            mask_flat = model.grid.mask.to_numpy().ravel(order="F")
+            pts_x = np.array([x for x, _, _ in points])
+            pts_y = np.array([y for _, y, _ in points])
+            inds = model.grid.get_indices_at_points(pts_x, pts_y).ravel()
+
+            for (x, y, name), idx in zip(points, inds, strict=True):
+                if idx >= 0 and mask_flat[idx] == 1:
+                    kept.append((x, y, name))
+                else:
+                    dropped.append(name)
+
         return kept, dropped
 
     def run(self) -> dict[str, Any]:
@@ -1374,8 +1754,14 @@ class SfincsPressureStage(_SfincsStageBase):
 
         nx_before, nx_after = _clip_meteo_to_domain(model, "pressure")
 
-        # Enable barometric pressure correction so SFINCS uses the forcing
+        # Enable barometric pressure correction so SFINCS uses the forcing.
+        # pavbnd / gapres set the reference atmospheric pressure (Pa) at the
+        # open boundaries and the "gap" pressure for inverse-barometer
+        # correction.  Standard atmosphere ≈ 101 325 Pa; 101 200 Pa is the
+        # conventional SFINCS default.
         model.config.set("baro", 1)
+        model.config.set("pavbnd", 101200)
+        model.config.set("gapres", 101200)
         self._log(
             f"Atmospheric pressure forcing added from {meteo_dataset} "
             f"(baro=1, res={dst_res:.0f} m, clipped {nx_before}→{nx_after} x-cells)"
@@ -1397,6 +1783,13 @@ class SfincsWriteStage(WorkflowStage):
     def run(self) -> dict[str, Any]:
         """Write all model files to the model root directory."""
         model = _get_model(self.config)
+
+        # Apply user-specified sfincs.inp overrides (e.g. physics params)
+        # right before writing so they take final precedence.
+        overrides: dict[str, Any] = getattr(self.config.model_config, "inp_overrides", {})
+        if overrides:
+            model.config.update(overrides)
+            self._log(f"Applied {len(overrides)} sfincs.inp override(s): {overrides}")
 
         self._update_substep("Writing model to disk")
         model.write()
@@ -1457,8 +1850,10 @@ class SfincsRunStage(_SfincsStageBase):
 
         self._log("SFINCS run completed")
 
-        # Clean up model registry
-        _clear_model(self.config)
+        # NOTE: do *not* clear the model registry here.  The plot stage
+        # runs immediately after and needs the in-memory SfincsModel to
+        # avoid a UGRID re-read error on quadtree grids.  The registry
+        # is garbage-collected when the process exits.
 
         return {"status": "completed", "mode": mode}
 
@@ -1500,28 +1895,6 @@ class SfincsPlotStage(_SfincsStageBase):
         raise ValueError("Cannot determine station dimension in point_h")
 
     @staticmethod
-    def _parse_obs_names(obs_file: Path) -> list[str]:
-        """Parse observation point names from a ``sfincs.obs`` file.
-
-        The file format has lines like::
-
-            x y "name"
-
-        Returns the list of names in order.
-        """
-        names: list[str] = []
-        for raw_line in obs_file.read_text().splitlines():
-            stripped = raw_line.strip()
-            if not stripped:
-                continue
-            parts = stripped.split('"')
-            if len(parts) >= 2:
-                names.append(parts[1].strip())
-            else:
-                names.append(f"obs_{len(names)}")
-        return names
-
-    @staticmethod
     def _plot_figures(
         sim_times: Any,
         sim_elevation: NDArray[np.float64],
@@ -1554,6 +1927,9 @@ class SfincsPlotStage(_SfincsStageBase):
         """
         import matplotlib.dates as mdates
         import matplotlib.pyplot as plt
+
+        # Use non-interactive backend for figure generation without display
+        plt.matplotlib.use("Agg")
 
         # ── Pre-filter: keep only stations with both obs and sim ──
         plotable = _plotable_stations(station_ids, sim_elevation, obs_ds)
@@ -1709,23 +2085,26 @@ class SfincsPlotStage(_SfincsStageBase):
         obs_ds.attrs["datum"] = "MSL"
         return obs_ds
 
-    @staticmethod
-    def _read_obs_names(mod: Any, model_root: Path) -> list[str]:
-        """Read observation point names from HydroMT model or sfincs.obs."""
-        if hasattr(mod, "observation_points") and hasattr(mod.observation_points, "geodataframe"):
-            gdf = mod.observation_points.geodataframe
-            if gdf is not None and not gdf.empty:
-                return gdf.index.tolist()
+    def _match_noaa_stations(self) -> tuple[list[int], list[str]]:
+        """Read the obs → station-ID mapping written by :class:`SfincsObsStage`.
 
-        obs_file = model_root / "sfincs.obs"
-        if obs_file.exists():
-            return SfincsPlotStage._parse_obs_names(obs_file)
-        return []
+        Returns
+        -------
+        noaa_indices : list[int]
+            Observation-point indices that correspond to a NOAA CO-OPS station.
+        noaa_station_ids : list[str]
+            Corresponding CO-OPS station IDs (same order as *noaa_indices*).
+        """
+        import json
+
+        map_path = get_model_root(self.config) / "obs_station_map.json"
+        entries = json.loads(map_path.read_text())
+        noaa_indices = [e["index"] for e in entries if "station_id" in e]
+        noaa_station_ids = [e["station_id"] for e in entries if "station_id" in e]
+        return noaa_indices, noaa_station_ids
 
     def run(self) -> dict[str, Any]:
         """Read SFINCS output, fetch NOAA observations, and plot comparison."""
-        from hydromt_sfincs import SfincsModel  # pyright: ignore[reportMissingImports]
-
         model_root = get_model_root(self.config)
         his_file = model_root / "sfincs_his.nc"
 
@@ -1734,31 +2113,45 @@ class SfincsPlotStage(_SfincsStageBase):
             return {"status": "skipped", "reason": "no output"}
 
         self._update_substep("Reading SFINCS output")
-        mod = SfincsModel(str(model_root), mode="r")
-        mod.read()
-        mod.output.read()
+        # Reuse the model already in the registry (read during init)
+        # instead of opening a fresh SfincsModel.  Creating a new model
+        # and calling read() can fail for quadtree grids when the
+        # written sfincs.nc is not fully UGRID-compatible.
+        mod = _get_model(self.config)
 
-        # Prefer point_zs (water surface elevation) over point_h (water depth)
-        if "point_zs" in mod.output.data:
-            point_zs = mod.output.data["point_zs"]
-        elif "point_h" in mod.output.data:
-            self._log("point_zs not found, falling back to point_h (water depth)")
-            point_zs = mod.output.data["point_h"]
-        else:
+        # Try reading output via the HydroMT component first; fall back
+        # to a direct xarray open of sfincs_his.nc when the output
+        # component fails (e.g. quadtree map output lacks UGRID topology).
+        point_zs: xr.DataArray | None = None
+        try:
+            mod.output.read()
+            if "point_zs" in mod.output.data:
+                point_zs = cast("xr.DataArray", mod.output.data["point_zs"])
+            elif "point_h" in mod.output.data:
+                self._log("point_zs not found, falling back to point_h (water depth)")
+                point_zs = cast("xr.DataArray", mod.output.data["point_h"])
+        except Exception as exc:
+            self._log(f"HydroMT output.read() failed ({exc}), reading sfincs_his.nc directly")
+
+        if point_zs is None:
+            # Direct read of the history file (always plain NetCDF).
+            import xarray as xr_mod
+
+            his_ds = xr_mod.open_dataset(his_file)
+            for var in ("point_zs", "point_h"):
+                if var in his_ds:
+                    point_zs = his_ds[var]
+                    if var == "point_h":
+                        self._log("point_zs not found, falling back to point_h (water depth)")
+                    break
+
+        if point_zs is None:
             self._log("No point_zs or point_h in output, skipping plot stage")
             return {"status": "skipped", "reason": "no point_zs"}
 
-        point_zs = cast("xr.DataArray", point_zs)
         station_dim = self._station_dim(point_zs)
-        obs_names = self._read_obs_names(mod, model_root)
 
-        # Identify NOAA stations by the "noaa_" prefix
-        noaa_indices: list[int] = []
-        noaa_station_ids: list[str] = []
-        for i, name in enumerate(obs_names):
-            if str(name).startswith("noaa_"):
-                noaa_indices.append(i)
-                noaa_station_ids.append(str(name).removeprefix("noaa_"))
+        noaa_indices, noaa_station_ids = self._match_noaa_stations()
 
         if not noaa_station_ids:
             self._log("No NOAA observation points found, skipping plot stage")

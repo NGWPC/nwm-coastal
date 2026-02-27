@@ -4,11 +4,9 @@ The coastal calibration workflow consists of sequential stages, each performing 
 specific task in the simulation pipeline. The stage order depends on the selected model
 (SCHISM or SFINCS).
 
-Both `run` and `submit` execute the same stage pipeline. Each stage is classified as
-either **Python-only** or **container** (requires Singularity/MPI). When using `submit`,
-Python-only stages run on the login node while container stages are submitted as a SLURM
-job. When using `run`, all stages execute locally (e.g., inside an interactive compute
-session).
+The `run` command executes all stages sequentially. Each stage is classified as either
+**Python-only** or **container** (requires Singularity/MPI). All stages execute locally
+on the allocated compute nodes (e.g., inside an `sbatch` script).
 
 ## SCHISM Stage Overview
 
@@ -17,8 +15,8 @@ flowchart TD
     A[download] --> B[pre_forcing]
     B --> C[nwm_forcing]
     C --> D[post_forcing]
-    D --> E[update_params]
-    E --> F[schism_obs]
+    D --> E[schism_obs]
+    E --> F[update_params]
     F --> G[boundary_conditions]
     G --> H[pre_schism]
     H --> I[schism_run]
@@ -57,7 +55,7 @@ flowchart TD
 - NWM streamflow data (CHRTOUT files)
 - STOFS or GLOFS water level data (when applicable)
 
-**Runs On:** Login node (before SLURM job submission)
+**Runs On:** Compute node (Python-only, no container needed)
 
 **Outputs:**
 
@@ -117,7 +115,45 @@ work_dir/
 
 **Runs On:** Compute node (inside Singularity)
 
-### 5. update_params
+### 5. schism_obs
+
+**Purpose:** Automatically discover NOAA CO-OPS water level stations within the model
+domain and generate a SCHISM `station.in` file so that SCHISM writes time-series output
+at those locations.
+
+**Enabled by:** `model_config.include_noaa_gages: true` (disabled by default)
+
+**How it works:**
+
+1. Parses `hgrid.gr3` to extract the coordinates of all open boundary nodes.
+1. Computes a concave hull around the boundary points (using `shapely.concave_hull` with
+    `ratio=0.05`).
+1. Queries the NOAA CO-OPS API to find active water level stations that fall inside the
+    hull polygon.
+1. Writes `station.in` (SCHISM station definition file with elevation-only output flag)
+    and a companion `station_noaa_ids.txt` that maps each station index to its NOAA
+    station ID.
+
+**Runs On:** Compute node (Python-only). Requires network access for the CO-OPS API
+call.
+
+**Outputs:**
+
+```
+work_dir/
+├── station.in             # SCHISM station definition file
+└── station_noaa_ids.txt   # Index-to-NOAA-ID mapping
+```
+
+!!! note "param.nml patching"
+
+    When `station.in` exists, the `pre_schism` stage automatically patches `param.nml` to
+    set `iout_sta = 1` (enable station output) and `nspool_sta = 18` (output interval in
+    time-steps). The value `nspool_sta = 18` is chosen because it divides all `nhot_write`
+    values used across domain templates (162, 324, 8640, etc.), satisfying the SCHISM
+    constraint `mod(nhot_write, nspool_sta) == 0`.
+
+### 6. update_params
 
 **Purpose:** Generate SCHISM parameter file and symlink mesh files.
 
@@ -137,48 +173,6 @@ work_dir/
 ├── hgrid.gr3 (symlink)
 └── param.nml
 ```
-
-### 6. schism_obs
-
-**Purpose:** Automatically discover NOAA CO-OPS water level stations within the model
-domain and generate a SCHISM `station.in` file so that SCHISM writes time-series output
-at those locations.
-
-**Enabled by:** `model_config.include_noaa_gages: true` (disabled by default)
-
-**Depends on:** `update_params` (which symlinks `hgrid.gr3` into the work directory).
-When running via `submit`, this stage is promoted to the login node and the dependency
-on `hgrid.gr3` is resolved automatically via a symlink from the parameter directory.
-
-**How it works:**
-
-1. Parses `hgrid.gr3` to extract the coordinates of all open boundary nodes.
-1. Computes a concave hull around the boundary points (using `shapely.concave_hull` with
-    `ratio=0.05`).
-1. Queries the NOAA CO-OPS API to find active water level stations that fall inside the
-    hull polygon.
-1. Writes `station.in` (SCHISM station definition file with elevation-only output flag)
-    and a companion `station_noaa_ids.txt` that maps each station index to its NOAA
-    station ID.
-
-**Runs On:** Login node (in `submit` mode) or compute node (in `run` mode). Requires
-network access for the CO-OPS API call.
-
-**Outputs:**
-
-```
-work_dir/
-├── station.in             # SCHISM station definition file
-└── station_noaa_ids.txt   # Index-to-NOAA-ID mapping
-```
-
-!!! note "param.nml patching"
-
-    When `station.in` exists, the `pre_schism` stage automatically patches `param.nml` to
-    set `iout_sta = 1` (enable station output) and `nspool_sta = 18` (output interval in
-    time-steps). The value `nspool_sta = 18` is chosen because it divides all `nhot_write`
-    values used across domain templates (162, 324, 8640, etc.), satisfying the SCHISM
-    constraint `mod(nhot_write, nspool_sta) == 0`.
 
 ### 7. boundary_conditions
 
@@ -257,8 +251,8 @@ every station discovered by the `schism_obs` stage.
     observed water levels.
 1. Saves PNG figures to the `figs/` subdirectory.
 
-**Runs On:** Login node (in `submit` mode, after SLURM job completes) or compute node
-(in `run` mode). Requires network access for the CO-OPS API call.
+**Runs On:** Compute node (Python-only). Requires network access for the CO-OPS API
+call.
 
 **Outputs:**
 
@@ -449,23 +443,19 @@ STOFS water level data.
 
 ## Running Partial Workflows
 
-Both `run` and `submit` support `--start-from` and `--stop-after`.
+The `run` command supports `--start-from` and `--stop-after`.
 
 ### CLI
 
 ```bash
-# SCHISM examples (run)
+# SCHISM examples
 coastal-calibration run config.yaml --stop-after download
 coastal-calibration run config.yaml --start-from pre_forcing --stop-after post_forcing
 coastal-calibration run config.yaml --start-from boundary_conditions
 
-# SCHISM examples (submit)
-coastal-calibration submit config.yaml --start-from boundary_conditions -i
-coastal-calibration submit config.yaml --stop-after post_forcing
-
 # SFINCS examples
 coastal-calibration run config.yaml --stop-after sfincs_write
-coastal-calibration submit config.yaml --start-from sfincs_run -i
+coastal-calibration run config.yaml --start-from sfincs_run
 ```
 
 ### Python API
@@ -476,11 +466,8 @@ from coastal_calibration import CoastalCalibConfig, CoastalCalibRunner
 config = CoastalCalibConfig.from_yaml("config.yaml")
 runner = CoastalCalibRunner(config)
 
-# Run specific stages locally
+# Run specific stages
 result = runner.run(start_from="pre_forcing", stop_after="post_forcing")
-
-# Submit partial pipeline to SLURM
-result = runner.submit(wait=True, start_from="boundary_conditions")
 ```
 
 ## Error Handling
@@ -510,8 +497,8 @@ Stage timing:
   pre_forcing: 12.3s
   nwm_forcing: 234.5s
   post_forcing: 8.7s
-  update_params: 2.1s
   schism_obs: 3.8s
+  update_params: 2.1s
   boundary_conditions: 156.8s
   pre_schism: 5.4s
   schism_run: 1823.6s
@@ -519,3 +506,88 @@ Stage timing:
   schism_plot: 15.4s
 Total: 2375.0s
 ```
+
+## SFINCS Creation Stages
+
+The `create` command builds a new SFINCS quadtree model from an AOI polygon. It uses a
+separate configuration schema (`SfincsCreateConfig`) and a dedicated runner
+(`SfincsCreator`) with resumable execution — completion is tracked in
+`.create_status.json` so that interrupted runs can be resumed with `--start-from`.
+
+```mermaid
+flowchart TD
+    A[create_grid] --> B[create_fetch_elevation]
+    B --> C[create_elevation]
+    C --> D[create_mask]
+    D --> E[create_boundary]
+    E --> F[create_subgrid]
+    F --> G[create_write]
+```
+
+### 1. create_grid
+
+**Purpose:** Generate a SFINCS quadtree grid from the AOI polygon.
+
+**Tasks:**
+
+- Read the AOI polygon (GeoJSON, Shapefile, etc.)
+- Create the base grid in the specified CRS
+- Apply quadtree refinement based on configured levels and criteria
+
+### 2. create_fetch_elevation
+
+**Purpose:** Fetch a NOAA coastal DEM covering the AOI.
+
+**Tasks:**
+
+- Query the packaged NOAA DEM spatial index to find the best-matching dataset based on
+    AOI overlap, resolution, and year
+- Download the DEM tiles from the NOAA `noaa-nos-coastal-lidar-pds` S3 bucket
+- Mosaic tiles and clip to the AOI extent
+
+### 3. create_elevation
+
+**Purpose:** Add elevation and bathymetry data to the grid.
+
+**Tasks:**
+
+- Load configured elevation datasets (e.g., fetched NOAA DEM, NWS topobathy)
+- Interpolate elevation values onto the quadtree grid cells
+- Apply `zmin`/`zmax` filters per dataset
+
+### 4. create_mask
+
+**Purpose:** Create the active cell mask.
+
+**Tasks:**
+
+- Determine which grid cells are active based on elevation thresholds
+- Apply land/water masking criteria
+
+### 5. create_boundary
+
+**Purpose:** Create water level boundary cells.
+
+**Tasks:**
+
+- Identify grid cells along the open ocean boundary
+- Assign boundary condition flags
+
+### 6. create_subgrid
+
+**Purpose:** Generate subgrid lookup tables.
+
+**Tasks:**
+
+- Compute high-resolution subgrid tables from the DEM
+- These tables allow SFINCS to use coarse computational cells while capturing fine-scale
+    topographic detail
+
+### 7. create_write
+
+**Purpose:** Write the complete SFINCS model to disk.
+
+**Tasks:**
+
+- Write all SFINCS input files to the configured `output_dir`
+- The output directory can be used as `prebuilt_dir` in a simulation config

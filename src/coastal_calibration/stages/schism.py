@@ -5,11 +5,10 @@ from __future__ import annotations
 import math
 import re
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
-from coastal_calibration.config.schema import SchismModelConfig
 from coastal_calibration.stages.base import WorkflowStage
 
 if TYPE_CHECKING:
@@ -17,7 +16,7 @@ if TYPE_CHECKING:
 
     from numpy.typing import NDArray
 
-    from coastal_calibration.config.schema import CoastalCalibConfig
+    from coastal_calibration.config.schema import CoastalCalibConfig, SchismModelConfig
     from coastal_calibration.utils.logging import WorkflowMonitor
 
 # Buffer size for reading large hgrid.gr3 files (8 MB).
@@ -230,8 +229,7 @@ class SchismObservationStage(WorkflowStage):
         monitor: WorkflowMonitor | None = None,
     ) -> None:
         super().__init__(config, monitor)
-        assert isinstance(config.model_config, SchismModelConfig)  # noqa: S101
-        self.model: SchismModelConfig = config.model_config
+        self.model: SchismModelConfig = cast("SchismModelConfig", config.model_config)
 
     def run(self) -> dict[str, Any]:
         """Discover stations and write station.in."""
@@ -320,8 +318,8 @@ class SchismObservationStage(WorkflowStage):
             )
 
         station_ids = selected["station_id"].tolist()
-        lons = [row.geometry.x for _, row in selected.iterrows()]
-        lats = [row.geometry.y for _, row in selected.iterrows()]
+        lons = selected.geometry.x.tolist()
+        lats = selected.geometry.y.tolist()
 
         # Write station.in and companion ID file
         self._update_substep("Writing station.in")
@@ -352,8 +350,7 @@ class PreSCHISMStage(WorkflowStage):
         monitor: WorkflowMonitor | None = None,
     ) -> None:
         super().__init__(config, monitor)
-        assert isinstance(config.model_config, SchismModelConfig)  # noqa: S101
-        self.model: SchismModelConfig = config.model_config
+        self.model: SchismModelConfig = cast("SchismModelConfig", config.model_config)
 
     def run(self) -> dict[str, Any]:
         """Execute SCHISM pre-processing."""
@@ -366,7 +363,7 @@ class PreSCHISMStage(WorkflowStage):
 
         self.run_singularity_command(
             [str(script_path)],
-            sif_path=self.config.model_config.singularity_image,
+            sif_path=self.model.singularity_image,
             env=env,
         )
 
@@ -409,8 +406,7 @@ class SCHISMRunStage(WorkflowStage):
         monitor: WorkflowMonitor | None = None,
     ) -> None:
         super().__init__(config, monitor)
-        assert isinstance(config.model_config, SchismModelConfig)  # noqa: S101
-        self.model: SchismModelConfig = config.model_config
+        self.model: SchismModelConfig = cast("SchismModelConfig", config.model_config)
 
     def run(self) -> dict[str, Any]:
         """Execute SCHISM model run."""
@@ -463,8 +459,7 @@ class PostSCHISMStage(WorkflowStage):
         monitor: WorkflowMonitor | None = None,
     ) -> None:
         super().__init__(config, monitor)
-        assert isinstance(config.model_config, SchismModelConfig)  # noqa: S101
-        self.model: SchismModelConfig = config.model_config
+        self.model: SchismModelConfig = cast("SchismModelConfig", config.model_config)
 
     def run(self) -> dict[str, Any]:
         """Execute SCHISM post-processing."""
@@ -520,8 +515,7 @@ class SchismPlotStage(WorkflowStage):
         monitor: WorkflowMonitor | None = None,
     ) -> None:
         super().__init__(config, monitor)
-        assert isinstance(config.model_config, SchismModelConfig)  # noqa: S101
-        self.model: SchismModelConfig = config.model_config
+        self.model: SchismModelConfig = cast("SchismModelConfig", config.model_config)
 
     def _fetch_observations_msl(
         self,
@@ -620,6 +614,9 @@ class SchismPlotStage(WorkflowStage):
         list[Path]
             Paths to the saved figures.
         """
+        import matplotlib
+
+        matplotlib.use("Agg")
         import matplotlib.dates as mdates
         import matplotlib.pyplot as plt
 
@@ -655,40 +652,33 @@ class SchismPlotStage(WorkflowStage):
             for i, (sid, col_idx) in enumerate(batch):
                 ax = axes_flat[i]
 
-                # Simulated
+                # _plotable_stations guarantees both sim & obs have
+                # finite values, so we can plot unconditionally.
                 sim_ts = sim_elevation[:, col_idx]
-                has_sim = bool(np.isfinite(sim_ts).any())
+                obs_wl = obs_ds.water_level.sel(station=sid)
 
-                # Observed
-                has_obs = False
-                if sid in obs_ds.station.values:
-                    obs_wl = obs_ds.water_level.sel(station=sid)
-                    has_obs = bool(np.isfinite(obs_wl).any())
-                    if has_obs:
-                        ax.plot(
-                            obs_wl.time.values,
-                            obs_wl.values,
-                            label="Observed",
-                            color="k",
-                            linewidth=1.0,
-                        )
-
-                if has_sim:
-                    ax.plot(
-                        sim_times,
-                        sim_ts,
-                        color="r",
-                        ls="--",
-                        alpha=0.5,
-                    )
-                    ax.scatter(
-                        sim_times,
-                        sim_ts,
-                        label="Simulated",
-                        color="r",
-                        marker="x",
-                        s=25,
-                    )
+                ax.plot(
+                    obs_wl.time.values,
+                    obs_wl.values,
+                    label="Observed",
+                    color="k",
+                    linewidth=1.0,
+                )
+                ax.plot(
+                    sim_times,
+                    sim_ts,
+                    color="r",
+                    ls="--",
+                    alpha=0.5,
+                )
+                ax.scatter(
+                    sim_times,
+                    sim_ts,
+                    label="Simulated",
+                    color="r",
+                    marker="x",
+                    s=25,
+                )
 
                 ax.set_title(f"NOAA {sid}", fontsize=14, fontweight="bold")
                 ax.set_ylabel("Water Level (m, MSL)", fontsize=12)
@@ -755,13 +745,11 @@ class SchismPlotStage(WorkflowStage):
             elevation = elevation[:, :n]
             station_ids = station_ids[:n]
 
-        # Convert simulation time to datetimes
+        # Convert simulation time to datetimes (vectorised).
         sim = self.config.simulation
         start_dt = sim.start_date
-        sim_times = np.array(
-            [start_dt + timedelta(seconds=float(t)) for t in time_seconds],
-            dtype="datetime64[ns]",
-        )
+        start_ns = np.datetime64(start_dt, "ns")
+        sim_times = start_ns + (time_seconds * 1e9).astype("timedelta64[ns]")
 
         # Fetch observed water levels (MLLW -> MSL)
         self._update_substep("Fetching NOAA CO-OPS observations")

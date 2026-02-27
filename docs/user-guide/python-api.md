@@ -20,13 +20,13 @@ if errors:
     for error in errors:
         print(f"Error: {error}")
 else:
-    # Submit the job
-    result = runner.submit(wait=True)
+    # Run the workflow
+    result = runner.run()
 
     if result.success:
-        print(f"Job {result.job_id} completed successfully")
+        print(f"Completed in {result.duration_seconds:.1f}s")
     else:
-        print(f"Job failed: {result.errors}")
+        print(f"Failed: {result.errors}")
 ```
 
 ## Configuration
@@ -40,7 +40,6 @@ from coastal_calibration import CoastalCalibConfig
 config = CoastalCalibConfig.from_yaml("config.yaml")
 
 # Access configuration values
-print(config.slurm.job_name)
 print(config.simulation.coastal_domain)
 print(config.paths.work_dir)
 print(config.model)  # "schism" or "sfincs"
@@ -53,7 +52,6 @@ from datetime import datetime
 from pathlib import Path
 from coastal_calibration import (
     CoastalCalibConfig,
-    SlurmConfig,
     SimulationConfig,
     BoundaryConfig,
     PathConfig,
@@ -63,9 +61,6 @@ from coastal_calibration import (
 )
 
 config = CoastalCalibConfig(
-    slurm=SlurmConfig(
-        job_name="my_simulation",
-    ),
     simulation=SimulationConfig(
         start_date=datetime(2021, 6, 11),
         duration_hours=24,
@@ -95,9 +90,6 @@ model configuration:
 
 ```python
 config = CoastalCalibConfig(
-    slurm=SlurmConfig(
-        job_name="hawaii_with_obs",
-    ),
     simulation=SimulationConfig(
         start_date=datetime(2021, 6, 11),
         duration_hours=24,
@@ -132,7 +124,6 @@ from datetime import datetime
 from pathlib import Path
 from coastal_calibration import (
     CoastalCalibConfig,
-    SlurmConfig,
     SimulationConfig,
     BoundaryConfig,
     PathConfig,
@@ -142,7 +133,6 @@ from coastal_calibration import (
 TEXAS_DIR = Path("/path/to/texas/model")
 
 config = CoastalCalibConfig(
-    slurm=SlurmConfig(),
     simulation=SimulationConfig(
         start_date=datetime(2025, 6, 1),
         duration_hours=168,
@@ -191,35 +181,7 @@ else:
 
 ## Workflow Execution
 
-### Submit to SLURM
-
-Both `run()` and `submit()` execute the same stage pipeline. `submit()` automatically
-partitions stages: Python-only stages run on the login node, while container stages are
-bundled into a SLURM job.
-
-```python
-from coastal_calibration import CoastalCalibConfig, CoastalCalibRunner
-
-config = CoastalCalibConfig.from_yaml("config.yaml")
-runner = CoastalCalibRunner(config)
-
-# Submit and return immediately
-result = runner.submit(wait=False)
-print(f"Job {result.job_id} submitted")
-
-# Submit and wait for completion
-result = runner.submit(wait=True)
-if result.success:
-    print(f"Job completed in {result.duration_seconds:.1f}s")
-
-# Submit partial pipeline
-result = runner.submit(wait=True, start_from="boundary_conditions")
-result = runner.submit(wait=True, stop_after="post_forcing")
-```
-
-### Run Directly
-
-For testing or when already inside a SLURM job:
+### Run the Workflow
 
 ```python
 # Run complete workflow
@@ -237,10 +199,9 @@ result = runner.run(start_from="pre_schism")
 The `WorkflowResult` object contains information about the execution:
 
 ```python
-result = runner.submit(wait=True)
+result = runner.run()
 
 print(f"Success: {result.success}")
-print(f"Job ID: {result.job_id}")
 print(f"Duration: {result.duration_seconds}s")
 
 if not result.success:
@@ -295,7 +256,7 @@ logger = setup_logger(log_level="DEBUG", log_file="workflow.log")
 # Now run your workflow
 config = CoastalCalibConfig.from_yaml("config.yaml")
 runner = CoastalCalibRunner(config)
-result = runner.submit(wait=True)
+result = runner.run()
 ```
 
 ## Example: Batch Processing
@@ -326,14 +287,15 @@ for start_date in start_dates:
     date_str = start_date.strftime("%Y%m%d")
     config.paths.work_dir = config.paths.work_dir.parent / f"run_{date_str}"
 
-    # Submit
+    # Run
     runner = CoastalCalibRunner(config)
-    result = runner.submit(wait=False)  # Don't wait, submit all jobs
+    result = runner.run()
     results.append((start_date, result))
 
-# Report job IDs
+# Report results
 for start_date, result in results:
-    print(f"{start_date}: Job {result.job_id}")
+    status = "Success" if result.success else "Failed"
+    print(f"{start_date}: {status}")
 ```
 
 ## Example: Domain Comparison
@@ -354,6 +316,6 @@ for domain in domains:
         print(f"{domain}: Validation failed - {errors}")
         continue
 
-    result = runner.submit(wait=True)
+    result = runner.run()
     print(f"{domain}: {'Success' if result.success else 'Failed'}")
 ```

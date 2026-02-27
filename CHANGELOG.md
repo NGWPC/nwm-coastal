@@ -5,10 +5,71 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0] - 2026-02-19
+## [Unreleased]
 
 ### Added
 
+- `create` CLI command for building SFINCS quadtree models from an AOI polygon. The
+    workflow supports grid generation with quadtree refinement, automatic NOAA DEM
+    discovery and download, elevation/bathymetry, active cell mask, boundary cells,
+    optional NWM discharge source points, and subgrid table generation.
+- `prepare-topobathy` CLI command for downloading NWS 30 m topobathymetric DEMs from
+    `icechunk` (S3) clipped to an AOI bounding box, with HydroMT data catalog output.
+- `update-dem-index` CLI command for rebuilding the NOAA DEM spatial index from S3 STAC
+    metadata.
+- `SfincsCreateConfig` configuration schema for the `create` workflow, with sections for
+    grid, elevation, mask, subgrid, and optional NWM discharge.
+- `SfincsCreator` runner with resumable execution (tracks completion in
+    `.create_status.json`) and `--start-from`/`--stop-after` support.
+- NOAA DEM auto-discovery utility (`noaa_dem.py`) that selects the best-matching coastal
+    DEM based on AOI overlap, resolution, and year.
+- NWS topobathy fetch utility (`topobathy.py`) for domain-specific DEM downloads via
+    `icechunk`.
+
+### Changed
+
+- Remove the `submit` execution path and `SlurmConfig` entirely. The `run` command is
+    now the sole entry point — use it inside user-written `sbatch` scripts instead. Old
+    YAML configs with a `slurm:` key are silently ignored for backward compatibility.
+    The `${slurm.user}` path-template alias continues to work, resolving from the
+    `$USER` environment variable.
+- Replace `assert isinstance(...)` with `typing.cast()` for `SchismModelConfig` type
+    narrowing in all stage modules (`boundary`, `forcing`, `schism`), since `assert`
+    statements are stripped by `python -O`.
+- Switch type checker from `pyright` to `ty`.
+- Switch documentation theme from `mkdocs-material` to `mkdocs-materialx`.
+
+### Fixed
+
+- Resolve all `ty` type-checker diagnostics across the codebase: invalid-assignment in
+    `coops_api.get_datums`, stale `type: ignore` comments in `_hydromt_compat`,
+    `download`, and `runner`, a possible `None` dereference in `logging` file-handler
+    stream reconfiguration, and dead `_work_dir` code path in `WorkflowMonitor`.
+
+### Removed
+
+- `SlurmConfig`, `SlurmManager`, `JobState`, and the `submit` CLI command.
+- `utils/slurm.py` module.
+- All submit/slurm-related tests and fixtures.
+
+## [3.1.1.0.0] - 2026-02-19
+
+### Added
+
+- Initial release of NWM Coastal
+- SCHISM coastal model workflow support
+- YAML configuration with variable interpolation
+- Configuration inheritance with `_base` field
+- CLI commands: `init`, `validate`, `submit`, `run`, `stages`
+- Python API for programmatic workflow control
+- Automatic data download from NWM and STOFS sources
+- Support for TPXO and STOFS boundary conditions
+- Support for four coastal domains: Hawaii, PRVI, Atlantic/Gulf, Pacific
+- Interactive and non-interactive job submission modes
+- Partial workflow execution with `--start-from` and `--stop-after`
+- Smart default paths with interpolation templates
+- Comprehensive configuration validation
+- MkDocs documentation with Material theme
 - Per-stage completion tracking in the `submit` path's generated runner script: each
     container stage is recorded in `.pipeline_status.json` as it finishes, enabling
     mid-pipeline restarts after a SLURM job failure without re-running expensive stages
@@ -21,13 +82,13 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     to CONUS scale — **reducing SFINCS runtime from 15 h+ to under 15 min**.
 - Stale netCDF file cleanup in `SfincsInitStage` to prevent HDF5 segfaults when
     re-running a pipeline over an existing model directory.
-- Geodataset-based water-level forcing with IDW interpolation to boundary points,
+- `GeoDataset`-based water-level forcing with IDW interpolation to boundary points,
     replacing the built-in `model.water_level.create(geodataset=...)` which passed all
     source stations incompatibly with `.bnd` files.
 - Active-cell filtering for discharge source points to prevent a SFINCS Fortran segfault
     when a source point falls on an inactive grid cell.
 - `apply_all_patches()` convenience function in `_hydromt_compat` that applies all
-    hydromt/hydromt-sfincs compatibility patches in one call, with logging.
+    `hydromt`/`hydromt-sfincs` compatibility patches in one call, with logging.
 - `quiet` parameter on `WorkflowMonitor.mark_stage_completed()` to control whether a
     visible COMPLETED log line is emitted for externally-executed stages.
 - Unified `run` and `submit` execution pipelines — both commands now execute the same
@@ -56,7 +117,7 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     outside the ±15 m range, indicating a possible sign or magnitude error in
     `forcing_to_mesh_offset_m`.
 - `sfincs_wind`, `sfincs_pressure`, and `sfincs_plot` stages to SFINCS workflow
-- SFINCS coastal model workflow with full pipeline (download through sfincs_run)
+- SFINCS coastal model workflow with full pipeline (download through `sfincs_run`)
 - Polymorphic `ModelConfig` ABC with `SchismModelConfig` and `SfincsModelConfig`
     concrete implementations
 - `MODEL_REGISTRY` for automatic model dispatch from YAML `model:` key
@@ -69,7 +130,7 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - `DownloadStage.description` is now a property that derives its text from the
     configured data sources (e.g. "Download input data (NWM, TPXO)") instead of a static
     string.
-- Hydromt compatibility patches consolidated into `apply_all_patches()` with per-patch
+- `hydromt` compatibility patches consolidated into `apply_all_patches()` with per-patch
     logging; individual imports replaced by a single call.
 - `CoastalCalibConfig` now takes `model_config: ModelConfig` instead of separate
     `model`, `mpi`, and `sfincs` parameters
@@ -120,7 +181,7 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     to avoid `float` index errors.
 - Use numeric comparison (`-gt`) instead of string comparison (`>`) for `LENGTH_HRS` in
     `update_param.bash`.
-- Add missing sub-hourly CHRTOUT symlinks for Hawaii in the last-timestep block of
+- Add missing sub-hourly `CHRTOUT` symlinks for Hawaii in the last-timestep block of
     `initial_discharge.bash`.
 - Read `NSCRIBES` from the environment with a fallback default instead of hardcoding it
     in `pre_schism.bash` and `run_sing_coastal_workflow_post_schism.bash`.
@@ -159,7 +220,7 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     stale copies baked into the container image.
 - Truncate discharge arrays in `merge_source_sink.py` to match the precipitation
     timestep count from `precip_source.nc`, preventing a shape-mismatch `ValueError`
-    when sub-hourly CHRTOUT files (e.g., Hawaii) produce one extra trailing timestep.
+    when sub-hourly `CHRTOUT` files (e.g., Hawaii) produce one extra trailing timestep.
 - Export `SCHISM_BEGIN_DATE` and `SCHISM_END_DATE` in the `submit` path header so that
     `update_param.bash` can patch `param.nml` with the correct simulation start/end
     dates — without these, `param.nml` retains its template defaults (2000-01-01) and
@@ -171,32 +232,5 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 - `MPIConfig` class (fields absorbed into `SchismModelConfig`)
 
-## [0.1.0] - 2026-02-06
-
-### Added
-
-- Initial release of NWM Coastal
-- SCHISM coastal model workflow support
-- YAML configuration with variable interpolation
-- Configuration inheritance with `_base` field
-- CLI commands: `init`, `validate`, `submit`, `run`, `stages`
-- Python API for programmatic workflow control
-- Automatic data download from NWM and STOFS sources
-- Support for TPXO and STOFS boundary conditions
-- Support for four coastal domains: Hawaii, PRVI, Atlantic/Gulf, Pacific
-- Interactive and non-interactive job submission modes
-- Partial workflow execution with `--start-from` and `--stop-after`
-- Smart default paths with interpolation templates
-- Comprehensive configuration validation
-- MkDocs documentation with Material theme
-
-### Supported Data Sources
-
-- NWM Retrospective 3.0 (1979-02-01 to 2023-01-31)
-- NWM Analysis (2018-09-17 to present)
-- STOFS water levels (2020-12-30 to present)
-- GLOFS (Great Lakes OFS, 2005-09-30 to present)
-- TPXO tidal model (local installation required)
-
-[0.1.0]: https://github.com/NGWPC/nwm-coastal/releases/tag/v0.1.0
-[0.2.0]: https://github.com/NGWPC/nwm-coastal/compare/v0.1.0...v0.2.0
+[3.1.1.0.0]: https://github.com/NGWPC/nwm-coastal/releases/tag/3.1.1.0.0
+[unreleased]: https://github.com/NGWPC/nwm-coastal/compare/3.1.1.0.0...HEAD

@@ -40,7 +40,7 @@ class WorkflowStage(ABC):
     def _log(self, message: str, level: str = "info") -> None:
         """Log message if monitor is available."""
         if self.monitor:
-            getattr(self.monitor, level)(message)
+            getattr(self.monitor, level)(f"  {message}")
 
     def _update_substep(self, substep: str) -> None:
         """Update current substep."""

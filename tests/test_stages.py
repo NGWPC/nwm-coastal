@@ -14,7 +14,6 @@ from coastal_calibration.config.schema import (
     PathConfig,
     SchismModelConfig,
     SimulationConfig,
-    SlurmConfig,
 )
 from coastal_calibration.stages.base import WorkflowStage
 from coastal_calibration.stages.boundary import (
@@ -265,7 +264,6 @@ class TestBuildDateEnvNegativeDuration:
 
     def test_negative_duration(self, tmp_path):
         config = CoastalCalibConfig(
-            slurm=SlurmConfig(user="test"),
             simulation=SimulationConfig(
                 start_date=datetime(2021, 6, 11),
                 duration_hours=-24,

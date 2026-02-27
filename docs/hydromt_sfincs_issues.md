@@ -390,3 +390,85 @@ are added and either:
 `scipy.spatial.cKDTree` to map each source point to its nearest quadtree face, checks
 the face mask value, and drops points on inactive cells. The names of dropped points are
 logged as a warning.
+
+______________________________________________________________________
+
+## 10. `_parse_river_list` crashes on freshly created models (`KeyError: 'geoms'`)
+
+**Summary**:
+
+`SfincsModel._parse_river_list()` crashes with `KeyError: 'geoms'` when called on a
+model created in write mode (`mode="w+"`). This makes it impossible to use river burning
+(`burn_river_rect`) during subgrid table creation on new models — i.e. whenever
+`subgrid.create(river_list=...)` is called as part of a model-building workflow rather
+than on a model read from disk.
+
+**Root cause**:
+
+`_parse_river_list` (`sfincs.py`, line 744) checks whether a river centerline dataset
+name already exists as a loaded model geometry:
+
+```python
+if isinstance(rivers, str) and rivers in self.geoms:
+    gdf_riv = self.geoms[rivers].copy()
+else:
+    gdf_riv = self.data_catalog.get_geodataframe(rivers, ...)
+```
+
+In `hydromt` v1+, `self.geoms` is resolved via `Model.__getattr__` →
+`Model.get_component`, which looks up `"geoms"` in the component registry
+(`self.components["geoms"]`). On freshly created models the `geoms` component is never
+registered, so the lookup raises:
+
+```python
+KeyError: "geoms"
+```
+
+Python's `and` operator should short-circuit, but the `KeyError` is raised by the
+attribute access itself (`self.geoms`), not by the `in` operator. The exception
+propagates before the `in` check can execute, and the `else` branch
+(`data_catalog.get_geodataframe`) — which is the correct code path for new models — is
+never reached.
+
+### Reproduction
+
+```python
+from hydromt_sfincs import SfincsModel
+
+sf = SfincsModel(root="./test_model", mode="w+", data_libs=["my_catalog.yml"])
+
+# ... create grid, elevation, mask, roughness ...
+
+sf.subgrid.create(
+    elevation_list=[{"elevation": "dem"}],
+    roughness_list=[{"lulc": "esa_worldcover"}],
+    river_list=[{"centerlines": "my_rivers"}],  # <-- KeyError: 'geoms'
+    nr_subgrid_pixels=5,
+)
+```
+
+**Suggested fix**:
+
+Guard the `self.geoms` access in `_parse_river_list` so that a missing component is
+treated the same as an empty one:
+
+```python
+try:
+    model_geoms = self.geoms
+except KeyError:
+    model_geoms = {}
+
+if isinstance(rivers, str) and rivers in model_geoms:
+    gdf_riv = model_geoms[rivers].copy()
+else:
+    gdf_riv = self.data_catalog.get_geodataframe(rivers, ...)
+```
+
+**Current workaround**:
+
+`patch_parse_river_list_geoms()` in `_hydromt_compat.py` (called from
+`apply_all_patches()`) wraps `_parse_river_list` to temporarily inject an empty dict
+into the model instance's `__dict__` under the key `"geoms"` when the component is
+missing. Python's normal attribute lookup finds the instance dict entry before falling
+through to `__getattr__`, so `self.geoms` resolves to `{}` and the `in` check evaluates
+to `False`.

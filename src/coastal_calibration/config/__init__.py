@@ -2,6 +2,15 @@
 
 from __future__ import annotations
 
+from coastal_calibration.config.create_schema import (
+    DataCatalogConfig,
+    ElevationConfig,
+    ElevationDataset,
+    GridConfig,
+    MaskConfig,
+    SfincsCreateConfig,
+    SubgridConfig,
+)
 from coastal_calibration.config.schema import (
     BoundaryConfig,
     BoundarySource,
@@ -15,7 +24,6 @@ from coastal_calibration.config.schema import (
     SchismModelConfig,
     SfincsModelConfig,
     SimulationConfig,
-    SlurmConfig,
 )
 
 __all__ = [
@@ -23,13 +31,19 @@ __all__ = [
     "BoundarySource",
     "CoastalCalibConfig",
     "CoastalDomain",
+    "DataCatalogConfig",
     "DownloadConfig",
+    "ElevationConfig",
+    "ElevationDataset",
+    "GridConfig",
+    "MaskConfig",
     "ModelConfig",
     "ModelType",
     "MonitoringConfig",
     "PathConfig",
     "SchismModelConfig",
+    "SfincsCreateConfig",
     "SfincsModelConfig",
     "SimulationConfig",
-    "SlurmConfig",
+    "SubgridConfig",
 ]

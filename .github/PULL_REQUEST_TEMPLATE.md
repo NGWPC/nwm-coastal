@@ -18,7 +18,6 @@
 
 ## Screenshots
 
-
 ## Notes
 
 -
@@ -35,11 +34,16 @@
 - [ ] Code follows project standards (link if applicable)
 - [ ] Passes all existing automated tests
 - [ ] Any _change_ in functionality is tested
-- [ ] New functions are documented (with a description, list of inputs, and expected output)
+- [ ] New functions are documented (with a description, list of inputs, and expected
+    output)
 - [ ] Placeholder code is flagged / future todos are captured in comments
-- [ ] Visually tested in supported browsers and devices (see checklist below :point_down:)
-- [ ] Project documentation has been updated (including the "Unreleased" section of the CHANGELOG)
-- [ ] Reviewers requested with the [Reviewers tool](https://help.github.com/articles/requesting-a-pull-request-review/) :arrow_right:
+- [ ] Visually tested in supported browsers and devices (see checklist below
+    :point_down:)
+- [ ] Project documentation has been updated (including the "Unreleased" section of the
+    CHANGELOG)
+- [ ] Reviewers requested with the
+    [Reviewers tool](https://help.github.com/articles/requesting-a-pull-request-review/)
+    :arrow_right:
 
 ## Testing checklist
 
@@ -56,8 +60,8 @@
 
 ### Other
 
-- [ ] Is useable without CSS
-- [ ] Is useable without JS
+- [ ] Is usable without CSS
+- [ ] Is usable without JS
 - [ ] Flexible from small to large screens
 - [ ] No linting errors or warnings
 - [ ] JavaScript tests are passing

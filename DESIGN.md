@@ -61,7 +61,6 @@ proceeds.
 - **Native Python datetime handling** replacing fragile shell date arithmetic
 - **Async data downloading** with built-in source validation
 - **CLI and programmatic APIs** for both interactive and automated use
-- **SLURM job management** with status monitoring
 - **Progress tracking** and structured logging
 - **Configuration inheritance** for DRY multi-run setups
 - **Smart default paths** with variable interpolation
@@ -225,7 +224,6 @@ src/coastal_calibration/
 └── utils/
     ├── __init__.py
     ├── logging.py               # Workflow monitoring
-    ├── slurm.py                 # SLURM job management
     ├── time.py                  # Datetime utilities
     └── workflow.py              # Workflow helper functions
 ```
@@ -285,9 +283,6 @@ Benefits:
 
 ```yaml
 # base.yaml - Shared defaults
-slurm:
-  partition: c5n-18xlarge
-
 paths:
   nfs_mount: /ngen-test
 
@@ -317,13 +312,13 @@ include the `${model}` variable for model-aware directory naming:
 
 ```python
 DEFAULT_WORK_DIR_TEMPLATE = (
-    "/ngen-test/coastal/${slurm.user}/"
+    "/ngen-test/coastal/${user}/"
     "${model}_${simulation.coastal_domain}_${boundary.source}_${simulation.meteo_source}/"
     "${model}_${simulation.start_date}"
 )
 
 DEFAULT_RAW_DOWNLOAD_DIR_TEMPLATE = (
-    "/ngen-test/coastal/${slurm.user}/"
+    "/ngen-test/coastal/${user}/"
     "${model}_${simulation.coastal_domain}_${boundary.source}_${simulation.meteo_source}/"
     "raw_data"
 )
@@ -453,32 +448,6 @@ class CoastalCalibRunner:
         """Execute the calibration workflow."""
         # Validation, stage sequencing, error handling, result collection
         pass
-
-    def submit(self, wait: bool = False) -> WorkflowResult:
-        """Submit workflow as a SLURM job.
-
-        Parameters
-        ----------
-        wait : bool
-            If True, wait for job completion with status updates.
-            If False (default), return immediately after submission.
-        """
-        pass
-```
-
-The `submit()` method execution flow is shown in the sequence diagram below:
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant Runner
-    participant Slurm
-
-    User->>Runner: submit(config)
-    Runner->>Runner: validate()
-    Runner->>Slurm: submit_job()
-    Slurm-->>Runner: job_id
-    Runner-->>User: WorkflowResult
 ```
 
 ______________________________________________________________________
@@ -606,10 +575,6 @@ def download_data(
 **Example SCHISM configuration**:
 
 ```yaml
-slurm:
-  job_name: coastal_calibration
-  partition: c5n-18xlarge
-
 simulation:
   start_date: '2023-06-11T00:00:00'
   duration_hours: 24
@@ -640,9 +605,6 @@ download:
 ```yaml
 model: sfincs
 
-slurm:
-  job_name: sfincs_texas
-
 simulation:
   start_date: 2025-06-01
   duration_hours: 168
@@ -664,40 +626,17 @@ download:
   skip_existing: true
 ```
 
-### 4. Non-Interactive Default with Interactive Flag
+### 4. Direct Execution Inside SLURM Jobs (`run` Command)
 
-**Decision**: The `submit` command returns immediately by default, with an optional
-`--interactive` (`-i`) flag to wait for completion.
-
-**Rationale**:
-
-- Matches standard `sbatch` behavior that users expect
-- Allows users to submit jobs and continue working
-- Interactive mode available when monitoring is desired
-
-**CLI behavior**:
-
-```bash
-# Default: Submit and return immediately (like sbatch)
-coastal-calibration submit config.yaml
-
-# Interactive: Wait for completion with status updates
-coastal-calibration submit config.yaml --interactive
-coastal-calibration submit config.yaml -i
-```
-
-### 5. Direct Execution Inside SLURM Jobs (`run` Command)
-
-**Decision**: Provide a `run` command for direct, in-process execution alongside the
-`submit` command.
+**Decision**: Provide a `run` command for direct, in-process execution inside
+user-written `sbatch` scripts.
 
 **Rationale**:
 
-The `submit` command handles job submission automatically, but users often need full
-control over SLURM resource allocation—for example when using non-default partitions,
-requesting specific hardware, or embedding the workflow in a larger pipeline. The `run`
-command fills this gap: it executes all stages locally on whatever resources are already
-allocated, making it ideal for use inside manually written `sbatch` scripts.
+Users need full control over SLURM resource allocation—for example when using
+non-default partitions, requesting specific hardware, or embedding the workflow in a
+larger pipeline. The `run` command executes all stages locally on whatever resources are
+already allocated, making it ideal for use inside manually written `sbatch` scripts.
 
 **Usage pattern (preferred on clusters)**:
 
@@ -748,11 +687,9 @@ rm -f "${CONFIG_FILE}"
     run concurrently
 - Single-quoted heredoc (`<<'EOF'`) prevents accidental shell variable expansion inside
     the YAML
-- `run` reuses the same stage pipeline as `submit`—the only difference is execution
-    context (in-process vs. SLURM job submission)
 - Complete examples for both SCHISM and SFINCS are provided in `docs/examples/`
 
-### 6. Stable Public API with Incremental Internal Rewrite
+### 5. Stable Public API with Incremental Internal Rewrite
 
 **Decision**: Establish a clean, stable public API while embedding existing scripts as a
 transitional measure.
@@ -801,7 +738,7 @@ This allows:
 1. Deprecate bash scripts as Python replacements are validated
 1. Optimize performance-critical paths (file I/O, data processing)
 
-### 7. Strict Type Checking with `pyright`
+### 6. Strict Type Checking with `pyright`
 
 **Decision**: Use strict `pyright` mode for static type analysis.
 
@@ -888,30 +825,7 @@ class WorkflowMonitor:
         """Save progress to JSON for resumption."""
 ```
 
-### 3. SLURM Integration
-
-**Original**: Manual SLURM script writing, no job tracking.
-
-**New**: Full `SlurmManager` class:
-
-```python
-class SlurmManager:
-    """Manage SLURM job submission and monitoring."""
-
-    def submit_job(self, script_path: Path) -> str:
-        """Submit and return job ID."""
-
-    def get_job_status(self, job_id: str) -> JobStatus:
-        """Query job status from sacct/squeue."""
-
-    def wait_for_job(self, job_id: str, poll_interval: int = 30) -> JobStatus:
-        """Block until job completes, logging state transitions."""
-
-    def generate_job_script(self, output_path: Path) -> Path:
-        """Generate SLURM script from configuration."""
-```
-
-### 4. CLI with Multiple Entry Points
+### 3. CLI with Multiple Entry Points
 
 ```bash
 # Initialize configuration for a domain
@@ -920,11 +834,11 @@ coastal-calibration init config.yaml --domain hawaii
 # Validate configuration
 coastal-calibration validate config.yaml
 
-# Run directly (for testing)
-coastal-calibration run config.yaml --dry-run
+# Run workflow (inside an sbatch script or locally)
+coastal-calibration run config.yaml
 
-# Submit to SLURM cluster
-coastal-calibration submit config.yaml
+# Dry-run to validate without executing
+coastal-calibration run config.yaml --dry-run
 
 # Run partial workflow
 coastal-calibration run config.yaml --start-from update_params --stop-after boundary_conditions
@@ -933,7 +847,7 @@ coastal-calibration run config.yaml --start-from update_params --stop-after boun
 coastal-calibration stages
 ```
 
-### 5. Dual API: CLI and Programmatic
+### 4. Dual API: CLI and Programmatic
 
 ```python
 # Python API
@@ -947,11 +861,11 @@ errors = runner.validate()
 if errors:
     print("Validation failed:", errors)
 else:
-    result = runner.submit()
-    print(f"Job {result.job_id}: {result.success}")
+    result = runner.run()
+    print(f"Success: {result.success}")
 ```
 
-### 6. Comprehensive Downloader
+### 5. Comprehensive Downloader
 
 | Feature           | Original       | New                               |
 | ----------------- | -------------- | --------------------------------- |
@@ -962,7 +876,7 @@ else:
 | Progress tracking | None           | Success/failure counts            |
 | Domain awareness  | Manual         | Automatic URL building            |
 
-### 7. Results Serialization
+### 6. Results Serialization
 
 ```python
 @dataclass
@@ -995,7 +909,6 @@ ______________________________________________________________________
 | Class                | Purpose                                        |
 | -------------------- | ---------------------------------------------- |
 | `CoastalCalibConfig` | Root configuration container                   |
-| `SlurmConfig`        | SLURM scheduling parameters                    |
 | `SimulationConfig`   | Time, domain, and source settings              |
 | `BoundaryConfig`     | TPXO vs STOFS selection                        |
 | `PathConfig`         | All file and directory paths                   |

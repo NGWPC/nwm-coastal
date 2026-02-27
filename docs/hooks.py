@@ -15,11 +15,12 @@ _ROOT = Path(__file__).parent.parent
 changelog = _ROOT / "CHANGELOG.md"
 contributing = _ROOT / "CONTRIBUTING.md"
 design = _ROOT / "DESIGN.md"
+license = _ROOT / "LICENSE"
 
 
 def on_files(files: Files, config: MkDocsConfig) -> Files:
     """Add root-level markdown files to the documentation site."""
-    for path in (changelog, contributing, design):
+    for path in (changelog, contributing, design, license):
         files.append(
             File(
                 path=path.name,

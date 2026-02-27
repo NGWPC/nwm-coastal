@@ -10,9 +10,6 @@ documents all available configuration options.
 The simplest valid SCHISM configuration only requires:
 
 ```yaml
-slurm:
-  job_name: my_run
-
 simulation:
   start_date: 2021-06-11
   duration_hours: 24
@@ -32,9 +29,6 @@ A minimal SFINCS configuration requires a `model` key and a `model_config` secti
 
 ```yaml
 model: sfincs
-
-slurm:
-  job_name: my_sfincs_run
 
 simulation:
   start_date: 2025-06-01
@@ -62,25 +56,24 @@ model_config:
 Configuration values support variable interpolation using `${section.key}` syntax:
 
 ```yaml
-slurm:
-  user: john
-
 simulation:
   coastal_domain: hawaii
 
 paths:
-  work_dir: /data/${slurm.user}/${simulation.coastal_domain}
-  # Resolves to: /data/john/hawaii
+  work_dir: /data/${user}/${simulation.coastal_domain}
+  # Resolves to: /data/<your_username>/hawaii
 ```
+
+The `${user}` variable is automatically resolved from the `$USER` environment variable.
 
 ### Default Path Templates
 
 If not specified, paths are automatically generated using model-aware templates:
 
-| Path               | Default Template                                                                                                                                         |
-| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `work_dir`         | `/ngen-test/coastal/${slurm.user}/${model}_${simulation.coastal_domain}_${boundary.source}_${simulation.meteo_source}/${model}_${simulation.start_date}` |
-| `raw_download_dir` | `/ngen-test/coastal/${slurm.user}/${model}_${simulation.coastal_domain}_${boundary.source}_${simulation.meteo_source}/raw_data`                          |
+| Path               | Default Template                                                                                                                                   |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `work_dir`         | `/ngen-test/coastal/${user}/${model}_${simulation.coastal_domain}_${boundary.source}_${simulation.meteo_source}/${model}_${simulation.start_date}` |
+| `raw_download_dir` | `/ngen-test/coastal/${user}/${model}_${simulation.coastal_domain}_${boundary.source}_${simulation.meteo_source}/raw_data`                          |
 
 The `${model}` variable resolves to `schism` or `sfincs` based on the `model` key.
 
@@ -93,30 +86,6 @@ The top-level `model` key selects the model type. It defaults to `schism` if omi
 ```yaml
 model: sfincs  # or "schism" (default)
 ```
-
-### SLURM Settings
-
-Configure SLURM job scheduling. Compute resources (nodes, tasks) are model-specific and
-live in the `model_config` section.
-
-```yaml
-slurm:
-  job_name: coastal_calibration  # Job name shown in squeue
-  user: your_username            # Optional: defaults to $USER
-  partition: c5n-18xlarge        # SLURM partition
-  time_limit:                    # Time limit (HH:MM:SS), null for no limit
-  account:                       # SLURM account for billing
-  qos:                           # Quality of Service
-```
-
-| Parameter    | Type   | Default               | Description                          |
-| ------------ | ------ | --------------------- | ------------------------------------ |
-| `job_name`   | string | `coastal_calibration` | SLURM job name                       |
-| `user`       | string | `$USER`               | SLURM username (defaults to `$USER`) |
-| `partition`  | string | `c5n-18xlarge`        | SLURM partition                      |
-| `time_limit` | string | null                  | Time limit                           |
-| `account`    | string | null                  | SLURM account                        |
-| `qos`        | string | null                  | Quality of Service                   |
 
 ### Simulation Settings
 
@@ -241,7 +210,7 @@ When set to `true`, two additional stages are activated in the SCHISM pipeline:
     MLLW to MSL datum), and generates 2×2 comparison plots saved to `figs/`.
 
 Both stages require network access for NOAA CO-OPS API calls and are classified as
-Python-only stages (they run on the login node in `submit` mode).
+Python-only stages.
 
 #### SFINCS Model Configuration
 
@@ -359,9 +328,6 @@ Use `_base` to inherit settings from another configuration file:
 
 ```yaml
 # base.yaml - shared settings
-slurm:
-  job_name: coastal_sim
-
 simulation:
   duration_hours: 24
   meteo_source: nwm_ana
@@ -394,6 +360,138 @@ This allows you to:
 - Override only the parameters that differ
 - Maintain consistency across related simulations
 
+## SFINCS Creation Configuration
+
+The `create` command uses a separate configuration schema (`SfincsCreateConfig`) to
+build a new SFINCS quadtree model from an AOI polygon. This config is independent of the
+run/simulation config above.
+
+### Minimal Create Config
+
+```yaml
+aoi: ./texas_aoi.geojson
+output_dir: ./my_sfincs_model
+
+elevation:
+  datasets:
+    - name: nws_topobathy
+      zmin: -20000
+
+data_catalog:
+  data_libs:
+    - ./dem/data_catalog.yml
+```
+
+### Create Configuration Sections
+
+#### Top-Level Fields
+
+| Parameter      | Type | Default                  | Description                                    |
+| -------------- | ---- | ------------------------ | ---------------------------------------------- |
+| `aoi`          | path | **required**             | Path to AOI polygon (GeoJSON, Shapefile, etc.) |
+| `output_dir`   | path | **required**             | Directory where the model will be written      |
+| `download_dir` | path | `{output_dir}/downloads` | Directory for downloaded data (NOAA DEMs)      |
+
+#### Grid Settings (`grid`)
+
+```yaml
+grid:
+  resolution: 50.0
+  crs: utm
+  rotated: true
+  refinement:
+    - polygon: ./aoi.geojson
+      level: 4
+      buffer_m: -3072
+```
+
+| Parameter    | Type  | Default | Description                                         |
+| ------------ | ----- | ------- | --------------------------------------------------- |
+| `resolution` | float | 50.0    | Base grid cell resolution in metres                 |
+| `crs`        | str   | `utm`   | CRS (`"utm"` for auto-detection, or `"EPSG:xxxxx"`) |
+| `rotated`    | bool  | true    | Allow grid rotation for tighter bounding-box fit    |
+| `refinement` | list  | `[]`    | Quadtree refinement levels (see below)              |
+
+Each refinement entry:
+
+| Field      | Type  | Description                                            |
+| ---------- | ----- | ------------------------------------------------------ |
+| `polygon`  | path  | Polygon defining the area to refine                    |
+| `level`    | int   | Refinement level (1 = base, 2 = base/2, 3 = base/4, …) |
+| `buffer_m` | float | Inward buffer in metres (negative shrinks the polygon) |
+
+#### Elevation Settings (`elevation`)
+
+```yaml
+elevation:
+  datasets:
+    - name: nws_topobathy
+      zmin: -20000
+    - name: gebco
+      zmin: -20000
+  buffer_cells: 1
+```
+
+| Parameter      | Type | Default          | Description                        |
+| -------------- | ---- | ---------------- | ---------------------------------- |
+| `datasets`     | list | copdem30 + gebco | Ordered list of elevation datasets |
+| `buffer_cells` | int  | 1                | Buffer cells around grid boundary  |
+
+Each dataset entry:
+
+| Field          | Type  | Description                                          |
+| -------------- | ----- | ---------------------------------------------------- |
+| `name`         | str   | HydroMT data-catalog dataset name                    |
+| `zmin`         | float | Minimum elevation threshold                          |
+| `source`       | str   | Auto-fetch source (`"noaa"` or null)                 |
+| `noaa_dataset` | str   | Explicit NOAA dataset name (auto-discovered if null) |
+
+#### Mask Settings (`mask`)
+
+| Parameter       | Type  | Default | Description                          |
+| --------------- | ----- | ------- | ------------------------------------ |
+| `zmin`          | float | -5.0    | Minimum elevation for active cells   |
+| `boundary_zmax` | float | -5.0    | Maximum elevation for boundary cells |
+| `reset_bounds`  | bool  | true    | Reset existing boundary conditions   |
+
+#### Subgrid Settings (`subgrid`)
+
+| Parameter           | Type  | Default               | Description                          |
+| ------------------- | ----- | --------------------- | ------------------------------------ |
+| `nr_subgrid_pixels` | int   | 5                     | Number of subgrid pixels per cell    |
+| `lulc_dataset`      | str   | `esa_worldcover_2021` | Land-use/land-cover dataset          |
+| `reclass_table`     | path  | null                  | Custom reclassification table CSV    |
+| `manning_land`      | float | 0.04                  | Default Manning coefficient for land |
+| `manning_sea`       | float | 0.02                  | Default Manning coefficient for sea  |
+
+#### Data Catalog (`data_catalog`)
+
+| Parameter   | Type | Default | Description                                |
+| ----------- | ---- | ------- | ------------------------------------------ |
+| `data_libs` | list | `[]`    | Additional HydroMT data catalog YAML paths |
+
+#### NWM Discharge (`nwm_discharge`) — Optional
+
+When configured, adds NWM streamflow discharge source points to the model by
+intersecting hydrofabric flowpaths with the AOI boundary.
+
+```yaml
+nwm_discharge:
+  hydrofabric_gpkg: ./nwm_hydrofabric.gpkg
+  flowpaths_layer: flowpaths
+  flowpath_id_column: feature_id
+  flowpath_ids: [12345, 67890]
+  coastal_domain: atlgulf
+```
+
+| Parameter            | Type | Default  | Description                             |
+| -------------------- | ---- | -------- | --------------------------------------- |
+| `hydrofabric_gpkg`   | path | required | Path to NWM hydrofabric GeoPackage      |
+| `flowpaths_layer`    | str  | required | Layer name with flowpath linestrings    |
+| `flowpath_id_column` | str  | required | Column matching NWM `feature_id` values |
+| `flowpath_ids`       | list | required | NWM feature IDs to extract              |
+| `coastal_domain`     | str  | `conus`  | NWM coastal domain for ID validation    |
+
 ## Validation
 
 Validate your configuration before running:
@@ -407,6 +505,5 @@ The validation checks:
 - All required fields are present
 - Date ranges are valid for selected data sources
 - File paths exist (for required files)
-- SLURM parameters are valid
 - Model-specific configuration is consistent (e.g., nscribes < total MPI tasks for
     SCHISM)

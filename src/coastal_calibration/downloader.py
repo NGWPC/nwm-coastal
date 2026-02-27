@@ -634,7 +634,7 @@ def _log_summary(results: DownloadResults) -> None:
     for result in results:
         status = "OK" if not result.errors else "ERRORS"
         logger.info(
-            "%s: %d/%d [%s]",
+            "  %s: %d/%d [%s]",
             result.source,
             result.successful,
             result.total_files,
@@ -645,10 +645,10 @@ def _log_summary(results: DownloadResults) -> None:
         total_failed += result.failed
 
         for error in result.errors:
-            logger.error("  %s", error)
+            logger.error("    %s", error)
 
     logger.info(
-        "Total: %d/%d (failed: %d)",
+        "  Total: %d/%d (failed: %d)",
         total_success,
         total_files,
         total_failed,

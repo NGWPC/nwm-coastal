@@ -68,12 +68,12 @@ def patch_serialize_crs() -> None:
     except ImportError:
         return
 
-    _original = _crs_mod._serialize_crs  # type: ignore[reportPrivateUsage]
+    _original = _crs_mod._serialize_crs
 
     if getattr(_original, "_patched", False):
         return
 
-    def _safe_serialize_crs(crs):  # type: ignore[no-untyped-def]
+    def _safe_serialize_crs(crs: Any) -> Any:
         epsg = crs.to_epsg()
         if epsg:
             return epsg
@@ -107,7 +107,7 @@ def patch_boundary_conditions_index_dim() -> None:
     except ImportError:
         return
 
-    _original_validate = SfincsBoundaryBase._validate_and_prepare_gdf  # type: ignore[reportPrivateUsage]
+    _original_validate = SfincsBoundaryBase._validate_and_prepare_gdf
 
     if getattr(_original_validate, "_patched", False):
         return
@@ -193,12 +193,12 @@ def patch_meteo_write_gridded() -> None:
                 nc_coord = nc.createVariable(coord, arr.dtype, ds.coords[coord].dims)
                 nc_coord[:] = arr
 
-            # --- data variables ---
+            # --- data variables (float32: SFINCS reads forcing as real*4) ---
             nc_vars = {}
             for vname in var_names:
                 da = ds[vname]
                 dims = tuple(str(d) for d in da.dims)
-                nc_vars[vname] = nc.createVariable(vname, da.dtype, dims)
+                nc_vars[vname] = nc.createVariable(vname, "f4", dims)
 
             # --- write one time-step at a time ---
             t0 = np.datetime64(tref_str)
@@ -211,9 +211,87 @@ def patch_meteo_write_gridded() -> None:
         finally:
             nc.close()
 
-    SfincsMeteo.write_gridded = _write_gridded_lazy
+    SfincsMeteo.write_gridded = _write_gridded_lazy  # type: ignore[assignment]
     SfincsMeteo.write_gridded._patched = True  # type: ignore[attr-defined]
     _log.info("Patched hydromt-sfincs write_gridded to stream time-steps lazily.")
+
+
+def patch_quadtree_subgrid_data_setter() -> None:
+    """Add a ``data`` setter to ``SfincsQuadtreeSubgridTable``.
+
+    The upstream ``read`` method does ``self.data = xr.load_dataset(...)``
+    but ``data`` is a read-only ``@property`` (no setter), so reading a
+    model that contains quadtree subgrid tables crashes with
+    ``AttributeError: property 'data' … has no setter``.
+
+    The ``create`` method correctly uses ``self._data = …``, so the fix
+    is simply to add a setter that forwards to ``_data``.
+    """
+    try:
+        from hydromt_sfincs.components.quadtree.quadtree_subgrid import (
+            SfincsQuadtreeSubgridTable,
+        )
+    except ImportError:
+        return
+
+    prop = SfincsQuadtreeSubgridTable.__dict__.get("data")
+    if not isinstance(prop, property) or prop.fset is not None:
+        return  # already has a setter or is not a property
+
+    def _set_data(self: Any, value: Any) -> None:
+        self._data = value
+
+    SfincsQuadtreeSubgridTable.data = prop.setter(_set_data)
+    _log.info("Patched SfincsQuadtreeSubgridTable.data to add missing setter.")
+
+
+def patch_parse_river_list_geoms() -> None:
+    """Fix ``_parse_river_list`` crash when ``geoms`` component is missing.
+
+    ``SfincsModel._parse_river_list`` checks whether a river centerline
+    dataset name already exists as a model geometry via
+    ``rivers in self.geoms``.  On freshly created models (``mode="w+"``),
+    the ``geoms`` component is never registered in hydromt's ``Model``
+    component dict, so the property access raises
+    ``KeyError: 'geoms'`` via ``Model.__getattr__`` →
+    ``Model.get_component``.
+
+    This patch wraps ``_parse_river_list`` to temporarily inject an
+    empty dict into the instance ``__dict__`` under the key ``"geoms"``
+    when the component is missing.  Python's normal attribute lookup
+    checks the instance dict before falling through to ``__getattr__``,
+    so ``self.geoms`` resolves to ``{}`` and ``rivers in self.geoms``
+    evaluates to ``False`` — falling through to the correct
+    ``self.data_catalog.get_geodataframe()`` path.
+    """
+    try:
+        from hydromt_sfincs import SfincsModel
+    except ImportError:
+        return
+
+    _original = SfincsModel._parse_river_list
+
+    if getattr(_original, "_patched", False):
+        return
+
+    def _parse_river_list_safe(self: Any, river_list: Any) -> Any:
+        _injected = False
+        try:
+            self.geoms  # noqa: B018  # test access
+        except KeyError:
+            # Shadow __getattr__ via the instance dict so the
+            # ``rivers in self.geoms`` check evaluates to False.
+            self.__dict__["geoms"] = {}
+            _injected = True
+        try:
+            return _original(self, river_list)
+        finally:
+            if _injected:
+                self.__dict__.pop("geoms", None)
+
+    SfincsModel._parse_river_list = _parse_river_list_safe  # type: ignore[assignment]
+    SfincsModel._parse_river_list._patched = True  # type: ignore[attr-defined]
+    _log.info("Patched SfincsModel._parse_river_list to handle missing 'geoms' component.")
 
 
 def apply_all_patches() -> None:
@@ -222,3 +300,5 @@ def apply_all_patches() -> None:
     register_round_coords_preprocessor()
     patch_boundary_conditions_index_dim()
     patch_meteo_write_gridded()
+    patch_quadtree_subgrid_data_setter()
+    patch_parse_river_list_geoms()

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from importlib.metadata import PackageNotFoundError, version
 
+from coastal_calibration.config.create_schema import SfincsCreateConfig
 from coastal_calibration.config.schema import (
     BoundaryConfig,
     BoundarySource,
@@ -18,8 +19,8 @@ from coastal_calibration.config.schema import (
     SchismModelConfig,
     SfincsModelConfig,
     SimulationConfig,
-    SlurmConfig,
 )
+from coastal_calibration.creator import SfincsCreator
 from coastal_calibration.downloader import (
     DATA_SOURCE_DATE_RANGES,
     CoastalSource,
@@ -38,7 +39,6 @@ from coastal_calibration.runner import (
     CoastalCalibRunner,
     WorkflowResult,
     run_workflow,
-    submit_workflow,
 )
 from coastal_calibration.stages.sfincs import (
     CatalogEntry,
@@ -88,9 +88,11 @@ __all__ = [
     "MonitoringConfig",
     "PathConfig",
     "SchismModelConfig",
+    # SFINCS creation
+    "SfincsCreateConfig",
+    "SfincsCreator",
     "SfincsModelConfig",
     "SimulationConfig",
-    "SlurmConfig",
     "WorkflowResult",
     "__version__",
     # Data Catalog (SFINCS)
@@ -108,5 +110,4 @@ __all__ = [
     "pre_nwm_forcing_coastal",
     "remove_nc_symlinks",
     "run_workflow",
-    "submit_workflow",
 ]
