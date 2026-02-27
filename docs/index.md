@@ -1,7 +1,16 @@
-# NWM Coastal
+# NWM Coastal: Coastal Model Workflow
 
-A Python package for running SCHISM and SFINCS coastal model calibration workflows on
-HPC clusters with Singularity containers.
+`nwm-coastal` is a collection of tools designed to implement skill assessments for
+coastal model runs and execute National Water Model (NWM) hindcast/forecast runs for
+standalone coastal models utilized in NWMv4 operations. This includes the Semi-implicit
+Cross-scale Hydroscience Integrated System Model (SCHISM) and Super-Fast INundation of
+CoastS (SFINCS) as the intended coastal models for implementation in NWMv4 operations.
+This repository stores symlinks to both coastal modeling development groups, which are
+used to compile and run the NWMv4 coastal models. The coastal modeling output for NWMv4
+operations is the Total Water Level (TWL) fields. These fields are the focus of the
+coastal tools in this repository for skill assessments across NWM domains, as well as
+the end result to retrieve from tools in this repository that set up and execute NWMv4
+hindcast and operational forecast runs.
 
 ## Features
 
@@ -48,7 +57,7 @@ boundary:
   source: stofs
 EOF
 
-/ngen-test/coastal-calibration/coastal-calibration run "${CONFIG_FILE}"
+coastal-calibration run "${CONFIG_FILE}"
 rm -f "${CONFIG_FILE}"
 ```
 
