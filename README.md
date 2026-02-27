@@ -7,9 +7,6 @@
 
 ## Open source licensing info
 
-These links must be included in the final version of your project README (keep this section,
-as is, but remove this sentence):
-
 1. [TERMS](TERMS.md)
 2. [LICENSE](LICENSE)
 
@@ -18,6 +15,6 @@ as is, but remove this sentence):
 
 ## Credits and references
 
-1. Projects that inspired you
-2. Related projects
-3. Books, papers, talks, or other sources that have meaningful impact or influence on this project
+1. [Next Gen Water Modeling Framework Prototype](https://github.com/NOAA-OWP/ngen)
+2. [schism-dev](https://ccrm.vims.edu/schismweb/) community
+3. [Deltares](https://www.deltares.nl/en/software-and-data/products/sfincs) community
