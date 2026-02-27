@@ -1,0 +1,67 @@
+# Example: Create a SFINCS quadtree model from an AOI polygon
+#
+# This configuration creates a new SFINCS model using the HydroMT-SFINCS
+# Python API.  The output directory can then be passed as ``prebuilt_dir``
+# to the ``run`` workflow for model preparation and execution.
+#
+# Usage:
+#   coastal-calibration create create_sfincs.yaml
+#   coastal-calibration create create_sfincs.yaml --dry-run
+#   coastal-calibration create create_sfincs.yaml --start-from create_mask
+
+# Path to the AOI polygon (GeoJSON, Shapefile, GeoPackage, etc.)
+aoi: /path/to/aoi.geojson
+
+# Directory where the SFINCS model will be written
+output_dir: /path/to/output
+
+# Grid generation settings
+grid:
+  resolution: 50          # metres (base resolution for quadtree)
+  crs: utm                # "utm" = auto-detect UTM zone, or EPSG code
+  rotated: true           # allow grid rotation for tighter fit
+
+# Elevation / bathymetry datasets (merged in order)
+elevation:
+  datasets:
+  - name: copdem30        # Copernicus DEM 30m (land)
+    zmin: 0.001
+  - name: gebco           # GEBCO bathymetry
+    zmin: -20000
+  buffer_cells: 1
+
+# Active-cell mask and boundary settings
+mask:
+  zmin: -5.0              # minimum elevation for active cells
+  boundary_zmax: -5.0     # max elevation for waterlevel boundary cells
+  reset_bounds: true
+
+# Subgrid tables (roughness is embedded in quadtree subgrid tables)
+subgrid:
+  nr_subgrid_pixels: 5
+  lulc_dataset: esa_worldcover_2021
+  # reclass_table: /path/to/custom_mapping.csv   # optional
+  manning_land: 0.04
+  manning_sea: 0.02
+
+# NWM discharge source points from hydrofabric (optional)
+# Derives discharge locations by intersecting flowpath linestrings
+# with the AOI boundary.  Feature IDs are validated against NWM
+# streamflow data before model creation.
+# nwm_discharge:
+#   hydrofabric_gpkg: /path/to/hydrofabric.gpkg
+#   flowpaths_layer: flowpaths
+#   flowpath_id_column: id
+#   flowpath_ids:
+#     - 1614588
+#     - 1614624
+#     - 1614632
+#   coastal_domain: conus    # conus, atlgulf, pacific, hawaii, prvi, alaska
+
+# Additional HydroMT data catalog YAMLs (optional)
+data_catalog:
+  data_libs: []
+
+# Logging
+monitoring:
+  log_level: INFO

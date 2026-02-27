@@ -21,21 +21,25 @@ boundary:
   source: tpxo
 
 model_config:
-  prebuilt_dir: /ngen-dev/taher.chegini/nwm-coastal-dev/docs/examples/texas
+  prebuilt_dir: /path/to/prebuilt/sfincs/texas
+  discharge_locations_file: /path/to/discharge/locations/file.src
+  merge_observations: true
+  merge_discharge: true
   include_noaa_gages: true
-  forcing_to_mesh_offset_m: 0.171
-  vdatum_mesh_to_msl_m: 0.171
+  forcing_to_mesh_offset_m: 0.171 # TPXO/MSL → NAVD88 mesh (VDatum at domain centroid)
+  vdatum_mesh_to_msl_m: 0.171     # NAVD88 mesh → MSL observations
   include_precip: true
   include_wind: true
   include_pressure: true
 EOF
 
-# Use the full NFS path so the command is found on compute nodes
-# regardless of PATH setup.
+# For production only this line is needed
 /ngen-test/coastal-calibration/coastal-calibration run "${CONFIG_FILE}"
 
-# For running the dev version we use pixi instead.
-# Comment out the line above and uncomment the three lines below.
+# For running the dev version we use pixi.
+# For production comment out these three lines.
+# For making uv work well on NSF mounted locations
+# we need to set these envs
 # export UV_CACHE_DIR=/var/tmp/uv-cache
 # export UV_LINK_MODE=copy
 # pixi r -e dev coastal-calibration run "${CONFIG_FILE}"

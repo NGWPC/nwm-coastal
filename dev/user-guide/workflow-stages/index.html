@@ -12,7 +12,7 @@
         <meta name="author" content="Taher Chegini">
       
       
-        <link rel="canonical" href="https://NGWPC.github.io/nwm-coastal/latest/user-guide/workflow-stages/">
+        <link rel="canonical" href="https://NGWPC.github.io/nwm-coastal/stable/user-guide/workflow-stages/">
       
       
         <link rel="prev" href="../python-api/">
@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.2">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-materialx-10.0.9">
     
     
       
@@ -33,10 +33,10 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.90ee4e44.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.63c7e8c3.min.css">
       
       
 
@@ -68,6 +68,8 @@
   </head>
   
   
+  
+  
     
     
       
@@ -75,12 +77,14 @@
     
     
     
-    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo" data-mx-topbar="glass">
   
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="toc" type="checkbox" id="__toc" autocomplete="off">
     <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
     <label class="md-overlay" for="__drawer"></label>
+    <label class="md-overlay" for="__toc"></label>
     <div data-md-component="skip">
       
         
@@ -173,10 +177,12 @@
     
     
       
+        
+      
       
         <label class="md-header__button md-icon" for="__search">
           
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10.25 2a8.25 8.25 0 0 1 6.34 13.53l5.69 5.69a.749.749 0 0 1-.326 1.275.75.75 0 0 1-.734-.215l-5.69-5.69A8.25 8.25 0 1 1 10.25 2M3.5 10.25a6.75 6.75 0 1 0 13.5 0 6.75 6.75 0 0 0-13.5 0"/></svg>
         </label>
         <div class="md-search" data-md-component="search" role="dialog">
   <label class="md-search__overlay" for="__search"></label>
@@ -185,7 +191,7 @@
       <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
       <label class="md-search__icon md-icon" for="__search">
         
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10.25 2a8.25 8.25 0 0 1 6.34 13.53l5.69 5.69a.749.749 0 0 1-.326 1.275.75.75 0 0 1-.734-.215l-5.69-5.69A8.25 8.25 0 1 1 10.25 2M3.5 10.25a6.75 6.75 0 1 0 13.5 0 6.75 6.75 0 0 0-13.5 0"/></svg>
         
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
       </label>
@@ -193,7 +199,7 @@
         
           <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
             
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 5.5a3.498 3.498 0 0 1-6.062 2.385l-5.112 3.021a3.5 3.5 0 0 1 0 2.188l5.112 3.021a3.5 3.5 0 1 1-.764 1.29l-5.112-3.02a3.499 3.499 0 1 1-3.843-5.642 3.5 3.5 0 0 1 3.843.872l5.112-3.021A3.5 3.5 0 1 1 20 5.5m-1.5 13a2 2 0 1 0-3.999-.001 2 2 0 0 0 3.999.001m0-13a2 2 0 1 0-3.999-.001A2 2 0 0 0 18.5 5.5M5.5 14a2 2 0 1 0 .001-3.999A2 2 0 0 0 5.5 14"/></svg>
           </a>
         
         <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
@@ -206,7 +212,7 @@
       
     </form>
     <div class="md-search__output">
-      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+      <div class="md-search__scrollwrap" tabindex="0">
         <div class="md-search-result" data-md-component="search-result">
           <div class="md-search-result__meta">
             Initializing search
@@ -384,6 +390,25 @@
   
 
       
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../LICENSE" class="md-tabs__link">
+        
+  
+  
+    
+  
+  License
+
+      </a>
+    </li>
+  
+
+      
     </ul>
   </div>
 </nav>
@@ -435,7 +460,7 @@
 </a>
     </div>
   
-  <ul class="md-nav__list" data-md-scrollfix>
+  <ul class="md-nav__list">
     
       
       
@@ -482,8 +507,6 @@
     
       
       
-        
-      
     
     
     <li class="md-nav__item md-nav__item--nested">
@@ -522,7 +545,7 @@
   
 
           </label>
-          <ul class="md-nav__list" data-md-scrollfix>
+          <ul class="md-nav__list">
             
               
                 
@@ -614,8 +637,6 @@
         
       
       
-        
-      
     
     
     <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
@@ -652,7 +673,7 @@
   
 
           </label>
-          <ul class="md-nav__list" data-md-scrollfix>
+          <ul class="md-nav__list">
             
               
                 
@@ -802,7 +823,7 @@
       <span class="md-nav__icon md-icon"></span>
       Table of contents
     </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+    <ul class="md-nav__list" data-md-component="toc">
       
         <li class="md-nav__item">
   <a href="#schism-stage-overview" class="md-nav__link">
@@ -883,10 +904,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#5-update_params" class="md-nav__link">
+  <a href="#5-schism_obs" class="md-nav__link">
     <span class="md-ellipsis">
       
-        5. update_params
+        5. schism_obs
       
     </span>
   </a>
@@ -894,10 +915,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#6-schism_obs" class="md-nav__link">
+  <a href="#6-update_params" class="md-nav__link">
     <span class="md-ellipsis">
       
-        6. schism_obs
+        6. update_params
       
     </span>
   </a>
@@ -1196,6 +1217,100 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#sfincs-creation-stages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SFINCS Creation Stages
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SFINCS Creation Stages">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-create_grid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. create_grid
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-create_fetch_elevation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. create_fetch_elevation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-create_elevation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. create_elevation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-create_mask" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. create_mask
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-create_boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. create_boundary
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-create_subgrid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. create_subgrid
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#7-create_write" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. create_write
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1255,8 +1370,6 @@
     
       
       
-        
-      
     
     
     <li class="md-nav__item md-nav__item--nested">
@@ -1295,7 +1408,7 @@
   
 
           </label>
-          <ul class="md-nav__list" data-md-scrollfix>
+          <ul class="md-nav__list">
             
               
                 
@@ -1386,6 +1499,33 @@
   
 
     
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../LICENSE" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    License
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
   </ul>
 </nav>
                   </div>
@@ -1454,7 +1594,7 @@
 
 
   
-    <a href="https://github.com/NGWPC/nwm-coastal/edit/main/docs/user-guide/workflow-stages.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/NGWPC/nwm-coastal/edit/development/docs/user-guide/workflow-stages.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75z"/></svg>
     </a>
@@ -1466,18 +1606,16 @@
 <p>The coastal calibration workflow consists of sequential stages, each performing a
 specific task in the simulation pipeline. The stage order depends on the selected model
 (SCHISM or SFINCS).</p>
-<p>Both <code>run</code> and <code>submit</code> execute the same stage pipeline. Each stage is classified as
-either <strong>Python-only</strong> or <strong>container</strong> (requires Singularity/MPI). When using <code>submit</code>,
-Python-only stages run on the login node while container stages are submitted as a SLURM
-job. When using <code>run</code>, all stages execute locally (e.g., inside an interactive compute
-session).</p>
+<p>The <code>run</code> command executes all stages sequentially. Each stage is classified as either
+<strong>Python-only</strong> or <strong>container</strong> (requires Singularity/MPI). All stages execute locally
+on the allocated compute nodes (e.g., inside an <code>sbatch</code> script).</p>
 <h2 id="schism-stage-overview">SCHISM Stage Overview<a class="headerlink" href="#schism-stage-overview" title="Permanent link">#</a></h2>
 <pre class="mermaid"><code>flowchart TD
     A[download] --&gt; B[pre_forcing]
     B --&gt; C[nwm_forcing]
     C --&gt; D[post_forcing]
-    D --&gt; E[update_params]
-    E --&gt; F[schism_obs]
+    D --&gt; E[schism_obs]
+    E --&gt; F[update_params]
     F --&gt; G[boundary_conditions]
     G --&gt; H[pre_schism]
     H --&gt; I[schism_run]
@@ -1507,7 +1645,7 @@ session).</p>
 <li>NWM streamflow data (CHRTOUT files)</li>
 <li>STOFS or GLOFS water level data (when applicable)</li>
 </ul>
-<p><strong>Runs On:</strong> Login node (before SLURM job submission)</p>
+<p><strong>Runs On:</strong> Compute node (Python-only, no container needed)</p>
 <p><strong>Outputs:</strong></p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>raw_download_dir/
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>├── meteo/nwm_ana/
@@ -1551,29 +1689,11 @@ session).</p>
 <li>Clean up temporary files</li>
 </ul>
 <p><strong>Runs On:</strong> Compute node (inside Singularity)</p>
-<h3 id="5-update_params">5. update_params<a class="headerlink" href="#5-update_params" title="Permanent link">#</a></h3>
-<p><strong>Purpose:</strong> Generate SCHISM parameter file and symlink mesh files.</p>
-<p><strong>Tasks:</strong></p>
-<ul>
-<li>Symlink <code>hgrid.gr3</code> and other mesh files into the work directory</li>
-<li>Create <code>param.nml</code> with simulation parameters</li>
-<li>Set time stepping configuration</li>
-<li>Configure output options</li>
-</ul>
-<p><strong>Runs On:</strong> Compute node (inside Singularity)</p>
-<p><strong>Outputs:</strong></p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>work_dir/
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>├── hgrid.gr3 (symlink)
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>└── param.nml
-</span></code></pre></div>
-<h3 id="6-schism_obs">6. schism_obs<a class="headerlink" href="#6-schism_obs" title="Permanent link">#</a></h3>
+<h3 id="5-schism_obs">5. schism_obs<a class="headerlink" href="#5-schism_obs" title="Permanent link">#</a></h3>
 <p><strong>Purpose:</strong> Automatically discover NOAA CO-OPS water level stations within the model
 domain and generate a SCHISM <code>station.in</code> file so that SCHISM writes time-series output
 at those locations.</p>
 <p><strong>Enabled by:</strong> <code>model_config.include_noaa_gages: true</code> (disabled by default)</p>
-<p><strong>Depends on:</strong> <code>update_params</code> (which symlinks <code>hgrid.gr3</code> into the work directory).
-When running via <code>submit</code>, this stage is promoted to the login node and the dependency
-on <code>hgrid.gr3</code> is resolved automatically via a symlink from the parameter directory.</p>
 <p><strong>How it works:</strong></p>
 <ol>
 <li>Parses <code>hgrid.gr3</code> to extract the coordinates of all open boundary nodes.</li>
@@ -1585,12 +1705,12 @@ on <code>hgrid.gr3</code> is resolved automatically via a symlink from the param
     and a companion <code>station_noaa_ids.txt</code> that maps each station index to its NOAA
     station ID.</li>
 </ol>
-<p><strong>Runs On:</strong> Login node (in <code>submit</code> mode) or compute node (in <code>run</code> mode). Requires
-network access for the CO-OPS API call.</p>
+<p><strong>Runs On:</strong> Compute node (Python-only). Requires network access for the CO-OPS API
+call.</p>
 <p><strong>Outputs:</strong></p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>work_dir/
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>├── station.in             # SCHISM station definition file
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>└── station_noaa_ids.txt   # Index-to-NOAA-ID mapping
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>work_dir/
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>├── station.in             # SCHISM station definition file
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>└── station_noaa_ids.txt   # Index-to-NOAA-ID mapping
 </span></code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">param.nml patching</p>
@@ -1600,6 +1720,21 @@ time-steps). The value <code>nspool_sta = 18</code> is chosen because it divides
 values used across domain templates (162, 324, 8640, etc.), satisfying the SCHISM
 constraint <code>mod(nhot_write, nspool_sta) == 0</code>.</p>
 </div>
+<h3 id="6-update_params">6. update_params<a class="headerlink" href="#6-update_params" title="Permanent link">#</a></h3>
+<p><strong>Purpose:</strong> Generate SCHISM parameter file and symlink mesh files.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>Symlink <code>hgrid.gr3</code> and other mesh files into the work directory</li>
+<li>Create <code>param.nml</code> with simulation parameters</li>
+<li>Set time stepping configuration</li>
+<li>Configure output options</li>
+</ul>
+<p><strong>Runs On:</strong> Compute node (inside Singularity)</p>
+<p><strong>Outputs:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>work_dir/
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>├── hgrid.gr3 (symlink)
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>└── param.nml
+</span></code></pre></div>
 <h3 id="7-boundary_conditions">7. boundary_conditions<a class="headerlink" href="#7-boundary_conditions" title="Permanent link">#</a></h3>
 <p><strong>Purpose:</strong> Generate boundary conditions from TPXO or STOFS.</p>
 <p><strong>Tasks (TPXO):</strong></p>
@@ -1662,8 +1797,8 @@ every station discovered by the <code>schism_obs</code> stage.</p>
     observed water levels.</li>
 <li>Saves PNG figures to the <code>figs/</code> subdirectory.</li>
 </ol>
-<p><strong>Runs On:</strong> Login node (in <code>submit</code> mode, after SLURM job completes) or compute node
-(in <code>run</code> mode). Requires network access for the CO-OPS API call.</p>
+<p><strong>Runs On:</strong> Compute node (Python-only). Requires network access for the CO-OPS API
+call.</p>
 <p><strong>Outputs:</strong></p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>work_dir/
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>└── figs/
@@ -1815,20 +1950,16 @@ compared with NOAA CO-OPS observations. This value can be obtained from the
 <a href="https://vdatum.noaa.gov/vdatumweb/api/convert">NOAA VDatum API</a>.</p>
 </div>
 <h2 id="running-partial-workflows">Running Partial Workflows<a class="headerlink" href="#running-partial-workflows" title="Permanent link">#</a></h2>
-<p>Both <code>run</code> and <code>submit</code> support <code>--start-from</code> and <code>--stop-after</code>.</p>
+<p>The <code>run</code> command supports <code>--start-from</code> and <code>--stop-after</code>.</p>
 <h3 id="cli">CLI<a class="headerlink" href="#cli" title="Permanent link">#</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># SCHISM examples (run)</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># SCHISM examples</span>
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>coastal-calibration<span class="w"> </span>run<span class="w"> </span>config.yaml<span class="w"> </span>--stop-after<span class="w"> </span>download
 </span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>coastal-calibration<span class="w"> </span>run<span class="w"> </span>config.yaml<span class="w"> </span>--start-from<span class="w"> </span>pre_forcing<span class="w"> </span>--stop-after<span class="w"> </span>post_forcing
 </span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>coastal-calibration<span class="w"> </span>run<span class="w"> </span>config.yaml<span class="w"> </span>--start-from<span class="w"> </span>boundary_conditions
 </span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="c1"># SCHISM examples (submit)</span>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>coastal-calibration<span class="w"> </span>submit<span class="w"> </span>config.yaml<span class="w"> </span>--start-from<span class="w"> </span>boundary_conditions<span class="w"> </span>-i
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>coastal-calibration<span class="w"> </span>submit<span class="w"> </span>config.yaml<span class="w"> </span>--stop-after<span class="w"> </span>post_forcing
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>
-</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="c1"># SFINCS examples</span>
-</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>coastal-calibration<span class="w"> </span>run<span class="w"> </span>config.yaml<span class="w"> </span>--stop-after<span class="w"> </span>sfincs_write
-</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>coastal-calibration<span class="w"> </span>submit<span class="w"> </span>config.yaml<span class="w"> </span>--start-from<span class="w"> </span>sfincs_run<span class="w"> </span>-i
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="c1"># SFINCS examples</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>coastal-calibration<span class="w"> </span>run<span class="w"> </span>config.yaml<span class="w"> </span>--stop-after<span class="w"> </span>sfincs_write
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>coastal-calibration<span class="w"> </span>run<span class="w"> </span>config.yaml<span class="w"> </span>--start-from<span class="w"> </span>sfincs_run
 </span></code></pre></div>
 <h3 id="python-api">Python API<a class="headerlink" href="#python-api" title="Permanent link">#</a></h3>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">coastal_calibration</span><span class="w"> </span><span class="kn">import</span> <span class="n">CoastalCalibConfig</span><span class="p">,</span> <span class="n">CoastalCalibRunner</span>
@@ -1836,11 +1967,8 @@ compared with NOAA CO-OPS observations. This value can be obtained from the
 </span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">config</span> <span class="o">=</span> <span class="n">CoastalCalibConfig</span><span class="o">.</span><span class="n">from_yaml</span><span class="p">(</span><span class="s2">&quot;config.yaml&quot;</span><span class="p">)</span>
 </span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="n">runner</span> <span class="o">=</span> <span class="n">CoastalCalibRunner</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
 </span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="c1"># Run specific stages locally</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="c1"># Run specific stages</span>
 </span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">start_from</span><span class="o">=</span><span class="s2">&quot;pre_forcing&quot;</span><span class="p">,</span> <span class="n">stop_after</span><span class="o">=</span><span class="s2">&quot;post_forcing&quot;</span><span class="p">)</span>
-</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>
-</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="c1"># Submit partial pipeline to SLURM</span>
-</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="n">wait</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">start_from</span><span class="o">=</span><span class="s2">&quot;boundary_conditions&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <h2 id="error-handling">Error Handling<a class="headerlink" href="#error-handling" title="Permanent link">#</a></h2>
 <p>If a stage fails:</p>
@@ -1862,8 +1990,8 @@ tracked and reported:</p>
 </span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="go">  pre_forcing: 12.3s</span>
 </span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="go">  nwm_forcing: 234.5s</span>
 </span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="go">  post_forcing: 8.7s</span>
-</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="go">  update_params: 2.1s</span>
-</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="go">  schism_obs: 3.8s</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="go">  schism_obs: 3.8s</span>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="go">  update_params: 2.1s</span>
 </span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="go">  boundary_conditions: 156.8s</span>
 </span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="go">  pre_schism: 5.4s</span>
 </span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="go">  schism_run: 1823.6s</span>
@@ -1871,13 +1999,72 @@ tracked and reported:</p>
 </span><span id="__span-8-12"><a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="go">  schism_plot: 15.4s</span>
 </span><span id="__span-8-13"><a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a><span class="go">Total: 2375.0s</span>
 </span></code></pre></div>
-
-
-
-
-
-
-
+<h2 id="sfincs-creation-stages">SFINCS Creation Stages<a class="headerlink" href="#sfincs-creation-stages" title="Permanent link">#</a></h2>
+<p>The <code>create</code> command builds a new SFINCS quadtree model from an AOI polygon. It uses a
+separate configuration schema (<code>SfincsCreateConfig</code>) and a dedicated runner
+(<code>SfincsCreator</code>) with resumable execution — completion is tracked in
+<code>.create_status.json</code> so that interrupted runs can be resumed with <code>--start-from</code>.</p>
+<pre class="mermaid"><code>flowchart TD
+    A[create_grid] --&gt; B[create_fetch_elevation]
+    B --&gt; C[create_elevation]
+    C --&gt; D[create_mask]
+    D --&gt; E[create_boundary]
+    E --&gt; F[create_subgrid]
+    F --&gt; G[create_write]</code></pre>
+<h3 id="1-create_grid">1. create_grid<a class="headerlink" href="#1-create_grid" title="Permanent link">#</a></h3>
+<p><strong>Purpose:</strong> Generate a SFINCS quadtree grid from the AOI polygon.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>Read the AOI polygon (GeoJSON, Shapefile, etc.)</li>
+<li>Create the base grid in the specified CRS</li>
+<li>Apply quadtree refinement based on configured levels and criteria</li>
+</ul>
+<h3 id="2-create_fetch_elevation">2. create_fetch_elevation<a class="headerlink" href="#2-create_fetch_elevation" title="Permanent link">#</a></h3>
+<p><strong>Purpose:</strong> Fetch a NOAA coastal DEM covering the AOI.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>Query the packaged NOAA DEM spatial index to find the best-matching dataset based on
+    AOI overlap, resolution, and year</li>
+<li>Download the DEM tiles from the NOAA <code>noaa-nos-coastal-lidar-pds</code> S3 bucket</li>
+<li>Mosaic tiles and clip to the AOI extent</li>
+</ul>
+<h3 id="3-create_elevation">3. create_elevation<a class="headerlink" href="#3-create_elevation" title="Permanent link">#</a></h3>
+<p><strong>Purpose:</strong> Add elevation and bathymetry data to the grid.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>Load configured elevation datasets (e.g., fetched NOAA DEM, NWS topobathy)</li>
+<li>Interpolate elevation values onto the quadtree grid cells</li>
+<li>Apply <code>zmin</code>/<code>zmax</code> filters per dataset</li>
+</ul>
+<h3 id="4-create_mask">4. create_mask<a class="headerlink" href="#4-create_mask" title="Permanent link">#</a></h3>
+<p><strong>Purpose:</strong> Create the active cell mask.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>Determine which grid cells are active based on elevation thresholds</li>
+<li>Apply land/water masking criteria</li>
+</ul>
+<h3 id="5-create_boundary">5. create_boundary<a class="headerlink" href="#5-create_boundary" title="Permanent link">#</a></h3>
+<p><strong>Purpose:</strong> Create water level boundary cells.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>Identify grid cells along the open ocean boundary</li>
+<li>Assign boundary condition flags</li>
+</ul>
+<h3 id="6-create_subgrid">6. create_subgrid<a class="headerlink" href="#6-create_subgrid" title="Permanent link">#</a></h3>
+<p><strong>Purpose:</strong> Generate subgrid lookup tables.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>Compute high-resolution subgrid tables from the DEM</li>
+<li>These tables allow SFINCS to use coarse computational cells while capturing fine-scale
+    topographic detail</li>
+</ul>
+<h3 id="7-create_write">7. create_write<a class="headerlink" href="#7-create_write" title="Permanent link">#</a></h3>
+<p><strong>Purpose:</strong> Write the complete SFINCS model to disk.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>Write all SFINCS input files to the configured <code>output_dir</code></li>
+<li>The output directory can be used as <code>prebuilt_dir</code> in a simulation config</li>
+</ul>
 
 
 
@@ -1893,13 +2080,23 @@ tracked and reported:</p>
 
 <script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
         </div>
-        
-          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
-  Back to top
-</button>
-        
+          <div class="md-top" data-md-component="top" hidden>
+  <div class="md-top__center">
+    <button type="button" class="md-top__button md-top__button--main" data-md-action="top">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+      <span>Back to top</span>
+    </button>
+    
+      
+      
+      <label class="md-top__button md-top__side md-top__side--nav" for="__drawer" >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2m0 14H9V6h11Z"/></svg>
+      </label>
+    
+    
+  </div>
+</div>
       </main>
       
         <footer class="md-footer">
@@ -1954,8 +2151,8 @@ tracked and reported:</p>
   
   
     Made with
-    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
-      Material for MkDocs
+    <a href="https://jaywhj.github.io/mkdocs-materialx/" target="_blank" rel="noopener">
+      MaterialX for MkDocs
     </a>
   
 </div>
@@ -1991,10 +2188,10 @@ tracked and reported:</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.action.edit", "content.code.annotate", "content.code.copy", "content.tabs.link", "navigation.collapse", "navigation.expand", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.instant.progress", "navigation.path", "navigation.sections", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "search.suggest", "toc.follow", "toc.integrate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.action.edit", "content.code.annotate", "content.code.copy", "content.tabs.link", "navigation.collapse", "navigation.expand", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.instant.progress", "navigation.path", "navigation.indexes", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "search.suggest", "toc.follow", "toc.integrate"], "search": "../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.6a56f36d.min.js"></script>
       
         <script src="../../javascripts/mathjax.js"></script>
       
