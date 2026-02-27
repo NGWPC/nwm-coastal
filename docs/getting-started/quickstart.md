@@ -164,13 +164,54 @@ model_config:
   prebuilt_dir: /path/to/prebuilt/sfincs/model
 ```
 
-### Step 3: Validate and Submit
+### Step 3: Validate and Run
 
 ```bash
 coastal-calibration validate sfincs_config.yaml
 ```
 
 Then write an sbatch script using `coastal-calibration run sfincs_config.yaml`.
+
+## SFINCS Model Creation Quick Start
+
+The `create` command builds a new SFINCS quadtree model from an AOI polygon, handling
+grid generation, DEM download, elevation, masking, boundary cells, and subgrid tables.
+
+### Step 1: Prepare a Topobathy DEM
+
+Download the NWS 30 m topobathymetric DEM clipped to your area of interest:
+
+```bash
+coastal-calibration prepare-topobathy aoi.geojson --domain atlgulf --output-dir ./dem
+```
+
+### Step 2: Write a Creation Config
+
+```yaml
+output_dir: ./my_sfincs_model
+
+grid:
+  aoi: aoi.geojson
+  crs: EPSG:32617
+
+elevation:
+  datasets:
+    - name: nws_topobathy
+      zmin: -20000
+
+data_catalog:
+  data_libs:
+    - ./dem/data_catalog.yml
+```
+
+### Step 3: Run the Creation Workflow
+
+```bash
+coastal-calibration create create_config.yaml
+```
+
+The output directory will contain a ready-to-run SFINCS model that can be used as the
+`prebuilt_dir` in a simulation config.
 
 ## Using the Python API
 

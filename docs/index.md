@@ -15,6 +15,9 @@ HPC clusters with Singularity containers.
 - **Boundary Conditions**: TPXO tidal model and STOFS water level support
 - **NOAA Observation Stations**: Automatic discovery of CO-OPS water level stations
     within the model domain, with post-run comparison plots (simulated vs observed)
+- **SFINCS Model Creation**: Build SFINCS quadtree models from an AOI polygon with
+    automatic NOAA DEM discovery, elevation/bathymetry, boundary cells, and subgrid
+    tables
 - **Workflow Control**: `run` pipeline with `--start-from` / `--stop-after` support for
     partial workflows
 - **Configuration Inheritance**: Share common settings across multiple runs

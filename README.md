@@ -1,7 +1,16 @@
-# Coastal Calibration: Coastal Model Calibration Workflow
+# NWM Coastal: Coastal Model Workflow
 
-A Python package for running SCHISM and SFINCS coastal model calibration workflows on
-HPC clusters with Singularity containers and SLURM job scheduling.
+`nwm-coastal` is a collection of tools designed to implement skill assessments for
+coastal model runs and execute National Water Model (NWM) hindcast/forecast runs for
+standalone coastal models utilized in NWMv4 operations. This includes the Semi-implicit
+Cross-scale Hydroscience Integrated System Model (SCHISM) and Super-Fast INundation of
+CoastS (SFINCS) as the intended coastal models for implementation in NWMv4 operations.
+This repository stores symlinks to both coastal modeling development groups, which are
+used to compile and run the NWMv4 coastal models. The coastal modeling output for NWMv4
+operations is the Total Water Level (TWL) fields. These fields are the focus of the
+coastal tools in this repository for skill assessments across NWM domains, as well as
+the end result to retrieve from tools in this repository that set up and execute NWMv4
+hindcast and operational forecast runs.
 
 ## Installation
 
@@ -33,13 +42,13 @@ Note that for development, all commands need to be run with `pixi r -e dev` to a
 the virtual environment. For example:
 
 ```bash
-pixi r -e dev coastal-calibration submit config.yaml -i
+pixi r -e dev coastal-calibration run config.yaml
 ```
 
 For the rest of this section, we will omit the `pixi r -e dev` prefix for brevity, but
 it is required when running from the development environment.
 
-Generate a configuration file, adjust it, then submit:
+Generate a configuration file, adjust it, then run:
 
 ```bash
 # SCHISM (default)
@@ -54,9 +63,6 @@ only requires the following (paths are auto-generated based on user, domain, and
 source):
 
 ```yaml
-slurm:
-  job_name: my_schism_run
-
 simulation:
   start_date: 2021-06-11
   duration_hours: 24
@@ -73,9 +79,6 @@ pointing to a pre-built SFINCS model:
 ```yaml
 model: sfincs
 
-slurm:
-  job_name: my_sfincs_run
-
 simulation:
   start_date: 2025-06-01
   duration_hours: 168
@@ -89,57 +92,27 @@ model_config:
   prebuilt_dir: /path/to/prebuilt/sfincs/model
 ```
 
-Validate and submit:
+Validate and run:
 
 ```bash
 coastal-calibration validate config.yaml
-coastal-calibration submit config.yaml
+coastal-calibration run config.yaml
 ```
 
-Both `run` and `submit` execute the same stage pipeline. The difference is that `run`
-executes everything locally (for use inside an interactive compute session), while
-`submit` runs Python-only stages on the login node and submits container stages as a
-SLURM job. Both support `--start-from` and `--stop-after` for partial workflows.
-
-By default, the CLI submits the job and returns immediately after the Python-only
-pre-job stages complete (e.g., download, observation station discovery):
-
-```console
-INFO  Running download stage on login node...
-INFO  meteo/nwm_ana: 4/4 [OK]
-INFO  hydro/nwm: 16/16 [OK]
-INFO  coastal/stofs: 1/1 [OK]
-INFO  Total: 21/21 (failed: 0)
-INFO  Download stage completed
-INFO  Generated job script: .../submit_job.sh
-INFO  Generated runner script: .../sing_run_generated.bash
-INFO  Submitting job: .../submit_job.sh
-INFO  Job 167 submitted.
-INFO  Once the job starts running, SLURM logs will be written to: .../slurm-167.out
-INFO  Check job status with: squeue -j 167
-```
-
-Use the `--interactive` (or `-i`) flag to wait and monitor the job until completion:
+The `run` command executes all stages sequentially on the current node. It is designed
+to be used inside a user-written `sbatch` script for full control over SLURM resource
+allocation. It supports `--start-from` and `--stop-after` for partial workflows:
 
 ```bash
-coastal-calibration submit config.yaml --interactive
+coastal-calibration run config.yaml --start-from boundary_conditions
+coastal-calibration run config.yaml --stop-after post_forcing
 ```
 
-Run partial pipelines with `--start-from` and `--stop-after`:
+### Running Inside a SLURM Job (`sbatch`)
 
-```bash
-coastal-calibration submit config.yaml --start-from boundary_conditions
-coastal-calibration submit config.yaml --stop-after post_forcing -i
-```
-
-### Running Inside a SLURM Job (sbatch)
-
-For full control over resource allocation, you can write your own sbatch script with an
-inline configuration and use `coastal-calibration run` to execute it. The `run` command
-executes all stages locally (no nested SLURM submissions), making it ideal for use
-inside a manually crafted sbatch script.
-
-Complete examples are provided in [`docs/examples/`](docs/examples/):
+Write an `sbatch` script with an inline YAML configuration and use
+`coastal-calibration run` to execute it. Complete examples are provided in
+[`docs/examples/`](docs/examples/):
 
 - [`schism.sh`](docs/examples/schism.sh) — SCHISM workflow (multi-node MPI)
 - [`sfincs.sh`](docs/examples/sfincs.sh) — SFINCS workflow (single-node OpenMP)
@@ -148,6 +121,21 @@ Complete examples are provided in [`docs/examples/`](docs/examples/):
 sbatch docs/examples/schism.sh
 ```
 
+### Creating a SFINCS Model from Scratch
+
+Build a new SFINCS quadtree model from an AOI polygon:
+
+```bash
+# Optionally download NWS topobathy for the AOI
+coastal-calibration prepare-topobathy aoi.geojson --domain atlgulf
+
+# Create the model
+coastal-calibration create create_config.yaml
+```
+
+The `create` workflow generates a quadtree SFINCS model with elevation, mask, boundary
+cells, and subgrid tables. It supports automatic NOAA DEM discovery and download.
+
 ## Python API
 
 ```python
@@ -155,33 +143,20 @@ from coastal_calibration import CoastalCalibConfig, CoastalCalibRunner
 
 config = CoastalCalibConfig.from_yaml("config.yaml")
 runner = CoastalCalibRunner(config)
-result = runner.submit()
+result = runner.run()
 
 if result.success:
-    print(f"Job {result.job_id} completed in {result.duration_seconds:.1f}s")
+    print(f"Completed in {result.duration_seconds:.1f}s")
 ```
 
 ### Running Partial Workflows
 
 ```python
-# Both run() and submit() support start_from/stop_after
 result = runner.run(start_from="pre_forcing", stop_after="post_forcing")
 result = runner.run(start_from="pre_schism")
-result = runner.submit(wait=True, start_from="boundary_conditions")
 ```
 
 ## Configuration Reference
-
-### SLURM Settings
-
-| Parameter    | Type | Default               | Description        |
-| ------------ | ---- | --------------------- | ------------------ |
-| `job_name`   | str  | `coastal_calibration` | SLURM job name     |
-| `partition`  | str  | `c5n-18xlarge`        | SLURM partition    |
-| `time_limit` | str  | null                  | Time limit         |
-| `account`    | str  | null                  | SLURM account      |
-| `qos`        | str  | null                  | Quality of Service |
-| `user`       | str  | null                  | SLURM username     |
 
 ### Model Configuration
 
@@ -271,15 +246,15 @@ the full home directory path.
 
 ### SCHISM Stages
 
-Each stage is either Python-only (runs on login node in `submit`) or container-based
-(runs inside SLURM job in `submit`). In `run` mode all stages execute locally.
+Each stage is classified as Python-only or container-based (requires Singularity). The
+`run` command executes all stages sequentially.
 
 1. **`download`** - Download NWM/STOFS data _(Python-only)_
 1. **`pre_forcing`** - Prepare NWM forcing data _(container)_
 1. **`nwm_forcing`** - Generate atmospheric forcing (MPI) _(container)_
 1. **`post_forcing`** - Post-process forcing data _(container)_
-1. **`update_params`** - Create SCHISM `param.nml` file _(container)_
 1. **`schism_obs`** - Add NOAA observation stations _(Python-only)_
+1. **`update_params`** - Create SCHISM `param.nml` file _(container)_
 1. **`boundary_conditions`** - Generate boundary conditions _(container)_
 1. **`pre_schism`** - Prepare SCHISM inputs _(container)_
 1. **`schism_run`** - Run SCHISM model (MPI) _(container)_
@@ -303,6 +278,19 @@ Each stage is either Python-only (runs on login node in `submit`) or container-b
 1. **`sfincs_run`** - Run SFINCS model (Singularity) _(container)_
 1. **`sfincs_plot`** - Plot simulated vs observed water levels _(Python-only)_
 
+### SFINCS Creation Stages
+
+Used by the `create` command to build a new SFINCS model from an AOI polygon:
+
+1. **`create_grid`** - Create SFINCS quadtree grid from AOI polygon
+1. **`create_fetch_elevation`** - Fetch NOAA topobathy DEM for AOI
+1. **`create_elevation`** - Add elevation and bathymetry data
+1. **`create_mask`** - Create active cell mask
+1. **`create_boundary`** - Create water level boundary cells
+1. **`create_discharge`** - Add NWM discharge source points _(optional)_
+1. **`create_subgrid`** - Create subgrid tables
+1. **`create_write`** - Write SFINCS model to disk
+
 ## Configuration Inheritance
 
 Use `_base` to inherit from a shared configuration. This is useful for running the same
@@ -310,9 +298,6 @@ simulation across different domains or time periods:
 
 ```yaml
 # base.yaml - shared settings
-slurm:
-  job_name: coastal_sim
-
 simulation:
   duration_hours: 24
   meteo_source: nwm_ana
@@ -349,25 +334,26 @@ coastal-calibration init config.yaml --domain atlgulf --model sfincs
 # Validate a configuration file
 coastal-calibration validate config.yaml
 
-# Submit job and return immediately (default)
-coastal-calibration submit config.yaml
-
-# Submit job and wait for completion with status updates
-coastal-calibration submit config.yaml --interactive
-coastal-calibration submit config.yaml -i
-
-# Submit with partial pipeline
-coastal-calibration submit config.yaml --start-from boundary_conditions
-coastal-calibration submit config.yaml --stop-after post_forcing -i
-
-# Run workflow locally (inside SLURM job or for testing)
+# Run workflow (inside SLURM job or for testing)
 coastal-calibration run config.yaml
 coastal-calibration run config.yaml --start-from update_params
+coastal-calibration run config.yaml --stop-after post_forcing
+
+# Create a SFINCS model from an AOI polygon
+coastal-calibration create create_config.yaml
+coastal-calibration create create_config.yaml --start-from create_elevation
+
+# Download NWS topobathy DEM for an AOI
+coastal-calibration prepare-topobathy aoi.geojson --domain atlgulf
+
+# Rebuild NOAA DEM spatial index
+coastal-calibration update-dem-index
 
 # List available workflow stages
 coastal-calibration stages
 coastal-calibration stages --model schism
 coastal-calibration stages --model sfincs
+coastal-calibration stages --model create
 ```
 
 ## License

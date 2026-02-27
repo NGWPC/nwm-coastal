@@ -48,7 +48,41 @@ This page provides detailed documentation for the NWM Coastal Python API.
 
 ::: coastal_calibration.config.schema.DownloadConfig
 
-## Workflow Runner
+## SFINCS Creation Configuration
+
+### SfincsCreateConfig
+
+::: coastal_calibration.config.create_schema.SfincsCreateConfig
+    options:
+      show_source: true
+      members:
+        - from_yaml
+        - to_yaml
+        - to_dict
+        - validate
+        - stage_order
+
+### GridConfig
+
+::: coastal_calibration.config.create_schema.GridConfig
+
+### ElevationConfig
+
+::: coastal_calibration.config.create_schema.ElevationConfig
+
+### MaskConfig
+
+::: coastal_calibration.config.create_schema.MaskConfig
+
+### SubgridConfig
+
+::: coastal_calibration.config.create_schema.SubgridConfig
+
+### NWMDischargeConfig
+
+::: coastal_calibration.config.create_schema.NWMDischargeConfig
+
+## Workflow Runners
 
 ### CoastalCalibRunner
 
@@ -57,6 +91,14 @@ This page provides detailed documentation for the NWM Coastal Python API.
       show_source: true
       members:
         - validate
+        - run
+
+### SfincsCreator
+
+::: coastal_calibration.creator.SfincsCreator
+    options:
+      show_source: true
+      members:
         - run
 
 ### WorkflowResult

@@ -15,8 +15,8 @@ flowchart TD
     A[download] --> B[pre_forcing]
     B --> C[nwm_forcing]
     C --> D[post_forcing]
-    D --> E[update_params]
-    E --> F[schism_obs]
+    D --> E[schism_obs]
+    E --> F[update_params]
     F --> G[boundary_conditions]
     G --> H[pre_schism]
     H --> I[schism_run]
@@ -115,36 +115,13 @@ work_dir/
 
 **Runs On:** Compute node (inside Singularity)
 
-### 5. update_params
-
-**Purpose:** Generate SCHISM parameter file and symlink mesh files.
-
-**Tasks:**
-
-- Symlink `hgrid.gr3` and other mesh files into the work directory
-- Create `param.nml` with simulation parameters
-- Set time stepping configuration
-- Configure output options
-
-**Runs On:** Compute node (inside Singularity)
-
-**Outputs:**
-
-```
-work_dir/
-├── hgrid.gr3 (symlink)
-└── param.nml
-```
-
-### 6. schism_obs
+### 5. schism_obs
 
 **Purpose:** Automatically discover NOAA CO-OPS water level stations within the model
 domain and generate a SCHISM `station.in` file so that SCHISM writes time-series output
 at those locations.
 
 **Enabled by:** `model_config.include_noaa_gages: true` (disabled by default)
-
-**Depends on:** `update_params` (which symlinks `hgrid.gr3` into the work directory).
 
 **How it works:**
 
@@ -175,6 +152,27 @@ work_dir/
     time-steps). The value `nspool_sta = 18` is chosen because it divides all `nhot_write`
     values used across domain templates (162, 324, 8640, etc.), satisfying the SCHISM
     constraint `mod(nhot_write, nspool_sta) == 0`.
+
+### 6. update_params
+
+**Purpose:** Generate SCHISM parameter file and symlink mesh files.
+
+**Tasks:**
+
+- Symlink `hgrid.gr3` and other mesh files into the work directory
+- Create `param.nml` with simulation parameters
+- Set time stepping configuration
+- Configure output options
+
+**Runs On:** Compute node (inside Singularity)
+
+**Outputs:**
+
+```
+work_dir/
+├── hgrid.gr3 (symlink)
+└── param.nml
+```
 
 ### 7. boundary_conditions
 
@@ -499,8 +497,8 @@ Stage timing:
   pre_forcing: 12.3s
   nwm_forcing: 234.5s
   post_forcing: 8.7s
-  update_params: 2.1s
   schism_obs: 3.8s
+  update_params: 2.1s
   boundary_conditions: 156.8s
   pre_schism: 5.4s
   schism_run: 1823.6s
@@ -508,3 +506,88 @@ Stage timing:
   schism_plot: 15.4s
 Total: 2375.0s
 ```
+
+## SFINCS Creation Stages
+
+The `create` command builds a new SFINCS quadtree model from an AOI polygon. It uses a
+separate configuration schema (`SfincsCreateConfig`) and a dedicated runner
+(`SfincsCreator`) with resumable execution — completion is tracked in
+`.create_status.json` so that interrupted runs can be resumed with `--start-from`.
+
+```mermaid
+flowchart TD
+    A[create_grid] --> B[create_fetch_elevation]
+    B --> C[create_elevation]
+    C --> D[create_mask]
+    D --> E[create_boundary]
+    E --> F[create_subgrid]
+    F --> G[create_write]
+```
+
+### 1. create_grid
+
+**Purpose:** Generate a SFINCS quadtree grid from the AOI polygon.
+
+**Tasks:**
+
+- Read the AOI polygon (GeoJSON, Shapefile, etc.)
+- Create the base grid in the specified CRS
+- Apply quadtree refinement based on configured levels and criteria
+
+### 2. create_fetch_elevation
+
+**Purpose:** Fetch a NOAA coastal DEM covering the AOI.
+
+**Tasks:**
+
+- Query the packaged NOAA DEM spatial index to find the best-matching dataset based on
+    AOI overlap, resolution, and year
+- Download the DEM tiles from the NOAA `noaa-nos-coastal-lidar-pds` S3 bucket
+- Mosaic tiles and clip to the AOI extent
+
+### 3. create_elevation
+
+**Purpose:** Add elevation and bathymetry data to the grid.
+
+**Tasks:**
+
+- Load configured elevation datasets (e.g., fetched NOAA DEM, NWS topobathy)
+- Interpolate elevation values onto the quadtree grid cells
+- Apply `zmin`/`zmax` filters per dataset
+
+### 4. create_mask
+
+**Purpose:** Create the active cell mask.
+
+**Tasks:**
+
+- Determine which grid cells are active based on elevation thresholds
+- Apply land/water masking criteria
+
+### 5. create_boundary
+
+**Purpose:** Create water level boundary cells.
+
+**Tasks:**
+
+- Identify grid cells along the open ocean boundary
+- Assign boundary condition flags
+
+### 6. create_subgrid
+
+**Purpose:** Generate subgrid lookup tables.
+
+**Tasks:**
+
+- Compute high-resolution subgrid tables from the DEM
+- These tables allow SFINCS to use coarse computational cells while capturing fine-scale
+    topographic detail
+
+### 7. create_write
+
+**Purpose:** Write the complete SFINCS model to disk.
+
+**Tasks:**
+
+- Write all SFINCS input files to the configured `output_dir`
+- The output directory can be used as `prebuilt_dir` in a simulation config

@@ -1,24 +1,3 @@
-All notable changes to this project will be documented in this file.
-We follow the [Semantic Versioning 2.0.0](http://semver.org/) format.
-
-
-## x.y.z - YYYY-MM-DD
-
-### Added
-
-- Lorem ipsum dolor sit amet
-
-### Deprecated
-
-- Nothing.
-
-### Removed
-
-- Nothing.
-
-### Fixed
-
-- Nothing.
 # Changelog
 
 All notable changes to this project will be documented in this file.
@@ -27,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Added
+
+- `create` CLI command for building SFINCS quadtree models from an AOI polygon. The
+    workflow supports grid generation with quadtree refinement, automatic NOAA DEM
+    discovery and download, elevation/bathymetry, active cell mask, boundary cells,
+    optional NWM discharge source points, and subgrid table generation.
+- `prepare-topobathy` CLI command for downloading NWS 30 m topobathymetric DEMs from
+    `icechunk` (S3) clipped to an AOI bounding box, with HydroMT data catalog output.
+- `update-dem-index` CLI command for rebuilding the NOAA DEM spatial index from S3 STAC
+    metadata.
+- `SfincsCreateConfig` configuration schema for the `create` workflow, with sections for
+    grid, elevation, mask, subgrid, and optional NWM discharge.
+- `SfincsCreator` runner with resumable execution (tracks completion in
+    `.create_status.json`) and `--start-from`/`--stop-after` support.
+- NOAA DEM auto-discovery utility (`noaa_dem.py`) that selects the best-matching coastal
+    DEM based on AOI overlap, resolution, and year.
+- NWS topobathy fetch utility (`topobathy.py`) for domain-specific DEM downloads via
+    `icechunk`.
 
 ### Changed
 

@@ -62,7 +62,7 @@ pixi install -e dev
 | `test314`   | Testing with Python 3.14                    | `pixi r -e test314 test`        |
 | `schism`    | Local development with SCHISM I/O libraries | `pixi r -e schism <cmd>`        |
 | `sfincs`    | Local development with HydroMT-SFINCS       | `pixi r -e sfincs <cmd>`        |
-| `typecheck` | Type checking with Pyright                  | `pixi r -e typecheck typecheck` |
+| `typecheck` | Type checking with ty                       | `pixi r -e typecheck typecheck` |
 | `lint`      | Linting with pre-commit                     | `pixi r lint`                   |
 | `docs`      | Documentation building                      | `pixi r -e docs docs-serve`     |
 
@@ -108,11 +108,14 @@ You should see the CLI help output with available commands:
 ```console
 Usage: coastal-calibration [OPTIONS] COMMAND [ARGS]...
 
-  NWM Coastal: Coastal model workflow on HPC clusters.
+  Coastal calibration workflow manager (SCHISM, SFINCS).
 
 Commands:
-  init      Generate a new configuration file.
-  validate  Validate a configuration file.
-  run       Run workflow directly.
-  stages    List available workflow stages.
+  create             Create a SFINCS model from an AOI polygon.
+  init               Create a minimal configuration file.
+  prepare-topobathy  Download NWS topobathy DEM clipped to an AOI bounding box.
+  run                Run the calibration workflow.
+  stages             List available workflow stages.
+  update-dem-index   Rebuild the NOAA DEM spatial index from S3 STAC metadata.
+  validate           Validate a configuration file.
 ```
