@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -64,9 +66,7 @@ def _write_catalog(
             },
         },
     }
-    catalog_path.write_text(
-        yaml.dump(catalog, default_flow_style=False, sort_keys=False)
-    )
+    catalog_path.write_text(yaml.dump(catalog, default_flow_style=False, sort_keys=False))
 
 
 def fetch_topobathy(
@@ -121,15 +121,12 @@ def fetch_topobathy(
     bbox = aoi_gdf.buffer(buffer_deg).total_bounds
 
     logger.info("Opening and clipping icechunk store: s3://%s/%s", _S3_BUCKET, prefix)
-    storage = ic.s3_storage(
-        bucket=_S3_BUCKET, prefix=prefix, region=_S3_REGION, from_env=True
-    )
+    storage = ic.s3_storage(bucket=_S3_BUCKET, prefix=prefix, region=_S3_REGION, from_env=True)
     store = ic.Repository.open(storage).readonly_session("main").store
     clipped = (
         xr.open_zarr(store, consolidated=False, decode_coords="all")
         .squeeze("band", drop=True)
-        .elevation
-        .rio.clip_box(*bbox, crs=aoi_gdf.crs)
+        .elevation.rio.clip_box(*bbox, crs=aoi_gdf.crs)
     )
 
     output_dir.mkdir(parents=True, exist_ok=True)

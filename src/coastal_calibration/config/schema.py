@@ -556,21 +556,6 @@ class SfincsModelConfig(ModelConfig):
         cores on the current machine (see :func:`~coastal_calibration.utils.system.get_cpu_count`).
         On HPC nodes this auto-detects correctly; on a local laptop it
         avoids over-subscribing the system.
-    snap_obs_to_wet_cell : bool
-        When True, observation points that land on "dry" grid cells
-        (bed elevation ≥ ``snap_obs_depth_threshold``) are relocated
-        to the nearest cell with bed elevation below the threshold.
-        This is common for NOAA tide gauges on piers / embankments
-        whose DEM elevation is positive even though the gauge is in
-        water.  Defaults to ``False``.
-    snap_obs_depth_threshold : float
-        Bed-elevation threshold (metres) used by ``snap_obs_to_wet_cell``.
-        Cells shallower than this are considered "dry" and trigger
-        snapping.  Defaults to ``-0.1`` (anything >= -0.1 m triggers
-        relocation).
-    snap_obs_search_radius_m : float
-        Maximum search radius (metres) for finding a replacement wet
-        cell when snapping observation points.  Defaults to ``1000.0``.
     inp_overrides : dict
         Arbitrary key/value pairs written to ``sfincs.inp`` just before the
         model is written to disk.  Use this to override physics parameters
@@ -597,9 +582,6 @@ class SfincsModelConfig(ModelConfig):
     container_tag: str = "latest"
     container_image: Path | None = None
     omp_num_threads: int = field(default=0)
-    snap_obs_to_wet_cell: bool = False
-    snap_obs_depth_threshold: float = -0.1
-    snap_obs_search_radius_m: float = 1000.0
     inp_overrides: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:

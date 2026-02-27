@@ -1221,6 +1221,11 @@ class SfincsObservationPointsStage(_SfincsStageBase):
     name = "sfincs_obs"
     description = "Add observation points"
 
+    #: Bed-elevation threshold (m): cells at or above this are "dry".
+    _SNAP_DEPTH_THRESHOLD: float = -0.1
+    #: Maximum search radius (m) when looking for a replacement wet cell.
+    _SNAP_SEARCH_RADIUS_M: float = 1000.0
+
     def _add_noaa_gages(self, model: SfincsModel) -> int:
         """Query NOAA CO-OPS and add water-level stations as observation points.
 
@@ -1389,8 +1394,8 @@ class SfincsObservationPointsStage(_SfincsStageBase):
     def _snap_obs_to_wet_cells(self, model: SfincsModel) -> int:
         """Relocate observation points on dry cells to the nearest wet cell.
 
-        A cell is considered "dry" when its bed elevation is above the
-        ``snap_obs_depth_threshold`` configured by the user.
+        A cell is considered "dry" when its bed elevation is at or above
+        ``_SNAP_DEPTH_THRESHOLD``.
 
         Returns the number of points that were relocated.
         """
@@ -1398,8 +1403,8 @@ class SfincsObservationPointsStage(_SfincsStageBase):
         import xarray as xr
         from scipy.spatial import KDTree
 
-        depth_threshold = self.sfincs.snap_obs_depth_threshold
-        search_radius = self.sfincs.snap_obs_search_radius_m
+        depth_threshold = self._SNAP_DEPTH_THRESHOLD
+        search_radius = self._SNAP_SEARCH_RADIUS_M
 
         obs_gdf = model.observation_points.data
         if obs_gdf is None or obs_gdf.empty:
@@ -1517,10 +1522,9 @@ class SfincsObservationPointsStage(_SfincsStageBase):
 
         # Snap observation points that sit on dry cells to the nearest
         # wet cell so that they produce dynamic water-level output.
-        if self.sfincs.snap_obs_to_wet_cell:
-            snapped = self._snap_obs_to_wet_cells(model)
-            if snapped:
-                self._log(f"Snapped {snapped} observation point(s) to nearest wet cell")
+        snapped = self._snap_obs_to_wet_cells(model)
+        if snapped:
+            self._log(f"Snapped {snapped} observation point(s) to nearest wet cell")
 
         # Persist obs-index → station-ID mapping so downstream stages
         # (e.g. plotting) can look it up directly instead of re-matching
