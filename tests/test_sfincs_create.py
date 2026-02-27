@@ -25,6 +25,7 @@ from coastal_calibration.config.create_schema import (
     ElevationDataset,
     GridConfig,
     NWMDischargeConfig,
+    RefinementLevel,
     SfincsCreateConfig,
     SubgridConfig,
 )
@@ -272,8 +273,6 @@ class TestSfincsCreateConfig:
 
     def test_to_dict_includes_buffer_m(self, aoi_file: Path, output_dir: Path) -> None:
         """buffer_m should round-trip through to_dict when non-zero."""
-        from coastal_calibration.config.create_schema import RefinementLevel
-
         cfg = SfincsCreateConfig(
             aoi=aoi_file,
             output_dir=output_dir,
@@ -287,8 +286,6 @@ class TestSfincsCreateConfig:
 
     def test_to_dict_omits_zero_buffer_m(self, aoi_file: Path, output_dir: Path) -> None:
         """buffer_m=0 (default) should not appear in serialized output."""
-        from coastal_calibration.config.create_schema import RefinementLevel
-
         cfg = SfincsCreateConfig(
             aoi=aoi_file,
             output_dir=output_dir,
@@ -297,6 +294,18 @@ class TestSfincsCreateConfig:
         d = cfg.to_dict()
         ref = d["grid"]["refinement"][0]
         assert "buffer_m" not in ref
+
+    def test_data_catalog_data_libs_is_list(self) -> None:
+        """DataCatalogConfig.data_libs should default to an empty list, not a string.
+
+        Regression: a bare triple-quoted string after the field was a
+        no-op expression, not a docstring. Verify the default is correct.
+        """
+        from coastal_calibration.config.create_schema import DataCatalogConfig
+
+        dc = DataCatalogConfig()
+        assert isinstance(dc.data_libs, list)
+        assert dc.data_libs == []
 
     def test_to_yaml(self, tmp_path: Path, minimal_create_config: SfincsCreateConfig) -> None:
         path = tmp_path / "out.yaml"

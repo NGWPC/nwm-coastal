@@ -294,7 +294,7 @@ def fetch_noaa_dem(
         If no overlapping DEM is found, *dataset_name* is not in
         the index, or the VRT has no valid data for the AOI region.
     """
-    from pathlib import Path as _Path
+    from pathlib import Path
 
     import geopandas as gpd
     import numpy as np
@@ -302,8 +302,8 @@ def fetch_noaa_dem(
 
     _log = log if log is not None else logger.info
 
-    aoi = _Path(aoi)
-    output_dir = _Path(output_dir)
+    aoi = Path(aoi)
+    output_dir = Path(output_dir)
 
     aoi_gdf = gpd.read_file(aoi)
     if aoi_gdf.crs is None:

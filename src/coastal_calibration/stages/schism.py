@@ -318,8 +318,8 @@ class SchismObservationStage(WorkflowStage):
             )
 
         station_ids = selected["station_id"].tolist()
-        lons = [row.geometry.x for _, row in selected.iterrows()]
-        lats = [row.geometry.y for _, row in selected.iterrows()]
+        lons = selected.geometry.x.tolist()
+        lats = selected.geometry.y.tolist()
 
         # Write station.in and companion ID file
         self._update_substep("Writing station.in")
@@ -652,40 +652,33 @@ class SchismPlotStage(WorkflowStage):
             for i, (sid, col_idx) in enumerate(batch):
                 ax = axes_flat[i]
 
-                # Simulated
+                # _plotable_stations guarantees both sim & obs have
+                # finite values, so we can plot unconditionally.
                 sim_ts = sim_elevation[:, col_idx]
-                has_sim = bool(np.isfinite(sim_ts).any())
+                obs_wl = obs_ds.water_level.sel(station=sid)
 
-                # Observed
-                has_obs = False
-                if sid in obs_ds.station.values:
-                    obs_wl = obs_ds.water_level.sel(station=sid)
-                    has_obs = bool(np.isfinite(obs_wl).any())
-                    if has_obs:
-                        ax.plot(
-                            obs_wl.time.values,
-                            obs_wl.values,
-                            label="Observed",
-                            color="k",
-                            linewidth=1.0,
-                        )
-
-                if has_sim:
-                    ax.plot(
-                        sim_times,
-                        sim_ts,
-                        color="r",
-                        ls="--",
-                        alpha=0.5,
-                    )
-                    ax.scatter(
-                        sim_times,
-                        sim_ts,
-                        label="Simulated",
-                        color="r",
-                        marker="x",
-                        s=25,
-                    )
+                ax.plot(
+                    obs_wl.time.values,
+                    obs_wl.values,
+                    label="Observed",
+                    color="k",
+                    linewidth=1.0,
+                )
+                ax.plot(
+                    sim_times,
+                    sim_ts,
+                    color="r",
+                    ls="--",
+                    alpha=0.5,
+                )
+                ax.scatter(
+                    sim_times,
+                    sim_ts,
+                    label="Simulated",
+                    color="r",
+                    marker="x",
+                    s=25,
+                )
 
                 ax.set_title(f"NOAA {sid}", fontsize=14, fontweight="bold")
                 ax.set_ylabel("Water Level (m, MSL)", fontsize=12)
@@ -752,13 +745,11 @@ class SchismPlotStage(WorkflowStage):
             elevation = elevation[:, :n]
             station_ids = station_ids[:n]
 
-        # Convert simulation time to datetimes
+        # Convert simulation time to datetimes (vectorised).
         sim = self.config.simulation
         start_dt = sim.start_date
-        sim_times = np.array(
-            [start_dt + timedelta(seconds=float(t)) for t in time_seconds],
-            dtype="datetime64[ns]",
-        )
+        start_ns = np.datetime64(start_dt, "ns")
+        sim_times = start_ns + (time_seconds * 1e9).astype("timedelta64[ns]")
 
         # Fetch observed water levels (MLLW -> MSL)
         self._update_substep("Fetching NOAA CO-OPS observations")

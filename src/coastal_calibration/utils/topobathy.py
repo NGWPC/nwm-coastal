@@ -118,7 +118,17 @@ def fetch_topobathy(
     aoi_gdf = gpd.read_file(aoi)
     if aoi_gdf.crs is None:
         raise ValueError(f"AOI file {aoi} has no CRS. Please ensure it is georeferenced.")
-    bbox = aoi_gdf.buffer(buffer_deg).total_bounds
+
+    # Buffer the AOI in geographic coordinates (degrees) so the buffer
+    # unit is always meaningful, regardless of the AOI's native CRS.
+    aoi_4326 = aoi_gdf.to_crs(epsg=4326)
+    geo_bounds = aoi_4326.total_bounds  # (w, s, e, n)
+    bbox = (
+        geo_bounds[0] - buffer_deg,
+        geo_bounds[1] - buffer_deg,
+        geo_bounds[2] + buffer_deg,
+        geo_bounds[3] + buffer_deg,
+    )
 
     logger.info("Opening and clipping icechunk store: s3://%s/%s", _S3_BUCKET, prefix)
     storage = ic.s3_storage(bucket=_S3_BUCKET, prefix=prefix, region=_S3_REGION, from_env=True)
@@ -126,7 +136,7 @@ def fetch_topobathy(
     clipped = (
         xr.open_zarr(store, consolidated=False, decode_coords="all")
         .squeeze("band", drop=True)
-        .elevation.rio.clip_box(*bbox, crs=aoi_gdf.crs)
+        .elevation.rio.clip_box(*bbox, crs="EPSG:4326")
     )
 
     output_dir.mkdir(parents=True, exist_ok=True)

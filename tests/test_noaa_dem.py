@@ -17,6 +17,7 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
+import yaml
 
 from coastal_calibration.utils.noaa_dem import (
     _overlap_fraction,
@@ -365,23 +366,64 @@ class TestWriteCatalog:
     def test_writes_epsg_integer(self, tmp_path: Path) -> None:
         cat = tmp_path / "catalog.yml"
         _write_catalog(cat, "dem.tif", 32617)
-        import yaml
 
         data = yaml.safe_load(cat.read_text())
         assert data["nws_topobathy"]["metadata"]["crs"] == 32617
 
     def test_rejects_non_integer(self, tmp_path: Path) -> None:
-        """Passing a CRS object instead of int should fail at the call site."""
+        """_write_catalog produces a clean integer EPSG in the YAML.
+
+        The old bug (passing a CRS object rather than ``int``) is now
+        prevented by the ``fetch_topobathy`` call to ``.to_epsg()``.
+        This test documents the expectation that the catalog always
+        contains a plain integer.
+        """
         cat = tmp_path / "catalog.yml"
-        # Simulate the old bug: passing a CRS object (mock) rather than int.
-        MagicMock(name="CRS")
-        # _write_catalog expects int; YAML serialization of a mock would
-        # produce garbage.  The regression is that fetch_topobathy now
-        # calls .to_epsg() before reaching _write_catalog, so this scenario
-        # cannot happen at runtime.  This test documents the expectation
-        # that _write_catalog produces a clean integer in the YAML.
         _write_catalog(cat, "dem.tif", 4326)
-        import yaml
 
         data = yaml.safe_load(cat.read_text())
         assert isinstance(data["nws_topobathy"]["metadata"]["crs"], int)
+
+
+# ------------------------------------------------------------------
+# fetch_topobathy buffer regression
+# ------------------------------------------------------------------
+
+
+class TestFetchTopobathyBuffer:
+    """Ensure fetch_topobathy buffers in geographic CRS (EPSG:4326)."""
+
+    def test_clip_box_uses_epsg4326(self, aoi_file: Path, tmp_path: Path) -> None:
+        """clip_box should receive crs='EPSG:4326' so buffer_deg is in degrees."""
+        mock_da = _make_mock_da("float32")
+        mock_zarr = MagicMock()
+        mock_zarr.squeeze.return_value = mock_zarr
+        mock_zarr.elevation.rio.clip_box.return_value = mock_da
+
+        mock_store = MagicMock()
+        mock_repo = MagicMock()
+        mock_repo.readonly_session.return_value.store = mock_store
+
+        with (
+            patch("dotenv.load_dotenv"),
+            patch("geopandas.read_file") as mock_read,
+            patch("icechunk.s3_storage"),
+            patch("icechunk.Repository.open", return_value=mock_repo),
+            patch("xarray.open_zarr", return_value=mock_zarr),
+        ):
+            import geopandas as gpd
+
+            mock_gdf = gpd.read_file(aoi_file)
+            mock_read.return_value = mock_gdf
+
+            from coastal_calibration.utils.topobathy import fetch_topobathy
+
+            fetch_topobathy(
+                domain="atlgulf",
+                aoi=aoi_file,
+                output_dir=tmp_path / "out",
+                buffer_deg=0.1,
+            )
+
+        call_kwargs = mock_zarr.elevation.rio.clip_box.call_args[1]
+        assert call_kwargs["crs"] == "EPSG:4326"

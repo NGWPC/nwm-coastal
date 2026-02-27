@@ -143,8 +143,8 @@ class SubgridConfig:
 class DataCatalogConfig:
     """HydroMT data catalog configuration."""
 
+    #: Additional HydroMT data catalog YAML paths or predefined catalog names.
     data_libs: list[str] = field(default_factory=list)
-    """Additional HydroMT data catalog YAML paths or predefined catalog names."""
 
 
 #: Valid NWM domains for streamflow validation.
