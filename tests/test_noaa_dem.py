@@ -26,7 +26,6 @@ from coastal_calibration.utils.noaa_dem import (
     select_best,
 )
 
-
 # ------------------------------------------------------------------
 # Fixtures
 # ------------------------------------------------------------------
@@ -204,9 +203,7 @@ class TestSelectBest:
         best = select_best(candidates, TEXAS_BBOX)
         assert best["is_topobathy"] is True
 
-    def test_prefers_finer_resolution_among_topobathy(
-        self, sample_index: list[dict]
-    ) -> None:
+    def test_prefers_finer_resolution_among_topobathy(self, sample_index: list[dict]) -> None:
         """LA DEM (1m, topobathy) should beat NCEI (3m, topobathy) for LA bbox."""
         bbox = (-93.0, 29.0, -89.0, 30.5)
         candidates = query_overlapping(sample_index, bbox)
@@ -300,7 +297,7 @@ class TestFetchNoaaDem:
         with patch("rioxarray.open_rasterio", return_value=mock_da):
             from coastal_calibration.utils.noaa_dem import fetch_noaa_dem
 
-            tif, cat, name = fetch_noaa_dem(
+            tif, _cat, name = fetch_noaa_dem(
                 aoi=aoi_file,
                 output_dir=output_dir,
                 dataset_name="NCEI_ninth_Topobathy_2014_8483",

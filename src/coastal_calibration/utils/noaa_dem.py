@@ -22,10 +22,10 @@ from __future__ import annotations
 import importlib.resources
 import json
 import logging
-from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -48,9 +48,7 @@ def load_index() -> list[dict[str, Any]]:
         ``resolution_m``, ``year``, ``is_topobathy``, ``epsg``,
         and ``vrt_filename``.
     """
-    ref = importlib.resources.files("coastal_calibration.data").joinpath(
-        "noaa_dem_index.json"
-    )
+    ref = importlib.resources.files("coastal_calibration.data").joinpath("noaa_dem_index.json")
     return json.loads(ref.read_text(encoding="utf-8"))
 
 
@@ -71,7 +69,9 @@ def query_overlapping(
     return [
         rec
         for rec in index
-        if not (rec["bbox"][2] < w or rec["bbox"][0] > e or rec["bbox"][3] < s or rec["bbox"][1] > n)
+        if not (
+            rec["bbox"][2] < w or rec["bbox"][0] > e or rec["bbox"][3] < s or rec["bbox"][1] > n
+        )
     ]
 
 
@@ -192,9 +192,57 @@ def _write_catalog(
             },
         },
     }
-    catalog_path.write_text(
-        yaml.dump(catalog, default_flow_style=False, sort_keys=False)
-    )
+    catalog_path.write_text(yaml.dump(catalog, default_flow_style=False, sort_keys=False))
+
+
+def _resolve_record(
+    index: list[dict[str, Any]],
+    dataset_name: str | None,
+    aoi_gdf: Any,
+) -> dict[str, Any]:
+    """Find the best index record for the AOI."""
+    if dataset_name is not None:
+        matches = [r for r in index if r["dataset_name"] == dataset_name]
+        if not matches:
+            raise ValueError(
+                f"Dataset {dataset_name!r} not found in NOAA DEM index. "
+                f"Available: {[r['dataset_name'] for r in index]}"
+            )
+        return matches[0]
+
+    aoi_4326 = aoi_gdf.to_crs(epsg=4326)
+    bbox = tuple(aoi_4326.total_bounds)
+    candidates = query_overlapping(index, bbox)
+    if not candidates:
+        raise ValueError(
+            f"No NOAA DEM overlaps AOI bbox {bbox}. "
+            f"Run 'coastal-calibration update-dem-index' to refresh the index."
+        )
+    return select_best(candidates, bbox)
+
+
+def _validate_raster(da: Any, dataset_name: str) -> None:
+    """Raise if the clipped raster has no valid (non-NaN) pixels."""
+    import numpy as np
+
+    if da.size < 1_000_000:
+        sample = da.values
+    else:
+        ny, nx = da.shape[-2], da.shape[-1]
+        cy, cx = ny // 2, nx // 2
+        hw = min(250, nx // 2)
+        hh = min(250, ny // 2)
+        sample = da.isel(
+            x=slice(cx - hw, cx + hw),
+            y=slice(cy - hh, cy + hh),
+        ).values
+    if int(np.sum(~np.isnan(sample))) == 0:
+        raise ValueError(
+            f"NOAA DEM '{dataset_name}' has no valid pixels in the "
+            f"clipped region. The VRT may lack data coverage for this area. "
+            f"Try a different dataset or use 'prepare-topobathy' to fetch "
+            f"from NWS icechunk instead."
+        )
 
 
 def fetch_noaa_dem(
@@ -248,7 +296,7 @@ def fetch_noaa_dem(
 
     import geopandas as gpd
     import numpy as np
-    import rioxarray  # noqa: F401 (registers accessor)
+    import rioxarray
 
     _log = log if log is not None else logger.info
 
@@ -259,28 +307,7 @@ def fetch_noaa_dem(
     if aoi_gdf.crs is None:
         raise ValueError(f"AOI file {aoi} has no CRS")
 
-    index = load_index()
-
-    if dataset_name is not None:
-        matches = [r for r in index if r["dataset_name"] == dataset_name]
-        if not matches:
-            raise ValueError(
-                f"Dataset {dataset_name!r} not found in NOAA DEM index. "
-                f"Available: {[r['dataset_name'] for r in index]}"
-            )
-        record = matches[0]
-    else:
-        # Reproject AOI to EPSG:4326 for bbox query (works for all datasets).
-        aoi_4326 = aoi_gdf.to_crs(epsg=4326)
-        bbox = tuple(aoi_4326.total_bounds)  # (w, s, e, n)
-        candidates = query_overlapping(index, bbox)
-        if not candidates:
-            raise ValueError(
-                f"No NOAA DEM overlaps AOI bbox {bbox}. "
-                f"Run 'coastal-calibration update-dem-index' to refresh the index."
-            )
-        record = select_best(candidates, bbox)
-
+    record = _resolve_record(load_index(), dataset_name, aoi_gdf)
     target_epsg = record["epsg"]
 
     _log(
@@ -312,27 +339,7 @@ def fetch_noaa_dem(
     if nodata_val is not None:
         da = da.where(da > nodata_val, drop=False)
 
-    # Validate that the clipped raster has actual data.
-    # Sample from the center of the array (coastal data is sparse near edges).
-    if da.size < 1_000_000:
-        sample = da.values
-    else:
-        ny, nx = da.shape[-2], da.shape[-1]
-        cy, cx = ny // 2, nx // 2
-        hw = min(250, nx // 2)
-        hh = min(250, ny // 2)
-        sample = da.isel(
-            x=slice(cx - hw, cx + hw),
-            y=slice(cy - hh, cy + hh),
-        ).values
-    valid_count = int(np.sum(~np.isnan(sample)))
-    if valid_count == 0:
-        raise ValueError(
-            f"NOAA DEM '{record['dataset_name']}' has no valid pixels in the "
-            f"clipped region. The VRT may lack data coverage for this area. "
-            f"Try a different dataset or use 'prepare-topobathy' to fetch "
-            f"from NWS icechunk instead."
-        )
+    _validate_raster(da, record["dataset_name"])
 
     # Finalize raster metadata before writing.
     da = da.rio.write_transform()
@@ -360,6 +367,88 @@ def fetch_noaa_dem(
 # ------------------------------------------------------------------
 
 
+def _pick_vrt(vrt_files: list[str]) -> tuple[str, int]:
+    """Select the best VRT filename and its EPSG code."""
+    import re
+
+    # Prefer geographic CRS VRTs (EPSG:4269 or 4326).
+    for vf in vrt_files:
+        m = re.search(r"EPSG-(\d+)", vf)
+        if m and int(m.group(1)) in (4269, 4326):
+            return vf, int(m.group(1))
+
+    # Fall back to first available VRT.
+    vrt_filename = vrt_files[0]
+    m = re.search(r"EPSG-(\d+)", vrt_filename)
+    return vrt_filename, int(m.group(1)) if m else 4269
+
+
+def _parse_stac_collection(
+    s3: Any,
+    bucket: str,
+    ds_name: str,
+) -> dict[str, Any] | None:
+    """Read a single dataset's STAC collection and VRT list into an index entry."""
+    import re
+
+    stac_prefix = f"dem/{ds_name}/stac/"
+    try:
+        stac_resp = s3.list_objects_v2(Bucket=bucket, Prefix=stac_prefix)
+        stac_files = [
+            obj["Key"]
+            for obj in stac_resp.get("Contents", [])
+            if obj["Key"].endswith(".json") and "collection" in obj["Key"]
+        ]
+        if not stac_files:
+            return None
+
+        body = s3.get_object(Bucket=bucket, Key=stac_files[0])["Body"].read()
+        collection = json.loads(body)
+    except Exception:
+        logger.debug("Skipping %s (no STAC collection)", ds_name)
+        return None
+
+    extent = collection.get("extent", {}).get("spatial", {}).get("bbox", [[]])
+    if not extent or not extent[0]:
+        return None
+
+    title = collection.get("title", ds_name)
+    description = collection.get("description", "")
+
+    is_topobathy = any(
+        kw in (title + description).lower()
+        for kw in ("topobathy", "topo-bathy", "bathymetric topographic")
+    )
+
+    year_match = re.search(r"(\d{4})", ds_name)
+    year = int(year_match.group(1)) if year_match else 0
+
+    vrt_resp = s3.list_objects_v2(Bucket=bucket, Prefix=f"dem/{ds_name}/", Delimiter="/")
+    vrt_files = [
+        obj["Key"].split("/")[-1]
+        for obj in vrt_resp.get("Contents", [])
+        if obj["Key"].endswith(".vrt")
+    ]
+    if not vrt_files:
+        return None
+
+    vrt_filename, epsg = _pick_vrt(vrt_files)
+
+    res_match = re.search(r"(\d+)[_-]?(?:arc)?[_-]?sec", title.lower())
+    resolution_m = int(res_match.group(1)) * 30.0 / 9 if res_match else 1.0
+
+    return {
+        "dataset_name": ds_name,
+        "title": title,
+        "bbox": extent[0][:4],
+        "resolution_m": round(resolution_m, 1),
+        "year": year,
+        "is_topobathy": is_topobathy,
+        "epsg": epsg,
+        "vrt_filename": vrt_filename,
+    }
+
+
 def build_index_from_s3(
     *,
     max_datasets: int | None = None,
@@ -379,8 +468,6 @@ def build_index_from_s3(
     list of dict
         Index entries ready to be written to JSON.
     """
-    import re
-
     import boto3
     from botocore import UNSIGNED
     from botocore.config import Config
@@ -405,86 +492,9 @@ def build_index_from_s3(
 
     entries: list[dict[str, Any]] = []
     for ds_name in dataset_names:
-        stac_prefix = f"dem/{ds_name}/stac/"
-        try:
-            stac_resp = s3.list_objects_v2(Bucket=bucket, Prefix=stac_prefix)
-            stac_files = [
-                obj["Key"]
-                for obj in stac_resp.get("Contents", [])
-                if obj["Key"].endswith(".json") and "collection" in obj["Key"]
-            ]
-            if not stac_files:
-                continue
-
-            body = s3.get_object(Bucket=bucket, Key=stac_files[0])["Body"].read()
-            collection = json.loads(body)
-        except Exception:
-            logger.debug("Skipping %s (no STAC collection)", ds_name)
-            continue
-
-        extent = collection.get("extent", {}).get("spatial", {}).get("bbox", [[]])
-        if not extent or not extent[0]:
-            continue
-        raw_bbox = extent[0]
-
-        title = collection.get("title", ds_name)
-        description = collection.get("description", "")
-
-        is_topobathy = any(
-            kw in (title + description).lower()
-            for kw in ("topobathy", "topo-bathy", "bathymetric topographic")
-        )
-
-        year_match = re.search(r"(\d{4})", ds_name)
-        year = int(year_match.group(1)) if year_match else 0
-
-        # Detect available VRTs.
-        vrt_resp = s3.list_objects_v2(Bucket=bucket, Prefix=f"dem/{ds_name}/", Delimiter="/")
-        vrt_files = [
-            obj["Key"].split("/")[-1]
-            for obj in vrt_resp.get("Contents", [])
-            if obj["Key"].endswith(".vrt")
-        ]
-        if not vrt_files:
-            continue
-
-        # Prefer geographic CRS VRTs (EPSG:4269 or 4326).
-        epsg = 4269
-        vrt_filename = ""
-        for vf in vrt_files:
-            m = re.search(r"EPSG-(\d+)", vf)
-            if m:
-                code = int(m.group(1))
-                if code in (4269, 4326):
-                    epsg = code
-                    vrt_filename = vf
-
-        if not vrt_filename:
-            # Fall back to first available VRT.
-            vrt_filename = vrt_files[0]
-            m = re.search(r"EPSG-(\d+)", vrt_filename)
-            if m:
-                epsg = int(m.group(1))
-
-        res_match = re.search(r"(\d+)[_-]?(?:arc)?[_-]?sec", title.lower())
-        if res_match:
-            arcsec = int(res_match.group(1))
-            resolution_m = arcsec * 30.0 / 9  # approximate
-        else:
-            resolution_m = 1.0
-
-        entries.append(
-            {
-                "dataset_name": ds_name,
-                "title": title,
-                "bbox": raw_bbox[:4],
-                "resolution_m": round(resolution_m, 1),
-                "year": year,
-                "is_topobathy": is_topobathy,
-                "epsg": epsg,
-                "vrt_filename": vrt_filename,
-            }
-        )
+        entry = _parse_stac_collection(s3, bucket, ds_name)
+        if entry is not None:
+            entries.append(entry)
 
     logger.info("Built index with %d entries", len(entries))
     return entries
