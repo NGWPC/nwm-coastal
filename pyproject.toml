@@ -232,7 +232,7 @@ isort.required-imports = [ "from __future__ import annotations" ]
 pydocstyle.convention = "numpy"
 
 [tool.codespell]
-skip = "__pycache__,_build,.git,./htmlcov,pixi.lock"
+skip = "__pycache__,_build,.git,./htmlcov,pixi.lock,./site,./cache"
 ignore-words-list = "gages,parm,oce,gage,nd"
 
 [tool.pyproject-fmt]
