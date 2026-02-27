@@ -78,8 +78,3 @@ pip install coastal-calibration
 ```
 
 See the [Installation Guide](getting-started/installation.md) for detailed instructions.
-
-## License
-
-This project is licensed under the BSD-2-Clause License. See
-[LICENSE](https://github.com/NGWPC/nwm-coastal/blob/main/LICENSE) for details.

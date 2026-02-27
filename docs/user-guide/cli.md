@@ -208,9 +208,9 @@ Key points:
 
 Complete examples for both models are available in `docs/examples/`:
 
-- [`schism.sh`](https://github.com/NGWPC/nwm-coastal/blob/main/docs/examples/schism.sh)
+- [`schism.sh`](https://github.com/NGWPC/nwm-coastal/blob/development/docs/examples/schism.sh)
     — SCHISM multi-node MPI
-- [`sfincs.sh`](https://github.com/NGWPC/nwm-coastal/blob/main/docs/examples/sfincs.sh)
+- [`sfincs.sh`](https://github.com/NGWPC/nwm-coastal/blob/development/docs/examples/sfincs.sh)
     — SFINCS single-node OpenMP
 
 ### create
@@ -277,11 +277,11 @@ coastal-calibration prepare-topobathy <aoi> [OPTIONS]
 
 **Options:**
 
-| Option         | Description                                     | Default              |
-| -------------- | ----------------------------------------------- | -------------------- |
-| `--domain`     | Coastal domain (atlgulf, hi, prvi, pacific, ak) | **required**         |
-| `--output-dir` | Output directory for GeoTIFF + catalog          | Same as AOI location |
-| `--buffer-deg` | BBox buffer in degrees                          | 0.1                  |
+| Option         | Description                                               | Default              |
+| -------------- | --------------------------------------------------------- | -------------------- |
+| `--domain`     | Coastal domain (`atlgulf`, `hi`, `prvi`, `pacific`, `ak`) | **required**         |
+| `--output-dir` | Output directory for GeoTIFF + catalog                    | Same as AOI location |
+| `--buffer-deg` | BBox buffer in degrees                                    | 0.1                  |
 
 **Examples:**
 

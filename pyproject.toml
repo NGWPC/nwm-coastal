@@ -332,6 +332,7 @@ s3fs = ">=2026.2.0,<2027"
 docs-build = "mkdocs build --strict"
 docs-serve = { cmd = [ "mike", "serve" ], depends-on = [ "docs-build" ] }
 docs-deploy = "mike deploy --push dev"
+docs-release = "mike deploy --push --update-aliases $(git describe --tags --abbrev=0) latest"
 [tool.pixi.feature.lint.tasks]
 lint = "pre-commit run --all-files"
 pcupdate = "pre-commit autoupdate"

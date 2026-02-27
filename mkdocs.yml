@@ -5,7 +5,7 @@ site_url: https://NGWPC.github.io/nwm-coastal
 
 repo_name: NGWPC/nwm-coastal
 repo_url: https://github.com/NGWPC/nwm-coastal
-edit_uri: edit/main/docs/
+edit_uri: edit/development/docs/
 
 copyright: Copyright &copy; 2025 Raytheon Company. BSD-2-Clause License.
 
@@ -160,3 +160,4 @@ nav:
   - API Reference: reference/api.md
 - Contributing: CONTRIBUTING.md
 - Changelog: CHANGELOG.md
+- License: LICENSE

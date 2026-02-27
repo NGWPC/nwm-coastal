@@ -3,12 +3,12 @@ name: Documentation
 on:
   push:
     branches:
-    - sfincs_creation
+    - development
     tags:
     - 3.1.*
   pull_request:
     branches:
-    - sfincs_creation
+    - development
   workflow_dispatch:
 
 permissions:
@@ -47,8 +47,15 @@ jobs:
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
 
+    - name: Remove stale versions
+      if: github.event_name != 'pull_request'
+      run: |
+        for v in $(mike list | grep -oP '^\S+' | grep -v -E '^(dev|3\.)'); do
+          mike delete --push "$v"
+        done
+
     - name: Deploy dev docs
-      if: github.ref == 'refs/heads/sfincs_creation'
+      if: github.ref == 'refs/heads/development'
       run: |
         mike deploy --push dev
         if ! mike list | grep -q latest; then
