@@ -20,7 +20,7 @@ license = _ROOT / "LICENSE"
 
 def on_files(files: Files, config: MkDocsConfig) -> Files:
     """Add root-level markdown files to the documentation site."""
-    for path in (changelog, contributing, design, license):
+    for path in (changelog, contributing, design):
         files.append(
             File(
                 path=path.name,
@@ -29,4 +29,12 @@ def on_files(files: Files, config: MkDocsConfig) -> Files:
                 use_directory_urls=config.use_directory_urls,
             )
         )
+    lic = File(
+        path="LICENSE.md",
+        src_dir=str(license.parent),
+        dest_dir=str(config.site_dir),
+        use_directory_urls=config.use_directory_urls,
+    )
+    lic.abs_src_path = str(license)
+    files.append(lic)
     return files
