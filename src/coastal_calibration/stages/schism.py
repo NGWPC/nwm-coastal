@@ -614,11 +614,11 @@ class SchismPlotStage(WorkflowStage):
         list[Path]
             Paths to the saved figures.
         """
+        import matplotlib
+
+        matplotlib.use("Agg")
         import matplotlib.dates as mdates
         import matplotlib.pyplot as plt
-
-        # Use non-interactive backend for figure generation without display
-        plt.matplotlib.use("Agg")
 
         # ── Pre-filter: keep only stations with at least obs or sim ──
         plotable = _plotable_stations(station_ids, sim_elevation, obs_ds)

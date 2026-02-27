@@ -188,10 +188,10 @@ coastal-calibration prepare-topobathy aoi.geojson --domain atlgulf --output-dir 
 ### Step 2: Write a Creation Config
 
 ```yaml
+aoi: aoi.geojson
 output_dir: ./my_sfincs_model
 
 grid:
-  aoi: aoi.geojson
   crs: EPSG:32617
 
 elevation:

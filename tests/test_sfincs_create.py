@@ -270,6 +270,34 @@ class TestSfincsCreateConfig:
         assert d["grid"]["resolution"] == 50.0
         assert d["subgrid"]["nr_subgrid_pixels"] == 5
 
+    def test_to_dict_includes_buffer_m(self, aoi_file: Path, output_dir: Path) -> None:
+        """buffer_m should round-trip through to_dict when non-zero."""
+        from coastal_calibration.config.create_schema import RefinementLevel
+
+        cfg = SfincsCreateConfig(
+            aoi=aoi_file,
+            output_dir=output_dir,
+            grid=GridConfig(
+                refinement=[RefinementLevel(polygon=aoi_file, level=3, buffer_m=-3072.0)]
+            ),
+        )
+        d = cfg.to_dict()
+        ref = d["grid"]["refinement"][0]
+        assert ref["buffer_m"] == -3072.0
+
+    def test_to_dict_omits_zero_buffer_m(self, aoi_file: Path, output_dir: Path) -> None:
+        """buffer_m=0 (default) should not appear in serialized output."""
+        from coastal_calibration.config.create_schema import RefinementLevel
+
+        cfg = SfincsCreateConfig(
+            aoi=aoi_file,
+            output_dir=output_dir,
+            grid=GridConfig(refinement=[RefinementLevel(polygon=aoi_file, level=2)]),
+        )
+        d = cfg.to_dict()
+        ref = d["grid"]["refinement"][0]
+        assert "buffer_m" not in ref
+
     def test_to_yaml(self, tmp_path: Path, minimal_create_config: SfincsCreateConfig) -> None:
         path = tmp_path / "out.yaml"
         minimal_create_config.to_yaml(path)

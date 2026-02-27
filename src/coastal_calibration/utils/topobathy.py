@@ -141,7 +141,10 @@ def fetch_topobathy(
     logger.info("GeoTIFF written (%.1f MB)", geotiff_path.stat().st_size / 1e6)
 
     catalog_path = output_dir / "nws_topobathy_catalog.yml"
-    _write_catalog(catalog_path, tif_name, clipped.rio.crs)
+    crs_epsg = clipped.rio.crs.to_epsg()
+    if crs_epsg is None:
+        raise ValueError(f"Cannot determine EPSG code from CRS: {clipped.rio.crs}")
+    _write_catalog(catalog_path, tif_name, crs_epsg)
     logger.info("Catalog written: %s", catalog_path)
 
     return geotiff_path, catalog_path

@@ -19,19 +19,14 @@ class RefinementLevel:
 
     level: int
 
+    #: Inward (negative) buffer in metres applied to the polygon before
+    #: refinement.  A negative value shrinks the polygon so that cells
+    #: near the grid boundary remain at a coarser level — required for
+    #: valid quadtree transitions.  Set to ``0`` to disable buffering.
+    #: When the refinement polygon coincides with the AOI, a buffer of
+    #: at least ``-2 x base_resolution`` is recommended (e.g. ``-3072``
+    #: for a 1024 m base resolution).
     buffer_m: float = 0.0
-    """Path to a polygon file (GeoJSON, Shapefile, etc.) defining the
-    area to refine.  Cells overlapping this polygon are refined to
-    *level*.  Use the AOI polygon itself for the innermost level."""
-    """Refinement level (1 = base resolution, 2 = base/2, 3 = base/4, …).
-    Higher levels produce finer cells."""
-    """Inward (negative) buffer in metres applied to the polygon before
-    refinement.  A negative value shrinks the polygon so that cells
-    near the grid boundary remain at a coarser level — required for
-    valid quadtree transitions.  Set to ``0`` to disable buffering.
-    When the refinement polygon coincides with the AOI, a buffer of
-    at least ``-2 x base_resolution`` is recommended (e.g. ``-3072``
-    for a 1024 m base resolution)."""
 
     def __post_init__(self) -> None:
         self.polygon = Path(self.polygon).expanduser().resolve()
@@ -41,49 +36,49 @@ class RefinementLevel:
 class GridConfig:
     """Grid generation configuration."""
 
+    #: Grid cell resolution in metres (base resolution for quadtree grids).
     resolution: float = 50.0
 
+    #: Coordinate reference system.  Use ``"utm"`` for automatic UTM zone
+    #: detection from the AOI centroid, or an EPSG code string (e.g. ``"EPSG:32617"``).
     crs: str = "utm"
 
+    #: Whether to allow grid rotation for tighter bounding-box fit.
     rotated: bool = True
 
+    #: Quadtree refinement levels.  Each entry maps a polygon to a
+    #: refinement level.  For example, to refine the whole AOI to level 4
+    #: (base/8), supply::
+    #:
+    #:     refinement:
+    #:       - polygon: ./texas_aoi.geojson
+    #:         level: 4
+    #:
+    #: Multiple entries with different polygons / levels enable spatially
+    #: varying resolution (coarser offshore, finer near the coast).
     refinement: list[RefinementLevel] = field(default_factory=list)
-    """Grid cell resolution in metres (base resolution for quadtree grids)."""
-    """Coordinate reference system.  Use ``"utm"`` for automatic UTM zone
-    detection from the AOI centroid, or an EPSG code string (e.g. ``"EPSG:32617"``)."""
-    """Whether to allow grid rotation for tighter bounding-box fit."""
-    """Quadtree refinement levels.  Each entry maps a polygon to a
-    refinement level.  For example, to refine the whole AOI to level 4
-    (base/8), supply::
-
-        refinement:
-          - polygon: ./texas_aoi.geojson
-            level: 4
-
-    Multiple entries with different polygons / levels enable spatially
-    varying resolution (coarser offshore, finer near the coast)."""
 
 
 @dataclass
 class ElevationDataset:
     """A single elevation/bathymetry dataset entry."""
 
+    #: HydroMT data-catalog dataset name.
     name: str = "copdem30"
 
+    #: Minimum elevation threshold for this dataset.
     zmin: float = 0.001
 
+    #: Data source for auto-fetching.  Currently only ``"noaa"`` is
+    #: supported.  When set, the ``create_fetch_elevation`` stage discovers
+    #: and downloads the best NOAA DEM overlapping the AOI.  When ``None``
+    #: (default), the dataset must already exist in ``data_catalog.data_libs``.
     source: str | None = None
 
+    #: Explicit NOAA dataset name (e.g. ``"TX_Coastal_DEM_2018_8899"``).
+    #: Only used when ``source`` is ``"noaa"``.  When ``None``, the best
+    #: dataset is auto-discovered based on AOI overlap and resolution.
     noaa_dataset: str | None = None
-    """HydroMT data-catalog dataset name."""
-    """Minimum elevation threshold for this dataset."""
-    """Data source for auto-fetching.  Currently only ``"noaa"`` is
-    supported.  When set, the ``create_fetch_elevation`` stage discovers
-    and downloads the best NOAA DEM overlapping the AOI.  When ``None``
-    (default), the dataset must already exist in ``data_catalog.data_libs``."""
-    """Explicit NOAA dataset name (e.g. ``"TX_Coastal_DEM_2018_8899"``).
-    Only used when ``source`` is ``"noaa"``.  When ``None``, the best
-    dataset is auto-discovered based on AOI overlap and resolution."""
 
 
 @dataclass
@@ -97,23 +92,22 @@ class ElevationConfig:
         ]
     )
 
+    #: Number of buffer cells around the grid boundary.
     buffer_cells: int = 1
-    """Ordered list of elevation datasets (later entries fill gaps)."""
-    """Number of buffer cells around the grid boundary."""
 
 
 @dataclass
 class MaskConfig:
     """Active-cell mask and boundary configuration."""
 
+    #: Minimum elevation for active cells.
     zmin: float = -5.0
 
+    #: Maximum elevation for waterlevel boundary cells.
     boundary_zmax: float = -5.0
 
+    #: Reset existing boundary conditions before creating new ones.
     reset_bounds: bool = True
-    """Minimum elevation for active cells."""
-    """Maximum elevation for waterlevel boundary cells."""
-    """Reset existing boundary conditions before creating new ones."""
 
 
 @dataclass
@@ -124,21 +118,21 @@ class SubgridConfig:
     the Manning coefficients are embedded directly in the subgrid tables.
     """
 
+    #: Number of subgrid pixels per grid cell.
     nr_subgrid_pixels: int = 5
 
+    #: Land-use / land-cover dataset for roughness classification.
     lulc_dataset: str = "esa_worldcover_2021"
 
+    #: Optional CSV path for custom reclassification table.  When ``None``,
+    #: the HydroMT-SFINCS built-in table for the chosen dataset is used.
     reclass_table: Path | None = None
 
+    #: Default Manning coefficient for land cells.
     manning_land: float = 0.04
 
+    #: Default Manning coefficient for sea cells.
     manning_sea: float = 0.02
-    """Number of subgrid pixels per grid cell."""
-    """Land-use / land-cover dataset for roughness classification."""
-    """Optional CSV path for custom reclassification table.  When ``None``,
-    the HydroMT-SFINCS built-in table for the chosen dataset is used."""
-    """Default Manning coefficient for land cells."""
-    """Default Manning coefficient for sea cells."""
 
     def __post_init__(self) -> None:
         if self.reclass_table is not None:
@@ -166,24 +160,24 @@ class NWMDischargeConfig:
     are added as SFINCS discharge source locations.
     """
 
+    #: Path to an NWM hydrofabric GeoPackage file.
     hydrofabric_gpkg: Path
 
+    #: Layer name inside the GeoPackage containing flowpath linestring
+    #: geometries.
     flowpaths_layer: str
 
+    #: Column in the flowpaths layer whose values identify each flowpath
+    #: and correspond to NWM ``feature_id`` values in CHRTOUT files.
     flowpath_id_column: str
 
+    #: List of NWM feature IDs to extract from the hydrofabric.
     flowpath_ids: list[int] = field(default_factory=list)
 
+    #: NWM coastal domain used for streamflow ID validation
+    #: (``conus``, ``atlgulf``, ``pacific``, ``hawaii``, ``prvi``, or
+    #: ``alaska``).
     coastal_domain: str = "conus"
-    """Path to an NWM hydrofabric GeoPackage file."""
-    """Layer name inside the GeoPackage containing flowpath linestring
-    geometries."""
-    """Column in the flowpaths layer whose values identify each flowpath
-    and correspond to NWM ``feature_id`` values in CHRTOUT files."""
-    """List of NWM feature IDs to extract from the hydrofabric."""
-    """NWM coastal domain used for streamflow ID validation
-    (``conus``, ``atlgulf``, ``pacific``, ``hawaii``, ``prvi``, or
-    ``alaska``)."""
 
     def __post_init__(self) -> None:
         self.hydrofabric_gpkg = Path(self.hydrofabric_gpkg).expanduser().resolve()
@@ -197,10 +191,14 @@ class SfincsCreateConfig:
     absolute paths during construction.
     """
 
+    #: Path to an AOI polygon file (GeoJSON, Shapefile, etc.).
     aoi: Path
 
+    #: Directory where the SFINCS model will be written.
     output_dir: Path
 
+    #: Directory for downloaded data (NOAA DEMs, etc.).  Defaults to
+    #: ``output_dir / "downloads"`` when ``None``.
     download_dir: Path | None = None
 
     grid: GridConfig = field(default_factory=GridConfig)
@@ -210,10 +208,6 @@ class SfincsCreateConfig:
     data_catalog: DataCatalogConfig = field(default_factory=DataCatalogConfig)
     monitoring: MonitoringConfig = field(default_factory=MonitoringConfig)
     nwm_discharge: NWMDischargeConfig | None = None
-    """Path to an AOI polygon file (GeoJSON, Shapefile, etc.)."""
-    """Directory where the SFINCS model will be written."""
-    """Directory for downloaded data (NOAA DEMs, etc.).  Defaults to
-    ``output_dir / "downloads"`` when ``None``."""
 
     def __post_init__(self) -> None:
         self.aoi = Path(self.aoi).expanduser().resolve()
@@ -478,7 +472,12 @@ class SfincsCreateConfig:
                 "crs": self.grid.crs,
                 "rotated": self.grid.rotated,
                 "refinement": [
-                    {"polygon": str(r.polygon), "level": r.level} for r in self.grid.refinement
+                    {
+                        "polygon": str(r.polygon),
+                        "level": r.level,
+                        **({"buffer_m": r.buffer_m} if r.buffer_m != 0.0 else {}),
+                    }
+                    for r in self.grid.refinement
                 ],
             },
             "elevation": {

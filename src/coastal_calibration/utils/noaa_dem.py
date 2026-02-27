@@ -320,26 +320,30 @@ def fetch_noaa_dem(
     vrt_url = get_vrt_url(record)
     _log(f"Opening VRT: {vrt_url}")
 
-    # Reproject AOI to the dataset's native CRS for clipping.
-    aoi_native = aoi_gdf.to_crs(epsg=target_epsg)
-    bounds = aoi_native.total_bounds  # (w, s, e, n)
-    buffered = (
-        bounds[0] - buffer_deg,
-        bounds[1] - buffer_deg,
-        bounds[2] + buffer_deg,
-        bounds[3] + buffer_deg,
+    # Buffer the AOI in geographic coordinates (degrees) before
+    # reprojecting so the buffer unit is always meaningful.
+    aoi_4326 = aoi_gdf.to_crs(epsg=4326)
+    geo_bounds = aoi_4326.total_bounds  # (w, s, e, n)
+    buffered_4326 = (
+        geo_bounds[0] - buffer_deg,
+        geo_bounds[1] - buffer_deg,
+        geo_bounds[2] + buffer_deg,
+        geo_bounds[3] + buffer_deg,
     )
+
+    # Reproject AOI to the dataset's native CRS for polygon clipping.
+    aoi_native = aoi_gdf.to_crs(epsg=target_epsg)
 
     # Use rioxarray.open_rasterio for robust remote VRT access.
     da = rioxarray.open_rasterio(vrt_url, chunks={"x": 4096, "y": 4096})
-    da = da.rio.clip_box(*buffered, crs=f"EPSG:{target_epsg}")  # type: ignore[union-attr]
+    da = da.rio.clip_box(*buffered_4326, crs="EPSG:4326")  # type: ignore[union-attr]
     da = da.squeeze(drop=True)
 
     # Clip to AOI polygon and mask nodata values.
     da = da.rio.clip(aoi_native.geometry, aoi_native.crs, drop=True)
     nodata_val = da.rio.nodata
     if nodata_val is not None:
-        da = da.where(da > nodata_val, drop=False)
+        da = da.where(da != nodata_val, drop=False)
 
     _validate_raster(da, record["dataset_name"])
 
