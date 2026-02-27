@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from coastal_calibration.config.create_schema import SfincsCreateConfig
 from coastal_calibration.runner import WorkflowResult
 from coastal_calibration.stages.sfincs_create import (
     CreateStage,
@@ -22,7 +20,9 @@ from coastal_calibration.utils.logging import (
 )
 
 if TYPE_CHECKING:
-    pass
+    from pathlib import Path
+
+    from coastal_calibration.config.create_schema import SfincsCreateConfig
 
 
 class SfincsCreator:

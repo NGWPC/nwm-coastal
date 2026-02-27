@@ -8,7 +8,7 @@ from typing import Any
 
 import yaml
 
-from coastal_calibration.config.schema import LogLevel, MonitoringConfig
+from coastal_calibration.config.schema import MonitoringConfig
 
 
 @dataclass
@@ -16,21 +16,21 @@ class RefinementLevel:
     """A single quadtree refinement polygon/level pair."""
 
     polygon: Path
+
+    level: int
+
+    buffer_m: float = 0.0
     """Path to a polygon file (GeoJSON, Shapefile, etc.) defining the
     area to refine.  Cells overlapping this polygon are refined to
     *level*.  Use the AOI polygon itself for the innermost level."""
-
-    level: int
     """Refinement level (1 = base resolution, 2 = base/2, 3 = base/4, …).
     Higher levels produce finer cells."""
-
-    buffer_m: float = 0.0
     """Inward (negative) buffer in metres applied to the polygon before
     refinement.  A negative value shrinks the polygon so that cells
     near the grid boundary remain at a coarser level — required for
     valid quadtree transitions.  Set to ``0`` to disable buffering.
     When the refinement polygon coincides with the AOI, a buffer of
-    at least ``-2 × base_resolution`` is recommended (e.g. ``-3072``
+    at least ``-2 x base_resolution`` is recommended (e.g. ``-3072``
     for a 1024 m base resolution)."""
 
     def __post_init__(self) -> None:
@@ -42,16 +42,16 @@ class GridConfig:
     """Grid generation configuration."""
 
     resolution: float = 50.0
-    """Grid cell resolution in metres (base resolution for quadtree grids)."""
 
     crs: str = "utm"
-    """Coordinate reference system.  Use ``"utm"`` for automatic UTM zone
-    detection from the AOI centroid, or an EPSG code string (e.g. ``"EPSG:32617"``)."""
 
     rotated: bool = True
-    """Whether to allow grid rotation for tighter bounding-box fit."""
 
     refinement: list[RefinementLevel] = field(default_factory=list)
+    """Grid cell resolution in metres (base resolution for quadtree grids)."""
+    """Coordinate reference system.  Use ``"utm"`` for automatic UTM zone
+    detection from the AOI centroid, or an EPSG code string (e.g. ``"EPSG:32617"``)."""
+    """Whether to allow grid rotation for tighter bounding-box fit."""
     """Quadtree refinement levels.  Each entry maps a polygon to a
     refinement level.  For example, to refine the whole AOI to level 4
     (base/8), supply::
@@ -69,10 +69,21 @@ class ElevationDataset:
     """A single elevation/bathymetry dataset entry."""
 
     name: str = "copdem30"
-    """HydroMT data-catalog dataset name."""
 
     zmin: float = 0.001
+
+    source: str | None = None
+
+    noaa_dataset: str | None = None
+    """HydroMT data-catalog dataset name."""
     """Minimum elevation threshold for this dataset."""
+    """Data source for auto-fetching.  Currently only ``"noaa"`` is
+    supported.  When set, the ``create_fetch_elevation`` stage discovers
+    and downloads the best NOAA DEM overlapping the AOI.  When ``None``
+    (default), the dataset must already exist in ``data_catalog.data_libs``."""
+    """Explicit NOAA dataset name (e.g. ``"TX_Coastal_DEM_2018_8899"``).
+    Only used when ``source`` is ``"noaa"``.  When ``None``, the best
+    dataset is auto-discovered based on AOI overlap and resolution."""
 
 
 @dataclass
@@ -85,9 +96,9 @@ class ElevationConfig:
             ElevationDataset(name="gebco", zmin=-20000),
         ]
     )
-    """Ordered list of elevation datasets (later entries fill gaps)."""
 
     buffer_cells: int = 1
+    """Ordered list of elevation datasets (later entries fill gaps)."""
     """Number of buffer cells around the grid boundary."""
 
 
@@ -96,12 +107,12 @@ class MaskConfig:
     """Active-cell mask and boundary configuration."""
 
     zmin: float = -5.0
-    """Minimum elevation for active cells."""
 
     boundary_zmax: float = -5.0
-    """Maximum elevation for waterlevel boundary cells."""
 
     reset_bounds: bool = True
+    """Minimum elevation for active cells."""
+    """Maximum elevation for waterlevel boundary cells."""
     """Reset existing boundary conditions before creating new ones."""
 
 
@@ -114,19 +125,19 @@ class SubgridConfig:
     """
 
     nr_subgrid_pixels: int = 5
-    """Number of subgrid pixels per grid cell."""
 
     lulc_dataset: str = "esa_worldcover_2021"
-    """Land-use / land-cover dataset for roughness classification."""
 
     reclass_table: Path | None = None
-    """Optional CSV path for custom reclassification table.  When ``None``,
-    the HydroMT-SFINCS built-in table for the chosen dataset is used."""
 
     manning_land: float = 0.04
-    """Default Manning coefficient for land cells."""
 
     manning_sea: float = 0.02
+    """Number of subgrid pixels per grid cell."""
+    """Land-use / land-cover dataset for roughness classification."""
+    """Optional CSV path for custom reclassification table.  When ``None``,
+    the HydroMT-SFINCS built-in table for the chosen dataset is used."""
+    """Default Manning coefficient for land cells."""
     """Default Manning coefficient for sea cells."""
 
     def __post_init__(self) -> None:
@@ -156,20 +167,20 @@ class NWMDischargeConfig:
     """
 
     hydrofabric_gpkg: Path
-    """Path to an NWM hydrofabric GeoPackage file."""
 
     flowpaths_layer: str
-    """Layer name inside the GeoPackage containing flowpath linestring
-    geometries."""
 
     flowpath_id_column: str
-    """Column in the flowpaths layer whose values identify each flowpath
-    and correspond to NWM ``feature_id`` values in CHRTOUT files."""
 
     flowpath_ids: list[int] = field(default_factory=list)
-    """List of NWM feature IDs to extract from the hydrofabric."""
 
     coastal_domain: str = "conus"
+    """Path to an NWM hydrofabric GeoPackage file."""
+    """Layer name inside the GeoPackage containing flowpath linestring
+    geometries."""
+    """Column in the flowpaths layer whose values identify each flowpath
+    and correspond to NWM ``feature_id`` values in CHRTOUT files."""
+    """List of NWM feature IDs to extract from the hydrofabric."""
     """NWM coastal domain used for streamflow ID validation
     (``conus``, ``atlgulf``, ``pacific``, ``hawaii``, ``prvi``, or
     ``alaska``)."""
@@ -187,10 +198,10 @@ class SfincsCreateConfig:
     """
 
     aoi: Path
-    """Path to an AOI polygon file (GeoJSON, Shapefile, etc.)."""
 
     output_dir: Path
-    """Directory where the SFINCS model will be written."""
+
+    download_dir: Path | None = None
 
     grid: GridConfig = field(default_factory=GridConfig)
     elevation: ElevationConfig = field(default_factory=ElevationConfig)
@@ -199,10 +210,21 @@ class SfincsCreateConfig:
     data_catalog: DataCatalogConfig = field(default_factory=DataCatalogConfig)
     monitoring: MonitoringConfig = field(default_factory=MonitoringConfig)
     nwm_discharge: NWMDischargeConfig | None = None
+    """Path to an AOI polygon file (GeoJSON, Shapefile, etc.)."""
+    """Directory where the SFINCS model will be written."""
+    """Directory for downloaded data (NOAA DEMs, etc.).  Defaults to
+    ``output_dir / "downloads"`` when ``None``."""
 
     def __post_init__(self) -> None:
         self.aoi = Path(self.aoi).expanduser().resolve()
         self.output_dir = Path(self.output_dir).expanduser().resolve()
+        if self.download_dir is not None:
+            self.download_dir = Path(self.download_dir).expanduser().resolve()
+
+    @property
+    def effective_download_dir(self) -> Path:
+        """Effective download directory (fallback to output_dir/downloads)."""
+        return self.download_dir or self.output_dir / "downloads"
 
     # ------------------------------------------------------------------
     # Stage ordering
@@ -216,12 +238,16 @@ class SfincsCreateConfig:
         is no separate roughness stage.  The ``create_discharge`` stage
         is included only when :attr:`nwm_discharge` is configured.
         """
-        stages = [
-            "create_grid",
-            "create_elevation",
-            "create_mask",
-            "create_boundary",
-        ]
+        stages = ["create_grid"]
+        if any(d.source is not None for d in self.elevation.datasets):
+            stages.append("create_fetch_elevation")
+        stages.extend(
+            [
+                "create_elevation",
+                "create_mask",
+                "create_boundary",
+            ]
+        )
         if self.nwm_discharge is not None:
             stages.append("create_discharge")
         stages.extend(["create_subgrid", "create_write"])
@@ -275,9 +301,13 @@ class SfincsCreateConfig:
             nwm_data["hydrofabric_gpkg"] = Path(nwm_data["hydrofabric_gpkg"])
             nwm_discharge = NWMDischargeConfig(**nwm_data)
 
+        download_dir_raw = data.get("download_dir")
+        download_dir = Path(download_dir_raw) if download_dir_raw else None
+
         return cls(
             aoi=Path(aoi),
             output_dir=Path(output_dir),
+            download_dir=download_dir,
             grid=grid,
             elevation=elevation,
             mask=mask,
@@ -286,6 +316,41 @@ class SfincsCreateConfig:
             monitoring=monitoring,
             nwm_discharge=nwm_discharge,
         )
+
+    @staticmethod
+    def _resolve_relative_paths(data: dict[str, Any], yaml_dir: Path) -> None:
+        """Resolve relative paths in *data* against *yaml_dir* in place."""
+        for key in ("aoi", "output_dir", "download_dir"):
+            val = data.get(key)
+            if val and not Path(val).is_absolute():
+                data[key] = str(yaml_dir / val)
+
+        reclass = (data.get("subgrid") or {}).get("reclass_table")
+        if reclass and not Path(reclass).is_absolute():
+            data["subgrid"]["reclass_table"] = str(yaml_dir / reclass)
+
+        for ref_entry in (data.get("grid") or {}).get("refinement") or []:
+            poly = ref_entry.get("polygon")
+            if poly and not Path(poly).is_absolute():
+                ref_entry["polygon"] = str(yaml_dir / poly)
+
+        nwm_data = data.get("nwm_discharge") or {}
+        gpkg = nwm_data.get("hydrofabric_gpkg")
+        if gpkg and not Path(gpkg).is_absolute():
+            nwm_data["hydrofabric_gpkg"] = str(yaml_dir / gpkg)
+            data["nwm_discharge"] = nwm_data
+
+        catalog_data = data.get("data_catalog") or {}
+        libs = catalog_data.get("data_libs") or []
+        resolved_libs = [
+            str((yaml_dir / lib).resolve())
+            if not Path(lib).is_absolute() and Path(lib).suffix in (".yml", ".yaml")
+            else lib
+            for lib in libs
+        ]
+        if resolved_libs:
+            catalog_data["data_libs"] = resolved_libs
+            data["data_catalog"] = catalog_data
 
     @classmethod
     def from_yaml(cls, config_path: Path | str) -> SfincsCreateConfig:
@@ -320,50 +385,44 @@ class SfincsCreateConfig:
         if data is None:
             raise ValueError(f"Configuration file is empty: {config_path}")
 
-        # Resolve relative paths against the YAML file's directory
-        yaml_dir = config_path.parent
-        for key in ("aoi", "output_dir"):
-            val = data.get(key)
-            if val and not Path(val).is_absolute():
-                data[key] = str(yaml_dir / val)
-
-        reclass = (data.get("subgrid") or {}).get("reclass_table")
-        if reclass and not Path(reclass).is_absolute():
-            data["subgrid"]["reclass_table"] = str(yaml_dir / reclass)
-
-        # Resolve relative refinement polygon paths against YAML dir
-        grid_data = data.get("grid") or {}
-        for ref_entry in grid_data.get("refinement") or []:
-            poly = ref_entry.get("polygon")
-            if poly and not Path(poly).is_absolute():
-                ref_entry["polygon"] = str(yaml_dir / poly)
-
-        # Resolve relative hydrofabric_gpkg path against the YAML directory
-        nwm_data = data.get("nwm_discharge") or {}
-        gpkg = nwm_data.get("hydrofabric_gpkg")
-        if gpkg and not Path(gpkg).is_absolute():
-            nwm_data["hydrofabric_gpkg"] = str(yaml_dir / gpkg)
-            data["nwm_discharge"] = nwm_data
-
-        # Resolve relative data_libs paths against the YAML directory
-        catalog_data = data.get("data_catalog") or {}
-        libs = catalog_data.get("data_libs") or []
-        resolved_libs: list[str] = []
-        for lib in libs:
-            lib_path = Path(lib)
-            if not lib_path.is_absolute() and lib_path.suffix in (".yml", ".yaml"):
-                resolved_libs.append(str((yaml_dir / lib_path).resolve()))
-            else:
-                resolved_libs.append(lib)
-        if resolved_libs:
-            catalog_data["data_libs"] = resolved_libs
-            data["data_catalog"] = catalog_data
-
+        cls._resolve_relative_paths(data, config_path.parent)
         return cls._from_dict(data)
 
     # ------------------------------------------------------------------
     # Validation
     # ------------------------------------------------------------------
+
+    def _validate_elevation(self) -> list[str]:
+        """Validate elevation configuration."""
+        errors: list[str] = []
+        if self.elevation.buffer_cells < 0:
+            errors.append("elevation.buffer_cells must be non-negative")
+        if not self.elevation.datasets:
+            errors.append("elevation.datasets must contain at least one entry")
+        for ds in self.elevation.datasets:
+            if ds.source is not None and ds.source != "noaa":
+                errors.append(
+                    f"elevation.datasets[{ds.name}].source must be 'noaa' or None, "
+                    f"got '{ds.source}'"
+                )
+            if ds.noaa_dataset is not None and ds.source != "noaa":
+                errors.append(
+                    f"elevation.datasets[{ds.name}].noaa_dataset is set but source is not 'noaa'"
+                )
+        return errors
+
+    def _validate_subgrid(self) -> list[str]:
+        """Validate subgrid configuration."""
+        errors: list[str] = []
+        if self.subgrid.manning_land <= 0:
+            errors.append("subgrid.manning_land must be positive")
+        if self.subgrid.manning_sea <= 0:
+            errors.append("subgrid.manning_sea must be positive")
+        if self.subgrid.reclass_table is not None and not self.subgrid.reclass_table.exists():
+            errors.append(f"subgrid.reclass_table not found: {self.subgrid.reclass_table}")
+        if self.subgrid.nr_subgrid_pixels < 1:
+            errors.append("subgrid.nr_subgrid_pixels must be >= 1")
+        return errors
 
     def validate(self) -> list[str]:
         """Validate configuration and return a list of error messages.
@@ -381,22 +440,8 @@ class SfincsCreateConfig:
         if self.grid.resolution <= 0:
             errors.append(f"grid.resolution must be positive, got {self.grid.resolution}")
 
-        if self.elevation.buffer_cells < 0:
-            errors.append("elevation.buffer_cells must be non-negative")
-
-        if not self.elevation.datasets:
-            errors.append("elevation.datasets must contain at least one entry")
-
-        if self.subgrid.manning_land <= 0:
-            errors.append("subgrid.manning_land must be positive")
-        if self.subgrid.manning_sea <= 0:
-            errors.append("subgrid.manning_sea must be positive")
-
-        if self.subgrid.reclass_table is not None and not self.subgrid.reclass_table.exists():
-            errors.append(f"subgrid.reclass_table not found: {self.subgrid.reclass_table}")
-
-        if self.subgrid.nr_subgrid_pixels < 1:
-            errors.append("subgrid.nr_subgrid_pixels must be >= 1")
+        errors.extend(self._validate_elevation())
+        errors.extend(self._validate_subgrid())
 
         for ref in self.grid.refinement:
             if not ref.polygon.exists():
@@ -407,9 +452,7 @@ class SfincsCreateConfig:
         if self.nwm_discharge is not None:
             nd = self.nwm_discharge
             if not nd.hydrofabric_gpkg.exists():
-                errors.append(
-                    f"nwm_discharge.hydrofabric_gpkg not found: {nd.hydrofabric_gpkg}"
-                )
+                errors.append(f"nwm_discharge.hydrofabric_gpkg not found: {nd.hydrofabric_gpkg}")
             if not nd.flowpath_ids:
                 errors.append("nwm_discharge.flowpath_ids must contain at least one ID")
             if nd.coastal_domain not in _VALID_NWM_DOMAINS:
@@ -429,18 +472,24 @@ class SfincsCreateConfig:
         return {
             "aoi": str(self.aoi),
             "output_dir": str(self.output_dir),
+            **({"download_dir": str(self.download_dir)} if self.download_dir else {}),
             "grid": {
                 "resolution": self.grid.resolution,
                 "crs": self.grid.crs,
                 "rotated": self.grid.rotated,
                 "refinement": [
-                    {"polygon": str(r.polygon), "level": r.level}
-                    for r in self.grid.refinement
+                    {"polygon": str(r.polygon), "level": r.level} for r in self.grid.refinement
                 ],
             },
             "elevation": {
                 "datasets": [
-                    {"name": d.name, "zmin": d.zmin} for d in self.elevation.datasets
+                    {
+                        "name": d.name,
+                        "zmin": d.zmin,
+                        **({"source": d.source} if d.source else {}),
+                        **({"noaa_dataset": d.noaa_dataset} if d.noaa_dataset else {}),
+                    }
+                    for d in self.elevation.datasets
                 ],
                 "buffer_cells": self.elevation.buffer_cells,
             },
@@ -463,9 +512,7 @@ class SfincsCreateConfig:
             },
             "monitoring": {
                 "log_level": self.monitoring.log_level,
-                "log_file": (
-                    str(self.monitoring.log_file) if self.monitoring.log_file else None
-                ),
+                "log_file": (str(self.monitoring.log_file) if self.monitoring.log_file else None),
                 "enable_progress_tracking": self.monitoring.enable_progress_tracking,
                 "enable_timing": self.monitoring.enable_timing,
             },

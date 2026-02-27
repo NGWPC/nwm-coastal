@@ -397,6 +397,45 @@ model_config:
     logger.info(f"Configuration written to: {output_path}")
 
 
+@cli.command("update-dem-index")
+@click.option(
+    "--output",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Write index to this path instead of the packaged location.",
+)
+@click.option(
+    "--max-datasets",
+    type=int,
+    default=None,
+    help="Limit S3 scan to N datasets (for testing).",
+)
+def update_dem_index(output: Path | None, max_datasets: int | None) -> None:
+    """Rebuild the NOAA DEM spatial index from S3 STAC metadata.
+
+    Scans the ``noaa-nos-coastal-lidar-pds`` S3 bucket (public,
+    anonymous access) for coastal DEM datasets and writes a JSON
+    index used by the ``create_fetch_elevation`` stage.
+    """
+    import importlib.resources
+    import json
+
+    from coastal_calibration.utils.noaa_dem import build_index_from_s3
+
+    configure_logger(level="INFO")
+
+    entries = build_index_from_s3(max_datasets=max_datasets)
+    if not entries:
+        _raise_cli_error("No DEM entries found on S3")
+
+    if output is None:
+        ref = importlib.resources.files("coastal_calibration.data").joinpath("noaa_dem_index.json")
+        output = Path(str(ref))
+
+    output.write_text(json.dumps(entries, indent=2) + "\n")
+    click.echo(f"Wrote {len(entries)} entries to {output}")
+
+
 @cli.command()
 @click.option(
     "--model",
@@ -439,6 +478,7 @@ def stages(model: str | None) -> None:
 
     create_stages_list = [
         ("create_grid", "Create SFINCS grid from AOI polygon"),
+        ("create_fetch_elevation", "Fetch NOAA topobathy DEM for AOI"),
         ("create_elevation", "Add elevation and bathymetry data"),
         ("create_mask", "Create active cell mask"),
         ("create_boundary", "Create water level boundary cells"),

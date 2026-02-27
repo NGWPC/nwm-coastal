@@ -14,7 +14,7 @@ from __future__ import annotations
 import os
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from coastal_calibration.stages._hydromt_compat import apply_all_patches
 
@@ -22,6 +22,7 @@ apply_all_patches()
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from pathlib import Path
 
     from hydromt_sfincs import SfincsModel
 
@@ -177,6 +178,7 @@ class CreateGridStage(CreateStage):
     description = "Create SFINCS grid from AOI"
 
     def run(self) -> dict[str, Any]:
+        """Initialise SfincsModel and generate the quadtree grid."""
         from hydromt_sfincs import SfincsModel
 
         cfg = self.config
@@ -251,6 +253,58 @@ class CreateGridStage(CreateStage):
         return {"status": "completed"}
 
 
+class CreateFetchElevationStage(_CreateStageBase):
+    """Fetch NOAA DEM(s) for the AOI before elevation creation."""
+
+    name = "create_fetch_elevation"
+    description = "Fetch NOAA topobathy DEM for AOI"
+
+    def _register_catalog(self, catalog_path: Path) -> None:
+        """Add *catalog_path* to both config data_libs and the live model."""
+        path_str = str(catalog_path.resolve())
+        if path_str not in self.config.data_catalog.data_libs:
+            self.config.data_catalog.data_libs.append(path_str)
+        self.sfincs.data_catalog.from_yml(path_str)
+
+    def run(self) -> dict[str, Any]:
+        """Discover and download NOAA DEM(s) overlapping the AOI."""
+        from coastal_calibration.utils.noaa_dem import fetch_noaa_dem
+
+        cfg = self.config
+        dl_dir = cfg.effective_download_dir
+
+        fetched: list[str] = []
+        for ds in cfg.elevation.datasets:
+            if ds.source != "noaa":
+                continue
+
+            catalog_name = ds.name
+            tif = dl_dir / f"{catalog_name}.tif"
+            cat = dl_dir / f"{catalog_name}_catalog.yml"
+
+            # Resumability: skip if already fetched.
+            if tif.exists() and cat.exists():
+                self._log(f"Reusing existing {tif.name}")
+                self._register_catalog(cat)
+                fetched.append(catalog_name)
+                continue
+
+            self._update_substep(f"Fetching NOAA DEM for '{catalog_name}'")
+            _, cat_path, _ = fetch_noaa_dem(
+                aoi=cfg.aoi,
+                output_dir=dl_dir,
+                dataset_name=ds.noaa_dataset,
+                buffer_deg=0.1,
+                catalog_name=catalog_name,
+                log=self._log,
+            )
+            self._register_catalog(cat_path)
+            fetched.append(catalog_name)
+
+        self._log(f"Fetched {len(fetched)} NOAA DEM(s): {fetched}")
+        return {"status": "completed", "fetched": fetched}
+
+
 class CreateElevationStage(_CreateStageBase):
     """Add elevation / bathymetry data to the model grid."""
 
@@ -258,12 +312,11 @@ class CreateElevationStage(_CreateStageBase):
     description = "Add elevation and bathymetry data"
 
     def run(self) -> dict[str, Any]:
+        """Add elevation and bathymetry layers to the grid."""
         cfg = self.config
 
         self._update_substep("Creating elevation layers")
-        elevation_list = [
-            {"elevation": d.name, "zmin": d.zmin} for d in cfg.elevation.datasets
-        ]
+        elevation_list = [{"elevation": d.name, "zmin": d.zmin} for d in cfg.elevation.datasets]
         self._log(f"Elevation datasets: {[d.name for d in cfg.elevation.datasets]}")
 
         self.sfincs.quadtree_elevation.create(
@@ -282,6 +335,7 @@ class CreateMaskStage(_CreateStageBase):
     description = "Create active cell mask"
 
     def run(self) -> dict[str, Any]:
+        """Create active-cell mask based on elevation threshold."""
         cfg = self.config
 
         self._update_substep("Creating active mask")
@@ -302,6 +356,7 @@ class CreateBoundaryStage(_CreateStageBase):
     description = "Create water level boundary cells"
 
     def run(self) -> dict[str, Any]:
+        """Create water-level boundary cells on the mask."""
         cfg = self.config
 
         self._update_substep("Creating waterlevel boundary")
@@ -329,7 +384,7 @@ class CreateDischargeStage(_CreateStageBase):
     description = "Add NWM discharge source points"
 
     # Known-good sample dates per domain for NWM retro streamflow validation.
-    _SAMPLE_DATES: dict[str, tuple[str, str]] = {
+    _SAMPLE_DATES: ClassVar[dict[str, tuple[str, str]]] = {
         "conus": ("2020-01-01", "2020-01-01T01:00:00"),
         "atlgulf": ("2020-01-01", "2020-01-01T01:00:00"),
         "pacific": ("2020-01-01", "2020-01-01T01:00:00"),
@@ -337,50 +392,6 @@ class CreateDischargeStage(_CreateStageBase):
         "prvi": ("2010-01-01", "2010-01-01T01:00:00"),
         "alaska": ("2018-01-01", "2018-01-01T01:00:00"),
     }
-
-    def validate(self) -> list[str]:
-        """Validate hydrofabric GPKG structure and NWM feature IDs."""
-        cfg = self.config
-        if cfg.nwm_discharge is None:
-            return []
-
-        nd = cfg.nwm_discharge
-        errors: list[str] = []
-
-        if not nd.hydrofabric_gpkg.exists():
-            errors.append(
-                f"nwm_discharge.hydrofabric_gpkg not found: {nd.hydrofabric_gpkg}"
-            )
-            return errors
-
-        # --- pyogrio layer validation ---
-        import pyogrio
-
-        layers = pyogrio.list_layers(nd.hydrofabric_gpkg)
-        layer_names = [name for name, _ in layers]
-        if nd.flowpaths_layer not in layer_names:
-            errors.append(
-                f"Layer '{nd.flowpaths_layer}' not found in "
-                f"{nd.hydrofabric_gpkg.name}. "
-                f"Available layers: {layer_names}"
-            )
-            return errors
-
-        # --- pyogrio column validation ---
-        info = pyogrio.read_info(nd.hydrofabric_gpkg, layer=nd.flowpaths_layer)
-        columns: list[str] = list(info["fields"])
-        if nd.flowpath_id_column not in columns:
-            errors.append(
-                f"Column '{nd.flowpath_id_column}' not found in layer "
-                f"'{nd.flowpaths_layer}'. Available columns: {columns}"
-            )
-            return errors
-
-        # --- NWM streamflow feature_id validation ---
-        nwm_errors = self._validate_nwm_feature_ids(nd)
-        errors.extend(nwm_errors)
-
-        return errors
 
     def _validate_nwm_feature_ids(
         self,
@@ -436,8 +447,7 @@ class CreateDischargeStage(_CreateStageBase):
                     ds.close()
             except Exception as exc:
                 self._log(
-                    f"Could not read NWM streamflow sample: {exc}; "
-                    "skipping feature_id check",
+                    f"Could not read NWM streamflow sample: {exc}; skipping feature_id check",
                     level="warning",
                 )
                 return errors
@@ -448,6 +458,48 @@ class CreateDischargeStage(_CreateStageBase):
                     f"NWM feature_id(s) not found in streamflow data for "
                     f"domain '{domain}': {missing}"
                 )
+
+        return errors
+
+    def validate(self) -> list[str]:
+        """Validate hydrofabric GPKG structure and NWM feature IDs."""
+        cfg = self.config
+        if cfg.nwm_discharge is None:
+            return []
+
+        nd = cfg.nwm_discharge
+        errors: list[str] = []
+
+        if not nd.hydrofabric_gpkg.exists():
+            errors.append(f"nwm_discharge.hydrofabric_gpkg not found: {nd.hydrofabric_gpkg}")
+            return errors
+
+        # --- pyogrio layer validation ---
+        import pyogrio
+
+        layers = pyogrio.list_layers(nd.hydrofabric_gpkg)
+        layer_names = [name for name, _ in layers]
+        if nd.flowpaths_layer not in layer_names:
+            errors.append(
+                f"Layer '{nd.flowpaths_layer}' not found in "
+                f"{nd.hydrofabric_gpkg.name}. "
+                f"Available layers: {layer_names}"
+            )
+            return errors
+
+        # --- pyogrio column validation ---
+        info = pyogrio.read_info(nd.hydrofabric_gpkg, layer=nd.flowpaths_layer)
+        columns: list[str] = list(info["fields"])
+        if nd.flowpath_id_column not in columns:
+            errors.append(
+                f"Column '{nd.flowpath_id_column}' not found in layer "
+                f"'{nd.flowpaths_layer}'. Available columns: {columns}"
+            )
+            return errors
+
+        # --- NWM streamflow feature_id validation ---
+        nwm_errors = self._validate_nwm_feature_ids(nd)
+        errors.extend(nwm_errors)
 
         return errors
 
@@ -496,9 +548,7 @@ class CreateDischargeStage(_CreateStageBase):
             real_idx = active_idx[active_pos]
             nx, ny = float(face_xy[real_idx, 0]), float(face_xy[real_idx, 1])
             snapped.append((nx, ny, name))
-            self._log(
-                f"  {name}: snapped to active cell ({dist:.0f} m away)"
-            )
+            self._log(f"  {name}: snapped to active cell ({dist:.0f} m away)")
 
         return snapped
 
@@ -594,10 +644,7 @@ class CreateDischargeStage(_CreateStageBase):
             for x, y, name in snapped:
                 f.write(f'{x:.2f} {y:.2f} "{name}"\n')
 
-        self._log(
-            f"Added {len(snapped)} discharge source point(s), "
-            f"wrote {src_path.name}"
-        )
+        self._log(f"Added {len(snapped)} discharge source point(s), wrote {src_path.name}")
         return {
             "status": "completed",
             "points_added": len(discharge_points),
@@ -616,14 +663,13 @@ class CreateSubgridStage(_CreateStageBase):
     description = "Create subgrid tables"
 
     def run(self) -> dict[str, Any]:
+        """Generate subgrid lookup tables with embedded roughness."""
         cfg = self.config
 
         self._update_substep("Creating subgrid tables")
         self._log(f"nr_subgrid_pixels={cfg.subgrid.nr_subgrid_pixels}")
 
-        elevation_list = [
-            {"elevation": d.name, "zmin": d.zmin} for d in cfg.elevation.datasets
-        ]
+        elevation_list = [{"elevation": d.name, "zmin": d.zmin} for d in cfg.elevation.datasets]
         roughness_entry: dict[str, Any] = {"lulc": cfg.subgrid.lulc_dataset}
         if cfg.subgrid.reclass_table is not None:
             roughness_entry["reclass_table"] = str(cfg.subgrid.reclass_table)
@@ -648,6 +694,7 @@ class CreateWriteStage(_CreateStageBase):
     description = "Write SFINCS model to disk"
 
     def run(self) -> dict[str, Any]:
+        """Write the SFINCS model to disk and clean up the registry."""
         cfg = self.config
 
         self._update_substep("Writing model")
@@ -668,6 +715,7 @@ class CreateWriteStage(_CreateStageBase):
 #: Mapping from stage name to its class.
 STAGE_CLASSES: dict[str, type[CreateStage]] = {
     "create_grid": CreateGridStage,
+    "create_fetch_elevation": CreateFetchElevationStage,
     "create_elevation": CreateElevationStage,
     "create_mask": CreateMaskStage,
     "create_boundary": CreateBoundaryStage,
