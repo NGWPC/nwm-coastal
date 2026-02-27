@@ -48,7 +48,9 @@ def load_index() -> list[dict[str, Any]]:
         ``resolution_m``, ``year``, ``is_topobathy``, ``epsg``,
         and ``vrt_filename``.
     """
-    ref = importlib.resources.files("coastal_calibration.data").joinpath("noaa_dem_index.json")
+    ref = importlib.resources.files("coastal_calibration.data_catalog").joinpath(
+        "noaa_dem_index.json"
+    )
     return json.loads(ref.read_text(encoding="utf-8"))
 
 

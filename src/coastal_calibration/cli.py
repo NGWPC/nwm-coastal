@@ -429,7 +429,9 @@ def update_dem_index(output: Path | None, max_datasets: int | None) -> None:
         _raise_cli_error("No DEM entries found on S3")
 
     if output is None:
-        ref = importlib.resources.files("coastal_calibration.data").joinpath("noaa_dem_index.json")
+        ref = importlib.resources.files("coastal_calibration.data_catalog").joinpath(
+            "noaa_dem_index.json"
+        )
         output = Path(str(ref))
 
     output.write_text(json.dumps(entries, indent=2) + "\n")

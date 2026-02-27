@@ -1,0 +1,42 @@
+[
+  {
+    "dataset_name": "NCEI_ninth_Topobathy_2014_8483",
+    "title": "NCEI 1/9 arc-second Coastal Relief Model (CONUS)",
+    "bbox": [-123.0, 25.0, -66.75, 49.0],
+    "resolution_m": 3.0,
+    "year": 2014,
+    "is_topobathy": true,
+    "epsg": 4269,
+    "vrt_filename": "NCEI_ninth_Topobathy_2014_m8483_EPSG-4269_1.vrt"
+  },
+  {
+    "dataset_name": "NCEI_ninth_Topobathy_Hawaii_9428",
+    "title": "NCEI 1/9 arc-second Topobathy (Hawaii)",
+    "bbox": [-160.25, 18.75, -154.75, 22.25],
+    "resolution_m": 3.0,
+    "year": 2014,
+    "is_topobathy": true,
+    "epsg": 4326,
+    "vrt_filename": "NCEI_ninth_Topobathy_Hawaii_EPSG-4326.vrt"
+  },
+  {
+    "dataset_name": "NCEI_ninth_Topobathy_PuertoRico_9525",
+    "title": "NCEI 1/9 arc-second Topobathy (Puerto Rico)",
+    "bbox": [-68.0, 17.75, -65.25, 18.75],
+    "resolution_m": 3.0,
+    "year": 2014,
+    "is_topobathy": true,
+    "epsg": 4269,
+    "vrt_filename": "NCEI_ninth_Topobathy_PuertoRico_EPSG-4269.vrt"
+  },
+  {
+    "dataset_name": "NCEI_ninth_Topobathy_USVI_9529",
+    "title": "NCEI 1/9 arc-second Topobathy (US Virgin Islands)",
+    "bbox": [-65.25, 17.5, -64.25, 18.75],
+    "resolution_m": 3.0,
+    "year": 2014,
+    "is_topobathy": true,
+    "epsg": 4269,
+    "vrt_filename": "NCEI_ninth_Topobathy_USVI_EPSG-4269.vrt"
+  }
+]
