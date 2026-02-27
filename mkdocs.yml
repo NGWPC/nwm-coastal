@@ -68,7 +68,7 @@ plugins:
 - search
 - mike:
     alias_type: symlink
-    canonical_version: latest
+    canonical_version: stable
 - mkdocstrings:
     default_handler: python
     handlers:

@@ -22,24 +22,18 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout
-      uses: actions/checkout@v6
+    - uses: actions/checkout@v6
       with:
         fetch-depth: 0
-
-    - name: Setup Python
-      uses: actions/setup-python@v6
+    - uses: prefix-dev/setup-pixi@v0.9.4
       with:
-        python-version: '3.14'
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -e ".[docs]"
+        pixi-version: v0.65.0
+        environments: docs
+        activate-environment: docs
 
     - name: Build documentation
       if: github.event_name == 'pull_request'
-      run: mkdocs build --strict
+      run: pixi r docs-build
 
     - name: Configure git
       if: github.event_name != 'pull_request'
@@ -50,21 +44,21 @@ jobs:
     - name: Remove stale versions
       if: github.event_name != 'pull_request'
       run: |
-        for v in $(mike list | grep -oP '^\S+' | grep -v -E '^(dev|3\.)'); do
-          mike delete --push "$v"
+        for v in $(pixi r mike list | grep -oP '^\S+' | grep -v -E '^(dev|3\.)'); do
+          pixi r mike delete --push "$v"
         done
 
     - name: Deploy dev docs
       if: github.ref == 'refs/heads/development'
       run: |
-        mike deploy --push dev
-        if ! mike list | grep -q latest; then
-          mike set-default --push dev
+        pixi r mike deploy --push --update-aliases dev latest
+        if ! pixi r mike list | grep -q stable; then
+          pixi r mike set-default --push latest
         fi
 
     - name: Deploy tagged version
       if: startsWith(github.ref, 'refs/tags/3.1.')
       run: |
         VERSION=${GITHUB_REF#refs/tags/}
-        mike deploy --push --update-aliases "$VERSION" latest
-        mike set-default --push latest
+        pixi r mike deploy --push --update-aliases "$VERSION" stable
+        pixi r mike set-default --push stable

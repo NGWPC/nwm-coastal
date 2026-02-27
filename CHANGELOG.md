@@ -232,5 +232,5 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 - `MPIConfig` class (fields absorbed into `SchismModelConfig`)
 
-[unreleased]: https://github.com/NGWPC/nwm-coastal/compare/3.1.1.0.0...HEAD
 [3.1.1.0.0]: https://github.com/NGWPC/nwm-coastal/releases/tag/3.1.1.0.0
+[unreleased]: https://github.com/NGWPC/nwm-coastal/compare/3.1.1.0.0...HEAD
