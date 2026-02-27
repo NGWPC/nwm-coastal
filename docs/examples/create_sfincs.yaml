@@ -24,10 +24,10 @@ grid:
 # Elevation / bathymetry datasets (merged in order)
 elevation:
   datasets:
-    - name: copdem30      # Copernicus DEM 30m (land)
-      zmin: 0.001
-    - name: gebco         # GEBCO bathymetry
-      zmin: -20000
+  - name: copdem30        # Copernicus DEM 30m (land)
+    zmin: 0.001
+  - name: gebco           # GEBCO bathymetry
+    zmin: -20000
   buffer_cells: 1
 
 # Active-cell mask and boundary settings

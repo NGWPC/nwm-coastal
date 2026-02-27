@@ -34,7 +34,6 @@ model_config:
   merge_observations: true
   merge_discharge: true
   include_noaa_gages: true
-  snap_obs_to_wet_cell: true        # relocate obs points on land cells to nearest wet cell
   forcing_to_mesh_offset_m: 0.0    # STOFS already in NAVD88
   vdatum_mesh_to_msl_m: 0.30       # NAVD88 mesh -> MSL (0.17 datum + ~0.13 model bias correction)
   include_precip: true

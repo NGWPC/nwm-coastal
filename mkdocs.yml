@@ -50,7 +50,7 @@ theme:
   - navigation.instant
   - navigation.instant.progress
   - navigation.path
-  - navigation.sections
+  - navigation.indexes
   - navigation.tabs
   - navigation.tabs.sticky
   - navigation.top
