@@ -49,7 +49,7 @@ jobs:
     - name: Remove stale versions
       if: github.event_name != 'pull_request'
       run: |
-        for v in $(pixi r mike list | grep -oP '^\S+' | grep -v -E '^(dev|3\.)'); do
+        for v in $(pixi r mike list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -oP '^\S+' | grep -v -E '^(dev|3\.)'); do
           pixi r mike delete --push "$v"
         done
 
@@ -57,7 +57,7 @@ jobs:
       if: github.ref == 'refs/heads/development' && !inputs.version
       run: |
         pixi r mike deploy --push --update-aliases dev latest
-        if ! pixi r mike list | grep -q stable; then
+        if ! pixi r mike list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -q stable; then
           pixi r mike set-default --push latest
         fi
 
