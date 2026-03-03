@@ -223,6 +223,21 @@ class SfincsCreateConfig:
     monitoring: MonitoringConfig = field(default_factory=MonitoringConfig)
     nwm_discharge: NWMDischargeConfig | None = None
 
+    #: When True, automatically query NOAA CO-OPS for water level
+    #: stations within the model domain and add them as observation
+    #: points.  Requires the ``plot`` optional dependencies.
+    add_noaa_gages: bool = False
+
+    #: Observation point specifications as list of dicts with
+    #: ``x``, ``y``, ``name`` keys (coordinates in model CRS).
+    observation_points: list[dict[str, Any]] = field(default_factory=list)
+
+    #: Path to a GeoJSON file with observation point locations.
+    observation_locations_file: Path | None = None
+
+    #: Whether to merge with pre-existing observation points.
+    merge_observations: bool = False
+
     # ------------------------------------------------------------------
     # Validation
     # ------------------------------------------------------------------
@@ -236,6 +251,10 @@ class SfincsCreateConfig:
     def __post_init__(self) -> None:
         self.aoi = Path(self.aoi).expanduser().resolve()
         self.output_dir = Path(self.output_dir).expanduser().resolve()
+        if self.observation_locations_file is not None:
+            self.observation_locations_file = (
+                Path(self.observation_locations_file).expanduser().resolve()
+            )
         if self.download_dir is not None:
             self.download_dir = Path(self.download_dir).expanduser().resolve()
 
@@ -270,7 +289,15 @@ class SfincsCreateConfig:
         )
         if self.nwm_discharge is not None:
             stages.append("create_discharge")
-        stages.extend(["create_subgrid", "create_write"])
+        stages.append("create_subgrid")
+        has_obs = (
+            self.add_noaa_gages
+            or bool(self.observation_points)
+            or self.observation_locations_file is not None
+        )
+        if has_obs:
+            stages.append("create_obs")
+        stages.append("create_write")
         return stages
 
     # ------------------------------------------------------------------
@@ -324,6 +351,12 @@ class SfincsCreateConfig:
         download_dir_raw = data.get("download_dir")
         download_dir = Path(download_dir_raw) if download_dir_raw else None
 
+        add_noaa_gages = data.get("add_noaa_gages", False)
+        observation_points = data.get("observation_points", [])
+        obs_file_raw = data.get("observation_locations_file")
+        observation_locations_file = Path(obs_file_raw) if obs_file_raw else None
+        merge_observations = data.get("merge_observations", False)
+
         return cls(
             aoi=Path(aoi),
             output_dir=Path(output_dir),
@@ -335,12 +368,16 @@ class SfincsCreateConfig:
             data_catalog=data_catalog,
             monitoring=monitoring,
             nwm_discharge=nwm_discharge,
+            add_noaa_gages=add_noaa_gages,
+            observation_points=observation_points,
+            observation_locations_file=observation_locations_file,
+            merge_observations=merge_observations,
         )
 
     @staticmethod
     def _resolve_relative_paths(data: dict[str, Any], yaml_dir: Path) -> None:
         """Resolve relative paths in *data* against *yaml_dir* in place."""
-        for key in ("aoi", "output_dir", "download_dir"):
+        for key in ("aoi", "output_dir", "download_dir", "observation_locations_file"):
             val = data.get(key)
             if val and not Path(val).is_absolute():
                 data[key] = str(yaml_dir / val)
@@ -558,6 +595,14 @@ class SfincsCreateConfig:
                 if self.nwm_discharge is not None
                 else None
             ),
+            "add_noaa_gages": self.add_noaa_gages,
+            "observation_points": self.observation_points,
+            "observation_locations_file": (
+                str(self.observation_locations_file)
+                if self.observation_locations_file
+                else None
+            ),
+            "merge_observations": self.merge_observations,
         }
 
     def to_yaml(self, path: Path | str) -> None:

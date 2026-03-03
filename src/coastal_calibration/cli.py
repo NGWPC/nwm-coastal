@@ -468,7 +468,6 @@ def stages(model: str | None) -> None:
         ("sfincs_init", "Initialise SFINCS model (pre-built)"),
         ("sfincs_timing", "Set SFINCS timing"),
         ("sfincs_forcing", "Add water level forcing"),
-        ("sfincs_obs", "Add observation points"),
         ("sfincs_discharge", "Add discharge sources"),
         ("sfincs_precip", "Add precipitation forcing"),
         ("sfincs_wind", "Add wind forcing"),
@@ -485,6 +484,7 @@ def stages(model: str | None) -> None:
         ("create_mask", "Create active cell mask"),
         ("create_boundary", "Create water level boundary cells"),
         ("create_subgrid", "Create subgrid tables"),
+        ("create_obs", "Add observation points (NOAA CO-OPS, file, inline)"),
         ("create_write", "Write SFINCS model to disk"),
     ]
 

@@ -11,6 +11,9 @@ as :mod:`coastal_calibration.stages.sfincs_build`.
 
 from __future__ import annotations
 
+import contextlib
+import json
+import math
 import os
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
@@ -722,6 +725,302 @@ class CreateDischargeStage(_CreateStageBase):
         }
 
 
+class CreateObservationPointsStage(_CreateStageBase):
+    """Add observation points to the model during creation.
+
+    Supports three sources of observation points:
+
+    * A GeoJSON file (``observation_locations_file``).
+    * An inline list (``observation_points``).
+    * Automatic NOAA CO-OPS station discovery (``add_noaa_gages``).
+
+    After adding points, all are snapped to the nearest wet cell so
+    that they produce dynamic water-level output during the SFINCS run.
+    A mapping file (``obs_station_map.json``) is written next to the
+    model files for downstream stages (e.g. plotting) to use.
+    """
+
+    name = "create_obs"
+    description = "Add observation points"
+
+    #: Bed-elevation threshold (m): cells at or above this are "dry".
+    _SNAP_DEPTH_THRESHOLD: float = -0.1
+    #: Maximum search radius (m) when looking for a replacement wet cell.
+    _SNAP_SEARCH_RADIUS_M: float = 1000.0
+
+    # ------------------------------------------------------------------
+    # NOAA CO-OPS helpers
+    # ------------------------------------------------------------------
+
+    def _add_noaa_gages(self, model: SfincsModel) -> int:
+        """Query NOAA CO-OPS and add water-level stations as observation points.
+
+        Returns the number of NOAA stations added.
+        """
+        from coastal_calibration.coops_api import COOPSAPIClient
+
+        model_crs = model.crs
+        if model_crs is None:
+            self._log("Model CRS is undefined, cannot add NOAA CO-OPS stations")
+            return 0
+
+        region_4326 = model.region.to_crs(4326)
+        domain_geom = region_4326.union_all()
+
+        client = COOPSAPIClient()
+        stations_gdf = client.stations_metadata
+        selected = stations_gdf[stations_gdf.within(domain_geom)]
+
+        if selected.empty:
+            self._log("No NOAA CO-OPS stations found within model domain")
+            return 0
+
+        candidate_ids = selected["station_id"].tolist()
+        valid_ids = client.filter_stations_by_datum(candidate_ids)
+        dropped = set(candidate_ids) - valid_ids
+        if dropped:
+            self._log(
+                f"Excluded {len(dropped)} station(s) without datum data: "
+                f"{', '.join(sorted(dropped))}",
+                "warning",
+            )
+        selected = selected[selected["station_id"].isin(sorted(valid_ids))]
+        if selected.empty:
+            self._log("No NOAA CO-OPS stations with valid datum data in domain")
+            return 0
+
+        dedup_distance_m = 100.0
+        existing_points: list[tuple[float, float]] = []
+        try:
+            gdf = model.observation_points.data
+            if gdf is not None and not gdf.empty:
+                existing_points = [(geom.x, geom.y) for geom in gdf.geometry if geom is not None]
+        except Exception:  # noqa: S110
+            pass
+
+        selected_projected = selected.to_crs(model_crs)
+
+        added = 0
+        for _, row in selected_projected.iterrows():
+            cx, cy = row.geometry.x, row.geometry.y
+            if any(math.hypot(cx - ex, cy - ey) < dedup_distance_m for ex, ey in existing_points):
+                continue
+            sid = row["station_id"]
+            model.observation_points.add_point(x=cx, y=cy, name=f"noaa_{sid}")
+            existing_points.append((cx, cy))
+            added += 1
+
+        return added
+
+    # ------------------------------------------------------------------
+    # Observation-point snapping
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _grid_face_centres(grid_ds: Any) -> tuple[Any, Any, Any, Any]:
+        """Compute face centres, bed elevations, and mask from a UGRID mesh."""
+        import numpy as np
+
+        z_elev = grid_ds["z"].values
+        mask_arr = grid_ds["mask"].values
+
+        face_nodes_raw = grid_ds["mesh2d_face_nodes"].values
+        fn_valid = ~np.isnan(face_nodes_raw)
+        fn_int = np.zeros(face_nodes_raw.shape, dtype=int)
+        fn_int[fn_valid] = face_nodes_raw[fn_valid].astype(int)
+        nodes_x = grid_ds.coords["mesh2d_node_x"].values
+        nodes_y = grid_ds.coords["mesh2d_node_y"].values
+        fx = np.nanmean(np.where(fn_valid, nodes_x[fn_int], np.nan), axis=1)
+        fy = np.nanmean(np.where(fn_valid, nodes_y[fn_int], np.nan), axis=1)
+        return fx, fy, z_elev, mask_arr
+
+    def _try_snap_point(
+        self,
+        obs_gdf: Any,
+        idx: int,
+        tree: Any,
+        fx: Any,
+        fy: Any,
+        z_elev: Any,
+        mask_arr: Any,
+        depth_threshold: float,
+        search_radius: float,
+    ) -> bool | None:
+        """Snap a single observation point if its cell is dry."""
+        import numpy as np
+        from shapely.geometry import Point
+
+        geom = obs_gdf.geometry.iloc[idx]
+        if geom is None:
+            return None
+        ox, oy = geom.x, geom.y
+        name = obs_gdf.index[idx] if obs_gdf.index.name else str(idx)
+        with contextlib.suppress(KeyError, IndexError):
+            name = obs_gdf["name"].iloc[idx]
+
+        _, cell_idx = tree.query([ox, oy])
+        cell_z = z_elev[cell_idx]
+        if cell_z < depth_threshold:
+            return None  # already wet
+
+        candidates = tree.query_ball_point([ox, oy], r=search_radius)
+        cand_arr = np.array(candidates) if candidates else np.array([], dtype=int)
+        if len(cand_arr) == 0:
+            self._log(
+                f"  {name}: z={cell_z:.3f} m (dry), no cells within {search_radius:.0f} m",
+                "warning",
+            )
+            return None
+
+        wet = (z_elev[cand_arr] < depth_threshold) & (mask_arr[cand_arr] > 0)
+        if not np.any(wet):
+            self._log(
+                f"  {name}: z={cell_z:.3f} m (dry), no wet cell within {search_radius:.0f} m",
+                "warning",
+            )
+            return None
+
+        wet_idxs = cand_arr[wet]
+        wet_dists = np.sqrt((fx[wet_idxs] - ox) ** 2 + (fy[wet_idxs] - oy) ** 2)
+        best = wet_idxs[np.argmin(wet_dists)]
+        new_z = z_elev[best]
+        move_dist = float(np.min(wet_dists))
+
+        obs_gdf.geometry.iloc[idx] = Point(float(fx[best]), float(fy[best]))
+        self._log(
+            f"  {name}: snapped from z={cell_z:.3f} m to z={new_z:.3f} m ({move_dist:.0f} m away)"
+        )
+        return True
+
+    def _snap_obs_to_wet_cells(self, model: SfincsModel) -> int:
+        """Relocate observation points on dry cells to the nearest wet cell."""
+        import numpy as np
+        import xarray as xr
+        from scipy.spatial import KDTree
+
+        depth_threshold = self._SNAP_DEPTH_THRESHOLD
+        search_radius = self._SNAP_SEARCH_RADIUS_M
+
+        obs_gdf = model.observation_points.data
+        if obs_gdf is None or obs_gdf.empty:
+            return 0
+
+        grid_path = self.config.output_dir / "sfincs.nc"
+        if not grid_path.exists():
+            self._log("sfincs.nc not found - cannot snap observation points", "warning")
+            return 0
+
+        with xr.open_dataset(grid_path) as grid_ds:
+            fx, fy, z_elev, mask_arr = self._grid_face_centres(grid_ds)
+        tree = KDTree(np.column_stack([fx, fy]))
+
+        snapped = 0
+        for idx in range(len(obs_gdf)):
+            result = self._try_snap_point(
+                obs_gdf, idx, tree, fx, fy, z_elev, mask_arr, depth_threshold, search_radius
+            )
+            if result is not None:
+                snapped += 1
+
+        if snapped > 0:
+            model.observation_points._data = obs_gdf
+        return snapped
+
+    # ------------------------------------------------------------------
+    # Station mapping file
+    # ------------------------------------------------------------------
+
+    def _write_obs_station_map(self, model: SfincsModel) -> None:
+        """Write ``obs_station_map.json`` mapping obs indices to station IDs."""
+        obs_gdf = model.observation_points.data
+        if obs_gdf is None or obs_gdf.empty:
+            return
+
+        station_map: list[dict[str, Any]] = []
+        for idx in range(len(obs_gdf)):
+            name = ""
+            with contextlib.suppress(KeyError, IndexError):
+                name = str(obs_gdf["name"].iloc[idx])
+            if not name:
+                with contextlib.suppress(Exception):
+                    name = str(obs_gdf.index[idx])
+
+            station_id = ""
+            if name.startswith("noaa_"):
+                station_id = name[len("noaa_"):]
+
+            geom = obs_gdf.geometry.iloc[idx]
+            entry: dict[str, Any] = {
+                "index": idx,
+                "name": name,
+                "x": float(geom.x) if geom else None,
+                "y": float(geom.y) if geom else None,
+            }
+            if station_id:
+                entry["station_id"] = station_id
+            station_map.append(entry)
+
+        map_path = self.config.output_dir / "obs_station_map.json"
+        map_path.write_text(json.dumps(station_map, indent=2))
+
+    # ------------------------------------------------------------------
+    # Main entry point
+    # ------------------------------------------------------------------
+
+    def run(self) -> dict[str, Any]:
+        """Add observation points from config, file, and/or NOAA gages."""
+        cfg = self.config
+        model = _get_model(cfg)
+
+        has_file = cfg.observation_locations_file is not None
+        has_points = bool(cfg.observation_points)
+        has_noaa = cfg.add_noaa_gages
+
+        if not has_file and not has_points and not has_noaa:
+            self._log("No observation points configured, skipping")
+            return {"status": "skipped"}
+
+        self._update_substep("Adding observation points")
+
+        if not cfg.merge_observations:
+            try:
+                existing = model.observation_points.nr_points
+                if existing > 0:
+                    model.observation_points.clear()
+                    self._log(f"Cleared {existing} existing observation point(s)")
+            except Exception:  # noqa: S110
+                pass
+
+        if has_file:
+            model.observation_points.create(
+                locations=str(cfg.observation_locations_file),
+                merge=cfg.merge_observations,
+            )
+            self._log(f"Observation points added from {cfg.observation_locations_file}")
+        elif has_points:
+            for pt in cfg.observation_points:
+                model.observation_points.add_point(
+                    x=pt["x"],
+                    y=pt["y"],
+                    name=pt.get("name", f"obs_{cfg.observation_points.index(pt)}"),
+                )
+            self._log(f"Added {len(cfg.observation_points)} observation point(s)")
+
+        noaa_count = 0
+        if has_noaa:
+            self._update_substep("Querying NOAA CO-OPS stations")
+            noaa_count = self._add_noaa_gages(model)
+            self._log(f"Added {noaa_count} NOAA CO-OPS observation point(s)")
+
+        snapped = self._snap_obs_to_wet_cells(model)
+        if snapped:
+            self._log(f"Snapped {snapped} observation point(s) to nearest wet cell")
+
+        self._write_obs_station_map(model)
+
+        return {"status": "completed", "noaa_stations": noaa_count}
+
+
 class CreateSubgridStage(_CreateStageBase):
     """Generate subgrid-derived lookup tables.
 
@@ -793,6 +1092,7 @@ STAGE_CLASSES: dict[str, type[CreateStage]] = {
     "create_boundary": CreateBoundaryStage,
     "create_discharge": CreateDischargeStage,
     "create_subgrid": CreateSubgridStage,
+    "create_obs": CreateObservationPointsStage,
     "create_write": CreateWriteStage,
 }
 

@@ -476,17 +476,6 @@ class SfincsModelConfig(ModelConfig):
     model_root : Path, optional
         Output directory for the built model.  Defaults to
         ``{work_dir}/sfincs_model``.
-    include_noaa_gages : bool
-        When True, automatically query NOAA CO-OPS for water level
-        stations within the model domain and add them as observation
-        points.  Requires the ``plot`` optional dependencies.
-    observation_points : list, optional
-        Observation point specifications as list of dicts with
-        ``x``, ``y``, ``name`` keys (coordinates in model CRS).
-    observation_locations_file : Path, optional
-        Path to a GeoJSON file with observation point locations.
-    merge_observations : bool
-        Whether to merge with pre-existing observation points.
     discharge_locations_file : Path, optional
         Path to a SFINCS ``.src`` or GeoJSON with discharge source point
         locations.
@@ -566,10 +555,6 @@ class SfincsModelConfig(ModelConfig):
 
     prebuilt_dir: Path
     model_root: Path | None = None
-    include_noaa_gages: bool = False
-    observation_points: list[dict[str, Any]] = field(default_factory=list)
-    observation_locations_file: Path | None = None
-    merge_observations: bool = False
     discharge_locations_file: Path | None = None
     merge_discharge: bool = False
     include_precip: bool = False
@@ -588,10 +573,6 @@ class SfincsModelConfig(ModelConfig):
         self.prebuilt_dir = Path(self.prebuilt_dir).expanduser().resolve()
         if self.model_root is not None:
             self.model_root = Path(self.model_root).expanduser().resolve()
-        if self.observation_locations_file is not None:
-            self.observation_locations_file = (
-                Path(self.observation_locations_file).expanduser().resolve()
-            )
         if self.discharge_locations_file is not None:
             self.discharge_locations_file = (
                 Path(self.discharge_locations_file).expanduser().resolve()
@@ -618,7 +599,6 @@ class SfincsModelConfig(ModelConfig):
             "sfincs_init",
             "sfincs_timing",
             "sfincs_forcing",
-            "sfincs_obs",
             "sfincs_discharge",
             "sfincs_precip",
             "sfincs_wind",
@@ -647,12 +627,6 @@ class SfincsModelConfig(ModelConfig):
                 if not (self.prebuilt_dir / fname).exists()
             )
 
-        if self.observation_locations_file and not self.observation_locations_file.exists():
-            errors.append(
-                "model_config.observation_locations_file not found: "
-                f"{self.observation_locations_file}"
-            )
-
         if self.discharge_locations_file and not self.discharge_locations_file.exists():
             errors.append(
                 f"model_config.discharge_locations_file not found: {self.discharge_locations_file}"
@@ -675,7 +649,6 @@ class SfincsModelConfig(ModelConfig):
             SfincsDischargeStage,
             SfincsForcingStage,
             SfincsInitStage,
-            SfincsObservationPointsStage,
             SfincsPlotStage,
             SfincsPrecipitationStage,
             SfincsPressureStage,
@@ -693,7 +666,6 @@ class SfincsModelConfig(ModelConfig):
             "sfincs_init": SfincsInitStage(config, monitor),
             "sfincs_timing": SfincsTimingStage(config, monitor),
             "sfincs_forcing": SfincsForcingStage(config, monitor),
-            "sfincs_obs": SfincsObservationPointsStage(config, monitor),
             "sfincs_discharge": SfincsDischargeStage(config, monitor),
             "sfincs_precip": SfincsPrecipitationStage(config, monitor),
             "sfincs_wind": SfincsWindStage(config, monitor),
@@ -707,12 +679,6 @@ class SfincsModelConfig(ModelConfig):
         return {
             "prebuilt_dir": str(self.prebuilt_dir),
             "model_root": str(self.model_root) if self.model_root else None,
-            "include_noaa_gages": self.include_noaa_gages,
-            "observation_points": self.observation_points,
-            "observation_locations_file": (
-                str(self.observation_locations_file) if self.observation_locations_file else None
-            ),
-            "merge_observations": self.merge_observations,
             "discharge_locations_file": (
                 str(self.discharge_locations_file) if self.discharge_locations_file else None
             ),
@@ -856,9 +822,6 @@ _SFINCS_FIELD_MIGRATION: dict[str, str] = {
     "model_dir": "prebuilt_dir",
     "docker_tag": "container_tag",
     "sif_path": "container_image",
-    "obs_points": "observation_points",
-    "obs_locations": "observation_locations_file",
-    "obs_merge": "merge_observations",
     "src_locations": "discharge_locations_file",
     "src_merge": "merge_discharge",
 }
