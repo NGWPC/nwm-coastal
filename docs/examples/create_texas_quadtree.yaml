@@ -100,5 +100,7 @@ nwm_discharge:
 #   data_libs:
 #   - ./cache/texas_data_catalog.yml
 
+add_noaa_gages: true           # discover NOAA CO-OPS stations in domain
+
 monitoring:
   log_level: INFO

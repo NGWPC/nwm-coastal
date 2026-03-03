@@ -23,9 +23,7 @@ boundary:
 model_config:
   prebuilt_dir: /path/to/prebuilt/sfincs/texas
   discharge_locations_file: /path/to/discharge/locations/file.src
-  merge_observations: true
   merge_discharge: true
-  include_noaa_gages: true
   forcing_to_mesh_offset_m: 0.171 # TPXO/MSL → NAVD88 mesh (VDatum at domain centroid)
   vdatum_mesh_to_msl_m: 0.171     # NAVD88 mesh → MSL observations
   include_precip: true

@@ -67,6 +67,22 @@ subgrid:
 #     - 1614632
 #   coastal_domain: conus    # conus, atlgulf, pacific, hawaii, prvi, alaska
 
+# Observation points (optional)
+# Discovers NOAA CO-OPS water level stations within the model domain
+# and adds them as observation points.  The station map is written to
+# ``obs_station_map.json`` in the output directory, which the ``run``
+# workflow uses to retrieve observed timeseries.
+# add_noaa_gages: true
+
+# Alternatively (or additionally), supply observation points inline:
+# observation_points:
+#   - x: 500000.0
+#     y: 3200000.0
+#     name: my_station_1
+# or from a GeoJSON file:
+# observation_locations_file: /path/to/obs_points.geojson
+# merge_observations: true   # merge with any pre-existing obs points
+
 # Additional HydroMT data catalog YAMLs (optional)
 data_catalog:
   data_libs: []
