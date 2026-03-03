@@ -64,20 +64,23 @@ def build_vrt(vrt_path: Path, tiff_files: list[Path | str]) -> None:
 
 
 def clip_to_aoi(
-    input_path: Path,
+    input_path: Path | str,
     cutline_path: Path,
     output_path: Path,
     *,
     nodata: str = "nan",
     output_type: str = "Float32",
     compress: str = "deflate",
+    target_extent: tuple[float, float, float, float] | None = None,
+    target_extent_srs: str | None = None,
 ) -> None:
     """Clip a raster to an AOI polygon using ``gdalwarp``.
 
     Parameters
     ----------
     input_path
-        Input raster or VRT path.
+        Input raster or VRT path.  GDAL virtual filesystem paths
+        (``/vsicurl/…``, ``/vsis3/…``) are supported.
     cutline_path
         Path to AOI polygon file (GeoJSON, Shapefile, …) used as
         the ``-cutline`` argument.  Its CRS must match the raster.
@@ -89,6 +92,14 @@ def clip_to_aoi(
         Output pixel type (default ``"Float32"``).
     compress
         GeoTIFF compression (default ``"deflate"``).
+    target_extent
+        ``(xmin, ymin, xmax, ymax)`` passed to ``gdalwarp -te``.
+        Limits which tiles are read — especially useful with remote
+        VRTs so GDAL skips tiles outside the area of interest.
+    target_extent_srs
+        SRS for interpreting *target_extent* (e.g. ``"EPSG:4326"``).
+        Required when *target_extent* is in a CRS different from
+        the output CRS.
 
     Raises
     ------
@@ -100,8 +111,54 @@ def clip_to_aoi(
     if shutil.which("gdalwarp") is None:
         raise ImportError("GDAL (libgdal-core) is required for clipping. Install via conda/pixi.")
 
+    input_str = _path_str(input_path)
+
+    # HTTP and caching settings for remote /vsicurl/ sources.
+    # Harmless for local-only operations; critical for VRTs whose
+    # tiles reference remote URLs.
+    #
+    # CPL_VSIL_CURL_CHUNK_SIZE: bytes per HTTP range request.
+    #   Default 16 KB → ~125 000 requests for 2 GB of tiles.
+    #   10 MB → ~200 requests — 600× fewer round-trips.
+    # VSI_CACHE_SIZE: in-memory cache for /vsicurl/ reads (100 MB).
+    # GDAL_CACHEMAX: raster block cache in MB (512 MB).
+    # GDAL_HTTP_MERGE_CONSECUTIVE_RANGES: merge adjacent byte-range
+    #   requests into a single HTTP call.
     command = [
         "gdalwarp",
+        "--config",
+        "GDAL_HTTP_MAX_RETRY",
+        "5",
+        "--config",
+        "GDAL_HTTP_RETRY_DELAY",
+        "2",
+        "--config",
+        "GDAL_DISABLE_READDIR_ON_OPEN",
+        "EMPTY_DIR",
+        "--config",
+        "VSI_CACHE",
+        "TRUE",
+        "--config",
+        "CPL_VSIL_CURL_CHUNK_SIZE",
+        "10485760",
+        "--config",
+        "VSI_CACHE_SIZE",
+        "100000000",
+        "--config",
+        "GDAL_CACHEMAX",
+        "512",
+        "--config",
+        "GDAL_HTTP_MERGE_CONSECUTIVE_RANGES",
+        "YES",
+    ]
+
+    # Target extent so GDAL only reads overlapping tiles.
+    if target_extent is not None:
+        command += ["-te", *(str(v) for v in target_extent)]
+        if target_extent_srs is not None:
+            command += ["-te_srs", target_extent_srs]
+
+    command += [
         "-cutline",
         _path_str(cutline_path),
         "-crop_to_cutline",
@@ -111,8 +168,13 @@ def clip_to_aoi(
         output_type,
         "-co",
         f"COMPRESS={compress.upper()}",
+        "-multi",
+        "-wo",
+        "NUM_THREADS=ALL_CPUS",
+        "-wm",
+        "500",
         "-overwrite",
-        _path_str(input_path),
+        input_str,
         _path_str(output_path),
     ]
     try:
@@ -147,14 +209,15 @@ def compute_aoi_coverage(
     float
         Percentage of valid pixels inside the zone (0--100).
     """
-    import fiona
+    from pathlib import Path
+
     import numpy as np
     import rasterio
+    import shapely
     from rasterio.features import geometry_mask
     from rasterio.windows import Window
 
-    with fiona.open(zone_path) as src:
-        geometries = [feature["geometry"] for feature in src]
+    geometries = [shapely.from_geojson(Path(zone_path).read_text())]
 
     block_size = 4096
     total_inside = 0

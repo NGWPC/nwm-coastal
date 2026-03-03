@@ -1,4 +1,9 @@
-"""Fetch NWS topobathy DEM from icechunk and write a HydroMT data-catalog entry."""
+"""Fetch NWS topobathy DEM from icechunk and write a HydroMT data-catalog entry.
+
+Reads the cloud-native Zarr store via ``icechunk``, clips to the
+buffered AOI bounding box with ``rioxarray``, then uses ``gdalwarp``
+to polygon-clip to the exact AOI shape.
+"""
 
 from __future__ import annotations
 
@@ -139,21 +144,41 @@ def fetch_topobathy(
         .elevation.rio.clip_box(*bbox, crs="EPSG:4326")
     )
 
-    output_dir.mkdir(parents=True, exist_ok=True)
-    tif_name = f"nws_topobathy_{key}.tif"
-    geotiff_path = output_dir / tif_name
+    from coastal_calibration.utils._gdal import clip_to_aoi
 
-    logger.info("Writing GeoTIFF: %s", geotiff_path)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Write bbox-clipped data to a temp GeoTIFF, then polygon-clip
+    # with gdalwarp so only the AOI polygon region is kept.
+    sub_dir = output_dir / "_topobathy_temp"
+    sub_dir.mkdir(parents=True, exist_ok=True)
+
+    temp_tif = sub_dir / "bbox_clipped.tif"
+    logger.info("Writing bbox-clipped temp GeoTIFF: %s", temp_tif)
     # SFINCS reads bathymetry as real*4; avoid writing unnecessary float64.
     if clipped.dtype != "float32":
         clipped = clipped.astype("float32")
-    clipped.rio.to_raster(str(geotiff_path), driver="GTiff", compress="deflate")
-    logger.info("GeoTIFF written (%.1f MB)", geotiff_path.stat().st_size / 1e6)
+    clipped.rio.to_raster(str(temp_tif), driver="GTiff", compress="deflate")
 
-    catalog_path = output_dir / "nws_topobathy_catalog.yml"
     crs_epsg = clipped.rio.crs.to_epsg()
     if crs_epsg is None:
         raise ValueError(f"Cannot determine EPSG code from CRS: {clipped.rio.crs}")
+
+    cutline_path = sub_dir / "cutline.geojson"
+    aoi_4326.to_file(cutline_path, driver="GeoJSON")
+
+    tif_name = f"nws_topobathy_{key}.tif"
+    geotiff_path = output_dir / tif_name
+    logger.info("Clipping to AOI polygon via gdalwarp: %s", geotiff_path)
+    clip_to_aoi(temp_tif, cutline_path, geotiff_path, nodata="nan", output_type="Float32")
+    logger.info("GeoTIFF written (%.1f MB)", geotiff_path.stat().st_size / 1e6)
+
+    # Clean up temporary files.
+    for f in [temp_tif, cutline_path]:
+        f.unlink(missing_ok=True)
+    sub_dir.rmdir()
+
+    catalog_path = output_dir / "nws_topobathy_catalog.yml"
     _write_catalog(catalog_path, tif_name, crs_epsg)
     logger.info("Catalog written: %s", catalog_path)
 
