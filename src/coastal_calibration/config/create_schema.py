@@ -69,10 +69,15 @@ class ElevationDataset:
     #: Minimum elevation threshold for this dataset.
     zmin: float = 0.001
 
-    #: Data source for auto-fetching.  Currently only ``"noaa"`` is
-    #: supported.  When set, the ``create_fetch_elevation`` stage discovers
-    #: and downloads the best NOAA DEM overlapping the AOI.  When ``None``
-    #: (default), the dataset must already exist in ``data_catalog.data_libs``.
+    #: Data source for auto-fetching.  Supported values:
+    #:
+    #: - ``"noaa"`` — NOAA coastal topobathy DEM from S3
+    #: - ``"copdem30"`` — Copernicus DEM 30 m from AWS S3
+    #: - ``"gebco"`` — GEBCO bathymetry via WMS
+    #:
+    #: When set, the ``create_fetch_data`` stage downloads the dataset
+    #: for the AOI automatically.  When ``None``, the dataset must
+    #: already exist in ``data_catalog.data_libs``.
     source: str | None = None
 
     #: Explicit NOAA dataset name (e.g. ``"TX_Coastal_DEM_2018_8899"``).
@@ -87,8 +92,8 @@ class ElevationConfig:
 
     datasets: list[ElevationDataset] = field(
         default_factory=lambda: [
-            ElevationDataset(name="copdem30", zmin=0.001),
-            ElevationDataset(name="gebco", zmin=-20000),
+            ElevationDataset(name="copdem30", zmin=0.001, source="copdem30"),
+            ElevationDataset(name="gebco", zmin=-20000, source="gebco"),
         ]
     )
 
@@ -122,7 +127,13 @@ class SubgridConfig:
     nr_subgrid_pixels: int = 5
 
     #: Land-use / land-cover dataset for roughness classification.
-    lulc_dataset: str = "esa_worldcover_2021"
+    lulc_dataset: str = "esa_worldcover"
+
+    #: Data source for auto-fetching the LULC dataset.  Currently
+    #: only ``"esa_worldcover"`` is supported (tiles from AWS S3).
+    #: When ``None``, the dataset must already exist in
+    #: ``data_catalog.data_libs``.
+    lulc_source: str | None = "esa_worldcover"
 
     #: Optional CSV path for custom reclassification table.  When ``None``,
     #: the HydroMT-SFINCS built-in table for the chosen dataset is used.
@@ -137,6 +148,9 @@ class SubgridConfig:
     def __post_init__(self) -> None:
         if self.reclass_table is not None:
             self.reclass_table = Path(self.reclass_table).expanduser().resolve()
+        # Backward compatibility: normalize legacy name.
+        if self.lulc_dataset == "esa_worldcover_2021":
+            self.lulc_dataset = "esa_worldcover"
 
 
 @dataclass
@@ -209,6 +223,16 @@ class SfincsCreateConfig:
     monitoring: MonitoringConfig = field(default_factory=MonitoringConfig)
     nwm_discharge: NWMDischargeConfig | None = None
 
+    # ------------------------------------------------------------------
+    # Validation
+    # ------------------------------------------------------------------
+
+    #: Valid ``ElevationDataset.source`` values.
+    _VALID_ELEV_SOURCES = frozenset({"noaa", "copdem30", "gebco"})
+
+    #: Valid ``SubgridConfig.lulc_source`` values.
+    _VALID_LULC_SOURCES = frozenset({"esa_worldcover"})
+
     def __post_init__(self) -> None:
         self.aoi = Path(self.aoi).expanduser().resolve()
         self.output_dir = Path(self.output_dir).expanduser().resolve()
@@ -233,8 +257,10 @@ class SfincsCreateConfig:
         is included only when :attr:`nwm_discharge` is configured.
         """
         stages = ["create_grid"]
-        if any(d.source is not None for d in self.elevation.datasets):
-            stages.append("create_fetch_elevation")
+        has_elev_source = any(d.source is not None for d in self.elevation.datasets)
+        has_lulc_source = self.subgrid.lulc_source is not None
+        if has_elev_source or has_lulc_source:
+            stages.append("create_fetch_data")
         stages.extend(
             [
                 "create_elevation",
@@ -382,10 +408,6 @@ class SfincsCreateConfig:
         cls._resolve_relative_paths(data, config_path.parent)
         return cls._from_dict(data)
 
-    # ------------------------------------------------------------------
-    # Validation
-    # ------------------------------------------------------------------
-
     def _validate_elevation(self) -> list[str]:
         """Validate elevation configuration."""
         errors: list[str] = []
@@ -394,10 +416,10 @@ class SfincsCreateConfig:
         if not self.elevation.datasets:
             errors.append("elevation.datasets must contain at least one entry")
         for ds in self.elevation.datasets:
-            if ds.source is not None and ds.source != "noaa":
+            if ds.source is not None and ds.source not in self._VALID_ELEV_SOURCES:
                 errors.append(
-                    f"elevation.datasets[{ds.name}].source must be 'noaa' or None, "
-                    f"got '{ds.source}'"
+                    f"elevation.datasets[{ds.name}].source must be one of "
+                    f"{sorted(self._VALID_ELEV_SOURCES)} or None, got '{ds.source}'"
                 )
             if ds.noaa_dataset is not None and ds.source != "noaa":
                 errors.append(
@@ -416,6 +438,15 @@ class SfincsCreateConfig:
             errors.append(f"subgrid.reclass_table not found: {self.subgrid.reclass_table}")
         if self.subgrid.nr_subgrid_pixels < 1:
             errors.append("subgrid.nr_subgrid_pixels must be >= 1")
+        if (
+            self.subgrid.lulc_source is not None
+            and self.subgrid.lulc_source not in self._VALID_LULC_SOURCES
+        ):
+            errors.append(
+                f"subgrid.lulc_source must be one of "
+                f"{sorted(self._VALID_LULC_SOURCES)} or None, "
+                f"got '{self.subgrid.lulc_source}'"
+            )
         return errors
 
     def validate(self) -> list[str]:
@@ -500,6 +531,7 @@ class SfincsCreateConfig:
             "subgrid": {
                 "nr_subgrid_pixels": self.subgrid.nr_subgrid_pixels,
                 "lulc_dataset": self.subgrid.lulc_dataset,
+                **({"lulc_source": self.subgrid.lulc_source} if self.subgrid.lulc_source else {}),
                 "reclass_table": (
                     str(self.subgrid.reclass_table) if self.subgrid.reclass_table else None
                 ),

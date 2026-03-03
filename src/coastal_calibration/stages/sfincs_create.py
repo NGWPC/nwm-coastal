@@ -253,11 +253,16 @@ class CreateGridStage(CreateStage):
         return {"status": "completed"}
 
 
-class CreateFetchElevationStage(_CreateStageBase):
-    """Fetch NOAA DEM(s) for the AOI before elevation creation."""
+class CreateFetchDataStage(_CreateStageBase):
+    """Fetch elevation and land-cover data for the AOI.
 
-    name = "create_fetch_elevation"
-    description = "Fetch NOAA topobathy DEM for AOI"
+    Dispatches to source-specific fetchers based on the ``source``
+    field of each :class:`ElevationDataset` and the ``lulc_source``
+    field of :class:`SubgridConfig`.
+    """
+
+    name = "create_fetch_data"
+    description = "Fetch elevation and land cover data for AOI"
 
     def _register_catalog(self, catalog_path: Path) -> None:
         """Add *catalog_path* to both config data_libs and the live model."""
@@ -266,16 +271,13 @@ class CreateFetchElevationStage(_CreateStageBase):
             self.config.data_catalog.data_libs.append(path_str)
         self.sfincs.data_catalog.from_yml(path_str)
 
-    def run(self) -> dict[str, Any]:
-        """Discover and download NOAA DEM(s) overlapping the AOI."""
-        from coastal_calibration.utils.noaa_dem import fetch_noaa_dem
-
+    def _fetch_elevation(self, fetched: list[str]) -> None:
+        """Fetch elevation datasets that have a ``source`` set."""
         cfg = self.config
         dl_dir = cfg.effective_download_dir
 
-        fetched: list[str] = []
         for ds in cfg.elevation.datasets:
-            if ds.source != "noaa":
+            if ds.source is None:
                 continue
 
             catalog_name = ds.name
@@ -289,20 +291,88 @@ class CreateFetchElevationStage(_CreateStageBase):
                 fetched.append(catalog_name)
                 continue
 
-            self._update_substep(f"Fetching NOAA DEM for '{catalog_name}'")
-            _, cat_path, _ = fetch_noaa_dem(
-                aoi=cfg.aoi,
-                output_dir=dl_dir,
-                dataset_name=ds.noaa_dataset,
-                buffer_deg=0.1,
-                catalog_name=catalog_name,
-                log=self._log,
-            )
+            if ds.source == "noaa":
+                from coastal_calibration.utils.noaa_dem import fetch_noaa_dem
+
+                self._update_substep(f"Fetching NOAA DEM for '{catalog_name}'")
+                _, cat_path, _ = fetch_noaa_dem(
+                    aoi=cfg.aoi,
+                    output_dir=dl_dir,
+                    dataset_name=ds.noaa_dataset,
+                    buffer_deg=0.1,
+                    catalog_name=catalog_name,
+                    log=self._log,
+                )
+            elif ds.source == "copdem30":
+                from coastal_calibration.utils.copdem import fetch_copdem30
+
+                self._update_substep(f"Fetching Copernicus DEM 30m for '{catalog_name}'")
+                _, cat_path, _ = fetch_copdem30(
+                    aoi=cfg.aoi,
+                    output_dir=dl_dir,
+                    catalog_name=catalog_name,
+                    log=self._log,
+                )
+            elif ds.source == "gebco":
+                from coastal_calibration.utils.gebco_wms import fetch_gebco
+
+                self._update_substep(f"Fetching GEBCO bathymetry for '{catalog_name}'")
+                _, cat_path, _ = fetch_gebco(
+                    aoi=cfg.aoi,
+                    output_dir=dl_dir,
+                    catalog_name=catalog_name,
+                    log=self._log,
+                )
+            else:
+                raise ValueError(f"Unknown elevation source: {ds.source!r}")
+
             self._register_catalog(cat_path)
             fetched.append(catalog_name)
 
-        self._log(f"Fetched {len(fetched)} NOAA DEM(s): {fetched}")
+    def _fetch_lulc(self, fetched: list[str]) -> None:
+        """Fetch the LULC dataset if ``lulc_source`` is set."""
+        cfg = self.config
+        if cfg.subgrid.lulc_source is None:
+            return
+
+        dl_dir = cfg.effective_download_dir
+        lulc_name = cfg.subgrid.lulc_dataset
+        tif = dl_dir / f"{lulc_name}.tif"
+        cat = dl_dir / f"{lulc_name}_catalog.yml"
+
+        if tif.exists() and cat.exists():
+            self._log(f"Reusing existing {tif.name}")
+            self._register_catalog(cat)
+            fetched.append(lulc_name)
+            return
+
+        if cfg.subgrid.lulc_source == "esa_worldcover":
+            from coastal_calibration.utils.esa_worldcover import fetch_esa_worldcover
+
+            self._update_substep(f"Fetching ESA WorldCover for '{lulc_name}'")
+            _, cat_path, _ = fetch_esa_worldcover(
+                aoi=cfg.aoi,
+                output_dir=dl_dir,
+                catalog_name=lulc_name,
+                log=self._log,
+            )
+        else:
+            raise ValueError(f"Unknown LULC source: {cfg.subgrid.lulc_source!r}")
+
+        self._register_catalog(cat_path)
+        fetched.append(lulc_name)
+
+    def run(self) -> dict[str, Any]:
+        """Fetch elevation and LULC datasets for the AOI."""
+        fetched: list[str] = []
+        self._fetch_elevation(fetched)
+        self._fetch_lulc(fetched)
+        self._log(f"Fetched {len(fetched)} dataset(s): {fetched}")
         return {"status": "completed", "fetched": fetched}
+
+
+# Backward-compatible alias.
+CreateFetchElevationStage = CreateFetchDataStage
 
 
 class CreateElevationStage(_CreateStageBase):
@@ -715,7 +785,9 @@ class CreateWriteStage(_CreateStageBase):
 #: Mapping from stage name to its class.
 STAGE_CLASSES: dict[str, type[CreateStage]] = {
     "create_grid": CreateGridStage,
-    "create_fetch_elevation": CreateFetchElevationStage,
+    "create_fetch_data": CreateFetchDataStage,
+    # Backward-compatible alias for saved status files.
+    "create_fetch_elevation": CreateFetchDataStage,
     "create_elevation": CreateElevationStage,
     "create_mask": CreateMaskStage,
     "create_boundary": CreateBoundaryStage,

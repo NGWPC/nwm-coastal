@@ -27,6 +27,7 @@ elevation:
     source: noaa                   # triggers NOAA DEM auto-discovery for AOI
   - name: gebco                    # global fallback for areas without NOAA coverage
     zmin: -20000
+    source: gebco                  # auto-fetched via GEBCO WMS
   buffer_cells: 1
 
 mask:
@@ -95,9 +96,9 @@ nwm_discharge:
   - 9355622
   - 9355778
 
-data_catalog:
-  data_libs:
-  - ./cache/texas_data_catalog.yml
+# data_catalog:
+#   data_libs:
+#   - ./cache/texas_data_catalog.yml
 
 monitoring:
   log_level: INFO

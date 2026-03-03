@@ -273,11 +273,16 @@ def _make_mock_da(dtype: str = "float32") -> MagicMock:
 class TestFetchNoaaDem:
     """Test fetch_noaa_dem with mocked rioxarray."""
 
+    _COVERAGE_PATCH = "coastal_calibration.utils._gdal.compute_aoi_coverage"
+
     def test_fetch_with_auto_discovery(self, aoi_file: Path, tmp_path: Path) -> None:
         output_dir = tmp_path / "downloads"
         mock_da = _make_mock_da("float32")
 
-        with patch("rioxarray.open_rasterio", return_value=mock_da):
+        with (
+            patch("rioxarray.open_rasterio", return_value=mock_da),
+            patch(self._COVERAGE_PATCH, return_value=85.0),
+        ):
             from coastal_calibration.utils.noaa_dem import fetch_noaa_dem
 
             tif, cat, name = fetch_noaa_dem(
@@ -296,7 +301,10 @@ class TestFetchNoaaDem:
         mock_da = _make_mock_da("float64")
         mock_da.astype.return_value = mock_da
 
-        with patch("rioxarray.open_rasterio", return_value=mock_da):
+        with (
+            patch("rioxarray.open_rasterio", return_value=mock_da),
+            patch(self._COVERAGE_PATCH, return_value=85.0),
+        ):
             from coastal_calibration.utils.noaa_dem import fetch_noaa_dem
 
             tif, _cat, name = fetch_noaa_dem(
@@ -328,7 +336,10 @@ class TestFetchNoaaDem:
         # Set a nodata value to activate the masking branch.
         mock_da.rio.nodata = -9999.0
 
-        with patch("rioxarray.open_rasterio", return_value=mock_da):
+        with (
+            patch("rioxarray.open_rasterio", return_value=mock_da),
+            patch(self._COVERAGE_PATCH, return_value=85.0),
+        ):
             from coastal_calibration.utils.noaa_dem import fetch_noaa_dem
 
             fetch_noaa_dem(aoi=aoi_file, output_dir=output_dir)
@@ -344,7 +355,10 @@ class TestFetchNoaaDem:
         output_dir = tmp_path / "downloads"
         mock_da = _make_mock_da("float32")
 
-        with patch("rioxarray.open_rasterio", return_value=mock_da):
+        with (
+            patch("rioxarray.open_rasterio", return_value=mock_da),
+            patch(self._COVERAGE_PATCH, return_value=85.0),
+        ):
             from coastal_calibration.utils.noaa_dem import fetch_noaa_dem
 
             fetch_noaa_dem(aoi=aoi_file, output_dir=output_dir)
@@ -353,6 +367,20 @@ class TestFetchNoaaDem:
         mock_da.rio.clip_box.assert_called_once()
         call_kwargs = mock_da.rio.clip_box.call_args[1]
         assert call_kwargs["crs"] == "EPSG:4326"
+
+    def test_low_coverage_raises(self, aoi_file: Path, tmp_path: Path) -> None:
+        """Coverage below 10% should raise a ValueError."""
+        output_dir = tmp_path / "downloads"
+        mock_da = _make_mock_da("float32")
+
+        with (
+            patch("rioxarray.open_rasterio", return_value=mock_da),
+            patch(self._COVERAGE_PATCH, return_value=5.0),
+        ):
+            from coastal_calibration.utils.noaa_dem import fetch_noaa_dem
+
+            with pytest.raises(ValueError, match=r"5\.0%.*coverage"):
+                fetch_noaa_dem(aoi=aoi_file, output_dir=output_dir)
 
 
 # ------------------------------------------------------------------

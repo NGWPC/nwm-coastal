@@ -415,7 +415,7 @@ def update_dem_index(output: Path | None, max_datasets: int | None) -> None:
 
     Scans the ``noaa-nos-coastal-lidar-pds`` S3 bucket (public,
     anonymous access) for coastal DEM datasets and writes a JSON
-    index used by the ``create_fetch_elevation`` stage.
+    index used by the ``create_fetch_data`` stage.
     """
     import importlib.resources
     import json
@@ -480,7 +480,7 @@ def stages(model: str | None) -> None:
 
     create_stages_list = [
         ("create_grid", "Create SFINCS grid from AOI polygon"),
-        ("create_fetch_elevation", "Fetch NOAA topobathy DEM for AOI"),
+        ("create_fetch_data", "Fetch elevation and land cover data for AOI"),
         ("create_elevation", "Add elevation and bathymetry data"),
         ("create_mask", "Create active cell mask"),
         ("create_boundary", "Create water level boundary cells"),

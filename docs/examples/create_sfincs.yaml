@@ -21,13 +21,20 @@ grid:
   crs: utm                # "utm" = auto-detect UTM zone, or EPSG code
   rotated: true           # allow grid rotation for tighter fit
 
-# Elevation / bathymetry datasets (merged in order)
+# Elevation / bathymetry datasets (merged in order).
+# Datasets with a ``source`` are auto-fetched — no data catalog needed.
 elevation:
   datasets:
   - name: copdem30        # Copernicus DEM 30m (land)
     zmin: 0.001
-  - name: gebco           # GEBCO bathymetry
+    source: copdem30      # auto-fetched from AWS S3
+  - name: gebco           # GEBCO bathymetry (ocean)
     zmin: -20000
+    source: gebco         # auto-fetched via GEBCO WMS
+  # Optionally add a NOAA topobathy DEM for US coastal areas:
+  # - name: noaa_topobathy
+  #   zmin: -20000
+  #   source: noaa        # auto-fetched from NOAA S3
   buffer_cells: 1
 
 # Active-cell mask and boundary settings
@@ -36,10 +43,12 @@ mask:
   boundary_zmax: -5.0     # max elevation for waterlevel boundary cells
   reset_bounds: true
 
-# Subgrid tables (roughness is embedded in quadtree subgrid tables)
+# Subgrid tables (roughness is embedded in quadtree subgrid tables).
+# The LULC dataset is auto-fetched by default (ESA WorldCover 2020).
 subgrid:
   nr_subgrid_pixels: 5
-  lulc_dataset: esa_worldcover_2021
+  lulc_dataset: esa_worldcover   # dataset name in the HydroMT catalog
+  lulc_source: esa_worldcover    # auto-fetched from AWS S3 (set to null to disable)
   # reclass_table: /path/to/custom_mapping.csv   # optional
   manning_land: 0.04
   manning_sea: 0.02

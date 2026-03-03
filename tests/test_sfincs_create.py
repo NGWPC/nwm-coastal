@@ -34,6 +34,7 @@ from coastal_calibration.stages.sfincs_create import (
     CreateBoundaryStage,
     CreateDischargeStage,
     CreateElevationStage,
+    CreateFetchDataStage,
     CreateFetchElevationStage,
     CreateGridStage,
     CreateMaskStage,
@@ -264,12 +265,15 @@ class TestSfincsCreateConfig:
         assert "create_roughness" not in stages
         assert stages[0] == "create_grid"
         assert stages[-1] == "create_write"
+        # Default config has source-backed datasets, so fetch is included
+        assert "create_fetch_data" in stages
 
     def test_to_dict_roundtrip(self, minimal_create_config: SfincsCreateConfig) -> None:
         d = minimal_create_config.to_dict()
         assert d["aoi"] == str(minimal_create_config.aoi)
         assert d["grid"]["resolution"] == 50.0
         assert d["subgrid"]["nr_subgrid_pixels"] == 5
+        assert d["subgrid"]["lulc_source"] == "esa_worldcover"
 
     def test_to_dict_includes_buffer_m(self, aoi_file: Path, output_dir: Path) -> None:
         """buffer_m should round-trip through to_dict when non-zero."""
@@ -324,23 +328,34 @@ class TestSfincsCreateConfig:
         cfg = SfincsCreateConfig.from_yaml(cfg_path)
         assert cfg.aoi == aoi.resolve()
 
-    # --- NOAA source config tests ---
+    # --- Source config tests ---
 
-    def test_source_none_excludes_fetch_stage(
-        self, minimal_create_config: SfincsCreateConfig
-    ) -> None:
-        """Default datasets (source=None) should not include fetch stage."""
-        assert "create_fetch_elevation" not in minimal_create_config.stage_order
+    def test_default_includes_fetch_stage(self, minimal_create_config: SfincsCreateConfig) -> None:
+        """Default datasets have source set, so fetch stage should be included."""
+        stages = minimal_create_config.stage_order
+        assert "create_fetch_data" in stages
+        assert stages.index("create_fetch_data") < stages.index("create_elevation")
+
+    def test_source_none_excludes_fetch_stage(self, aoi_file: Path, output_dir: Path) -> None:
+        """Datasets with source=None and lulc_source=None exclude fetch stage."""
+        cfg = SfincsCreateConfig(
+            aoi=aoi_file,
+            output_dir=output_dir,
+            elevation=ElevationConfig(datasets=[ElevationDataset(name="copdem30")]),
+            subgrid=SubgridConfig(lulc_source=None),
+        )
+        assert "create_fetch_data" not in cfg.stage_order
 
     def test_source_noaa_includes_fetch_stage(self, aoi_file: Path, output_dir: Path) -> None:
         cfg = SfincsCreateConfig(
             aoi=aoi_file,
             output_dir=output_dir,
             elevation=ElevationConfig(datasets=[ElevationDataset(name="noaa_tb", source="noaa")]),
+            subgrid=SubgridConfig(lulc_source=None),
         )
         stages = cfg.stage_order
-        assert "create_fetch_elevation" in stages
-        assert stages.index("create_fetch_elevation") < stages.index("create_elevation")
+        assert "create_fetch_data" in stages
+        assert stages.index("create_fetch_data") < stages.index("create_elevation")
 
     def test_source_invalid_fails_validation(self, aoi_file: Path, output_dir: Path) -> None:
         cfg = SfincsCreateConfig(
@@ -349,7 +364,31 @@ class TestSfincsCreateConfig:
             elevation=ElevationConfig(datasets=[ElevationDataset(name="bad", source="s3")]),
         )
         errors = cfg.validate()
-        assert any("source must be 'noaa' or None" in e for e in errors)
+        assert any("source must be one of" in e for e in errors)
+
+    def test_lulc_source_includes_fetch_stage(self, aoi_file: Path, output_dir: Path) -> None:
+        """lulc_source alone should trigger the fetch stage."""
+        cfg = SfincsCreateConfig(
+            aoi=aoi_file,
+            output_dir=output_dir,
+            elevation=ElevationConfig(datasets=[ElevationDataset(name="copdem30")]),
+            subgrid=SubgridConfig(lulc_source="esa_worldcover"),
+        )
+        assert "create_fetch_data" in cfg.stage_order
+
+    def test_lulc_source_invalid_fails_validation(self, aoi_file: Path, output_dir: Path) -> None:
+        cfg = SfincsCreateConfig(
+            aoi=aoi_file,
+            output_dir=output_dir,
+            subgrid=SubgridConfig(lulc_source="bad_lulc"),
+        )
+        errors = cfg.validate()
+        assert any("lulc_source must be one of" in e for e in errors)
+
+    def test_esa_worldcover_2021_normalized(self) -> None:
+        """Backward compat: esa_worldcover_2021 → esa_worldcover."""
+        sc = SubgridConfig(lulc_dataset="esa_worldcover_2021")
+        assert sc.lulc_dataset == "esa_worldcover"
 
     def test_noaa_dataset_without_source_fails(self, aoi_file: Path, output_dir: Path) -> None:
         cfg = SfincsCreateConfig(
@@ -410,7 +449,7 @@ class TestSfincsCreateConfig:
         cfg = SfincsCreateConfig.from_yaml(cfg_path)
         assert cfg.elevation.datasets[0].source == "noaa"
         assert cfg.download_dir is not None
-        assert "create_fetch_elevation" in cfg.stage_order
+        assert "create_fetch_data" in cfg.stage_order
 
 
 # ===================================================================
@@ -518,7 +557,7 @@ class TestCreateStages:
         with pytest.raises(RuntimeError, match="No SfincsModel found"):
             _get_model(minimal_create_config)
 
-    def test_create_fetch_elevation(
+    def test_create_fetch_data_noaa(
         self,
         aoi_file: Path,
         output_dir: Path,
@@ -530,6 +569,7 @@ class TestCreateStages:
             elevation=ElevationConfig(
                 datasets=[ElevationDataset(name="noaa_tb", source="noaa", zmin=-20000)]
             ),
+            subgrid=SubgridConfig(lulc_source=None),
         )
         _set_model(cfg, mock_sfincs_model)
 
@@ -547,7 +587,7 @@ class TestCreateStages:
         with patch("coastal_calibration.utils.noaa_dem.fetch_noaa_dem") as mock_fetch:
             mock_fetch.side_effect = _fake_fetch
 
-            stage = CreateFetchElevationStage(cfg)
+            stage = CreateFetchDataStage(cfg)
             result = stage.run()
 
         assert result["status"] == "completed"
@@ -555,7 +595,111 @@ class TestCreateStages:
         mock_fetch.assert_called_once()
         _clear_model(cfg)
 
-    def test_create_fetch_elevation_reuses_existing(
+    def test_create_fetch_data_copdem30(
+        self,
+        aoi_file: Path,
+        output_dir: Path,
+        mock_sfincs_model: MagicMock,
+    ) -> None:
+        cfg = SfincsCreateConfig(
+            aoi=aoi_file,
+            output_dir=output_dir,
+            elevation=ElevationConfig(
+                datasets=[ElevationDataset(name="copdem30", source="copdem30", zmin=0.001)]
+            ),
+            subgrid=SubgridConfig(lulc_source=None),
+        )
+        _set_model(cfg, mock_sfincs_model)
+
+        dl_dir = cfg.effective_download_dir
+
+        def _fake_fetch(**kwargs):
+            dl_dir.mkdir(parents=True, exist_ok=True)
+            (dl_dir / "copdem30.tif").write_bytes(b"\x00")
+            cat = dl_dir / "copdem30_catalog.yml"
+            cat.write_text("meta: {}")
+            return dl_dir / "copdem30.tif", cat, "copdem30"
+
+        with patch("coastal_calibration.utils.copdem.fetch_copdem30") as mock_fetch:
+            mock_fetch.side_effect = _fake_fetch
+            stage = CreateFetchDataStage(cfg)
+            result = stage.run()
+
+        assert result["status"] == "completed"
+        assert "copdem30" in result["fetched"]
+        mock_fetch.assert_called_once()
+        _clear_model(cfg)
+
+    def test_create_fetch_data_gebco(
+        self,
+        aoi_file: Path,
+        output_dir: Path,
+        mock_sfincs_model: MagicMock,
+    ) -> None:
+        cfg = SfincsCreateConfig(
+            aoi=aoi_file,
+            output_dir=output_dir,
+            elevation=ElevationConfig(
+                datasets=[ElevationDataset(name="gebco", source="gebco", zmin=-20000)]
+            ),
+            subgrid=SubgridConfig(lulc_source=None),
+        )
+        _set_model(cfg, mock_sfincs_model)
+
+        dl_dir = cfg.effective_download_dir
+
+        def _fake_fetch(**kwargs):
+            dl_dir.mkdir(parents=True, exist_ok=True)
+            (dl_dir / "gebco.tif").write_bytes(b"\x00")
+            cat = dl_dir / "gebco_catalog.yml"
+            cat.write_text("meta: {}")
+            return dl_dir / "gebco.tif", cat, "gebco"
+
+        with patch("coastal_calibration.utils.gebco_wms.fetch_gebco") as mock_fetch:
+            mock_fetch.side_effect = _fake_fetch
+            stage = CreateFetchDataStage(cfg)
+            result = stage.run()
+
+        assert result["status"] == "completed"
+        assert "gebco" in result["fetched"]
+        mock_fetch.assert_called_once()
+        _clear_model(cfg)
+
+    def test_create_fetch_data_lulc(
+        self,
+        aoi_file: Path,
+        output_dir: Path,
+        mock_sfincs_model: MagicMock,
+    ) -> None:
+        """Test that LULC fetching works via lulc_source."""
+        cfg = SfincsCreateConfig(
+            aoi=aoi_file,
+            output_dir=output_dir,
+            elevation=ElevationConfig(datasets=[ElevationDataset(name="copdem30")]),
+            subgrid=SubgridConfig(lulc_source="esa_worldcover"),
+        )
+        _set_model(cfg, mock_sfincs_model)
+
+        dl_dir = cfg.effective_download_dir
+
+        def _fake_fetch(**kwargs):
+            dl_dir.mkdir(parents=True, exist_ok=True)
+            (dl_dir / "esa_worldcover.tif").write_bytes(b"\x00")
+            cat = dl_dir / "esa_worldcover_catalog.yml"
+            cat.write_text("meta: {}")
+            return dl_dir / "esa_worldcover.tif", cat, "esa_worldcover"
+
+        with patch("coastal_calibration.utils.esa_worldcover.fetch_esa_worldcover") as mock_fetch:
+            mock_fetch.side_effect = _fake_fetch
+            stage = CreateFetchDataStage(cfg)
+            result = stage.run()
+
+        assert result["status"] == "completed"
+        assert "esa_worldcover" in result["fetched"]
+        mock_fetch.assert_called_once()
+        _clear_model(cfg)
+
+    def test_create_fetch_data_reuses_existing(
         self,
         aoi_file: Path,
         output_dir: Path,
@@ -568,6 +712,7 @@ class TestCreateStages:
             elevation=ElevationConfig(
                 datasets=[ElevationDataset(name="noaa_tb", source="noaa", zmin=-20000)]
             ),
+            subgrid=SubgridConfig(lulc_source=None),
         )
         _set_model(cfg, mock_sfincs_model)
 
@@ -577,12 +722,16 @@ class TestCreateStages:
         (dl_dir / "noaa_tb_catalog.yml").write_text("meta: {}")
 
         with patch("coastal_calibration.utils.noaa_dem.fetch_noaa_dem") as mock_fetch:
-            stage = CreateFetchElevationStage(cfg)
+            stage = CreateFetchDataStage(cfg)
             result = stage.run()
 
         assert result["status"] == "completed"
         mock_fetch.assert_not_called()
         _clear_model(cfg)
+
+    def test_backward_compat_alias(self) -> None:
+        """CreateFetchElevationStage should be an alias for CreateFetchDataStage."""
+        assert CreateFetchElevationStage is CreateFetchDataStage
 
     def test_create_stages_helper(self, minimal_create_config: SfincsCreateConfig) -> None:
         stages_dict = create_stages(minimal_create_config)

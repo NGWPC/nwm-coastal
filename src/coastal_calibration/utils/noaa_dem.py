@@ -223,27 +223,41 @@ def _resolve_record(
     return select_best(candidates, bbox)
 
 
-def _validate_raster(da: Any, dataset_name: str) -> None:
-    """Raise if the clipped raster has no valid (non-NaN) pixels."""
-    import numpy as np
+def _check_aoi_coverage(
+    geotiff_path: Path,
+    aoi_native: Any,
+    output_dir: Path,
+    dataset_name: str,
+    log: Callable[[str], None],
+) -> None:
+    """Compute AOI data coverage and raise if below 10%.
 
-    if da.size < 1_000_000:
-        sample = da.values
-    else:
-        ny, nx = da.shape[-2], da.shape[-1]
-        cy, cx = ny // 2, nx // 2
-        hw = min(250, nx // 2)
-        hh = min(250, ny // 2)
-        sample = da.isel(
-            x=slice(cx - hw, cx + hw),
-            y=slice(cy - hh, cy + hh),
-        ).values
-    if int(np.sum(~np.isnan(sample))) == 0:
+    Writes the AOI as a temporary GeoPackage in the raster's native CRS,
+    then uses :func:`~coastal_calibration.utils._gdal.compute_aoi_coverage`
+    (block-based rasterio) to count valid pixels.
+    """
+    from coastal_calibration.utils._gdal import compute_aoi_coverage
+
+    temp_dir = output_dir / "_noaa_coverage_temp"
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    zone_path = temp_dir / "aoi.gpkg"
+    aoi_native.to_file(zone_path, driver="GPKG")
+
+    try:
+        coverage_pct = compute_aoi_coverage(geotiff_path, zone_path)
+    finally:
+        for f in temp_dir.iterdir():
+            f.unlink(missing_ok=True)
+        temp_dir.rmdir()
+
+    log(f"Data coverage within AOI: {coverage_pct:.1f}%")
+    if coverage_pct < 10.0:
+        geotiff_path.unlink(missing_ok=True)
         raise ValueError(
-            f"NOAA DEM '{dataset_name}' has no valid pixels in the "
-            f"clipped region. The VRT may lack data coverage for this area. "
-            f"Try a different dataset or use 'prepare-topobathy' to fetch "
-            f"from NWS icechunk instead."
+            f"NOAA DEM '{dataset_name}' has only {coverage_pct:.1f}% "
+            f"data coverage within the AOI (minimum 10% required). "
+            f"The VRT may lack data for this area. Try a different dataset "
+            f"or use 'prepare-topobathy' to fetch from NWS icechunk instead."
         )
 
 
@@ -345,8 +359,6 @@ def fetch_noaa_dem(
     if nodata_val is not None:
         da = da.where(da != nodata_val, drop=False)
 
-    _validate_raster(da, record["dataset_name"])
-
     # Finalize raster metadata before writing.
     da = da.rio.write_transform()
     da = da.rio.write_nodata(np.nan, encoded=True)
@@ -360,6 +372,8 @@ def fetch_noaa_dem(
         da = da.astype("float32")
     da.rio.to_raster(str(geotiff_path), driver="GTiff", compress="deflate")
     _log(f"GeoTIFF written ({geotiff_path.stat().st_size / 1e6:.1f} MB)")
+
+    _check_aoi_coverage(geotiff_path, aoi_native, output_dir, record["dataset_name"], _log)
 
     catalog_path = output_dir / f"{catalog_name}_catalog.yml"
     _write_catalog(catalog_path, tif_name, catalog_name, target_epsg)
