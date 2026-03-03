@@ -229,8 +229,6 @@ def sfincs_workflow_config(
         ),
         model_config=SfincsModelConfig(
             prebuilt_dir=sfincs_model_dir,
-            include_noaa_gages=False,
-            merge_observations=True,
             merge_discharge=True,
             include_precip=True,
             include_wind=True,
@@ -418,79 +416,6 @@ class TestSfincsForcingStage:
         assert result["source"] == "stofs_waterlevel"
 
 
-class TestSfincsObsStage:
-    """Test the observation points stage with mocked CO-OPS API."""
-
-    def test_obs_with_noaa_gages(self, sfincs_workflow_config):
-        from coastal_calibration.stages.sfincs_build import (
-            SfincsInitStage,
-            SfincsObservationPointsStage,
-        )
-
-        sfincs_workflow_config.model_config.include_noaa_gages = True
-
-        SfincsInitStage(sfincs_workflow_config).run()
-
-        with patch("coastal_calibration.coops_api.COOPSAPIClient") as mock_cls:
-            mock_cls.return_value = _mock_coops_client()
-            result = SfincsObservationPointsStage(sfincs_workflow_config).run()
-
-        assert result["status"] == "completed"
-        # Should find at least some stations in the Texas domain
-        assert result["noaa_stations"] >= 0
-
-    def test_obs_dedup_on_rerun(self, sfincs_workflow_config):
-        """Verify that re-running with merge_observations=True doesn't accumulate duplicates.
-
-        The pre-built Texas model already contains ``Sargent (8772985)``
-        at the same coordinates as the NOAA station 8772985.  The
-        spatial-proximity dedup should recognise the overlap and *not*
-        add a ``noaa_8772985`` duplicate.
-        """
-        from coastal_calibration.stages.sfincs_build import (
-            SfincsInitStage,
-            SfincsObservationPointsStage,
-            SfincsWriteStage,
-            get_model_root,
-        )
-
-        sfincs_workflow_config.model_config.include_noaa_gages = True
-        sfincs_workflow_config.model_config.merge_observations = True
-
-        SfincsInitStage(sfincs_workflow_config).run()
-
-        def _obs_lines() -> list[str]:
-            """Return non-blank lines from sfincs.obs after writing."""
-            SfincsWriteStage(sfincs_workflow_config).run()
-            model_root = get_model_root(sfincs_workflow_config)
-            obs_file = model_root / "sfincs.obs"
-            return [ln for ln in obs_file.read_text().splitlines() if ln.strip()]
-
-        with patch("coastal_calibration.coops_api.COOPSAPIClient") as mock_cls:
-            mock_cls.return_value = _mock_coops_client()
-            SfincsObservationPointsStage(sfincs_workflow_config).run()
-        lines_first = _obs_lines()
-
-        # The spatial dedup should prevent a ``noaa_8772985`` duplicate
-        # because the pre-built "Sargent (8772985)" sits at the same
-        # coordinates.  No line should contain ``noaa_8772985``.
-        noaa_dupes = [ln for ln in lines_first if "noaa_8772985" in ln]
-        assert len(noaa_dupes) == 0, (
-            f"noaa_8772985 should not appear — spatial dedup should "
-            f"recognise the pre-built point: {noaa_dupes}"
-        )
-
-        # Second run — total count should not grow
-        with patch("coastal_calibration.coops_api.COOPSAPIClient") as mock_cls:
-            mock_cls.return_value = _mock_coops_client()
-            SfincsObservationPointsStage(sfincs_workflow_config).run()
-        lines_second = _obs_lines()
-
-        assert len(lines_second) == len(lines_first), (
-            f"Observation count changed between runs: {len(lines_first)} → {len(lines_second)}"
-        )
-
-
 class TestSfincsDischargeStage:
     """Test the discharge source points stage."""
 
@@ -620,38 +545,37 @@ class TestSfincsPlotStage:
     def test_plot_with_mock_output(self, sfincs_workflow_config):
         """Test the plot stage with a synthetic sfincs_his.nc.
 
-        The plot stage spatially matches observation points against
-        CO-OPS station metadata, so the mock must return stations
-        whose projected coordinates fall within 100 m of the model's
-        observation points.
+        The plot stage reads obs_station_map.json (written by the create
+        workflow) to find NOAA station IDs, then fetches and plots
+        observed vs simulated water levels.
         """
+        import json
+
         import pandas as pd
 
         from coastal_calibration.stages.sfincs_build import (
             SfincsInitStage,
-            SfincsObservationPointsStage,
             SfincsPlotStage,
             SfincsTimingStage,
             SfincsWriteStage,
             get_model_root,
         )
 
-        sfincs_workflow_config.model_config.include_noaa_gages = True
-
         # Run prerequisite stages
         SfincsInitStage(sfincs_workflow_config).run()
         SfincsTimingStage(sfincs_workflow_config).run()
-
-        with patch("coastal_calibration.coops_api.COOPSAPIClient") as mock_cls:
-            mock_cls.return_value = _mock_coops_client()
-            SfincsObservationPointsStage(sfincs_workflow_config).run()
-
         SfincsWriteStage(sfincs_workflow_config).run()
 
-        # Count observation points from sfincs.obs
+        # Write obs_station_map.json (normally created by create_obs stage)
         model_root = get_model_root(sfincs_workflow_config)
-        obs_file = model_root / "sfincs.obs"
-        n_stations = sum(1 for ln in obs_file.read_text().splitlines() if ln.strip())
+        matched_ids = ["8772985", "8773037"]
+        station_map = [
+            {"index": i, "name": f"noaa_{sid}", "x": 0.0, "y": 0.0, "station_id": sid}
+            for i, sid in enumerate(matched_ids)
+        ]
+        (model_root / "obs_station_map.json").write_text(json.dumps(station_map))
+
+        n_stations = len(matched_ids)
 
         times = pd.date_range("2025-06-01", periods=6, freq="10min")
         point_zs = (
@@ -679,11 +603,6 @@ class TestSfincsPlotStage:
         )
         his_ds.to_netcdf(model_root / "sfincs_his.nc")
 
-        # The plot stage spatially matches obs points to CO-OPS
-        # stations.  Our mock provides 2 stations; one overlaps a
-        # pre-built point (8772985 ≈ Sargent) and one was newly added
-        # (8773037).  Both should be matched → 2 station IDs.
-        matched_ids = ["8772985", "8773037"]
         mock_obs_ds = _make_mock_obs_ds(matched_ids, datetime(2025, 6, 1))
 
         mock_client = _mock_coops_client()
@@ -725,8 +644,6 @@ class TestSfincsWorkflowRunner:
     def test_full_workflow_no_download(self, sfincs_workflow_config):
         """Run the complete SFINCS workflow with download disabled and mocked I/O."""
         from coastal_calibration.runner import CoastalCalibRunner
-
-        sfincs_workflow_config.model_config.include_noaa_gages = False
 
         mock_obs_ds = _make_mock_obs_ds(["8772985"], datetime(2025, 6, 1))
 

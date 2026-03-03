@@ -117,7 +117,6 @@ class TestCoastalCalibRunner:
             "sfincs_init",
             "sfincs_timing",
             "sfincs_forcing",
-            "sfincs_obs",
             "sfincs_discharge",
             "sfincs_precip",
             "sfincs_wind",
