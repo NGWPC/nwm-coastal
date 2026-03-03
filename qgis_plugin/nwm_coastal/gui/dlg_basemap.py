@@ -17,7 +17,7 @@ from qgis.PyQt.QtWidgets import (
     QVBoxLayout,
 )
 
-REQUIRED_GPKG_LAYERS = ("nexus", "gages", "flowpaths", "divides")
+REQUIRED_GPKG_LAYERS = ("flowpaths", "divides")
 
 
 class BasemapDialog(QDialog):

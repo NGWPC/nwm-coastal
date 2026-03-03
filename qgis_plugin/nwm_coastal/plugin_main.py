@@ -147,11 +147,11 @@ class NWMCoastalPlugin:
             lambda lyr: self._style_flowpaths(lyr, min_order),
         )
 
-        # 4. gages (point: red, size 3)
-        self._add_gpkg_layer(gpkg_path, "gages", project, self._style_gages)
+        # 4. gages (point: red, size 3) — optional
+        self._add_gpkg_layer(gpkg_path, "gages", project, self._style_gages, optional=True)
 
-        # 5. nexus (point: green, size 2)
-        self._add_gpkg_layer(gpkg_path, "nexus", project, self._style_nexus)
+        # 5. nexus (point: green, size 2) — optional
+        self._add_gpkg_layer(gpkg_path, "nexus", project, self._style_nexus, optional=True)
 
         # 6. CO-OPS stations (point: orange star, size 7)
         self._add_coops_layer(parquet_path, project)
@@ -165,15 +165,20 @@ class NWMCoastalPlugin:
         layer_name: str,
         project: QgsProject,
         style_fn,
+        *,
+        optional: bool = False,
     ) -> None:
         uri = f"{gpkg_path}|layername={layer_name}"
         layer = QgsVectorLayer(uri, layer_name, "ogr")
         if not layer.isValid():
-            self._log(
-                f"Failed to load '{layer_name}' from {gpkg_path}",
-                Qgis.MessageLevel.Warning,
-                push=True,
-            )
+            if optional:
+                self._log(f"Optional layer '{layer_name}' not found, skipping.")
+            else:
+                self._log(
+                    f"Failed to load '{layer_name}' from {gpkg_path}",
+                    Qgis.MessageLevel.Warning,
+                    push=True,
+                )
             return
         style_fn(layer)
         project.addMapLayer(layer)
