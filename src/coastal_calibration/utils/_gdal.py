@@ -190,7 +190,8 @@ def compute_aoi_coverage(
 ) -> float:
     """Compute the percentage of valid (non-nodata) pixels inside zone polygons.
 
-    The raster and zone polygons **must** share the same CRS.
+    If the zone CRS differs from the raster CRS, zones are reprojected
+    automatically.
 
     Uses ``rasterio`` block-based reading with
     ``rasterio.features.geometry_mask`` so the full raster and mask
@@ -202,28 +203,28 @@ def compute_aoi_coverage(
     raster_path
         Input GeoTIFF with a nodata value set.
     zone_path
-        OGR-readable vector file whose CRS matches *raster_path*.
+        OGR-readable vector file (GeoJSON, Shapefile, …).
 
     Returns
     -------
     float
         Percentage of valid pixels inside the zone (0--100).
     """
-    from pathlib import Path
-
+    import geopandas as gpd
     import numpy as np
     import rasterio
-    import shapely
     from rasterio.features import geometry_mask
     from rasterio.windows import Window
-
-    geometries = [shapely.from_geojson(Path(zone_path).read_text())]
 
     block_size = 4096
     total_inside = 0
     valid_inside = 0
 
     with rasterio.open(raster_path) as src:
+        zone_gdf = gpd.read_file(zone_path)
+        if zone_gdf.crs is not None and not zone_gdf.crs.equals(src.crs):
+            zone_gdf = zone_gdf.to_crs(src.crs)
+        geometries = zone_gdf.geometry.tolist()
         nodata = src.nodata
         for row_off in range(0, src.height, block_size):
             for col_off in range(0, src.width, block_size):
