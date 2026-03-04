@@ -39,6 +39,19 @@ from coastal_calibration import CoastalCalibConfig
 # From YAML file
 config = CoastalCalibConfig.from_yaml("config.yaml")
 
+# From a plain dictionary (useful in notebooks and scripts)
+config = CoastalCalibConfig.from_dict(
+    {
+        "simulation": {
+            "start_date": "2021-06-11",
+            "duration_hours": 24,
+            "coastal_domain": "hawaii",
+            "meteo_source": "nwm_ana",
+        },
+        "boundary": {"source": "stofs"},
+    }
+)
+
 # Access configuration values
 print(config.simulation.coastal_domain)
 print(config.paths.work_dir)
@@ -211,6 +224,52 @@ if not result.success:
 # Stage timing (if enable_timing is True)
 for stage, duration in result.stage_durations.items():
     print(f"  {stage}: {duration:.1f}s")
+```
+
+All result objects (`WorkflowResult`, `DownloadResult`, `DownloadResults`, and
+`StageProgress`) have human-readable `__str__` methods, so `print(result)` produces
+clean, indented output:
+
+```python
+result = runner.run()
+print(result)
+# WorkflowResult: SUCCESS
+#   Start:     2025-06-01 00:00:00
+#   End:       2025-06-01 00:12:34
+#   Duration:  12m 34s
+#   Completed: download, sfincs_init, sfincs_timing, ...
+```
+
+## SFINCS Model Creation
+
+The `SfincsCreator` runner builds a new SFINCS quadtree model from an AOI polygon. It
+uses a separate `SfincsCreateConfig` configuration schema.
+
+```python
+from coastal_calibration import SfincsCreateConfig
+from coastal_calibration.creator import SfincsCreator
+
+# Load from YAML
+config = SfincsCreateConfig.from_yaml("create_config.yaml")
+
+# Or from a dictionary
+config = SfincsCreateConfig.from_dict(
+    {
+        "aoi": "./texas_aoi.geojson",
+        "output_dir": "./my_sfincs_model",
+        "elevation": {
+            "datasets": [{"name": "nws_topobathy", "zmin": -20000}],
+        },
+        "data_catalog": {"data_libs": ["./dem/data_catalog.yml"]},
+    }
+)
+
+# Run the creation workflow
+creator = SfincsCreator(config)
+creator.run()
+
+# Resume from a specific stage (uses .create_status.json for tracking)
+creator.run(start_from="create_elevation")
 ```
 
 ## Data Sources

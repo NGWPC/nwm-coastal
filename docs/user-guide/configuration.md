@@ -386,11 +386,15 @@ data_catalog:
 
 #### Top-Level Fields
 
-| Parameter      | Type | Default                  | Description                                    |
-| -------------- | ---- | ------------------------ | ---------------------------------------------- |
-| `aoi`          | path | **required**             | Path to AOI polygon (GeoJSON, Shapefile, etc.) |
-| `output_dir`   | path | **required**             | Directory where the model will be written      |
-| `download_dir` | path | `{output_dir}/downloads` | Directory for downloaded data (NOAA DEMs)      |
+| Parameter                    | Type | Default                  | Description                                         |
+| ---------------------------- | ---- | ------------------------ | --------------------------------------------------- |
+| `aoi`                        | path | **required**             | Path to AOI polygon (GeoJSON, Shapefile, etc.)      |
+| `output_dir`                 | path | **required**             | Directory where the model will be written           |
+| `download_dir`               | path | `{output_dir}/downloads` | Directory for downloaded data (NOAA DEMs)           |
+| `add_noaa_gages`             | bool | false                    | Auto-discover NOAA CO-OPS stations as obs points    |
+| `observation_points`         | list | `[]`                     | Observation point dicts (`x`, `y`, `name`)          |
+| `observation_locations_file` | path | null                     | GeoJSON file with observation point locations       |
+| `merge_observations`         | bool | false                    | Merge with pre-existing observation points in model |
 
 #### Grid Settings (`grid`)
 

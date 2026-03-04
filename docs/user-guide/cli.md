@@ -238,11 +238,13 @@ coastal-calibration create <config> [OPTIONS]
 **Available Stages:**
 
 - `create_grid` — Create SFINCS grid from AOI polygon
-- `create_fetch_elevation` — Fetch NOAA topobathy DEM for AOI
+- `create_fetch_data` — Fetch elevation and land cover data for AOI
 - `create_elevation` — Add elevation and bathymetry data
 - `create_mask` — Create active cell mask
 - `create_boundary` — Create water level boundary cells
+- `create_discharge` — Add NWM discharge source points _(optional)_
 - `create_subgrid` — Create subgrid tables
+- `create_obs` — Add observation points _(optional)_
 - `create_write` — Write SFINCS model to disk
 
 **Examples:**
@@ -384,12 +386,14 @@ SFINCS workflow stages:
 
 SFINCS creation stages (create subcommand):
   1. create_grid: Create SFINCS grid from AOI polygon
-  2. create_fetch_elevation: Fetch NOAA topobathy DEM for AOI
+  2. create_fetch_data: Fetch elevation and land cover data for AOI
   3. create_elevation: Add elevation and bathymetry data
   4. create_mask: Create active cell mask
   5. create_boundary: Create water level boundary cells
-  6. create_subgrid: Create subgrid tables
-  7. create_write: Write SFINCS model to disk
+  6. create_discharge: Add NWM discharge source points
+  7. create_subgrid: Create subgrid tables
+  8. create_obs: Add observation points (NOAA CO-OPS, file, inline)
+  9. create_write: Write SFINCS model to disk
 ```
 
 ## Exit Codes
