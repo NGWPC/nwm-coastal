@@ -258,7 +258,7 @@ config = SfincsCreateConfig.from_dict(
         "aoi": "./texas_aoi.geojson",
         "output_dir": "./my_sfincs_model",
         "elevation": {
-            "datasets": [{"name": "nws_topobathy", "zmin": -20000}],
+            "datasets": [{"name": "nws_30m", "zmin": -20000}],
         },
         "data_catalog": {"data_libs": ["./dem/data_catalog.yml"]},
     }

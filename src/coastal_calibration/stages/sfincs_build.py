@@ -1956,8 +1956,8 @@ class SfincsPlotStage(_SfincsStageBase):
             self._log("No NOAA observation points found, skipping plot stage")
             return {"status": "skipped", "reason": "no noaa stations"}
 
-        # Guard against a stale obs_station_map.json whose indices exceed
-        # the number of observation points in the current model output.
+        # Guard against matched station indices that exceed the number
+        # of observation points in the current model output.
         n_stations = point_zs.sizes[station_dim]
         valid = [
             (idx, sid)
