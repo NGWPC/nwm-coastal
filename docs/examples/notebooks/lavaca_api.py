@@ -87,6 +87,7 @@ create_config = SfincsCreateConfig.from_dict(
 # %%
 creator = SfincsCreator(create_config)
 result = creator.run()
+print(result)
 
 # %% [markdown]
 # ### Inspect the created model
@@ -102,6 +103,7 @@ for f in sorted(output.iterdir()):
         continue
     size = f.stat().st_size
     label = f"{size / 1e6:.1f} MB" if size > 1e6 else f"{size / 1e3:.1f} KB"
+    print(f"  {f.name:<30s} {label}")
 
 # %% [markdown]
 # ## 2. Run the simulation pipeline
@@ -174,6 +176,7 @@ run_config = CoastalCalibConfig.from_dict(
 # %%
 runner = CoastalCalibRunner(run_config)
 result = runner.run()
+print(result)
 
 # %% [markdown]
 # ## 3. View results

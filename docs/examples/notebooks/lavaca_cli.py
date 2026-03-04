@@ -125,7 +125,6 @@ figs_dir = Path("run/sfincs_model/figs")
 assert figs_dir.exists(), f"Results not found: {figs_dir.resolve()} — run the pipeline first."
 
 for png in sorted(figs_dir.glob("stations_comparison_*.png")):
-    print(png.name)
     display(Image(filename=str(png), width=800))
 
 # %% [markdown]
