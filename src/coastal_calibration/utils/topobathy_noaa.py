@@ -23,14 +23,13 @@ from __future__ import annotations
 
 import importlib.resources
 import json
-import logging
 from typing import TYPE_CHECKING, Any
+
+from coastal_calibration.utils.logging import logger
 
 if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
-
-logger = logging.getLogger(__name__)
 
 _S3_BASE = "https://noaa-nos-coastal-lidar-pds.s3.amazonaws.com/dem"
 
@@ -335,7 +334,7 @@ def fetch_noaa_dem(
     *,
     dataset_name: str | None = None,
     buffer_deg: float = 0.1,
-    catalog_name: str = "noaa_topobathy",
+    catalog_name: str = "noaa_3m",
     log: Callable[[str], None] | None = None,
 ) -> tuple[Path, Path, str]:
     """Discover, clip, and save a NOAA DEM overlapping *aoi*.

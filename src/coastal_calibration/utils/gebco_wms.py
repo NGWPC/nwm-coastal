@@ -110,7 +110,7 @@ def fetch_gebco(
     output_dir: Path | str,
     *,
     buffer_deg: float = 0.1,
-    catalog_name: str = "gebco",
+    catalog_name: str = "gebco_15arcs",
     log: Callable[[str], None] | None = None,
 ) -> tuple[Path, Path, str]:
     """Fetch GEBCO bathymetry for *aoi* from CEDA GeoTIFF tiles.

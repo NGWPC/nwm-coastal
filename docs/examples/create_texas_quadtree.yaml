@@ -22,12 +22,12 @@ grid:
 
 elevation:
   datasets:
-  - name: noaa_topobathy           # auto-fetched from NOAA S3 by create_fetch_elevation
+  - name: noaa_3m                   # auto-fetched from NOAA S3 by create_fetch_data
     zmin: -20000
-    source: noaa                   # triggers NOAA DEM auto-discovery for AOI
-  - name: gebco                    # global fallback for areas without NOAA coverage
+    source: noaa_3m                # triggers NOAA DEM auto-discovery for AOI
+  - name: gebco_15arcs                # global fallback for areas without NOAA coverage
     zmin: -20000
-    source: gebco                  # auto-fetched via GEBCO WMS
+    source: gebco_15arcs              # auto-fetched via CEDA GeoTIFF tiles
   buffer_cells: 1
 
 mask:

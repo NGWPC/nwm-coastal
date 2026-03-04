@@ -92,16 +92,16 @@ class TestWriteCatalog:
     """Test _write_catalog output."""
 
     def test_writes_valid_yaml(self, tmp_path: Path) -> None:
-        cat_path = tmp_path / "copdem30_catalog.yml"
-        _write_catalog(cat_path, "copdem30.tif", "copdem30", 4326)
+        cat_path = tmp_path / "copdem_30m_catalog.yml"
+        _write_catalog(cat_path, "copdem_30m.tif", "copdem_30m", 4326)
 
         assert cat_path.exists()
         data = yaml.safe_load(cat_path.read_text())
-        assert data["meta"]["name"] == "copdem30"
-        assert data["copdem30"]["uri"] == "copdem30.tif"
-        assert data["copdem30"]["data_type"] == "RasterDataset"
-        assert data["copdem30"]["metadata"]["crs"] == 4326
-        assert data["copdem30"]["data_adapter"]["rename"] == {"elevation": "elevtn"}
+        assert data["meta"]["name"] == "copdem_30m"
+        assert data["copdem_30m"]["uri"] == "copdem_30m.tif"
+        assert data["copdem_30m"]["data_type"] == "RasterDataset"
+        assert data["copdem_30m"]["metadata"]["crs"] == 4326
+        assert data["copdem_30m"]["data_adapter"]["rename"] == {"elevation": "elevtn"}
 
 
 # ===================================================================
@@ -172,8 +172,8 @@ class TestFetchCopdem30:
                 log=log_messages.append,
             )
 
-        assert name == "copdem30"
-        assert catalog.name == "copdem30_catalog.yml"
+        assert name == "copdem_30m"
+        assert catalog.name == "copdem_30m_catalog.yml"
         assert catalog.exists()
         assert geotiff.exists()
         mock_dl.assert_called_once()

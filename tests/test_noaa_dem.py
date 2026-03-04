@@ -19,14 +19,14 @@ import numpy as np
 import pytest
 import yaml
 
-from coastal_calibration.utils.noaa_dem import (
+from coastal_calibration.utils.topobathy_noaa import (
     _overlap_fraction,
     get_vrt_url,
     load_index,
     query_overlapping,
     select_best,
 )
-from coastal_calibration.utils.topobathy import _write_catalog
+from coastal_calibration.utils.topobathy_nws import _write_catalog
 
 # ------------------------------------------------------------------
 # Fixtures
@@ -286,7 +286,7 @@ def _mock_localize_vrt(vrt_url, local_path, *, bbox=None):
 class TestFetchNoaaDem:
     """Test fetch_noaa_dem with mocked GDAL CLI."""
 
-    _VRT_PATCH = "coastal_calibration.utils.noaa_dem._localize_vrt"
+    _VRT_PATCH = "coastal_calibration.utils.topobathy_noaa._localize_vrt"
     _CLIP_PATCH = "coastal_calibration.utils._gdal.clip_to_aoi"
     _COVERAGE_PATCH = "coastal_calibration.utils._gdal.compute_aoi_coverage"
 
@@ -298,7 +298,7 @@ class TestFetchNoaaDem:
             patch(self._CLIP_PATCH, side_effect=_mock_clip_side_effect),
             patch(self._COVERAGE_PATCH, return_value=85.0),
         ):
-            from coastal_calibration.utils.noaa_dem import fetch_noaa_dem
+            from coastal_calibration.utils.topobathy_noaa import fetch_noaa_dem
 
             tif, cat, name = fetch_noaa_dem(
                 aoi=aoi_file,
@@ -307,9 +307,9 @@ class TestFetchNoaaDem:
 
         assert tif.exists()
         assert cat.exists()
-        assert name == "noaa_topobathy"
+        assert name == "noaa_3m"
         # Catalog YAML should reference the tif
-        assert "noaa_topobathy.tif" in cat.read_text()
+        assert "noaa_3m.tif" in cat.read_text()
 
     def test_fetch_with_explicit_dataset(self, aoi_file: Path, tmp_path: Path) -> None:
         output_dir = tmp_path / "downloads"
@@ -319,7 +319,7 @@ class TestFetchNoaaDem:
             patch(self._CLIP_PATCH, side_effect=_mock_clip_side_effect),
             patch(self._COVERAGE_PATCH, return_value=85.0),
         ):
-            from coastal_calibration.utils.noaa_dem import fetch_noaa_dem
+            from coastal_calibration.utils.topobathy_noaa import fetch_noaa_dem
 
             tif, _cat, name = fetch_noaa_dem(
                 aoi=aoi_file,
@@ -332,7 +332,7 @@ class TestFetchNoaaDem:
         assert tif.name == "my_dem.tif"
 
     def test_fetch_unknown_dataset_raises(self, aoi_file: Path, tmp_path: Path) -> None:
-        from coastal_calibration.utils.noaa_dem import fetch_noaa_dem
+        from coastal_calibration.utils.topobathy_noaa import fetch_noaa_dem
 
         with pytest.raises(ValueError, match="not found in NOAA DEM index"):
             fetch_noaa_dem(
@@ -350,7 +350,7 @@ class TestFetchNoaaDem:
             patch(self._CLIP_PATCH, side_effect=_mock_clip_side_effect) as mock_clip,
             patch(self._COVERAGE_PATCH, return_value=85.0),
         ):
-            from coastal_calibration.utils.noaa_dem import fetch_noaa_dem
+            from coastal_calibration.utils.topobathy_noaa import fetch_noaa_dem
 
             fetch_noaa_dem(aoi=aoi_file, output_dir=output_dir)
 
@@ -367,7 +367,7 @@ class TestFetchNoaaDem:
             patch(self._CLIP_PATCH, side_effect=_mock_clip_side_effect),
             patch(self._COVERAGE_PATCH, return_value=5.0),
         ):
-            from coastal_calibration.utils.noaa_dem import fetch_noaa_dem
+            from coastal_calibration.utils.topobathy_noaa import fetch_noaa_dem
 
             with pytest.raises(ValueError, match=r"5\.0%.*coverage"):
                 fetch_noaa_dem(aoi=aoi_file, output_dir=output_dir)
@@ -386,7 +386,7 @@ class TestWriteCatalog:
         _write_catalog(cat, "dem.tif", 32617)
 
         data = yaml.safe_load(cat.read_text())
-        assert data["nws_topobathy"]["metadata"]["crs"] == 32617
+        assert data["nws_30m"]["metadata"]["crs"] == 32617
 
     def test_rejects_non_integer(self, tmp_path: Path) -> None:
         """_write_catalog produces a clean integer EPSG in the YAML.
@@ -400,7 +400,7 @@ class TestWriteCatalog:
         _write_catalog(cat, "dem.tif", 4326)
 
         data = yaml.safe_load(cat.read_text())
-        assert isinstance(data["nws_topobathy"]["metadata"]["crs"], int)
+        assert isinstance(data["nws_30m"]["metadata"]["crs"], int)
 
 
 # ------------------------------------------------------------------
@@ -438,7 +438,7 @@ class TestFetchTopobathyBuffer:
             mock_gdf = gpd.read_file(aoi_file)
             mock_read.return_value = mock_gdf
 
-            from coastal_calibration.utils.topobathy import fetch_topobathy
+            from coastal_calibration.utils.topobathy_nws import fetch_topobathy
 
             fetch_topobathy(
                 domain="atlgulf",

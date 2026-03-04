@@ -121,8 +121,8 @@ def full_config_dict(aoi_file: Path, output_dir: Path) -> dict[str, Any]:
         "grid": {"resolution": 100, "crs": "EPSG:32615", "rotated": False},
         "elevation": {
             "datasets": [
-                {"name": "copdem30", "zmin": 0.001},
-                {"name": "gebco", "zmin": -20000},
+                {"name": "copdem_30m", "zmin": 0.001},
+                {"name": "gebco_15arcs", "zmin": -20000},
             ],
             "buffer_cells": 2,
         },
@@ -341,7 +341,7 @@ class TestSfincsCreateConfig:
         cfg = SfincsCreateConfig(
             aoi=aoi_file,
             output_dir=output_dir,
-            elevation=ElevationConfig(datasets=[ElevationDataset(name="copdem30")]),
+            elevation=ElevationConfig(datasets=[ElevationDataset(name="copdem_30m")]),
             subgrid=SubgridConfig(lulc_source=None),
         )
         assert "create_fetch_data" not in cfg.stage_order
@@ -350,7 +350,9 @@ class TestSfincsCreateConfig:
         cfg = SfincsCreateConfig(
             aoi=aoi_file,
             output_dir=output_dir,
-            elevation=ElevationConfig(datasets=[ElevationDataset(name="noaa_tb", source="noaa")]),
+            elevation=ElevationConfig(
+                datasets=[ElevationDataset(name="noaa_tb", source="noaa_3m")]
+            ),
             subgrid=SubgridConfig(lulc_source=None),
         )
         stages = cfg.stage_order
@@ -371,7 +373,7 @@ class TestSfincsCreateConfig:
         cfg = SfincsCreateConfig(
             aoi=aoi_file,
             output_dir=output_dir,
-            elevation=ElevationConfig(datasets=[ElevationDataset(name="copdem30")]),
+            elevation=ElevationConfig(datasets=[ElevationDataset(name="copdem_30m")]),
             subgrid=SubgridConfig(lulc_source="esa_worldcover"),
         )
         assert "create_fetch_data" in cfg.stage_order
@@ -421,7 +423,7 @@ class TestSfincsCreateConfig:
                 datasets=[
                     ElevationDataset(
                         name="noaa_tb",
-                        source="noaa",
+                        source="noaa_3m",
                         noaa_dataset="TX_Coastal_DEM_2018_8899",
                     )
                 ]
@@ -429,7 +431,7 @@ class TestSfincsCreateConfig:
         )
         d = cfg.to_dict()
         ds = d["elevation"]["datasets"][0]
-        assert ds["source"] == "noaa"
+        assert ds["source"] == "noaa_3m"
         assert ds["noaa_dataset"] == "TX_Coastal_DEM_2018_8899"
         assert "download_dir" in d
 
@@ -441,13 +443,13 @@ class TestSfincsCreateConfig:
             "output_dir": str(output_dir),
             "download_dir": str(tmp_path / "dl"),
             "elevation": {
-                "datasets": [{"name": "noaa_tb", "zmin": -20000, "source": "noaa"}],
+                "datasets": [{"name": "noaa_tb", "zmin": -20000, "source": "noaa_3m"}],
             },
         }
         cfg_path = tmp_path / "noaa.yaml"
         cfg_path.write_text(yaml.dump(cfg_data))
         cfg = SfincsCreateConfig.from_yaml(cfg_path)
-        assert cfg.elevation.datasets[0].source == "noaa"
+        assert cfg.elevation.datasets[0].source == "noaa_3m"
         assert cfg.download_dir is not None
         assert "create_fetch_data" in cfg.stage_order
 
@@ -567,7 +569,7 @@ class TestCreateStages:
             aoi=aoi_file,
             output_dir=output_dir,
             elevation=ElevationConfig(
-                datasets=[ElevationDataset(name="noaa_tb", source="noaa", zmin=-20000)]
+                datasets=[ElevationDataset(name="noaa_tb", source="noaa_3m", zmin=-20000)]
             ),
             subgrid=SubgridConfig(lulc_source=None),
         )
@@ -584,7 +586,7 @@ class TestCreateStages:
             cat.write_text("meta: {}")
             return tif, cat, "noaa_tb"
 
-        with patch("coastal_calibration.utils.noaa_dem.fetch_noaa_dem") as mock_fetch:
+        with patch("coastal_calibration.utils.topobathy_noaa.fetch_noaa_dem") as mock_fetch:
             mock_fetch.side_effect = _fake_fetch
 
             stage = CreateFetchDataStage(cfg)
@@ -605,7 +607,7 @@ class TestCreateStages:
             aoi=aoi_file,
             output_dir=output_dir,
             elevation=ElevationConfig(
-                datasets=[ElevationDataset(name="copdem30", source="copdem30", zmin=0.001)]
+                datasets=[ElevationDataset(name="copdem_30m", source="copdem_30m", zmin=0.001)]
             ),
             subgrid=SubgridConfig(lulc_source=None),
         )
@@ -615,10 +617,10 @@ class TestCreateStages:
 
         def _fake_fetch(**kwargs):
             dl_dir.mkdir(parents=True, exist_ok=True)
-            (dl_dir / "copdem30.tif").write_bytes(b"\x00")
-            cat = dl_dir / "copdem30_catalog.yml"
+            (dl_dir / "copdem_30m.tif").write_bytes(b"\x00")
+            cat = dl_dir / "copdem_30m_catalog.yml"
             cat.write_text("meta: {}")
-            return dl_dir / "copdem30.tif", cat, "copdem30"
+            return dl_dir / "copdem_30m.tif", cat, "copdem_30m"
 
         with patch("coastal_calibration.utils.copdem.fetch_copdem30") as mock_fetch:
             mock_fetch.side_effect = _fake_fetch
@@ -626,7 +628,7 @@ class TestCreateStages:
             result = stage.run()
 
         assert result["status"] == "completed"
-        assert "copdem30" in result["fetched"]
+        assert "copdem_30m" in result["fetched"]
         mock_fetch.assert_called_once()
         _clear_model(cfg)
 
@@ -640,7 +642,7 @@ class TestCreateStages:
             aoi=aoi_file,
             output_dir=output_dir,
             elevation=ElevationConfig(
-                datasets=[ElevationDataset(name="gebco", source="gebco", zmin=-20000)]
+                datasets=[ElevationDataset(name="gebco_15arcs", source="gebco_15arcs", zmin=-20000)]
             ),
             subgrid=SubgridConfig(lulc_source=None),
         )
@@ -650,10 +652,10 @@ class TestCreateStages:
 
         def _fake_fetch(**kwargs):
             dl_dir.mkdir(parents=True, exist_ok=True)
-            (dl_dir / "gebco.tif").write_bytes(b"\x00")
-            cat = dl_dir / "gebco_catalog.yml"
+            (dl_dir / "gebco_15arcs.tif").write_bytes(b"\x00")
+            cat = dl_dir / "gebco_15arcs_catalog.yml"
             cat.write_text("meta: {}")
-            return dl_dir / "gebco.tif", cat, "gebco"
+            return dl_dir / "gebco_15arcs.tif", cat, "gebco_15arcs"
 
         with patch("coastal_calibration.utils.gebco_wms.fetch_gebco") as mock_fetch:
             mock_fetch.side_effect = _fake_fetch
@@ -661,7 +663,7 @@ class TestCreateStages:
             result = stage.run()
 
         assert result["status"] == "completed"
-        assert "gebco" in result["fetched"]
+        assert "gebco_15arcs" in result["fetched"]
         mock_fetch.assert_called_once()
         _clear_model(cfg)
 
@@ -675,7 +677,7 @@ class TestCreateStages:
         cfg = SfincsCreateConfig(
             aoi=aoi_file,
             output_dir=output_dir,
-            elevation=ElevationConfig(datasets=[ElevationDataset(name="copdem30")]),
+            elevation=ElevationConfig(datasets=[ElevationDataset(name="copdem_30m")]),
             subgrid=SubgridConfig(lulc_source="esa_worldcover"),
         )
         _set_model(cfg, mock_sfincs_model)
@@ -710,7 +712,7 @@ class TestCreateStages:
             aoi=aoi_file,
             output_dir=output_dir,
             elevation=ElevationConfig(
-                datasets=[ElevationDataset(name="noaa_tb", source="noaa", zmin=-20000)]
+                datasets=[ElevationDataset(name="noaa_tb", source="noaa_3m", zmin=-20000)]
             ),
             subgrid=SubgridConfig(lulc_source=None),
         )
@@ -721,7 +723,7 @@ class TestCreateStages:
         (dl_dir / "noaa_tb.tif").write_bytes(b"\x00")
         (dl_dir / "noaa_tb_catalog.yml").write_text("meta: {}")
 
-        with patch("coastal_calibration.utils.noaa_dem.fetch_noaa_dem") as mock_fetch:
+        with patch("coastal_calibration.utils.topobathy_noaa.fetch_noaa_dem") as mock_fetch:
             stage = CreateFetchDataStage(cfg)
             result = stage.run()
 

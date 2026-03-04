@@ -105,7 +105,7 @@ def fetch_copdem30(
     output_dir: Path | str,
     *,
     buffer_deg: float = 0.1,
-    catalog_name: str = "copdem30",
+    catalog_name: str = "copdem_30m",
     log: Callable[[str], None] | None = None,
 ) -> tuple[Path, Path, str]:
     """Discover, download, and mosaic CopDEM 30m tiles for *aoi*.

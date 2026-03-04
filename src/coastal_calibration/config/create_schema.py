@@ -64,16 +64,17 @@ class ElevationDataset:
     """A single elevation/bathymetry dataset entry."""
 
     #: HydroMT data-catalog dataset name.
-    name: str = "copdem30"
+    name: str = "copdem_30m"
 
     #: Minimum elevation threshold for this dataset.
     zmin: float = 0.001
 
     #: Data source for auto-fetching.  Supported values:
     #:
-    #: - ``"noaa"`` — NOAA coastal topobathy DEM from S3
-    #: - ``"copdem30"`` — Copernicus DEM 30 m from AWS S3
-    #: - ``"gebco"`` — GEBCO bathymetry via WMS
+    #: - ``"nws_30m"`` — NWS 30 m topo-bathymetric DEM from icechunk (S3)
+    #: - ``"noaa_3m"`` — NOAA ~3 m coastal topobathy DEM from S3
+    #: - ``"copdem_30m"`` — Copernicus DEM 30 m from AWS S3
+    #: - ``"gebco_15arcs"`` — GEBCO 15 arc-second bathymetry (~450 m) via CEDA
     #:
     #: When set, the ``create_fetch_data`` stage downloads the dataset
     #: for the AOI automatically.  When ``None``, the dataset must
@@ -81,9 +82,14 @@ class ElevationDataset:
     source: str | None = None
 
     #: Explicit NOAA dataset name (e.g. ``"TX_Coastal_DEM_2018_8899"``).
-    #: Only used when ``source`` is ``"noaa"``.  When ``None``, the best
+    #: Only used when ``source`` is ``"noaa_3m"``.  When ``None``, the best
     #: dataset is auto-discovered based on AOI overlap and resolution.
     noaa_dataset: str | None = None
+
+    #: NWS topobathy coastal domain identifier (e.g. ``"atlgulf"``,
+    #: ``"hi"``, ``"prvi"``, ``"pacific"``, ``"ak"``).
+    #: Only used when ``source`` is ``"nws_30m"``.
+    coastal_domain: str | None = None
 
 
 @dataclass
@@ -92,8 +98,8 @@ class ElevationConfig:
 
     datasets: list[ElevationDataset] = field(
         default_factory=lambda: [
-            ElevationDataset(name="copdem30", zmin=0.001, source="copdem30"),
-            ElevationDataset(name="gebco", zmin=-20000, source="gebco"),
+            ElevationDataset(name="copdem_30m", zmin=0.001, source="copdem_30m"),
+            ElevationDataset(name="gebco_15arcs", zmin=-20000, source="gebco_15arcs"),
         ]
     )
 
@@ -243,7 +249,7 @@ class SfincsCreateConfig:
     # ------------------------------------------------------------------
 
     #: Valid ``ElevationDataset.source`` values.
-    _VALID_ELEV_SOURCES = frozenset({"noaa", "copdem30", "gebco"})
+    _VALID_ELEV_SOURCES = frozenset({"nws_30m", "noaa_3m", "copdem_30m", "gebco_15arcs"})
 
     #: Valid ``SubgridConfig.lulc_source`` values.
     _VALID_LULC_SOURCES = frozenset({"esa_worldcover"})
@@ -458,9 +464,17 @@ class SfincsCreateConfig:
                     f"elevation.datasets[{ds.name}].source must be one of "
                     f"{sorted(self._VALID_ELEV_SOURCES)} or None, got '{ds.source}'"
                 )
-            if ds.noaa_dataset is not None and ds.source != "noaa":
+            if ds.noaa_dataset is not None and ds.source != "noaa_3m":
                 errors.append(
-                    f"elevation.datasets[{ds.name}].noaa_dataset is set but source is not 'noaa'"
+                    f"elevation.datasets[{ds.name}].noaa_dataset is set but source is not 'noaa_3m'"
+                )
+            if ds.coastal_domain is not None and ds.source != "nws_30m":
+                errors.append(
+                    f"elevation.datasets[{ds.name}].coastal_domain is set but source is not 'nws_30m'"
+                )
+            if ds.source == "nws_30m" and ds.coastal_domain is None:
+                errors.append(
+                    f"elevation.datasets[{ds.name}].coastal_domain is required when source is 'nws_30m'"
                 )
         return errors
 
@@ -555,6 +569,7 @@ class SfincsCreateConfig:
                         "zmin": d.zmin,
                         **({"source": d.source} if d.source else {}),
                         **({"noaa_dataset": d.noaa_dataset} if d.noaa_dataset else {}),
+                        **({"coastal_domain": d.coastal_domain} if d.coastal_domain else {}),
                     }
                     for d in self.elevation.datasets
                 ],
@@ -598,9 +613,7 @@ class SfincsCreateConfig:
             "add_noaa_gages": self.add_noaa_gages,
             "observation_points": self.observation_points,
             "observation_locations_file": (
-                str(self.observation_locations_file)
-                if self.observation_locations_file
-                else None
+                str(self.observation_locations_file) if self.observation_locations_file else None
             ),
             "merge_observations": self.merge_observations,
         }

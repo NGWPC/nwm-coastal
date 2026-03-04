@@ -261,7 +261,7 @@ def prepare_topobathy(
     Requires AWS credentials (via environment or ~/.aws) and the
     ``icechunk`` Python package.
     """
-    from coastal_calibration.utils.topobathy import fetch_topobathy
+    from coastal_calibration.utils.topobathy_nws import fetch_topobathy
 
     if output_dir is None:
         output_dir = aoi.resolve().parent
@@ -269,7 +269,7 @@ def prepare_topobathy(
     configure_logger(level="INFO")
 
     try:
-        tif_path, cat_path = fetch_topobathy(
+        tif_path, cat_path, _ = fetch_topobathy(
             domain=domain,
             aoi=aoi.resolve(),
             output_dir=output_dir.resolve(),
@@ -285,7 +285,7 @@ def prepare_topobathy(
         "\nUpdate your create config:\n"
         "  elevation:\n"
         "    datasets:\n"
-        "      - name: nws_topobathy\n"
+        "      - name: nws_30m\n"
         "        zmin: -20000\n"
         "  data_catalog:\n"
         "    data_libs:\n"
@@ -420,7 +420,7 @@ def update_dem_index(output: Path | None, max_datasets: int | None) -> None:
     import importlib.resources
     import json
 
-    from coastal_calibration.utils.noaa_dem import build_index_from_s3
+    from coastal_calibration.utils.topobathy_noaa import build_index_from_s3
 
     configure_logger(level="INFO")
 

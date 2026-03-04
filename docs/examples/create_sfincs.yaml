@@ -25,16 +25,21 @@ grid:
 # Datasets with a ``source`` are auto-fetched — no data catalog needed.
 elevation:
   datasets:
-  - name: copdem30        # Copernicus DEM 30m (land)
+  - name: copdem_30m      # Copernicus DEM 30m (land)
     zmin: 0.001
-    source: copdem30      # auto-fetched from AWS S3
-  - name: gebco           # GEBCO bathymetry (ocean)
+    source: copdem_30m    # auto-fetched from AWS S3
+  - name: gebco_15arcs       # GEBCO 15 arc-second bathymetry (ocean)
     zmin: -20000
-    source: gebco         # auto-fetched via GEBCO WMS
+    source: gebco_15arcs     # auto-fetched via CEDA GeoTIFF tiles
   # Optionally add a NOAA topobathy DEM for US coastal areas:
-  # - name: noaa_topobathy
+  # - name: noaa_3m
   #   zmin: -20000
-  #   source: noaa        # auto-fetched from NOAA S3
+  #   source: noaa_3m     # auto-fetched from NOAA S3
+  # Or NWS 30m topobathy (requires coastal_domain):
+  # - name: nws_30m
+  #   zmin: -20000
+  #   source: nws_30m
+  #   coastal_domain: atlgulf   # atlgulf, hi, prvi, pacific, ak
   buffer_cells: 1
 
 # Active-cell mask and boundary settings

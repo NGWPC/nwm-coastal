@@ -88,16 +88,16 @@ class TestWriteCatalog:
     """Test _write_catalog output."""
 
     def test_writes_valid_yaml(self, tmp_path: Path) -> None:
-        cat_path = tmp_path / "gebco_catalog.yml"
-        _write_catalog(cat_path, "gebco.tif", "gebco", 4326)
+        cat_path = tmp_path / "gebco_15arcs_catalog.yml"
+        _write_catalog(cat_path, "gebco_15arcs.tif", "gebco_15arcs", 4326)
 
         assert cat_path.exists()
         data = yaml.safe_load(cat_path.read_text())
-        assert data["meta"]["name"] == "gebco"
-        assert data["gebco"]["uri"] == "gebco.tif"
-        assert data["gebco"]["data_type"] == "RasterDataset"
-        assert data["gebco"]["metadata"]["crs"] == 4326
-        assert data["gebco"]["data_adapter"]["rename"] == {"elevation": "elevtn"}
+        assert data["meta"]["name"] == "gebco_15arcs"
+        assert data["gebco_15arcs"]["uri"] == "gebco_15arcs.tif"
+        assert data["gebco_15arcs"]["data_type"] == "RasterDataset"
+        assert data["gebco_15arcs"]["metadata"]["crs"] == 4326
+        assert data["gebco_15arcs"]["data_adapter"]["rename"] == {"elevation": "elevtn"}
 
 
 # ===================================================================
@@ -162,8 +162,8 @@ class TestFetchGebco:
                 log=log_messages.append,
             )
 
-        assert name == "gebco"
-        assert catalog.name == "gebco_catalog.yml"
+        assert name == "gebco_15arcs"
+        assert catalog.name == "gebco_15arcs_catalog.yml"
         assert catalog.exists()
         assert geotiff.exists()
         mock_vrt.assert_called_once()

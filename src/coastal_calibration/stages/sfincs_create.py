@@ -294,8 +294,25 @@ class CreateFetchDataStage(_CreateStageBase):
                 fetched.append(catalog_name)
                 continue
 
-            if ds.source == "noaa":
-                from coastal_calibration.utils.noaa_dem import fetch_noaa_dem
+            if ds.source == "nws_30m":
+                from coastal_calibration.utils.topobathy_nws import fetch_topobathy
+
+                if ds.coastal_domain is None:
+                    raise ValueError(
+                        f"elevation.datasets[{ds.name}].coastal_domain is required "
+                        f"when source is 'nws_30m'"
+                    )
+                self._update_substep(f"Fetching NWS topobathy for '{catalog_name}'")
+                _, cat_path, _ = fetch_topobathy(
+                    domain=ds.coastal_domain,
+                    aoi=cfg.aoi,
+                    output_dir=dl_dir,
+                    buffer_deg=0.1,
+                    catalog_name=catalog_name,
+                    log=self._log,
+                )
+            elif ds.source == "noaa_3m":
+                from coastal_calibration.utils.topobathy_noaa import fetch_noaa_dem
 
                 self._update_substep(f"Fetching NOAA DEM for '{catalog_name}'")
                 _, cat_path, _ = fetch_noaa_dem(
@@ -306,7 +323,7 @@ class CreateFetchDataStage(_CreateStageBase):
                     catalog_name=catalog_name,
                     log=self._log,
                 )
-            elif ds.source == "copdem30":
+            elif ds.source == "copdem_30m":
                 from coastal_calibration.utils.copdem import fetch_copdem30
 
                 self._update_substep(f"Fetching Copernicus DEM 30m for '{catalog_name}'")
@@ -316,10 +333,10 @@ class CreateFetchDataStage(_CreateStageBase):
                     catalog_name=catalog_name,
                     log=self._log,
                 )
-            elif ds.source == "gebco":
+            elif ds.source == "gebco_15arcs":
                 from coastal_calibration.utils.gebco_wms import fetch_gebco
 
-                self._update_substep(f"Fetching GEBCO bathymetry for '{catalog_name}'")
+                self._update_substep(f"Fetching GEBCO 15-arcsec bathymetry for '{catalog_name}'")
                 _, cat_path, _ = fetch_gebco(
                     aoi=cfg.aoi,
                     output_dir=dl_dir,

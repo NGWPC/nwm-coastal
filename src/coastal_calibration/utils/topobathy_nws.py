@@ -7,13 +7,13 @@ to polygon-clip to the exact AOI shape.
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING, Any
 
-if TYPE_CHECKING:
-    from pathlib import Path
+from coastal_calibration.utils.logging import logger
 
-logger = logging.getLogger(__name__)
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
 
 # S3 prefixes keyed by short domain name.
 _PREFIXES: dict[str, str] = {
@@ -48,6 +48,7 @@ def _write_catalog(
     catalog_path: Path,
     tif_name: str,
     crs_epsg: int,
+    catalog_name: str = "nws_30m",
 ) -> None:
     """Write a minimal HydroMT data-catalog YAML next to the GeoTIFF."""
     import yaml
@@ -55,10 +56,10 @@ def _write_catalog(
     catalog: dict[str, Any] = {
         "meta": {
             "version": "v1.0.0",
-            "name": "nws_topobathy",
+            "name": catalog_name,
             "hydromt_version": ">1.0a,<2",
         },
-        "nws_topobathy": {
+        catalog_name: {
             "data_type": "RasterDataset",
             "uri": tif_name,
             "driver": {"name": "rasterio"},
@@ -80,7 +81,9 @@ def fetch_topobathy(
     output_dir: Path,
     *,
     buffer_deg: float = 0.1,
-) -> tuple[Path, Path]:
+    catalog_name: str = "nws_30m",
+    log: Callable[[str], None] | None = None,
+) -> tuple[Path, Path, str]:
     """Clip NWS topobathy DEM to *aoi* and write a HydroMT data-catalog entry.
 
     Parameters
@@ -96,12 +99,19 @@ def fetch_topobathy(
     buffer_deg
         Bounding-box buffer in degrees added around the AOI extent
         (default 0.1 ≈ 11 km).
+    catalog_name
+        Name used for the HydroMT data-catalog entry and the output
+        GeoTIFF file stem (default ``"nws_30m"``).
+    log
+        Optional callable for progress messages (e.g. a stage ``_log``
+        method).  Falls back to the module-level logger.
 
     Returns
     -------
-    tuple[Path, Path]
-        ``(geotiff_path, catalog_path)`` — the local GeoTIFF and the
-        HydroMT data-catalog YAML that references it.
+    tuple[Path, Path, str]
+        ``(geotiff_path, catalog_path, catalog_name)`` — the local
+        GeoTIFF, the HydroMT data-catalog YAML, and the catalog entry
+        name used.
 
     Raises
     ------
@@ -110,6 +120,7 @@ def fetch_topobathy(
     ImportError
         If ``icechunk``, ``rioxarray``, or ``geopandas`` are not installed.
     """
+    _log: Callable[[str], None] = log or logger.info
     import dotenv
     import geopandas as gpd
     import icechunk as ic
@@ -135,7 +146,7 @@ def fetch_topobathy(
         geo_bounds[3] + buffer_deg,
     )
 
-    logger.info("Opening and clipping icechunk store: s3://%s/%s", _S3_BUCKET, prefix)
+    _log(f"Opening and clipping icechunk store: s3://{_S3_BUCKET}/{prefix}")
     storage = ic.s3_storage(bucket=_S3_BUCKET, prefix=prefix, region=_S3_REGION, from_env=True)
     store = ic.Repository.open(storage).readonly_session("main").store
     clipped = (
@@ -154,7 +165,7 @@ def fetch_topobathy(
     sub_dir.mkdir(parents=True, exist_ok=True)
 
     temp_tif = sub_dir / "bbox_clipped.tif"
-    logger.info("Writing bbox-clipped temp GeoTIFF: %s", temp_tif)
+    _log(f"Writing bbox-clipped temp GeoTIFF: {temp_tif}")
     # SFINCS reads bathymetry as real*4; avoid writing unnecessary float64.
     if clipped.dtype != "float32":
         clipped = clipped.astype("float32")
@@ -167,19 +178,19 @@ def fetch_topobathy(
     cutline_path = sub_dir / "cutline.geojson"
     aoi_4326.to_file(cutline_path, driver="GeoJSON")
 
-    tif_name = f"nws_topobathy_{key}.tif"
+    tif_name = f"{catalog_name}.tif"
     geotiff_path = output_dir / tif_name
-    logger.info("Clipping to AOI polygon via gdalwarp: %s", geotiff_path)
+    _log(f"Clipping to AOI polygon via gdalwarp: {geotiff_path}")
     clip_to_aoi(temp_tif, cutline_path, geotiff_path, nodata="nan", output_type="Float32")
-    logger.info("GeoTIFF written (%.1f MB)", geotiff_path.stat().st_size / 1e6)
+    _log(f"GeoTIFF written ({geotiff_path.stat().st_size / 1e6:.1f} MB)")
 
     # Clean up temporary files.
     for f in [temp_tif, cutline_path]:
         f.unlink(missing_ok=True)
     sub_dir.rmdir()
 
-    catalog_path = output_dir / "nws_topobathy_catalog.yml"
-    _write_catalog(catalog_path, tif_name, crs_epsg)
-    logger.info("Catalog written: %s", catalog_path)
+    catalog_path = output_dir / f"{catalog_name}_catalog.yml"
+    _write_catalog(catalog_path, tif_name, crs_epsg, catalog_name=catalog_name)
+    _log(f"Catalog written: {catalog_path}")
 
-    return geotiff_path, catalog_path
+    return geotiff_path, catalog_path, catalog_name
