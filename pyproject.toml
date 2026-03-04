@@ -216,13 +216,15 @@ per-file-ignores."tests/*.py" = [
   # insecure use of path
   "S108",
 ]
-per-file-ignores."docs/examples/notebooks/*.ipynb" = [
+per-file-ignores."docs/examples/notebooks/*.{ipynb,py}" = [
   # missing module docstring
   "D100",
   # module level import not at top
   "E402",
   # use of "assert"
   "S101",
+  # print statements
+  "T20",
 ]
 extend-safe-fixes = [
   # module level imports
@@ -241,7 +243,7 @@ isort.required-imports = [ "from __future__ import annotations" ]
 pydocstyle.convention = "numpy"
 
 [tool.codespell]
-skip = "__pycache__,_build,.git,./htmlcov,pixi.lock,./site,./cache"
+skip = "__pycache__,_build,.git,./htmlcov,pixi.lock,./site,./cache,*.ipynb"
 ignore-words-list = "gages,parm,oce,gage,nd"
 
 [tool.pyproject-fmt]

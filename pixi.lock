@@ -3624,8 +3624,8 @@ packages:
   requires_python: '>=3.8'
 - pypi: ./
   name: coastal-calibration
-  version: 3.1.1.0.1.dev351+g1917bdbb1.d20260304
-  sha256: af28d63be7544779edbc49212545dad9f9c34029e58f562e092b65b0bcc00263
+  version: 3.1.1.0.1.dev353+g290cd386c.d20260304
+  sha256: 18e6f3b4d522d940585ac2167fbd0e3a6794bd8617537f5cae491d306ffcf747
   requires_dist:
   - pyyaml>=6
   - rich-click
