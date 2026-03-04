@@ -232,14 +232,32 @@ class CreateGridStage(CreateStage):
                 if ref.buffer_m != 0.0:
                     gdf = gdf.copy()
                     gdf["geometry"] = gdf.geometry.buffer(ref.buffer_m)
+                    # Drop geometries that collapsed to empty after buffering.
+                    empty = gdf.geometry.is_empty
+                    if empty.any():
+                        n_dropped = int(empty.sum())
+                        self._log(
+                            f"Refinement polygon '{ref.polygon.name}': "
+                            f"{n_dropped} geometry(ies) collapsed to empty after "
+                            f"buffer_m={ref.buffer_m} m — dropped",
+                            "warning",
+                        )
+                        gdf = gdf[~empty]
+                if gdf.empty:
+                    continue
                 gdf["refinement_level"] = ref.level
                 parts.append(gdf)
-            refinement_gdf = gpd.GeoDataFrame(pd.concat(parts, ignore_index=True))
-
-            self._log(
-                f"Refinement: {len(cfg.grid.refinement)} polygon(s), "
-                f"max level {max(r.level for r in cfg.grid.refinement)}"
-            )
+            if parts:
+                refinement_gdf = gpd.GeoDataFrame(pd.concat(parts, ignore_index=True))
+                self._log(
+                    f"Refinement: {len(parts)} polygon(s), "
+                    f"max level {max(r.level for r in cfg.grid.refinement)}"
+                )
+            else:
+                self._log(
+                    "All refinement polygons collapsed after buffering — building uniform grid",
+                    "warning",
+                )
 
         with _suppress_stdout():
             sf.quadtree_grid.create_from_region(
@@ -532,7 +550,7 @@ class CreateDischargeStage(_CreateStageBase):
             try:
                 ds = xr.open_dataset(paths[0])
                 try:
-                    nwm_ids = set(ds["feature_id"].values.tolist())
+                    nwm_ids = set(ds["feature_id"].to_numpy().tolist())
                 finally:
                     ds.close()
             except Exception as exc:
@@ -833,87 +851,22 @@ class CreateObservationPointsStage(_CreateStageBase):
     # Observation-point snapping
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _grid_face_centres(grid_ds: Any) -> tuple[Any, Any, Any, Any]:
-        """Compute face centres, bed elevations, and mask from a UGRID mesh."""
-        import numpy as np
-
-        z_elev = grid_ds["z"].values
-        mask_arr = grid_ds["mask"].values
-
-        face_nodes_raw = grid_ds["mesh2d_face_nodes"].values
-        fn_valid = ~np.isnan(face_nodes_raw)
-        fn_int = np.zeros(face_nodes_raw.shape, dtype=int)
-        fn_int[fn_valid] = face_nodes_raw[fn_valid].astype(int)
-        nodes_x = grid_ds.coords["mesh2d_node_x"].values
-        nodes_y = grid_ds.coords["mesh2d_node_y"].values
-        fx = np.nanmean(np.where(fn_valid, nodes_x[fn_int], np.nan), axis=1)
-        fy = np.nanmean(np.where(fn_valid, nodes_y[fn_int], np.nan), axis=1)
-        return fx, fy, z_elev, mask_arr
-
-    def _try_snap_point(
-        self,
-        obs_gdf: Any,
-        idx: int,
-        tree: Any,
-        fx: Any,
-        fy: Any,
-        z_elev: Any,
-        mask_arr: Any,
-        depth_threshold: float,
-        search_radius: float,
-    ) -> bool | None:
-        """Snap a single observation point if its cell is dry."""
-        import numpy as np
-        from shapely.geometry import Point
-
-        geom = obs_gdf.geometry.iloc[idx]
-        if geom is None:
-            return None
-        ox, oy = geom.x, geom.y
-        name = obs_gdf.index[idx] if obs_gdf.index.name else str(idx)
-        with contextlib.suppress(KeyError, IndexError):
-            name = obs_gdf["name"].iloc[idx]
-
-        _, cell_idx = tree.query([ox, oy])
-        cell_z = z_elev[cell_idx]
-        if cell_z < depth_threshold:
-            return None  # already wet
-
-        candidates = tree.query_ball_point([ox, oy], r=search_radius)
-        cand_arr = np.array(candidates) if candidates else np.array([], dtype=int)
-        if len(cand_arr) == 0:
-            self._log(
-                f"  {name}: z={cell_z:.3f} m (dry), no cells within {search_radius:.0f} m",
-                "warning",
-            )
-            return None
-
-        wet = (z_elev[cand_arr] < depth_threshold) & (mask_arr[cand_arr] > 0)
-        if not np.any(wet):
-            self._log(
-                f"  {name}: z={cell_z:.3f} m (dry), no wet cell within {search_radius:.0f} m",
-                "warning",
-            )
-            return None
-
-        wet_idxs = cand_arr[wet]
-        wet_dists = np.sqrt((fx[wet_idxs] - ox) ** 2 + (fy[wet_idxs] - oy) ** 2)
-        best = wet_idxs[np.argmin(wet_dists)]
-        new_z = z_elev[best]
-        move_dist = float(np.min(wet_dists))
-
-        obs_gdf.geometry.iloc[idx] = Point(float(fx[best]), float(fy[best]))
-        self._log(
-            f"  {name}: snapped from z={cell_z:.3f} m to z={new_z:.3f} m ({move_dist:.0f} m away)"
-        )
-        return True
-
     def _snap_obs_to_wet_cells(self, model: SfincsModel) -> int:
-        """Relocate observation points on dry cells to the nearest wet cell."""
+        """Snap every observation point to the centre of the nearest wet cell.
+
+        SFINCS's internal quadtree cell lookup maps (x, y) coordinates
+        to cells via the (n, m) index structure.  When a point is *not*
+        at the exact face centre, the lookup can land on a neighbouring
+        (potentially dry or inactive) cell — especially after grid
+        refinement changes the (n, m) layout.
+
+        To guarantee correct placement we *always* relocate each point
+        to the centre of the nearest active wet face, regardless of
+        whether the current cell appears wet.
+        """
         import numpy as np
-        import xarray as xr
         from scipy.spatial import KDTree
+        from shapely.geometry import Point
 
         depth_threshold = self._SNAP_DEPTH_THRESHOLD
         search_radius = self._SNAP_SEARCH_RADIUS_M
@@ -922,22 +875,48 @@ class CreateObservationPointsStage(_CreateStageBase):
         if obs_gdf is None or obs_gdf.empty:
             return 0
 
-        grid_path = self.config.output_dir / "sfincs.nc"
-        if not grid_path.exists():
-            self._log("sfincs.nc not found - cannot snap observation points", "warning")
-            return 0
+        grid_ds = model.quadtree_grid.data
+        ugrid = grid_ds.ugrid.grid
+        fx = np.asarray(ugrid.face_x)
+        fy = np.asarray(ugrid.face_y)
+        z_elev = grid_ds["z"].to_numpy()  # type: ignore[index]
+        mask_arr = grid_ds["mask"].to_numpy()  # type: ignore[index]
 
-        with xr.open_dataset(grid_path) as grid_ds:
-            fx, fy, z_elev, mask_arr = self._grid_face_centres(grid_ds)
-        tree = KDTree(np.column_stack([fx, fy]))
+        # Build a KDTree of active wet face centres only.
+        wet_active = (z_elev < depth_threshold) & (mask_arr > 0)
+        wet_idx = np.where(wet_active)[0]
+        if len(wet_idx) == 0:
+            self._log("No active wet cells in grid — cannot snap observation points", "warning")
+            return 0
+        tree_wet = KDTree(np.column_stack([fx[wet_idx], fy[wet_idx]]))
 
         snapped = 0
-        for idx in range(len(obs_gdf)):
-            result = self._try_snap_point(
-                obs_gdf, idx, tree, fx, fy, z_elev, mask_arr, depth_threshold, search_radius
+        for i in range(len(obs_gdf)):
+            geom = obs_gdf.geometry.iloc[i]
+            if geom is None:
+                continue
+            ox, oy = geom.x, geom.y
+            name = str(i)
+            with contextlib.suppress(KeyError, IndexError):
+                name = obs_gdf["name"].iloc[i]
+
+            dist, pos = tree_wet.query([ox, oy])
+            if dist > search_radius:
+                self._log(
+                    f"  {name}: no wet cell within {search_radius:.0f} m "
+                    f"(nearest {dist:.0f} m away)",
+                    "warning",
+                )
+                continue
+
+            best = wet_idx[pos]
+            new_x, new_y = float(fx[best]), float(fy[best])
+            new_z = z_elev[best]
+            obs_gdf.geometry.iloc[i] = Point(new_x, new_y)
+            self._log(
+                f"  {name}: placed at face centre z={new_z:.3f} m ({dist:.0f} m from original)"
             )
-            if result is not None:
-                snapped += 1
+            snapped += 1
 
         if snapped > 0:
             model.observation_points._data = obs_gdf
@@ -964,7 +943,7 @@ class CreateObservationPointsStage(_CreateStageBase):
 
             station_id = ""
             if name.startswith("noaa_"):
-                station_id = name[len("noaa_"):]
+                station_id = name[len("noaa_") :]
 
             geom = obs_gdf.geometry.iloc[idx]
             entry: dict[str, Any] = {
