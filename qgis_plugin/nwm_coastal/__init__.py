@@ -1,5 +1,7 @@
 """NWM Coastal QGIS Plugin."""
 
+from __future__ import annotations
+
 
 def classFactory(iface):  # noqa: N802
     """Load the plugin class.

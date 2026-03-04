@@ -23,6 +23,56 @@ REQUIRED_GPKG_LAYERS = ("flowpaths", "divides")
 class BasemapDialog(QDialog):
     """Dialog for selecting NHF GeoPackage, CO-OPS parquet, and stream order filter."""
 
+    def _browse_gpkg(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Select NHF GeoPackage", "", "GeoPackage (*.gpkg)"
+        )
+        if path:
+            self.gpkg_edit.setText(path)
+
+    def _browse_parquet(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Select CO-OPS Stations Parquet", "", "Parquet (*.parquet)"
+        )
+        if path:
+            self.parquet_edit.setText(path)
+
+    def _validate_and_accept(self) -> None:
+        """Validate inputs before accepting the dialog."""
+        gpkg = self.gpkg_path
+        parquet = self.parquet_path
+
+        if not gpkg.is_file():
+            self.validation_label.setText(f"GeoPackage not found: {gpkg}")
+            return
+        if gpkg.suffix != ".gpkg":
+            self.validation_label.setText("GeoPackage file must have .gpkg extension.")
+            return
+        if not parquet.is_file():
+            self.validation_label.setText(f"Parquet file not found: {parquet}")
+            return
+
+        # Validate gpkg contains required layers
+        from osgeo import ogr
+
+        ds = ogr.Open(str(gpkg))
+        if ds is None:
+            self.validation_label.setText(f"Cannot open GeoPackage: {gpkg}")
+            return
+
+        available = {ds.GetLayerByIndex(i).GetName() for i in range(ds.GetLayerCount())}
+        ds = None
+
+        missing = set(REQUIRED_GPKG_LAYERS) - available
+        if missing:
+            self.validation_label.setText(
+                f"GeoPackage missing required layers: {', '.join(sorted(missing))}"
+            )
+            return
+
+        self.validation_label.setText("")
+        self.accept()
+
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Add Basemap")
@@ -85,53 +135,3 @@ class BasemapDialog(QDialog):
     def min_stream_order(self) -> int:
         """Return the minimum stream order filter value."""
         return self.stream_order_spin.value()
-
-    def _browse_gpkg(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(
-            self, "Select NHF GeoPackage", "", "GeoPackage (*.gpkg)"
-        )
-        if path:
-            self.gpkg_edit.setText(path)
-
-    def _browse_parquet(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(
-            self, "Select CO-OPS Stations Parquet", "", "Parquet (*.parquet)"
-        )
-        if path:
-            self.parquet_edit.setText(path)
-
-    def _validate_and_accept(self) -> None:
-        """Validate inputs before accepting the dialog."""
-        gpkg = self.gpkg_path
-        parquet = self.parquet_path
-
-        if not gpkg.is_file():
-            self.validation_label.setText(f"GeoPackage not found: {gpkg}")
-            return
-        if gpkg.suffix != ".gpkg":
-            self.validation_label.setText("GeoPackage file must have .gpkg extension.")
-            return
-        if not parquet.is_file():
-            self.validation_label.setText(f"Parquet file not found: {parquet}")
-            return
-
-        # Validate gpkg contains required layers
-        from osgeo import ogr
-
-        ds = ogr.Open(str(gpkg))
-        if ds is None:
-            self.validation_label.setText(f"Cannot open GeoPackage: {gpkg}")
-            return
-
-        available = {ds.GetLayerByIndex(i).GetName() for i in range(ds.GetLayerCount())}
-        ds = None
-
-        missing = set(REQUIRED_GPKG_LAYERS) - available
-        if missing:
-            self.validation_label.setText(
-                f"GeoPackage missing required layers: {', '.join(sorted(missing))}"
-            )
-            return
-
-        self.validation_label.setText("")
-        self.accept()
