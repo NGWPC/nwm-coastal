@@ -146,21 +146,10 @@ def create(
 
     CONFIG is the path to a YAML configuration file.
     """
-    import os
-
     from coastal_calibration.config.create_schema import SfincsCreateConfig
     from coastal_calibration.creator import SfincsCreator
 
     config_path = config.resolve()
-
-    # Redirect stdout to /dev/null for the entire create workflow.
-    # hydromt-sfincs's quadtree builders use raw print() calls that
-    # cannot be silenced through the logging system.  All our own
-    # output goes to stderr via RichHandler so nothing is lost.
-    _devnull = os.open(os.devnull, os.O_WRONLY)
-    _saved_stdout = os.dup(1)
-    os.dup2(_devnull, 1)
-    os.close(_devnull)
 
     try:
         cfg = SfincsCreateConfig.from_yaml(config_path)
@@ -189,13 +178,6 @@ def create(
         raise
     except Exception as e:
         _raise_cli_error(str(e))
-    finally:
-        # Do NOT restore stdout — leave it redirected to /dev/null.
-        # hydromt-sfincs's quadtree builder fires raw print() calls
-        # during lazy XUGrid construction triggered by SfincsModel
-        # garbage collection after this function returns.  All our
-        # own output goes to stderr (RichHandler), so nothing is lost.
-        os.close(_saved_stdout)
 
 
 @cli.command()
