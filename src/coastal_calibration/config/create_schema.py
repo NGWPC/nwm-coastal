@@ -307,12 +307,23 @@ class SfincsCreateConfig:
         return stages
 
     # ------------------------------------------------------------------
-    # YAML I/O
+    # Serialisation / deserialisation
     # ------------------------------------------------------------------
 
     @classmethod
-    def _from_dict(cls, data: dict[str, Any]) -> SfincsCreateConfig:
-        """Create config from a raw dictionary."""
+    def from_dict(cls, data: dict[str, Any]) -> SfincsCreateConfig:
+        """Create config from a plain dictionary.
+
+        Parameters
+        ----------
+        data : dict
+            Configuration dictionary with the same structure as the YAML
+            file (see :meth:`to_dict` for the expected keys).
+
+        Returns
+        -------
+        SfincsCreateConfig
+        """
         aoi = data.get("aoi")
         if aoi is None:
             raise ValueError("'aoi' is required (path to AOI polygon file)")
@@ -449,7 +460,7 @@ class SfincsCreateConfig:
             raise ValueError(f"Configuration file is empty: {config_path}")
 
         cls._resolve_relative_paths(data, config_path.parent)
-        return cls._from_dict(data)
+        return cls.from_dict(data)
 
     def _validate_elevation(self) -> list[str]:
         """Validate elevation configuration."""

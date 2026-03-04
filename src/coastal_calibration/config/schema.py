@@ -905,10 +905,24 @@ class CoastalCalibConfig:
         return self.model_config.model_name
 
     @classmethod
-    def _from_dict(
+    def from_dict(
         cls, data: dict[str, Any], base_config_path: Path | None = None
     ) -> CoastalCalibConfig:
-        """Create config from dictionary."""
+        """Create config from a plain dictionary.
+
+        Parameters
+        ----------
+        data : dict
+            Configuration dictionary with the same structure as the YAML
+            file (see :meth:`to_dict` for the expected keys).
+        base_config_path : Path, optional
+            Path to a base configuration file (for YAML inheritance).
+            Only needed when the config was loaded via ``_base`` key.
+
+        Returns
+        -------
+        CoastalCalibConfig
+        """
         if "model" not in data:
             raise ValueError("'model' is required (e.g., model: schism or model: sfincs)")
         model_type: str = data["model"]
@@ -1027,7 +1041,7 @@ class CoastalCalibConfig:
         # Interpolate variables after merging
         data = _interpolate_config(data)
 
-        return cls._from_dict(data, base_config_path=config_path if base_config else None)
+        return cls.from_dict(data, base_config_path=config_path if base_config else None)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert config to dictionary."""
