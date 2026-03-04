@@ -12,31 +12,31 @@
         <meta name="author" content="Taher Chegini">
       
       
-        <link rel="canonical" href="https://NGWPC.github.io/nwm-coastal/stable/examples/">
+        <link rel="canonical" href="https://NGWPC.github.io/nwm-coastal/stable/user-guide/qgis-plugin/">
       
       
-        <link rel="prev" href="../user-guide/workflow-stages/">
+        <link rel="prev" href="../python-api/">
       
       
-        <link rel="next" href="notebooks/lavaca_cli/">
+        <link rel="next" href="../workflow-stages/">
       
       
         
       
       
-      <link rel="icon" href="../assets/images/favicon.png">
+      <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-materialx-10.0.9">
     
     
       
-        <title>Overview - NWM Coastal</title>
+        <title>QGIS Plugin - NWM Coastal</title>
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.90ee4e44.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.90ee4e44.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.63c7e8c3.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.63c7e8c3.min.css">
       
       
 
@@ -55,11 +55,11 @@
       
     
     
-      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
     
-      <link rel="stylesheet" href="../stylesheets/extra.css">
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
     
-    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -88,7 +88,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#examples" class="md-skip">
+        <a href="#qgis-plugin" class="md-skip">
           Skip to content
         </a>
       
@@ -108,7 +108,7 @@
 
 <header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href=".." title="NWM Coastal" class="md-header__button md-logo" aria-label="NWM Coastal" data-md-component="logo">
+    <a href="../.." title="NWM Coastal" class="md-header__button md-logo" aria-label="NWM Coastal" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -128,7 +128,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Overview
+              QGIS Plugin
             
           </span>
         </div>
@@ -252,7 +252,7 @@
   
   
     <li class="md-tabs__item">
-      <a href=".." class="md-tabs__link">
+      <a href="../.." class="md-tabs__link">
         
   
   
@@ -273,7 +273,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../getting-started/installation/" class="md-tabs__link">
+        <a href="../../getting-started/installation/" class="md-tabs__link">
           
   
   
@@ -291,11 +291,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../user-guide/configuration/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../configuration/" class="md-tabs__link">
           
   
   
@@ -313,13 +315,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="./" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../examples/" class="md-tabs__link">
           
   
   
@@ -339,7 +339,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../DESIGN/" class="md-tabs__link">
+      <a href="../../DESIGN/" class="md-tabs__link">
         
   
   
@@ -360,7 +360,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../reference/api/" class="md-tabs__link">
+        <a href="../../reference/api/" class="md-tabs__link">
           
   
   
@@ -380,7 +380,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../CONTRIBUTING/" class="md-tabs__link">
+      <a href="../../CONTRIBUTING/" class="md-tabs__link">
         
   
   
@@ -399,7 +399,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../CHANGELOG/" class="md-tabs__link">
+      <a href="../../CHANGELOG/" class="md-tabs__link">
         
   
   
@@ -418,7 +418,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../LICENSE/" class="md-tabs__link">
+      <a href="../../LICENSE/" class="md-tabs__link">
         
   
   
@@ -461,7 +461,7 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href=".." title="NWM Coastal" class="md-nav__button md-logo" aria-label="NWM Coastal" data-md-component="logo">
+    <a href="../.." title="NWM Coastal" class="md-nav__button md-logo" aria-label="NWM Coastal" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -491,7 +491,7 @@
   
   
     <li class="md-nav__item">
-      <a href=".." class="md-nav__link">
+      <a href="../.." class="md-nav__link">
         
   
   
@@ -576,7 +576,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../getting-started/installation/" class="md-nav__link">
+      <a href="../../getting-started/installation/" class="md-nav__link">
         
   
   
@@ -604,7 +604,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../getting-started/quickstart/" class="md-nav__link">
+      <a href="../../getting-started/quickstart/" class="md-nav__link">
         
   
   
@@ -636,8 +636,10 @@
       
   
   
+    
   
   
+  
     
     
       
@@ -655,19 +657,20 @@
     
     
       
+        
+        
+      
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
-        
-          
-          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
             
   
   
@@ -685,7 +688,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -703,7 +706,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../user-guide/configuration/" class="md-nav__link">
+      <a href="../configuration/" class="md-nav__link">
         
   
   
@@ -731,7 +734,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../user-guide/cli/" class="md-nav__link">
+      <a href="../cli/" class="md-nav__link">
         
   
   
@@ -759,7 +762,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../user-guide/python-api/" class="md-nav__link">
+      <a href="../python-api/" class="md-nav__link">
         
   
   
@@ -784,10 +787,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../user-guide/qgis-plugin/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    QGIS Plugin
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -803,6 +833,131 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc">
+      
+        <li class="md-nav__item">
+  <a href="#installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#required-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Required Data
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#toolbar-buttons" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Toolbar Buttons
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Toolbar Buttons">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-add-basemap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Add Basemap
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-draw-polygon" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Draw Polygon
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-edit-polygon" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Edit Polygon
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-union-with-nhf-divides" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Union with NHF Divides
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-save-polygon" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Save Polygon
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#typical-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Typical Workflow
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -815,7 +970,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../user-guide/workflow-stages/" class="md-nav__link">
+      <a href="../workflow-stages/" class="md-nav__link">
         
   
   
@@ -847,8 +1002,6 @@
       
   
   
-    
-  
   
   
     
@@ -866,21 +1019,20 @@
     
     
       
-        
-        
-      
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="./" class="md-nav__link md-nav__link--active">
+            <a href="../../examples/" class="md-nav__link ">
               
   
   
@@ -898,13 +1050,13 @@
             </a>
             
               
-              <label class="md-nav__link md-nav__link--active" for="__nav_4" id="__nav_4_label" tabindex="">
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             
@@ -924,7 +1076,7 @@
   
   
     <li class="md-nav__item">
-      <a href="notebooks/lavaca_cli/" class="md-nav__link">
+      <a href="../../examples/notebooks/lavaca_cli/" class="md-nav__link">
         
   
   
@@ -952,7 +1104,7 @@
   
   
     <li class="md-nav__item">
-      <a href="notebooks/lavaca_api/" class="md-nav__link">
+      <a href="../../examples/notebooks/lavaca_api/" class="md-nav__link">
         
   
   
@@ -987,7 +1139,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../DESIGN/" class="md-nav__link">
+      <a href="../../DESIGN/" class="md-nav__link">
         
   
   
@@ -1070,7 +1222,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/api/" class="md-nav__link">
+      <a href="../../reference/api/" class="md-nav__link">
         
   
   
@@ -1105,7 +1257,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../CONTRIBUTING/" class="md-nav__link">
+      <a href="../../CONTRIBUTING/" class="md-nav__link">
         
   
   
@@ -1132,7 +1284,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../CHANGELOG/" class="md-nav__link">
+      <a href="../../CHANGELOG/" class="md-nav__link">
         
   
   
@@ -1159,7 +1311,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../LICENSE/" class="md-nav__link">
+      <a href="../../LICENSE/" class="md-nav__link">
         
   
   
@@ -1204,7 +1356,7 @@
   
   
     <li class="md-path__item">
-      <a href=".." class="md-path__link">
+      <a href="../.." class="md-path__link">
         
   <span class="md-ellipsis">
     Home
@@ -1222,10 +1374,10 @@
     
     
       <li class="md-path__item">
-        <a href="./" class="md-path__link">
+        <a href="../configuration/" class="md-path__link">
           
   <span class="md-ellipsis">
-    Examples
+    User Guide
   </span>
 
         </a>
@@ -1247,7 +1399,7 @@
 
 
   
-    <a href="https://github.com/NGWPC/nwm-coastal/edit/development/docs/examples/index.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/NGWPC/nwm-coastal/edit/development/docs/user-guide/qgis-plugin.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75z"/></svg>
     </a>
@@ -1255,35 +1407,166 @@
   
 
 
-<h1 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">#</a></h1>
-<p>These tutorial notebooks walk through the full Lavaca Bay (Texas) SFINCS workflow — from
-building the model grid to running the simulation and comparing results against NOAA
-tide-gauge observations.</p>
-<p>Both notebooks cover the same two-phase workflow:</p>
-<ol>
-<li><strong>Create</strong> — build a SFINCS model from an Area of Interest polygon (grid, elevation,
-    subgrid tables, boundary conditions, observation points).</li>
-<li><strong>Run</strong> — download forcing data, write SFINCS input files, execute the model, and
-    plot simulated vs. observed water levels.</li>
-</ol>
+<h1 id="qgis-plugin">QGIS Plugin<a class="headerlink" href="#qgis-plugin" title="Permanent link">#</a></h1>
+<p>The NWM Coastal QGIS plugin provides an interactive graphical workflow for defining
+coastal model domains. It loads National HydroFabric (NHF) data and NOAA CO-OPS station
+layers as a basemap, lets you sketch and refine an area-of-interest (AOI) polygon, snap
+the polygon boundary to NHF watershed divides, and export the result as GeoJSON for use
+with the <code>create</code> command.</p>
 <div class="admonition note">
-<p class="admonition-title">Prerequisites</p>
-<p>The examples require the downloaded forcing data cache (<code>docs/examples/downloads/</code>) and
-a compiled SFINCS executable (or Singularity image). See the
-<a href="../getting-started/quickstart/">Quick Start</a> for setup details.</p>
+<p class="admonition-title">Experimental</p>
+<p>The QGIS plugin is experimental (v0.1.0) and requires QGIS 3.34 or later.</p>
 </div>
-<div class="grid cards">
+<h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">#</a></h2>
+<p>The plugin lives in the <code>qgis_plugin/nwm_coastal/</code> directory of the repository. To
+install it into QGIS:</p>
+<ol>
+<li>
+<p>Locate your QGIS plugin directory:</p>
 <ul>
-<li>
-<p><a href="notebooks/lavaca_cli/" title="CLI Tutorial"><img alt="CLI Tutorial" loading="lazy" src="images/lavaca_cli_thumb.png" /></a>
-    <strong>CLI Tutorial</strong></p>
-</li>
-<li>
-<p><a href="notebooks/lavaca_api/" title="Python API Tutorial"><img alt="Python API Tutorial" loading="lazy" src="images/lavaca_api_thumb.png" /></a>
-    <strong>Python API Tutorial</strong></p>
-</li>
+<li><strong>Linux</strong>: <code>~/.local/share/QGIS/QGIS3/profiles/default/python/plugins/</code></li>
+<li><strong>macOS</strong>:
+    <code>~/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins/</code></li>
+<li><strong>Windows</strong>: <code>%APPDATA%\QGIS\QGIS3\profiles\default\python\plugins\</code></li>
 </ul>
-</div>
+</li>
+<li>
+<p>Symlink or copy the plugin folder:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>ln<span class="w"> </span>-s<span class="w"> </span>/path/to/nwm-coastal/qgis_plugin/nwm_coastal<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span>~/.local/share/QGIS/QGIS3/profiles/default/python/plugins/nwm_coastal
+</span></code></pre></div>
+</li>
+<li>
+<p>Restart QGIS, then enable <strong>NWM Coastal</strong> in <strong>Plugins &gt; Manage and Install
+    Plugins</strong>.</p>
+</li>
+</ol>
+<p>After activation, an <strong>NWM Coastal</strong> toolbar appears with five buttons.</p>
+<h2 id="required-data">Required Data<a class="headerlink" href="#required-data" title="Permanent link">#</a></h2>
+<p>Before using the plugin, prepare two data files:</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Format</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>National HydroFabric</td>
+<td>GeoPackage (<code>.gpkg</code>)</td>
+<td>Must contain <code>flowpaths</code> and <code>divides</code> layers. <code>gages</code> and <code>nexus</code> layers are loaded if present but are optional.</td>
+</tr>
+<tr>
+<td>CO-OPS Stations</td>
+<td>Parquet (<code>.parquet</code>)</td>
+<td>NOAA CO-OPS tide-gauge station locations with a geometry column.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="toolbar-buttons">Toolbar Buttons<a class="headerlink" href="#toolbar-buttons" title="Permanent link">#</a></h2>
+<h3 id="1-add-basemap">1. Add Basemap<a class="headerlink" href="#1-add-basemap" title="Permanent link">#</a></h3>
+<p>Opens a dialog to select the NHF GeoPackage, CO-OPS parquet file, and a minimum stream
+order filter. On confirmation the plugin loads:</p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Style</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OpenStreetMap</td>
+<td>XYZ raster tiles</td>
+<td>openstreetmap.org</td>
+</tr>
+<tr>
+<td>divides</td>
+<td>Transparent fill, black outline (0.1 width)</td>
+<td>GeoPackage</td>
+</tr>
+<tr>
+<td>flowpaths</td>
+<td>Blue lines (width 1), filtered by stream order</td>
+<td>GeoPackage</td>
+</tr>
+<tr>
+<td>gages</td>
+<td>Red circles (size 3)</td>
+<td>GeoPackage (optional)</td>
+</tr>
+<tr>
+<td>nexus</td>
+<td>Green circles (size 2)</td>
+<td>GeoPackage (optional)</td>
+</tr>
+<tr>
+<td>coops</td>
+<td>Orange stars (size 7)</td>
+<td>Parquet</td>
+</tr>
+</tbody>
+</table>
+<p>The dialog validates that the GeoPackage exists and contains the required <code>flowpaths</code>
+and <code>divides</code> layers before accepting.</p>
+<h3 id="2-draw-polygon">2. Draw Polygon<a class="headerlink" href="#2-draw-polygon" title="Permanent link">#</a></h3>
+<p>Creates a temporary in-memory polygon layer (<code>sketcher_polygon</code>) and activates the <strong>Add
+Feature</strong> tool so you can immediately sketch a polygon on the map canvas.</p>
+<ul>
+<li>Left-click to place vertices.</li>
+<li>Right-click to finish the polygon.</li>
+<li>The sketcher layer uses a semi-transparent orange fill so underlying basemap layers
+    remain visible.</li>
+</ul>
+<h3 id="3-edit-polygon">3. Edit Polygon<a class="headerlink" href="#3-edit-polygon" title="Permanent link">#</a></h3>
+<p>Activates the <strong>Vertex Tool</strong> on the sketcher layer, allowing you to move individual
+vertices to refine the polygon shape.</p>
+<h3 id="4-union-with-nhf-divides">4. Union with NHF Divides<a class="headerlink" href="#4-union-with-nhf-divides" title="Permanent link">#</a></h3>
+<p>Computes the geometric union of the sketcher polygon with all intersecting NHF divide
+polygons. This snaps the AOI boundary to watershed boundaries, producing a
+hydrologically meaningful domain.</p>
+<ul>
+<li>The original sketcher layer is preserved so you can edit and re-run the union.</li>
+<li>The union result appears in a separate <code>merged_polygon</code> layer with a semi-transparent
+    green fill.</li>
+<li>Interior holes are removed and multipart results are collapsed to the largest polygon.</li>
+<li>CRS differences between the sketcher and divides layers are handled automatically.</li>
+</ul>
+<h3 id="5-save-polygon">5. Save Polygon<a class="headerlink" href="#5-save-polygon" title="Permanent link">#</a></h3>
+<p>Exports the polygon to a GeoJSON file via a file-save dialog. If a merged layer exists
+it is saved; otherwise the sketcher polygon is used.</p>
+<p>The exported GeoJSON can be passed directly to the <code>create</code> command as the <code>aoi</code>
+parameter:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">aoi</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_domain.geojson</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">output_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./my_sfincs_model</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="nt">grid</span><span class="p">:</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="nt">crs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">EPSG:32617</span>
+</span></code></pre></div>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>coastal-calibration<span class="w"> </span>create<span class="w"> </span>create_config.yaml
+</span></code></pre></div>
+<h2 id="typical-workflow">Typical Workflow<a class="headerlink" href="#typical-workflow" title="Permanent link">#</a></h2>
+<pre class="mermaid"><code>flowchart TD
+    A["Add Basemap"] --&gt; B["Draw Polygon"]
+    B --&gt; C["Edit Polygon"]
+    C --&gt; D["Union with NHF Divides"]
+    D --&gt; E{Satisfied?}
+    E -- No --&gt; C
+    E -- Yes --&gt; F["Save Polygon"]
+    F --&gt; G["coastal-calibration create"]</code></pre>
+<ol>
+<li><strong>Add Basemap</strong> -- load NHF data and CO-OPS stations to orient yourself.</li>
+<li><strong>Draw Polygon</strong> -- sketch a rough AOI around the coastal area of interest.</li>
+<li><strong>Edit Polygon</strong> -- fine-tune vertices as needed.</li>
+<li><strong>Union with NHF Divides</strong> -- snap the boundary to NHF watershed divides.</li>
+<li>Repeat steps 3--4 until the domain looks right.</li>
+<li><strong>Save Polygon</strong> -- export as GeoJSON.</li>
+<li>Use the exported GeoJSON as input to <code>coastal-calibration create</code> to build a SFINCS
+    model.</li>
+</ol>
 
 
 
@@ -1325,7 +1608,7 @@ a compiled SFINCS executable (or Singularity image). See the
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../user-guide/workflow-stages/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Workflow Stages">
+          <a href="../python-api/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Python API">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -1335,20 +1618,20 @@ a compiled SFINCS executable (or Singularity image). See the
                 Previous
               </span>
               <div class="md-ellipsis">
-                Workflow Stages
+                Python API
               </div>
             </div>
           </a>
         
         
           
-          <a href="notebooks/lavaca_cli/" class="md-footer__link md-footer__link--next" aria-label="Next: Lavaca Bay SFINCS Tutorial — CLI Workflow">
+          <a href="../workflow-stages/" class="md-footer__link md-footer__link--next" aria-label="Next: Workflow Stages">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Lavaca Bay SFINCS Tutorial — CLI Workflow
+                Workflow Stages
               </div>
             </div>
             <div class="md-footer__button md-icon">
@@ -1407,12 +1690,12 @@ a compiled SFINCS executable (or Singularity image). See the
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["content.action.edit", "content.code.annotate", "content.code.copy", "content.tabs.link", "navigation.collapse", "navigation.expand", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.instant.progress", "navigation.path", "navigation.indexes", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "search.suggest", "toc.follow", "toc.integrate"], "search": "../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.action.edit", "content.code.annotate", "content.code.copy", "content.tabs.link", "navigation.collapse", "navigation.expand", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.instant.progress", "navigation.path", "navigation.indexes", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "search.suggest", "toc.follow", "toc.integrate"], "search": "../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.6a56f36d.min.js"></script>
+      <script src="../../assets/javascripts/bundle.6a56f36d.min.js"></script>
       
-        <script src="../javascripts/mathjax.js"></script>
+        <script src="../../javascripts/mathjax.js"></script>
       
         <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
       

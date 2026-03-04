@@ -649,6 +649,8 @@
       
         
       
+        
+      
     
     
     
@@ -765,6 +767,34 @@
     
   
     Python API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/qgis-plugin/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    QGIS Plugin
   
 
     
@@ -1358,6 +1388,9 @@ this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic V
 <h2 id="unreleased"><a href="https://github.com/NGWPC/nwm-coastal/compare/3.1.1.0.0...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">#</a></h3>
 <ul>
+<li>NWM Coastal QGIS plugin with toolbar for basemap loading (NHF GeoPackage + CO-OPS
+    stations), polygon sketching and vertex editing, union with NHF divides, and GeoJSON
+    export.</li>
 <li>Human-readable <code>__str__</code> methods on <code>WorkflowResult</code>, <code>DownloadResult</code>,
     <code>DownloadResults</code>, and <code>StageProgress</code> so that <code>print(result)</code> produces clean,
     indented output with friendly time formatting.</li>
@@ -1405,6 +1438,11 @@ this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic V
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">#</a></h3>
 <ul>
+<li>Update <code>_TEXAS_ZIP</code> path in test fixtures to match relocated archive at
+    <code>docs/examples/slurm/texas.zip</code>, restoring 18 previously-skipped SFINCS integration
+    tests.</li>
+<li>Correct mock NOAA station IDs and coordinates in <code>test_sfincs_workflow</code> to fall within
+    the 0.1-degree spatial match radius of the pre-built model observation points.</li>
 <li>Resolve all <code>ty</code> type-checker diagnostics across the codebase: invalid-assignment in
     <code>coops_api.get_datums</code>, stale <code>type: ignore</code> comments in <code>_hydromt_compat</code>,
     <code>download</code>, and <code>runner</code>, a possible <code>None</code> dereference in <code>logging</code> file-handler

@@ -904,6 +904,8 @@
       
         
       
+        
+      
     
     
     
@@ -1020,6 +1022,34 @@
     
   
     Python API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/qgis-plugin/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    QGIS Plugin
   
 
     
@@ -1614,6 +1644,12 @@ for details.</p>
 <h2 id="sfincs-model-creation-quick-start">SFINCS Model Creation Quick Start<a class="headerlink" href="#sfincs-model-creation-quick-start" title="Permanent link">#</a></h2>
 <p>The <code>create</code> command builds a new SFINCS quadtree model from an AOI polygon, handling
 grid generation, DEM download, elevation, masking, boundary cells, and subgrid tables.</p>
+<div class="admonition tip">
+<p class="admonition-title">Draw the AOI in QGIS</p>
+<p>Use the <a href="../../user-guide/qgis-plugin/">QGIS Plugin</a> to interactively draw your AOI
+polygon over NHF basemap layers, snap it to watershed divides, and export it as GeoJSON
+-- no manual coordinate editing required.</p>
+</div>
 <h3 id="step-1-prepare-a-topobathy-dem">Step 1: Prepare a Topobathy DEM<a class="headerlink" href="#step-1-prepare-a-topobathy-dem" title="Permanent link">#</a></h3>
 <p>Download the NWS 30 m topobathymetric DEM clipped to your area of interest:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>coastal-calibration<span class="w"> </span>prepare-topobathy<span class="w"> </span>aoi.geojson<span class="w"> </span>--domain<span class="w"> </span>atlgulf<span class="w"> </span>--output-dir<span class="w"> </span>./dem
