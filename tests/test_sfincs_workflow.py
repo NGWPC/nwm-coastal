@@ -250,19 +250,19 @@ _NOAA_STATIONS_IN_DOMAIN = gpd.GeoDataFrame(
     [
         {
             "station_id": "8772985",
-            "station_name": "Freeport Harbor",
+            "station_name": "Sargent",
             "state": "TX",
             "tidal": True,
             "greatlakes": False,
-            "geometry": shapely.Point(-95.3083, 28.9483),
+            "geometry": shapely.Point(-95.62, 28.77),
         },
         {
-            "station_id": "8773037",
-            "station_name": "Seadrift",
+            "station_id": "8773259",
+            "station_name": "Port Lavaca",
             "state": "TX",
             "tidal": True,
             "greatlakes": False,
-            "geometry": shapely.Point(-96.7117, 28.4067),
+            "geometry": shapely.Point(-96.61, 28.64),
         },
     ],
     crs=4326,
@@ -273,7 +273,7 @@ def _mock_coops_client() -> MagicMock:
     """Return a mock COOPSAPIClient with 2 stations inside the Texas domain."""
     mock_client = MagicMock()
     mock_client.stations_metadata = _NOAA_STATIONS_IN_DOMAIN
-    mock_client.filter_stations_by_datum.return_value = {"8772985", "8773037"}
+    mock_client.filter_stations_by_datum.return_value = {"8772985", "8773259"}
 
     # Mock datum objects for the plot stage
     datum_8772985 = MagicMock()
@@ -281,12 +281,12 @@ def _mock_coops_client() -> MagicMock:
     datum_8772985.get_datum_value.side_effect = {"MSL": 0.404, "MLLW": 0.0}.get
     datum_8772985.units = "meters"
 
-    datum_8773037 = MagicMock()
-    datum_8773037.station_id = "8773037"
-    datum_8773037.get_datum_value.side_effect = {"MSL": 0.213, "MLLW": 0.0}.get
-    datum_8773037.units = "meters"
+    datum_8773259 = MagicMock()
+    datum_8773259.station_id = "8773259"
+    datum_8773259.get_datum_value.side_effect = {"MSL": 0.213, "MLLW": 0.0}.get
+    datum_8773259.units = "meters"
 
-    mock_client.get_datums.return_value = [datum_8772985, datum_8773037]
+    mock_client.get_datums.return_value = [datum_8772985, datum_8773259]
     return mock_client
 
 
@@ -568,7 +568,7 @@ class TestSfincsPlotStage:
 
         # Write obs_station_map.json (normally created by create_obs stage)
         model_root = get_model_root(sfincs_workflow_config)
-        matched_ids = ["8772985", "8773037"]
+        matched_ids = ["8772985", "8773259"]
         station_map = [
             {"index": i, "name": f"noaa_{sid}", "x": 0.0, "y": 0.0, "station_id": sid}
             for i, sid in enumerate(matched_ids)

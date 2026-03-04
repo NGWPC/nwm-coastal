@@ -157,6 +157,7 @@ nav:
   - Configuration: user-guide/configuration.md
   - CLI Reference: user-guide/cli.md
   - Python API: user-guide/python-api.md
+  - QGIS Plugin: user-guide/qgis-plugin.md
   - Workflow Stages: user-guide/workflow-stages.md
 - Examples:
   - Overview: examples/index.md

@@ -1,0 +1,24 @@
+[general]
+name=NWM Coastal
+about=Tools for NWM coastal model domain definition using National HydroFabric and CO-OPS stations.
+description=QGIS plugin for NWM Coastal model calibration workflow: basemap loading, polygon drawing, editing, and export.
+category=Analysis
+hasProcessingProvider=False
+icon=
+tags=coastal,nwm,hydrofabric,coops,sfincs
+
+author=Taher Chegini
+email=tchegini@dewberry.com
+homepage=https://ngwpc.github.io/nwm-coastal
+repository=https://github.com/NGWPC/nwm-coastal
+tracker=https://github.com/NGWPC/nwm-coastal/issues
+
+deprecated=False
+experimental=True
+plugin_dependencies=
+qgisMinimumVersion=3.34
+qgisMaximumVersion=3.99
+supportsQt6=True
+
+version=0.1.0
+changelog=

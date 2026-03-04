@@ -10,7 +10,7 @@ Run with::
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import geopandas as gpd
 import numpy as np
@@ -20,6 +20,9 @@ from rasterio.transform import from_bounds
 from shapely.geometry import box
 
 from coastal_calibration.utils._gdal import compute_aoi_coverage
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _write_raster(
@@ -49,7 +52,9 @@ def _write_raster(
     return path
 
 
-def _write_zone(path: Path, bounds: tuple[float, float, float, float], crs: str = "EPSG:4326") -> Path:
+def _write_zone(
+    path: Path, bounds: tuple[float, float, float, float], crs: str = "EPSG:4326"
+) -> Path:
     """Write a GeoJSON zone polygon via GeoPandas (produces a FeatureCollection)."""
     gdf = gpd.GeoDataFrame(geometry=[box(*bounds)], crs=crs)
     gdf.to_file(path, driver="GeoJSON")

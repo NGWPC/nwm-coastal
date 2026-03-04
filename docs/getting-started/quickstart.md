@@ -177,6 +177,12 @@ Then write an sbatch script using `coastal-calibration run sfincs_config.yaml`.
 The `create` command builds a new SFINCS quadtree model from an AOI polygon, handling
 grid generation, DEM download, elevation, masking, boundary cells, and subgrid tables.
 
+!!! tip "Draw the AOI in QGIS"
+
+    Use the [QGIS Plugin](../user-guide/qgis-plugin.md) to interactively draw your AOI
+    polygon over NHF basemap layers, snap it to watershed divides, and export it as GeoJSON
+    -- no manual coordinate editing required.
+
 ### Step 1: Prepare a Topobathy DEM
 
 Download the NWS 30 m topobathymetric DEM clipped to your area of interest:
