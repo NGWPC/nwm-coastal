@@ -117,8 +117,8 @@ Save this as `my_run.sh` and submit with `sbatch my_run.sh`.
     Use `<<'EOF'` (single-quoted) to prevent the shell from expanding `$` variables inside
     the YAML content. This ensures the YAML is written exactly as written.
 
-Complete sbatch examples are provided for [SCHISM](../examples/schism.sh) and
-[SFINCS](../examples/sfincs.sh).
+Complete sbatch examples are provided for [SCHISM](../examples/slurm/schism.sh) and
+[SFINCS](../examples/slurm/sfincs.sh).
 
 ### Step 5: Check Results
 
