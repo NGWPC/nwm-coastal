@@ -51,6 +51,7 @@ dev = [
 docs = [
   "mike>=2",
   "mkdocs>=1.6",
+  "mkdocs-jupyter",
   "mkdocs-materialx",
   "mkdocstrings[python]>=0.27",
   "ruff",
@@ -111,7 +112,7 @@ source = "vcs"
 target-version = "py311"
 line-length = 100
 include = [ "src/coastal_calibration/**/*.py", "src/coastal_calibration/*.py" ]
-exclude = [ "src/coastal_calibration/scripts/**" ]
+exclude = [ "docs/examples/notebooks/*.py", "src/coastal_calibration/scripts/**" ]
 [tool.ruff.lint]
 select = [
   # flake8-bugbear
@@ -214,6 +215,14 @@ per-file-ignores."tests/*.py" = [
   "S101",
   # insecure use of path
   "S108",
+]
+per-file-ignores."docs/examples/notebooks/*.ipynb" = [
+  # missing module docstring
+  "D100",
+  # module level import not at top
+  "E402",
+  # use of "assert"
+  "S101",
 ]
 extend-safe-fixes = [
   # module level imports

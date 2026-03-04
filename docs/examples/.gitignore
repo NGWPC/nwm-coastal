@@ -1,0 +1,34 @@
+# Shared download cache (keep on disk, avoid re-downloading)
+downloads/
+
+# Model outputs
+**/output/
+**/run/
+**/sfincs_model/
+
+# SFINCS files
+*.nc
+*.log
+*.inp
+*.bnd
+*.obs
+*.src
+*.dis
+*_subgrid.nc
+create_*.json
+.create_status.json
+workflow_*.json
+.pipeline_status.json
+
+# Temporary / intermediate
+*.tif
+*.tiff
+*.yml
+!create_sfincs.yaml
+figs/
+gis/
+subgrid/
+slurm-*.out
+
+# OS
+.DS_Store

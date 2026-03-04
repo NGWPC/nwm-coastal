@@ -6,9 +6,13 @@
 #SBATCH --exclusive
 #SBATCH --output=slurm-%j.out
 
+# Unzip pre-built Texas model to a job-local temp directory
+MODEL_DIR="/tmp/texas_model_${SLURM_JOB_ID}"
+unzip -o "$(dirname "$0")/texas.zip" -d "${MODEL_DIR}"
+
 CONFIG_FILE="/tmp/coastal_config_${SLURM_JOB_ID}.yaml"
 
-cat > "${CONFIG_FILE}" <<'EOF'
+cat > "${CONFIG_FILE}" <<EOF
 model: sfincs
 
 simulation:
@@ -21,11 +25,11 @@ boundary:
   source: tpxo
 
 model_config:
-  prebuilt_dir: /path/to/prebuilt/sfincs/texas
-  discharge_locations_file: /path/to/discharge/locations/file.src
+  prebuilt_dir: ${MODEL_DIR}
+  discharge_locations_file: ${MODEL_DIR}/sfincs_nwm.src
   merge_discharge: true
-  forcing_to_mesh_offset_m: 0.171 # TPXO/MSL → NAVD88 mesh (VDatum at domain centroid)
-  vdatum_mesh_to_msl_m: 0.171     # NAVD88 mesh → MSL observations
+  forcing_to_mesh_offset_m: 0.171 # TPXO/MSL -> NAVD88 mesh (VDatum at domain centroid)
+  vdatum_mesh_to_msl_m: 0.171     # NAVD88 mesh -> MSL observations
   include_precip: true
   include_wind: true
   include_pressure: true
@@ -43,3 +47,4 @@ EOF
 # pixi r -e dev coastal-calibration run "${CONFIG_FILE}"
 
 rm -f "${CONFIG_FILE}"
+rm -rf "${MODEL_DIR}"

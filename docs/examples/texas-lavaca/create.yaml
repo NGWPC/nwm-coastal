@@ -1,0 +1,57 @@
+# Lavaca Bay, Texas — SFINCS model creation from AOI
+#
+# Creates a quadtree mesh using HydroMT-SFINCS. The resulting model
+# directory (./output) can be used as ``prebuilt_dir`` in the run config.
+#
+# Usage:
+#   coastal-calibration create create.yaml
+#   coastal-calibration create create.yaml --dry-run
+
+aoi: ./aoi.geojson
+output_dir: ./output
+download_dir: ../downloads/lavaca_grid
+
+grid:
+  resolution: 512        # base resolution in metres
+  crs: utm               # auto-detect UTM zone (-> EPSG:32614)
+  rotated: false
+  refinement:
+  - polygon: ./refine.geojson     # refine interior to 64 m (512 / 2^3)
+    level: 3                      # 3 refinement steps: 512->256->128->64 m
+
+elevation:
+  datasets:
+  - name: noaa_3m                 # auto-fetched from NOAA S3
+    zmin: -20000
+    source: noaa_3m               # triggers NOAA DEM auto-discovery for AOI
+  - name: gebco_15arcs            # global fallback for areas without NOAA coverage
+    zmin: -20000
+    source: gebco_15arcs          # auto-fetched via CEDA GeoTIFF tiles
+  buffer_cells: 1
+
+mask:
+  zmin: -50.0             # minimum elevation for active cells
+  boundary_zmax: -1.0     # max elevation for waterlevel boundary cells
+  reset_bounds: true
+
+subgrid:
+  nr_subgrid_pixels: 4
+  lulc_dataset: esa_worldcover
+  manning_land: 0.04
+  manning_sea: 0.02
+
+# nwm_discharge:
+#   hydrofabric_gpkg: /path/to/reference_fabric.gpkg
+#   flowpaths_layer: flowpaths
+#   flowpath_id_column: flowpath_id
+#   coastal_domain: atlgulf
+#   flowpath_ids:
+#   - 9356634
+#   - 9356656
+#   - 7843181
+#   - 9349399
+
+add_noaa_gages: true           # discover NOAA CO-OPS stations in domain
+
+monitoring:
+  log_level: INFO
