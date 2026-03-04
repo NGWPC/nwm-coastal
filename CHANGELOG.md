@@ -9,6 +9,14 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 
+- Human-readable `__str__` methods on `WorkflowResult`, `DownloadResult`,
+    `DownloadResults`, and `StageProgress` so that `print(result)` produces clean,
+    indented output with friendly time formatting.
+- `from_dict` public class method on `SfincsCreateConfig` and `CoastalCalibConfig` for
+    constructing configs from plain dictionaries in notebooks and scripts.
+- Examples gallery in the documentation with two Lavaca Bay tutorial notebooks (CLI and
+    Python API) rendered via `mkdocs-jupyter`, a gallery index page with Material grid
+    cards, and restructured example configs under `docs/examples/`.
 - `create` CLI command for building SFINCS quadtree models from an AOI polygon. The
     workflow supports grid generation with quadtree refinement, automatic NOAA DEM
     discovery and download, elevation/bathymetry, active cell mask, boundary cells,
@@ -28,6 +36,13 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
+- Rewrite NOAA station matching in `SfincsPlotStage` to use spatial KDTree
+    nearest-neighbour lookup instead of file-based `obs_station_map.json` / regex
+    fallback. Observation points are reprojected to WGS 84 and matched against the full
+    NOAA CO-OPS station catalogue, making the run workflow work with any SFINCS model.
+- Move stdout suppression for `hydromt-sfincs` from the CLI into a `_suppress_stdout()`
+    context manager in `SfincsCreator` that redirects both fd 1 and `sys.stdout`, fixing
+    noisy print output in Jupyter notebooks.
 - Remove the `submit` execution path and `SlurmConfig` entirely. The `run` command is
     now the sole entry point — use it inside user-written `sbatch` scripts instead. Old
     YAML configs with a `slurm:` key are silently ignored for backward compatibility.
