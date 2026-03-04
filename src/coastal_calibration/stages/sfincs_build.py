@@ -461,9 +461,6 @@ class SfincsInitStage(_SfincsStageBase):
         # SFINCS output files (not strictly forcing but can interfere)
         "sfincs_map.nc",
         "sfincs_his.nc",
-        # Metadata from a previous create workflow whose observation-point
-        # indices may not match the current pre-built model's sfincs.obs.
-        "obs_station_map.json",
     )
 
     #: Files that must be restored from the pre-built model on every
@@ -1561,11 +1558,15 @@ class SfincsPlotStage(_SfincsStageBase):
     """Plot simulated water levels against NOAA CO-OPS observations.
 
     After the SFINCS run, this stage reads ``point_zs`` (water surface
-    elevation) from the model output (``sfincs_his.nc``), looks up
-    NOAA observation points from the ``obs_station_map.json`` mapping
-    (written by the ``create_obs`` stage during model creation), fetches
-    observed water levels from the NOAA CO-OPS API, and produces a
-    comparison time-series figure saved to ``<model_root>/figs/``.
+    elevation) from the model output (``sfincs_his.nc``), spatially
+    matches each model observation point to the nearest NOAA CO-OPS
+    tide-gauge station, fetches observed water levels from the CO-OPS
+    API, and produces a comparison time-series figure saved to
+    ``<model_root>/figs/``.
+
+    Station matching is purely spatial (KDTree nearest-neighbour in
+    WGS 84) so the stage works with **any** SFINCS model — not only
+    models created by this package.
 
     Observations are fetched in MLLW (universally supported by all
     CO-OPS stations) and then converted to MSL using per-station datum
@@ -1576,12 +1577,16 @@ class SfincsPlotStage(_SfincsStageBase):
 
     * The model output file (``sfincs_his.nc``) does not exist.
     * No ``point_zs`` (or ``point_h``) variable is present in the output.
-    * No ``obs_station_map.json`` is found (observation points not configured).
-    * No observation points with the ``noaa_`` prefix are found.
+    * No observation points are within range of a NOAA CO-OPS station.
     """
 
     name = "sfincs_plot"
     description = "Plot simulated vs observed water levels"
+
+    #: Maximum distance (degrees) between an observation point and a NOAA
+    #: station to consider them a match.  0.1° ≈ 11 km — generous because
+    #: obs points may be snapped to wet cells some distance from the gauge.
+    _NOAA_MATCH_RADIUS_DEG: float = 0.1
 
     @staticmethod
     def _station_dim(point_h: Any) -> str:
@@ -1786,12 +1791,22 @@ class SfincsPlotStage(_SfincsStageBase):
         return obs_ds
 
     def _match_noaa_stations(self) -> tuple[list[int], list[str]]:
-        """Identify NOAA CO-OPS observation points and their station IDs.
+        """Find the nearest NOAA CO-OPS station for each observation point.
 
-        Tries ``obs_station_map.json`` first (written by the ``create_obs``
-        stage).  Falls back to parsing 7-digit NOAA station IDs from
-        observation point names in ``sfincs.obs`` so that pre-built models
-        work without a prior create workflow.
+        Uses a spatial lookup so that the run workflow works with **any**
+        SFINCS model, not only models created by this package.
+
+        Steps:
+
+        1. Read observation-point coordinates from the loaded model.
+        2. Reproject to WGS 84.
+        3. Query the full NOAA CO-OPS station catalogue and build a KDTree.
+        4. For each observation point, find the nearest station within
+           :attr:`_NOAA_MATCH_RADIUS_DEG`.
+        5. Keep only stations that have valid MSL and MLLW datum values
+           (required for the MLLW → MSL conversion in the comparison plot).
+        6. Deduplicate — if multiple obs points match the same station,
+           keep the closest one.
 
         Returns
         -------
@@ -1800,37 +1815,81 @@ class SfincsPlotStage(_SfincsStageBase):
         noaa_station_ids : list[str]
             Corresponding CO-OPS station IDs (same order as *noaa_indices*).
         """
-        import json
-        import re
+        import numpy as np
+        from scipy.spatial import KDTree
 
-        root = get_model_root(self.config)
+        from coastal_calibration.coops_api import COOPSAPIClient
 
-        # Primary: explicit mapping from the create workflow.
-        map_path = root / "obs_station_map.json"
-        if map_path.exists():
-            entries = json.loads(map_path.read_text())
-            noaa_indices = [e["index"] for e in entries if "station_id" in e]
-            noaa_station_ids = [e["station_id"] for e in entries if "station_id" in e]
-            return noaa_indices, noaa_station_ids
+        model = _get_model(self.config)
 
-        # Fallback: parse NOAA station IDs from sfincs.obs point names.
-        # Names like "Port Lavaca (8773259)" contain a 7-digit CO-OPS ID.
-        obs_path = root / "sfincs.obs"
-        if not obs_path.exists():
+        obs_gdf = model.observation_points.data
+        if obs_gdf is None or obs_gdf.empty:
             return [], []
 
-        noaa_id_re = re.compile(r"\((\d{7})\)")
-        noaa_indices: list[int] = []
-        noaa_station_ids: list[str] = []
-        idx = 0
-        for line in obs_path.read_text().splitlines():
-            if not line.strip():
+        # Reproject observation points to WGS 84 for comparison with the
+        # NOAA station catalogue (also in EPSG:4326).
+        obs_4326 = obs_gdf.to_crs(4326)
+        obs_xy = np.column_stack(
+            [
+                obs_4326.geometry.x.to_numpy(),
+                obs_4326.geometry.y.to_numpy(),
+            ]
+        )
+
+        client = COOPSAPIClient()
+        stations_gdf = client.stations_metadata
+        if stations_gdf.empty:
+            self._log("NOAA station catalogue is empty", "warning")
+            return [], []
+
+        sta_xy = np.column_stack(
+            [
+                stations_gdf.geometry.x.to_numpy(),
+                stations_gdf.geometry.y.to_numpy(),
+            ]
+        )
+        sta_ids = stations_gdf["station_id"].to_numpy()
+        tree = KDTree(sta_xy)
+
+        # For each observation point, find the nearest NOAA station.
+        dists, idxs = tree.query(obs_xy)
+        radius = self._NOAA_MATCH_RADIUS_DEG
+
+        # Collect (obs_index, station_id, distance) for matches within radius.
+        candidates: dict[str, tuple[int, float]] = {}  # sid → (obs_idx, dist)
+        for obs_idx, (dist, sta_idx) in enumerate(zip(dists, idxs, strict=True)):
+            if dist > radius:
                 continue
-            m = noaa_id_re.search(line)
-            if m:
-                noaa_indices.append(idx)
-                noaa_station_ids.append(m.group(1))
-            idx += 1
+            sid = str(sta_ids[sta_idx])
+            # Deduplicate: keep the closest obs point per station.
+            if sid not in candidates or dist < candidates[sid][1]:
+                candidates[sid] = (obs_idx, float(dist))
+
+        if not candidates:
+            return [], []
+
+        # Validate datum availability (same filter as the create step).
+        valid_ids = client.filter_stations_by_datum(list(candidates.keys()))
+        dropped = set(candidates.keys()) - valid_ids
+        if dropped:
+            self._log(
+                f"Excluded {len(dropped)} station(s) without datum data: "
+                f"{', '.join(sorted(dropped))}",
+                "warning",
+            )
+
+        # Build the final lists, sorted by observation-point index.
+        pairs = sorted(
+            ((obs_idx, sid) for sid, (obs_idx, _) in candidates.items() if sid in valid_ids),
+            key=lambda t: t[0],
+        )
+        noaa_indices = [p[0] for p in pairs]
+        noaa_station_ids = [p[1] for p in pairs]
+
+        self._log(
+            f"Matched {len(noaa_station_ids)} observation point(s) "
+            f"to NOAA station(s): {', '.join(noaa_station_ids)}"
+        )
         return noaa_indices, noaa_station_ids
 
     def _read_point_zs(self, his_file: Path) -> xr.DataArray | None:
