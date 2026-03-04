@@ -11,7 +11,6 @@ module-level registry keyed by config ``id``.
 
 from __future__ import annotations
 
-import contextlib
 import math
 import os
 import shutil
@@ -50,6 +49,9 @@ def _plotable_stations(
     A station is plotable only when *both* its simulated and observed
     time-series contain finite values — a comparison plot with only
     one series is not useful.
+
+    The returned list is sorted by numeric station ID so that figures
+    are deterministic across runs.
     """
     result: list[tuple[str, int]] = []
     for i, sid in enumerate(station_ids):
@@ -59,6 +61,10 @@ def _plotable_stations(
             has_obs = bool(np.isfinite(obs_ds.water_level.sel(station=sid)).any())
         if has_sim and has_obs:
             result.append((sid, i))
+    try:
+        result.sort(key=lambda pair: int(pair[0]))
+    except ValueError:
+        result.sort(key=lambda pair: pair[0])
     return result
 
 
@@ -455,6 +461,9 @@ class SfincsInitStage(_SfincsStageBase):
         # SFINCS output files (not strictly forcing but can interfere)
         "sfincs_map.nc",
         "sfincs_his.nc",
+        # Metadata from a previous create workflow whose observation-point
+        # indices may not match the current pre-built model's sfincs.obs.
+        "obs_station_map.json",
     )
 
     #: Files that must be restored from the pre-built model on every
@@ -463,11 +472,21 @@ class SfincsInitStage(_SfincsStageBase):
     #: the pre-built model are always picked up.  Without overwriting,
     #: a stale file from a previous run would persist and cause silent
     #: errors (e.g. wrong boundary cells, wrong grid, etc.).
+    #:
+    #: ``sfincs_subgrid.nc`` must also be overwritten because it is
+    #: tightly coupled to the quadtree grid topology stored in
+    #: ``sfincs.nc``.  A stale subgrid file left by a previous run
+    #: with a different grid (e.g. different refinement) has a
+    #: different number of cells, causing SFINCS to read mismatched
+    #: bed-level data and produce incorrect (flat) water-level output.
     _ALWAYS_OVERWRITE_FILES: tuple[str, ...] = (
         "sfincs.inp",
         "sfincs.nc",
         "sfincs.bnd",
         "sfincs.obs",
+        "sfincs_subgrid.nc",
+        "sfincs.src",
+        "sfincs.dis",
     )
 
     def _remove_stale_outputs(self, root: Path) -> None:
@@ -647,14 +666,14 @@ class SfincsForcingStage(_SfincsStageBase):
 
         ds = xr.open_dataset(nc_path)
         try:
-            mask = ds["mask"].values
+            mask = ds["mask"].to_numpy()
             bnd_idx = np.where(mask == 2)[0]
             if len(bnd_idx) == 0:
                 return []
 
-            node_x = ds["mesh2d_node_x"].values
-            node_y = ds["mesh2d_node_y"].values
-            face_nodes = ds["mesh2d_face_nodes"].values  # (nFaces, max_nodes)
+            node_x = ds["mesh2d_node_x"].to_numpy()
+            node_y = ds["mesh2d_node_y"].to_numpy()
+            face_nodes = ds["mesh2d_face_nodes"].to_numpy()  # (nFaces, max_nodes)
 
             face_x = np.array(
                 [
@@ -699,8 +718,8 @@ class SfincsForcingStage(_SfincsStageBase):
         if len(y_idx) == 0:
             return []
 
-        x_coords = msk_var.coords["x"].values
-        y_coords = msk_var.coords["y"].values
+        x_coords = msk_var.coords["x"].to_numpy()
+        y_coords = msk_var.coords["y"].to_numpy()
         bnd_x = x_coords[x_idx]
         bnd_y = y_coords[y_idx]
 
@@ -1767,10 +1786,12 @@ class SfincsPlotStage(_SfincsStageBase):
         return obs_ds
 
     def _match_noaa_stations(self) -> tuple[list[int], list[str]]:
-        """Read the obs → station-ID mapping written by the create workflow.
+        """Identify NOAA CO-OPS observation points and their station IDs.
 
-        The mapping file (``obs_station_map.json``) is produced by the
-        ``create_obs`` stage during model creation.
+        Tries ``obs_station_map.json`` first (written by the ``create_obs``
+        stage).  Falls back to parsing 7-digit NOAA station IDs from
+        observation point names in ``sfincs.obs`` so that pre-built models
+        work without a prior create workflow.
 
         Returns
         -------
@@ -1780,34 +1801,54 @@ class SfincsPlotStage(_SfincsStageBase):
             Corresponding CO-OPS station IDs (same order as *noaa_indices*).
         """
         import json
+        import re
 
-        map_path = get_model_root(self.config) / "obs_station_map.json"
-        if not map_path.exists():
+        root = get_model_root(self.config)
+
+        # Primary: explicit mapping from the create workflow.
+        map_path = root / "obs_station_map.json"
+        if map_path.exists():
+            entries = json.loads(map_path.read_text())
+            noaa_indices = [e["index"] for e in entries if "station_id" in e]
+            noaa_station_ids = [e["station_id"] for e in entries if "station_id" in e]
+            return noaa_indices, noaa_station_ids
+
+        # Fallback: parse NOAA station IDs from sfincs.obs point names.
+        # Names like "Port Lavaca (8773259)" contain a 7-digit CO-OPS ID.
+        obs_path = root / "sfincs.obs"
+        if not obs_path.exists():
             return [], []
-        entries = json.loads(map_path.read_text())
-        noaa_indices = [e["index"] for e in entries if "station_id" in e]
-        noaa_station_ids = [e["station_id"] for e in entries if "station_id" in e]
+
+        noaa_id_re = re.compile(r"\((\d{7})\)")
+        noaa_indices: list[int] = []
+        noaa_station_ids: list[str] = []
+        idx = 0
+        for line in obs_path.read_text().splitlines():
+            if not line.strip():
+                continue
+            m = noaa_id_re.search(line)
+            if m:
+                noaa_indices.append(idx)
+                noaa_station_ids.append(m.group(1))
+            idx += 1
         return noaa_indices, noaa_station_ids
 
-    def run(self) -> dict[str, Any]:
-        """Read SFINCS output, fetch NOAA observations, and plot comparison."""
-        model_root = get_model_root(self.config)
-        his_file = model_root / "sfincs_his.nc"
+    def _read_point_zs(self, his_file: Path) -> xr.DataArray | None:
+        """Read ``point_zs`` (or ``point_h``) from SFINCS output.
 
-        if not his_file.exists():
-            self._log("sfincs_his.nc not found, skipping plot stage")
-            return {"status": "skipped", "reason": "no output"}
-
-        self._update_substep("Reading SFINCS output")
+        Tries HydroMT's output reader first, then falls back to a
+        direct :mod:`xarray` open of *sfincs_his.nc*.
+        """
         # Reuse the model already in the registry (read during init)
         # instead of opening a fresh SfincsModel.  Creating a new model
         # and calling read() can fail for quadtree grids when the
         # written sfincs.nc is not fully UGRID-compatible.
         mod = _get_model(self.config)
 
-        # Try reading output via the HydroMT component first; fall back
-        # to a direct xarray open of sfincs_his.nc when the output
-        # component fails (e.g. quadtree map output lacks UGRID topology).
+        # Read output via HydroMT (the compat patch in
+        # _hydromt_compat.patch_quadtree_output_read handles the
+        # missing UGRID topology in quadtree map files).  Fall back
+        # to a direct xarray open when HydroMT still fails.
         point_zs: xr.DataArray | None = None
         try:
             mod.output.read()
@@ -1820,7 +1861,6 @@ class SfincsPlotStage(_SfincsStageBase):
             self._log(f"HydroMT output.read() failed ({exc}), reading sfincs_his.nc directly")
 
         if point_zs is None:
-            # Direct read of the history file (always plain NetCDF).
             import xarray as xr_mod
 
             his_ds = xr_mod.open_dataset(his_file)
@@ -1830,6 +1870,20 @@ class SfincsPlotStage(_SfincsStageBase):
                     if var == "point_h":
                         self._log("point_zs not found, falling back to point_h (water depth)")
                     break
+
+        return point_zs
+
+    def run(self) -> dict[str, Any]:
+        """Read SFINCS output, fetch NOAA observations, and plot comparison."""
+        model_root = get_model_root(self.config)
+        his_file = model_root / "sfincs_his.nc"
+
+        if not his_file.exists():
+            self._log("sfincs_his.nc not found, skipping plot stage")
+            return {"status": "skipped", "reason": "no output"}
+
+        self._update_substep("Reading SFINCS output")
+        point_zs = self._read_point_zs(his_file)
 
         if point_zs is None:
             self._log("No point_zs or point_h in output, skipping plot stage")
@@ -1842,6 +1896,22 @@ class SfincsPlotStage(_SfincsStageBase):
         if not noaa_station_ids:
             self._log("No NOAA observation points found, skipping plot stage")
             return {"status": "skipped", "reason": "no noaa stations"}
+
+        # Guard against a stale obs_station_map.json whose indices exceed
+        # the number of observation points in the current model output.
+        n_stations = point_zs.sizes[station_dim]
+        valid = [
+            (idx, sid)
+            for idx, sid in zip(noaa_indices, noaa_station_ids, strict=False)
+            if idx < n_stations
+        ]
+        if not valid:
+            self._log("All NOAA station indices are out of bounds, skipping plot stage")
+            return {"status": "skipped", "reason": "noaa indices out of bounds"}
+        if len(valid) < len(noaa_indices):
+            dropped = len(noaa_indices) - len(valid)
+            self._log(f"Dropped {dropped} NOAA station(s) with out-of-bounds indices")
+        noaa_indices, noaa_station_ids = [v[0] for v in valid], [v[1] for v in valid]
 
         # Extract numpy arrays from xarray for the selected NOAA stations
         sim_times = point_zs["time"].to_numpy()
