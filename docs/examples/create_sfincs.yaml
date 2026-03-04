@@ -17,7 +17,7 @@ output_dir: /path/to/output
 
 # Grid generation settings
 grid:
-  resolution: 50          # metres (base resolution for quadtree)
+  resolution: 50          # meters (base resolution for quadtree)
   crs: utm                # "utm" = auto-detect UTM zone, or EPSG code
   rotated: true           # allow grid rotation for tighter fit
 

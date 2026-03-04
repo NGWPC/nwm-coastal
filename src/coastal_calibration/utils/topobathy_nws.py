@@ -35,7 +35,7 @@ _S3_REGION = "us-east-1"
 
 
 def _resolve_domain(domain: str) -> str:
-    """Normalise *domain* to a key in :data:`_PREFIXES`."""
+    """Normalize *domain* to a key in :data:`_PREFIXES`."""
     key = _DOMAIN_ALIASES.get(domain, domain)
     if key not in _PREFIXES:
         valid = sorted({*_PREFIXES, *_DOMAIN_ALIASES})
@@ -116,7 +116,7 @@ def fetch_topobathy(
     Raises
     ------
     ValueError
-        If *domain* is not recognised.
+        If *domain* is not recognized.
     ImportError
         If ``icechunk``, ``rioxarray``, or ``geopandas`` are not installed.
     """

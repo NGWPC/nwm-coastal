@@ -12,7 +12,7 @@ output_dir: ./output
 download_dir: ../downloads/lavaca_grid
 
 grid:
-  resolution: 512        # base resolution in metres
+  resolution: 512        # base resolution in meters
   crs: utm               # auto-detect UTM zone (-> EPSG:32614)
   rotated: false
   refinement:

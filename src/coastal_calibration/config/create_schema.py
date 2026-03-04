@@ -19,7 +19,7 @@ class RefinementLevel:
 
     level: int
 
-    #: Inward (negative) buffer in metres applied to the polygon before
+    #: Inward (negative) buffer in meters applied to the polygon before
     #: refinement.  A negative value shrinks the polygon so that cells
     #: near the grid boundary remain at a coarser level — required for
     #: valid quadtree transitions.  Set to ``0`` to disable buffering.
@@ -36,7 +36,7 @@ class RefinementLevel:
 class GridConfig:
     """Grid generation configuration."""
 
-    #: Grid cell resolution in metres (base resolution for quadtree grids).
+    #: Grid cell resolution in meters (base resolution for quadtree grids).
     resolution: float = 50.0
 
     #: Coordinate reference system.  Use ``"utm"`` for automatic UTM zone

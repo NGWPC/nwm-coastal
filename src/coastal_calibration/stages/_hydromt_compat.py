@@ -22,7 +22,7 @@ def register_round_coords_preprocessor() -> None:
     NWM LDASIN files store projected coordinates (LCC, in meters) with
     floating-point rounding errors up to ~0.125 m.  hydromt's raster
     accessor rejects them as "not a regular grid" because its tolerance
-    (``atol=5e-4``) is far too tight for metre-scale coordinates.
+    (``atol=5e-4``) is far too tight for meter-scale coordinates.
 
     This preprocessor rounds x/y coordinates to the nearest integer,
     which makes the grid perfectly regular.
@@ -55,7 +55,7 @@ def patch_serialize_crs() -> None:
     hydromt's ``_serialize_crs`` calls ``list(crs.to_authority())`` without
     guarding against ``to_authority()`` returning ``None``, which raises
     ``TypeError: 'NoneType' object is not iterable`` for any CRS that has
-    no EPSG code and no recognised authority (e.g. custom proj strings).
+    no EPSG code and no recognized authority (e.g. custom proj strings).
 
     Pydantic's ``PlainSerializer`` captures a direct reference to the
     function object at class-definition time, so replacing the function
@@ -112,15 +112,15 @@ def patch_boundary_conditions_index_dim() -> None:
     if getattr(_original_validate, "_patched", False):
         return
 
-    def _validate_and_normalise(self: Any, gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    def _validate_and_normalize(self: Any, gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
         gdf = _original_validate(self, gdf)
         if gdf.index.name != "index":
             gdf.index.name = "index"
         return gdf
 
-    SfincsBoundaryBase._validate_and_prepare_gdf = _validate_and_normalise  # type: ignore[reportPrivateUsage]
+    SfincsBoundaryBase._validate_and_prepare_gdf = _validate_and_normalize  # type: ignore[reportPrivateUsage]
     SfincsBoundaryBase._validate_and_prepare_gdf._patched = True  # type: ignore[reportPrivateUsage, attr-defined]
-    _log.info("Patched hydromt-sfincs _validate_and_prepare_gdf to normalise index name.")
+    _log.info("Patched hydromt-sfincs _validate_and_prepare_gdf to normalize index name.")
 
 
 def patch_meteo_write_gridded() -> None:

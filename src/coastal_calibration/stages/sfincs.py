@@ -338,12 +338,12 @@ def _build_meteo_entry(
     # NWM LDASIN files store projected (LCC) coordinates with floating-point
     # rounding errors up to ~0.125 m.  hydromt's raster accessor rejects
     # them as non-regular because its tolerance (atol=5e-4) is far too tight
-    # for metre-scale coordinates.  The custom ``round_coords`` preprocessor
+    # for meter-scale coordinates.  The custom ``round_coords`` preprocessor
     # (registered in ``_hydromt_compat``) rounds x/y to the nearest integer,
     # making the grid perfectly regular.
     #
     # Each LDASIN file also carries a scalar ``reference_time`` coordinate
-    # (model initialisation time).  When ``open_mfdataset`` concatenates
+    # (model initialization time).  When ``open_mfdataset`` concatenates
     # the files, ``reference_time`` becomes a new dimension and inflates
     # the data to 4-D (reference_time, time, y, x).  hydromt only supports
     # 2-D/3-D arrays, so we drop it via ``drop_variables``.

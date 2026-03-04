@@ -362,7 +362,7 @@ class SchismModelConfig(ModelConfig):
 
         # MPI / AWS EFA fabric tuning — required for reliable MPI
         # on EFA-enabled instances (e.g. c5n-18xlarge).  Without
-        # these, MPI collectives can hang during ESMF initialisation.
+        # these, MPI collectives can hang during ESMF initialization.
         env["MPICH_OFI_STARTUP_CONNECT"] = "1"
         env["MPICH_COLL_SYNC"] = "MPI_Bcast"
         env["MPICH_REDUCE_NO_SMP"] = "1"
@@ -506,10 +506,10 @@ class SfincsModelConfig(ModelConfig):
            full CONUS extent, producing multi-GB files and very slow
            simulations.
     forcing_to_mesh_offset_m : float
-        Vertical offset in metres *added* to the boundary-condition water
+        Vertical offset in meters *added* to the boundary-condition water
         levels before they enter SFINCS.
 
-        Tidal-only sources such as TPXO provide oscillations centred on
+        Tidal-only sources such as TPXO provide oscillations centered on
         zero (MSL) but carry no information about where MSL sits on the
         mesh's vertical datum.  This parameter anchors the forcing signal
         to the correct geodetic height on the mesh.  Set it to the
@@ -522,7 +522,7 @@ class SfincsModelConfig(ModelConfig):
 
         Defaults to ``0.0``.
     vdatum_mesh_to_msl_m : float
-        Vertical offset in metres *added* to the simulated water level
+        Vertical offset in meters *added* to the simulated water level
         before comparison with NOAA CO-OPS observations (which are in
         MSL).  The model output inherits the mesh vertical datum, so
         this converts it to MSL (e.g. ``0.171`` for a NAVD88 mesh on

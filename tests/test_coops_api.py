@@ -458,7 +458,7 @@ class TestFilterStationsByDatum:
 
 
 # ---------------------------------------------------------------------------
-# _get_stations_metadata (cache behaviour)
+# _get_stations_metadata (cache behavior)
 # ---------------------------------------------------------------------------
 
 

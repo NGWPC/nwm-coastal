@@ -129,7 +129,7 @@ def _get_model(config: CoastalCalibConfig) -> SfincsModel:
     inp_file = root / "sfincs.inp"
     if not inp_file.exists():
         raise RuntimeError(
-            "SFINCS model not initialised and no sfincs.inp found at "
+            "SFINCS model not initialized and no sfincs.inp found at "
             f"{root}.  Ensure the 'sfincs_init' stage runs first."
         )
 
@@ -212,7 +212,7 @@ def _clip_meteo_to_domain(
         Name of the meteo component (``"precipitation"``, ``"wind"``,
         or ``"pressure"``).
     buffer : float
-        Extra metres around the model region bounds to include.
+        Extra meters around the model region bounds to include.
         Default 10 km gives SFINCS comfortable headroom for
         interpolation near the boundary.
 
@@ -404,14 +404,14 @@ class _SfincsStageBase(WorkflowStage):
 
 
 class SfincsInitStage(_SfincsStageBase):
-    """Initialise the SFINCS model (pre-built mode).
+    """Initialize the SFINCS model (pre-built mode).
 
     Copies pre-built model files to the output directory, opens the model
     in ``r+`` mode, reads it, and clears missing file references.
     """
 
     name = "sfincs_init"
-    description = "Initialise SFINCS model (pre-built)"
+    description = "Initialize SFINCS model (pre-built)"
 
     #: Config attributes that reference external files.  When a pre-built
     #: ``sfincs.inp`` lists placeholder names for files that haven't been
@@ -451,7 +451,7 @@ class SfincsInitStage(_SfincsStageBase):
     #: Generated files that downstream stages will recreate.
     #: Stale files from a previous run can crash the HDF5 library when
     #: ``write_netcdf_safely`` (or a lazy ``model.read()``) tries to open
-    #: them, so we delete them at the start of every fresh initialisation.
+    #: them, so we delete them at the start of every fresh initialization.
     _STALE_OUTPUT_FILES: tuple[str, ...] = (
         "sfincs_netbndbzsbzifile.nc",
         "sfincs_netamuv.nc",
@@ -561,7 +561,7 @@ class SfincsInitStage(_SfincsStageBase):
 
         _set_model(self.config, model)
 
-        self._log(f"SFINCS model initialised (grid_type={model.grid_type}) at {root}")
+        self._log(f"SFINCS model initialized (grid_type={model.grid_type}) at {root}")
 
         return {
             "model_root": str(root),
@@ -649,12 +649,12 @@ class SfincsForcingStage(_SfincsStageBase):
 
     @staticmethod
     def _parse_quadtree_bnd(nc_path: Path) -> list[tuple[float, float, str]]:
-        """Extract boundary-cell face centres from a quadtree ``sfincs.nc``.
+        """Extract boundary-cell face centers from a quadtree ``sfincs.nc``.
 
         For quadtree grids HydroMT-SFINCS stores boundary info in the
         mask array (value 2) inside ``sfincs.nc`` instead of writing a
         separate ``.bnd`` file.  This helper reads the UGRID mesh
-        connectivity, computes face centres for boundary cells, and
+        connectivity, computes face centers for boundary cells, and
         returns them in the same ``(x, y, name)`` format as
         :meth:`_parse_bnd_file`.
         """
@@ -698,7 +698,7 @@ class SfincsForcingStage(_SfincsStageBase):
     def _parse_regular_grid_bnd(
         model: SfincsModel,
     ) -> list[tuple[float, float, str]]:
-        """Extract boundary-cell centres from a regular-grid mask.
+        """Extract boundary-cell centers from a regular-grid mask.
 
         HydroMT-SFINCS marks boundary cells as ``mask==2`` but does not
         always write a separate ``.bnd`` file for regular grids.  This
@@ -1073,7 +1073,7 @@ class SfincsForcingStage(_SfincsStageBase):
         values : ndarray, shape (T, N)
             Timeseries values at each source point.
         k : int
-            Number of nearest neighbours to use (capped at N).
+            Number of nearest neighbors to use (capped at N).
 
         Returns
         -------
@@ -1269,7 +1269,7 @@ class SfincsDischargeStage(_SfincsStageBase):
         SFINCS grids.  For regular grids the cell index is computed
         arithmetically via ``SfincsGrid.get_indices_at_points`` (O(1)
         per point, handles rotated grids).  For quadtree grids a KDTree
-        lookup over face centres is used.
+        lookup over face centers is used.
 
         Returns
         -------
@@ -1564,7 +1564,7 @@ class SfincsPlotStage(_SfincsStageBase):
     API, and produces a comparison time-series figure saved to
     ``<model_root>/figs/``.
 
-    Station matching is purely spatial (KDTree nearest-neighbour in
+    Station matching is purely spatial (KDTree nearest-neighbor in
     WGS 84) so the stage works with **any** SFINCS model — not only
     models created by this package.
 
@@ -1800,7 +1800,7 @@ class SfincsPlotStage(_SfincsStageBase):
 
         1. Read observation-point coordinates from the loaded model.
         2. Reproject to WGS 84.
-        3. Query the full NOAA CO-OPS station catalogue and build a KDTree.
+        3. Query the full NOAA CO-OPS station catalog and build a KDTree.
         4. For each observation point, find the nearest station within
            :attr:`_NOAA_MATCH_RADIUS_DEG`.
         5. Keep only stations that have valid MSL and MLLW datum values
@@ -1827,7 +1827,7 @@ class SfincsPlotStage(_SfincsStageBase):
             return [], []
 
         # Reproject observation points to WGS 84 for comparison with the
-        # NOAA station catalogue (also in EPSG:4326).
+        # NOAA station catalog (also in EPSG:4326).
         obs_4326 = obs_gdf.to_crs(4326)
         obs_xy = np.column_stack(
             [
@@ -1839,7 +1839,7 @@ class SfincsPlotStage(_SfincsStageBase):
         client = COOPSAPIClient()
         stations_gdf = client.stations_metadata
         if stations_gdf.empty:
-            self._log("NOAA station catalogue is empty", "warning")
+            self._log("NOAA station catalog is empty", "warning")
             return [], []
 
         sta_xy = np.column_stack(

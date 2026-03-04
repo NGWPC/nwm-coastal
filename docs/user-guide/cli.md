@@ -370,7 +370,7 @@ SFINCS workflow stages:
   1. download: Download NWM/STOFS data (optional)
   2. sfincs_symlinks: Create .nc symlinks for NWM data
   3. sfincs_data_catalog: Generate HydroMT data catalog
-  4. sfincs_init: Initialise SFINCS model (pre-built)
+  4. sfincs_init: Initialize SFINCS model (pre-built)
   5. sfincs_timing: Set SFINCS timing
   6. sfincs_forcing: Add water level forcing
   7. sfincs_obs: Add observation points

@@ -37,12 +37,12 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Changed
 
 - Rewrite NOAA station matching in `SfincsPlotStage` to use spatial KDTree
-    nearest-neighbour lookup instead of file-based `obs_station_map.json` / regex
+    nearest-neighbor lookup instead of file-based `obs_station_map.json` / regex
     fallback. Observation points are reprojected to WGS 84 and matched against the full
-    NOAA CO-OPS station catalogue, making the run workflow work with any SFINCS model.
+    NOAA CO-OPS station catalog, making the run workflow work with any SFINCS model.
 - Move stdout suppression for `hydromt-sfincs` from the CLI into a `_suppress_stdout()`
-    context manager in `SfincsCreator` that redirects both fd 1 and `sys.stdout`, fixing
-    noisy print output in Jupyter notebooks.
+    context manager in `SfincsCreator` that redirects both `fd 1` and `sys.stdout`,
+    fixing noisy print output in Jupyter notebooks.
 - Remove the `submit` execution path and `SlurmConfig` entirely. The `run` command is
     now the sole entry point — use it inside user-written `sbatch` scripts instead. Old
     YAML configs with a `slurm:` key are silently ignored for backward compatibility.

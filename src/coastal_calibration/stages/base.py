@@ -233,7 +233,7 @@ class WorkflowStage(ABC):
             Path to the Singularity SIF image.
 
         Environment variables are inherited by the container through
-        Singularity's default pass-through behaviour (the host
+        Singularity's default pass-through behavior (the host
         environment is visible inside the container).
         """
         if env is None:

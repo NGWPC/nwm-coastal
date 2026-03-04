@@ -1,7 +1,7 @@
 """Fetch ESA WorldCover 2020 tiles from AWS S3.
 
 The ``esa-worldcover`` S3 bucket hosts 10 m land-use / land-cover
-classification maps as Cloud-Optimised GeoTIFFs in 3x3 degree tiles.
+classification maps as Cloud-Optimized GeoTIFFs in 3x3 degree tiles.
 
 At runtime, :func:`fetch_esa_worldcover` downloads the tiles that
 overlap the user's AOI via ``tiny_retriever``, builds a virtual

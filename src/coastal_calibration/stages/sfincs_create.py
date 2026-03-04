@@ -175,18 +175,18 @@ class _CreateStageBase(CreateStage):
 
 
 class CreateGridStage(CreateStage):
-    """Initialise a new ``SfincsModel`` and generate the quadtree grid."""
+    """Initialize a new ``SfincsModel`` and generate the quadtree grid."""
 
     name = "create_grid"
     description = "Create SFINCS grid from AOI"
 
     def run(self) -> dict[str, Any]:
-        """Initialise SfincsModel and generate the quadtree grid."""
+        """Initialize SfincsModel and generate the quadtree grid."""
         from hydromt_sfincs import SfincsModel
 
         cfg = self.config
 
-        self._update_substep("Initialising SfincsModel")
+        self._update_substep("Initializing SfincsModel")
         sf = SfincsModel(
             root=str(cfg.output_dir),
             mode="w+",
@@ -209,7 +209,7 @@ class CreateGridStage(CreateStage):
 
             # HydroMT's quadtree builder compares polygon coordinates
             # directly against the grid (no CRS reprojection).  Determine
-            # the grid CRS first so we can reproject + buffer in metres.
+            # the grid CRS first so we can reproject + buffer in meters.
             grid_crs_str = cfg.grid.crs
             if grid_crs_str == "utm":
                 aoi_gdf = gpd.read_file(str(cfg.aoi))
@@ -223,7 +223,7 @@ class CreateGridStage(CreateStage):
             parts: list[gpd.GeoDataFrame] = []
             for ref in cfg.grid.refinement:
                 gdf = gpd.read_file(ref.polygon)
-                # Reproject to the grid CRS first (buffer is in metres).
+                # Reproject to the grid CRS first (buffer is in meters).
                 if gdf.crs is not None and gdf.crs != target_crs:
                     gdf = gdf.to_crs(target_crs)
                 # Apply inward buffer (negative = shrink) so that
@@ -621,7 +621,7 @@ class CreateDischargeStage(_CreateStageBase):
         For each point, if it already sits on an active cell (``mask == 1``)
         it is kept as-is.  Otherwise the nearest active cell is found via
         a KDTree search and the point is relocated to that cell's face
-        centre.  Points with no active cell within the search radius are
+        center.  Points with no active cell within the search radius are
         dropped with a warning.
 
         Returns the list of (x, y, name) tuples on active cells.
@@ -634,8 +634,8 @@ class CreateDischargeStage(_CreateStageBase):
         face_xy = np.column_stack([ugrid.face_x, ugrid.face_y])
         mask = grid_ds["mask"].to_numpy()
 
-        # Build a KDTree of *all* face centres for initial lookup,
-        # and a separate tree of *active-only* centres for snapping.
+        # Build a KDTree of *all* face centers for initial lookup,
+        # and a separate tree of *active-only* centers for snapping.
         tree_all = KDTree(face_xy)
         active_idx = np.where(mask == 1)[0]
         if len(active_idx) == 0:
@@ -852,16 +852,16 @@ class CreateObservationPointsStage(_CreateStageBase):
     # ------------------------------------------------------------------
 
     def _snap_obs_to_wet_cells(self, model: SfincsModel) -> int:
-        """Snap every observation point to the centre of the nearest wet cell.
+        """Snap every observation point to the center of the nearest wet cell.
 
         SFINCS's internal quadtree cell lookup maps (x, y) coordinates
         to cells via the (n, m) index structure.  When a point is *not*
-        at the exact face centre, the lookup can land on a neighbouring
+        at the exact face center, the lookup can land on a neighboring
         (potentially dry or inactive) cell — especially after grid
         refinement changes the (n, m) layout.
 
         To guarantee correct placement we *always* relocate each point
-        to the centre of the nearest active wet face, regardless of
+        to the center of the nearest active wet face, regardless of
         whether the current cell appears wet.
         """
         import numpy as np
@@ -882,7 +882,7 @@ class CreateObservationPointsStage(_CreateStageBase):
         z_elev = grid_ds["z"].to_numpy()  # type: ignore[index]
         mask_arr = grid_ds["mask"].to_numpy()  # type: ignore[index]
 
-        # Build a KDTree of active wet face centres only.
+        # Build a KDTree of active wet face centers only.
         wet_active = (z_elev < depth_threshold) & (mask_arr > 0)
         wet_idx = np.where(wet_active)[0]
         if len(wet_idx) == 0:
@@ -914,7 +914,7 @@ class CreateObservationPointsStage(_CreateStageBase):
             new_z = z_elev[best]
             obs_gdf.geometry.iloc[i] = Point(new_x, new_y)
             self._log(
-                f"  {name}: placed at face centre z={new_z:.3f} m ({dist:.0f} m from original)"
+                f"  {name}: placed at face center z={new_z:.3f} m ({dist:.0f} m from original)"
             )
             snapped += 1
 

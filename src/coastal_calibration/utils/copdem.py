@@ -1,7 +1,7 @@
 """Fetch Copernicus DEM 30m tiles from AWS S3.
 
 The ``copernicus-dem-30m`` public S3 bucket hosts global 1-arc-second
-(~30 m) elevation data as Cloud-Optimised GeoTIFFs organised in 1x1 degree
+(~30 m) elevation data as Cloud-Optimized GeoTIFFs organized in 1x1 degree
 tiles.
 
 At runtime, :func:`fetch_copdem30` computes which tiles overlap the

@@ -297,7 +297,7 @@ STOFS water level data.
 
 ### 4. sfincs_init
 
-**Purpose:** Initialise the SFINCS model from a pre-built template.
+**Purpose:** Initialize the SFINCS model from a pre-built template.
 
 **Tasks:**
 
@@ -335,7 +335,7 @@ STOFS water level data.
 
 !!! tip "Forcing vertical datum offset"
 
-    Tidal-only sources like TPXO provide oscillations centred on zero (MSL) but carry no
+    Tidal-only sources like TPXO provide oscillations centered on zero (MSL) but carry no
     information about where MSL sits on the mesh's vertical datum. The
     `forcing_to_mesh_offset_m` parameter anchors the tidal signal to the correct geodetic
     height on the mesh. For sources already in the mesh datum (e.g. STOFS on a NAVD88 mesh),

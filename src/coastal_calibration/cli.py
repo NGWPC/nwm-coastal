@@ -447,7 +447,7 @@ def stages(model: str | None) -> None:
         ("download", "Download NWM/STOFS data (optional)"),
         ("sfincs_symlinks", "Create .nc symlinks for NWM data"),
         ("sfincs_data_catalog", "Generate HydroMT data catalog"),
-        ("sfincs_init", "Initialise SFINCS model (pre-built)"),
+        ("sfincs_init", "Initialize SFINCS model (pre-built)"),
         ("sfincs_timing", "Set SFINCS timing"),
         ("sfincs_forcing", "Add water level forcing"),
         ("sfincs_discharge", "Add discharge sources"),
