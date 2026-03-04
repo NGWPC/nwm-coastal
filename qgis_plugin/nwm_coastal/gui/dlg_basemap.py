@@ -37,27 +37,35 @@ class BasemapDialog(QDialog):
         if path:
             self.parquet_edit.setText(path)
 
+    def _check_paths(self) -> str | None:
+        """Return an error message if file paths are invalid, else ``None``."""
+        if not self.gpkg_edit.text().strip():
+            return "Please select a GeoPackage file."
+        if not self.parquet_edit.text().strip():
+            return "Please select a CO-OPS Parquet file."
+
+        gpkg = self.gpkg_path
+        if not gpkg.is_file():
+            return f"GeoPackage not found: {gpkg}"
+        if gpkg.suffix != ".gpkg":
+            return "GeoPackage file must have .gpkg extension."
+        if not self.parquet_path.is_file():
+            return f"Parquet file not found: {self.parquet_path}"
+        return None
+
     def _validate_and_accept(self) -> None:
         """Validate inputs before accepting the dialog."""
-        gpkg = self.gpkg_path
-        parquet = self.parquet_path
-
-        if not gpkg.is_file():
-            self.validation_label.setText(f"GeoPackage not found: {gpkg}")
-            return
-        if gpkg.suffix != ".gpkg":
-            self.validation_label.setText("GeoPackage file must have .gpkg extension.")
-            return
-        if not parquet.is_file():
-            self.validation_label.setText(f"Parquet file not found: {parquet}")
+        error = self._check_paths()
+        if error:
+            self.validation_label.setText(error)
             return
 
         # Validate gpkg contains required layers
         from osgeo import ogr
 
-        ds = ogr.Open(str(gpkg))
+        ds = ogr.Open(str(self.gpkg_path))
         if ds is None:
-            self.validation_label.setText(f"Cannot open GeoPackage: {gpkg}")
+            self.validation_label.setText(f"Cannot open GeoPackage: {self.gpkg_path}")
             return
 
         available = {ds.GetLayerByIndex(i).GetName() for i in range(ds.GetLayerCount())}

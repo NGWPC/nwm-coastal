@@ -35,6 +35,12 @@ PLUGIN_NAME = "NWM Coastal"
 class NWMCoastalPlugin:
     """Main QGIS plugin class for NWM Coastal."""
 
+    # ------------------------------------------------------------------
+    # Button 1: Add Basemap
+    # ------------------------------------------------------------------
+
+    _BASEMAP_LAYER_NAMES = ("OpenStreetMap", "divides", "flowpaths", "gages", "nexus", "coops")
+
     def __init__(self, iface: QgisInterface) -> None:
         self.iface = iface
         self._toolbar = None
@@ -154,9 +160,11 @@ class NWMCoastalPlugin:
         symbol.appendSymbolLayer(marker)
         layer.renderer().setSymbol(symbol)
 
-    # ------------------------------------------------------------------
-    # Button 1: Add Basemap
-    # ------------------------------------------------------------------
+    def _remove_existing_basemap_layers(self, project: QgsProject) -> None:
+        """Remove previously added basemap layers to avoid duplicates."""
+        for name in self._BASEMAP_LAYER_NAMES:
+            for layer in project.mapLayersByName(name):
+                project.removeMapLayer(layer.id())
 
     def _on_add_basemap(self) -> None:
         from .gui.dlg_basemap import BasemapDialog
@@ -170,6 +178,8 @@ class NWMCoastalPlugin:
         min_order = dlg.min_stream_order
         project = QgsProject.instance()
         root = project.layerTreeRoot()
+
+        self._remove_existing_basemap_layers(project)
 
         # 1. OpenStreetMap (bottom layer)
         osm_uri = "type=xyz&url=https://tile.openstreetmap.org/{z}/{x}/{y}.png&zmax=19&zmin=0"
@@ -354,10 +364,21 @@ class NWMCoastalPlugin:
             self._sketcher_layer = None
             return
 
-        if self._sketcher_layer.isEditable():
-            self._sketcher_layer.commitChanges()
+        if self._sketcher_layer.isEditable() and not self._sketcher_layer.commitChanges():
+            self._log(
+                "Failed to commit sketcher edits. Fix geometry errors and try again.",
+                Qgis.MessageLevel.Critical,
+                push=True,
+            )
+            self._sketcher_layer.rollBack()
+            return
 
-        if self._sketcher_layer.featureCount() == 0:
+        sketcher_geoms = [
+            f.geometry()
+            for f in self._sketcher_layer.getFeatures()
+            if f.geometry() and not f.geometry().isEmpty()
+        ]
+        if not sketcher_geoms:
             self._log(
                 "Sketcher layer has no features. Draw a polygon first.",
                 Qgis.MessageLevel.Warning,
@@ -374,15 +395,20 @@ class NWMCoastalPlugin:
             )
             return
 
-        sketcher_geom = next(self._sketcher_layer.getFeatures()).geometry()
         sketcher_crs = self._sketcher_layer.crs()
         divides_crs = divides_layers[0].crs()
 
         if sketcher_crs != divides_crs:
-            sketcher_geom_div = QgsGeometry(sketcher_geom)
-            sketcher_geom_div.transform(QgsCoordinateTransform(sketcher_crs, divides_crs, project))
+            transform = QgsCoordinateTransform(sketcher_crs, divides_crs, project)
+            sketcher_geoms_div = []
+            for g in sketcher_geoms:
+                geom_div = QgsGeometry(g)
+                geom_div.transform(transform)
+                sketcher_geoms_div.append(geom_div)
         else:
-            sketcher_geom_div = sketcher_geom
+            sketcher_geoms_div = sketcher_geoms
+
+        sketcher_geom_div = self._union_and_clean(sketcher_geoms_div)
 
         intersecting = self._collect_intersecting_divides(sketcher_geom_div, divides_layers[0])
         if not intersecting:
@@ -493,5 +519,5 @@ class NWMCoastalPlugin:
         self._actions.clear()
 
         if self._toolbar is not None:
-            del self._toolbar
+            self.iface.mainWindow().removeToolBar(self._toolbar)
             self._toolbar = None
