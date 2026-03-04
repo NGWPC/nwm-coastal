@@ -18,7 +18,7 @@
         <link rel="prev" href="../python-api/">
       
       
-        <link rel="next" href="../../DESIGN/">
+        <link rel="next" href="../../examples/">
       
       
         
@@ -304,6 +304,28 @@
     
   
   User Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../examples/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Examples
 
         </a>
       </li>
@@ -1241,10 +1263,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#2-create_fetch_elevation" class="md-nav__link">
+  <a href="#2-create_fetch_data" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. create_fetch_elevation
+        2. create_fetch_data
       
     </span>
   </a>
@@ -1285,10 +1307,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#6-create_subgrid" class="md-nav__link">
+  <a href="#6-create_discharge-optional" class="md-nav__link">
     <span class="md-ellipsis">
       
-        6. create_subgrid
+        6. create_discharge (optional)
       
     </span>
   </a>
@@ -1296,10 +1318,32 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#7-create_write" class="md-nav__link">
+  <a href="#7-create_subgrid" class="md-nav__link">
     <span class="md-ellipsis">
       
-        7. create_write
+        7. create_subgrid
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#8-create_obs-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. create_obs (optional)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#9-create_write" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. create_write
       
     </span>
   </a>
@@ -1315,6 +1359,140 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../examples/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Examples
+  
+
+          </label>
+          <ul class="md-nav__list">
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/notebooks/lavaca_cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lavaca Bay SFINCS Tutorial — CLI Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/notebooks/lavaca_api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lavaca Bay SFINCS Tutorial — Python API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -1378,10 +1556,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
         
           
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
             
   
   
@@ -1399,8 +1577,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1831,7 +2009,7 @@ STOFS water level data.</p>
 <li>Register NWM meteo, streamflow, and STOFS data sources</li>
 </ul>
 <h3 id="4-sfincs_init">4. sfincs_init<a class="headerlink" href="#4-sfincs_init" title="Permanent link">#</a></h3>
-<p><strong>Purpose:</strong> Initialise the SFINCS model from a pre-built template.</p>
+<p><strong>Purpose:</strong> Initialize the SFINCS model from a pre-built template.</p>
 <p><strong>Tasks:</strong></p>
 <ul>
 <li>Copy pre-built SFINCS model from <code>prebuilt_dir</code> into the work directory</li>
@@ -1864,7 +2042,7 @@ STOFS water level data.</p>
 </ul>
 <div class="admonition tip">
 <p class="admonition-title">Forcing vertical datum offset</p>
-<p>Tidal-only sources like TPXO provide oscillations centred on zero (MSL) but carry no
+<p>Tidal-only sources like TPXO provide oscillations centered on zero (MSL) but carry no
 information about where MSL sits on the mesh's vertical datum. The
 <code>forcing_to_mesh_offset_m</code> parameter anchors the tidal signal to the correct geodetic
 height on the mesh. For sources already in the mesh datum (e.g. STOFS on a NAVD88 mesh),
@@ -2005,12 +2183,14 @@ separate configuration schema (<code>SfincsCreateConfig</code>) and a dedicated 
 (<code>SfincsCreator</code>) with resumable execution — completion is tracked in
 <code>.create_status.json</code> so that interrupted runs can be resumed with <code>--start-from</code>.</p>
 <pre class="mermaid"><code>flowchart TD
-    A[create_grid] --&gt; B[create_fetch_elevation]
+    A[create_grid] --&gt; B[create_fetch_data]
     B --&gt; C[create_elevation]
     C --&gt; D[create_mask]
     D --&gt; E[create_boundary]
-    E --&gt; F[create_subgrid]
-    F --&gt; G[create_write]</code></pre>
+    E --&gt; F["create_discharge (optional)"]
+    F --&gt; G[create_subgrid]
+    G --&gt; H["create_obs (optional)"]
+    H --&gt; I[create_write]</code></pre>
 <h3 id="1-create_grid">1. create_grid<a class="headerlink" href="#1-create_grid" title="Permanent link">#</a></h3>
 <p><strong>Purpose:</strong> Generate a SFINCS quadtree grid from the AOI polygon.</p>
 <p><strong>Tasks:</strong></p>
@@ -2019,14 +2199,20 @@ separate configuration schema (<code>SfincsCreateConfig</code>) and a dedicated 
 <li>Create the base grid in the specified CRS</li>
 <li>Apply quadtree refinement based on configured levels and criteria</li>
 </ul>
-<h3 id="2-create_fetch_elevation">2. create_fetch_elevation<a class="headerlink" href="#2-create_fetch_elevation" title="Permanent link">#</a></h3>
-<p><strong>Purpose:</strong> Fetch a NOAA coastal DEM covering the AOI.</p>
+<h3 id="2-create_fetch_data">2. create_fetch_data<a class="headerlink" href="#2-create_fetch_data" title="Permanent link">#</a></h3>
+<p><strong>Purpose:</strong> Fetch elevation and land cover data for the AOI.</p>
+<p><strong>Enabled by:</strong> Any elevation dataset with a <code>source</code> field, or <code>subgrid.lulc_source</code>.
+Skipped when all datasets are user-provided (no auto-fetch configured).</p>
 <p><strong>Tasks:</strong></p>
 <ul>
-<li>Query the packaged NOAA DEM spatial index to find the best-matching dataset based on
-    AOI overlap, resolution, and year</li>
-<li>Download the DEM tiles from the NOAA <code>noaa-nos-coastal-lidar-pds</code> S3 bucket</li>
-<li>Mosaic tiles and clip to the AOI extent</li>
+<li>For NOAA DEM sources: query the packaged spatial index to find the best-matching
+    dataset based on AOI overlap, resolution, and year, download DEM tiles from S3,
+    mosaic, and clip to the AOI extent</li>
+<li>For NWS topobathy sources: fetch from the NWS <code>icechunk</code> S3 store clipped to the AOI
+    bounding box</li>
+<li>For Copernicus DEM / GEBCO sources: download tiles and mosaic</li>
+<li>For ESA WorldCover land cover: download and mosaic land-use / land-cover tiles</li>
+<li>Write a HydroMT data catalog YAML for the fetched datasets</li>
 </ul>
 <h3 id="3-create_elevation">3. create_elevation<a class="headerlink" href="#3-create_elevation" title="Permanent link">#</a></h3>
 <p><strong>Purpose:</strong> Add elevation and bathymetry data to the grid.</p>
@@ -2050,7 +2236,19 @@ separate configuration schema (<code>SfincsCreateConfig</code>) and a dedicated 
 <li>Identify grid cells along the open ocean boundary</li>
 <li>Assign boundary condition flags</li>
 </ul>
-<h3 id="6-create_subgrid">6. create_subgrid<a class="headerlink" href="#6-create_subgrid" title="Permanent link">#</a></h3>
+<h3 id="6-create_discharge-optional">6. create_discharge <em>(optional)</em><a class="headerlink" href="#6-create_discharge-optional" title="Permanent link">#</a></h3>
+<p><strong>Purpose:</strong> Add NWM discharge source points to the model.</p>
+<p><strong>Enabled by:</strong> Configuring a <code>nwm_discharge</code> section in the creation config. Skipped
+when <code>nwm_discharge</code> is not present.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>Read NWM hydrofabric flowpath linestrings from a GeoPackage</li>
+<li>Intersect selected flowpaths with the AOI boundary to locate discharge inflow points</li>
+<li>Snap source points to the nearest active grid cell</li>
+<li>Write the SFINCS <code>.src</code> file and a discharge locations file usable by the simulation
+    workflow</li>
+</ul>
+<h3 id="7-create_subgrid">7. create_subgrid<a class="headerlink" href="#7-create_subgrid" title="Permanent link">#</a></h3>
 <p><strong>Purpose:</strong> Generate subgrid lookup tables.</p>
 <p><strong>Tasks:</strong></p>
 <ul>
@@ -2058,7 +2256,20 @@ separate configuration schema (<code>SfincsCreateConfig</code>) and a dedicated 
 <li>These tables allow SFINCS to use coarse computational cells while capturing fine-scale
     topographic detail</li>
 </ul>
-<h3 id="7-create_write">7. create_write<a class="headerlink" href="#7-create_write" title="Permanent link">#</a></h3>
+<h3 id="8-create_obs-optional">8. create_obs <em>(optional)</em><a class="headerlink" href="#8-create_obs-optional" title="Permanent link">#</a></h3>
+<p><strong>Purpose:</strong> Add observation points to the model.</p>
+<p><strong>Enabled by:</strong> Setting <code>add_noaa_gages: true</code>, providing <code>observation_points</code>, or
+providing an <code>observation_locations_file</code> in the creation config. Skipped when none of
+these are configured.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>When <code>add_noaa_gages</code> is true: query NOAA CO-OPS for active water level stations
+    within the model domain and add them as observation points</li>
+<li>When <code>observation_points</code> or <code>observation_locations_file</code> is provided: add the
+    user-specified observation points</li>
+<li>Write observation point locations into the SFINCS model</li>
+</ul>
+<h3 id="9-create_write">9. create_write<a class="headerlink" href="#9-create_write" title="Permanent link">#</a></h3>
 <p><strong>Purpose:</strong> Write the complete SFINCS model to disk.</p>
 <p><strong>Tasks:</strong></p>
 <ul>
@@ -2123,13 +2334,13 @@ separate configuration schema (<code>SfincsCreateConfig</code>) and a dedicated 
         
         
           
-          <a href="../../DESIGN/" class="md-footer__link md-footer__link--next" aria-label="Next: Design">
+          <a href="../../examples/" class="md-footer__link md-footer__link--next" aria-label="Next: Overview">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Design
+                Overview
               </div>
             </div>
             <div class="md-footer__button md-icon">

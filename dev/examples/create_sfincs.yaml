@@ -17,17 +17,29 @@ output_dir: /path/to/output
 
 # Grid generation settings
 grid:
-  resolution: 50          # metres (base resolution for quadtree)
+  resolution: 50          # meters (base resolution for quadtree)
   crs: utm                # "utm" = auto-detect UTM zone, or EPSG code
   rotated: true           # allow grid rotation for tighter fit
 
-# Elevation / bathymetry datasets (merged in order)
+# Elevation / bathymetry datasets (merged in order).
+# Datasets with a ``source`` are auto-fetched — no data catalog needed.
 elevation:
   datasets:
-  - name: copdem30        # Copernicus DEM 30m (land)
+  - name: copdem_30m      # Copernicus DEM 30m (land)
     zmin: 0.001
-  - name: gebco           # GEBCO bathymetry
+    source: copdem_30m    # auto-fetched from AWS S3
+  - name: gebco_15arcs       # GEBCO 15 arc-second bathymetry (ocean)
     zmin: -20000
+    source: gebco_15arcs     # auto-fetched via CEDA GeoTIFF tiles
+  # Optionally add a NOAA topobathy DEM for US coastal areas:
+  # - name: noaa_3m
+  #   zmin: -20000
+  #   source: noaa_3m     # auto-fetched from NOAA S3
+  # Or NWS 30m topobathy (requires coastal_domain):
+  # - name: nws_30m
+  #   zmin: -20000
+  #   source: nws_30m
+  #   coastal_domain: atlgulf   # atlgulf, hi, prvi, pacific, ak
   buffer_cells: 1
 
 # Active-cell mask and boundary settings
@@ -36,10 +48,12 @@ mask:
   boundary_zmax: -5.0     # max elevation for waterlevel boundary cells
   reset_bounds: true
 
-# Subgrid tables (roughness is embedded in quadtree subgrid tables)
+# Subgrid tables (roughness is embedded in quadtree subgrid tables).
+# The LULC dataset is auto-fetched by default (ESA WorldCover 2020).
 subgrid:
   nr_subgrid_pixels: 5
-  lulc_dataset: esa_worldcover_2021
+  lulc_dataset: esa_worldcover   # dataset name in the HydroMT catalog
+  lulc_source: esa_worldcover    # auto-fetched from AWS S3 (set to null to disable)
   # reclass_table: /path/to/custom_mapping.csv   # optional
   manning_land: 0.04
   manning_sea: 0.02
@@ -57,6 +71,22 @@ subgrid:
 #     - 1614624
 #     - 1614632
 #   coastal_domain: conus    # conus, atlgulf, pacific, hawaii, prvi, alaska
+
+# Observation points (optional)
+# Discovers NOAA CO-OPS water level stations within the model domain
+# and adds them as observation points.  The station map is written to
+# ``obs_station_map.json`` in the output directory, which the ``run``
+# workflow uses to retrieve observed timeseries.
+# add_noaa_gages: true
+
+# Alternatively (or additionally), supply observation points inline:
+# observation_points:
+#   - x: 500000.0
+#     y: 3200000.0
+#     name: my_station_1
+# or from a GeoJSON file:
+# observation_locations_file: /path/to/obs_points.geojson
+# merge_observations: true   # merge with any pre-existing obs points
 
 # Additional HydroMT data catalog YAMLs (optional)
 data_catalog:

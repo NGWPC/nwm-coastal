@@ -314,6 +314,28 @@
   
   
   
+    
+    
+      <li class="md-tabs__item">
+        <a href="../examples/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Examples
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
     <li class="md-tabs__item">
       <a href="../DESIGN/" class="md-tabs__link">
         
@@ -797,6 +819,140 @@
   
   
   
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../examples/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Examples
+  
+
+          </label>
+          <ul class="md-nav__list">
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/notebooks/lavaca_cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lavaca Bay SFINCS Tutorial — CLI Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/notebooks/lavaca_api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lavaca Bay SFINCS Tutorial — Python API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
     <li class="md-nav__item">
       <a href="../DESIGN/" class="md-nav__link">
         
@@ -842,10 +998,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
         
           
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
             
   
   
@@ -863,8 +1019,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1202,6 +1358,14 @@ this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic V
 <h2 id="unreleased"><a href="https://github.com/NGWPC/nwm-coastal/compare/3.1.1.0.0...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">#</a></h3>
 <ul>
+<li>Human-readable <code>__str__</code> methods on <code>WorkflowResult</code>, <code>DownloadResult</code>,
+    <code>DownloadResults</code>, and <code>StageProgress</code> so that <code>print(result)</code> produces clean,
+    indented output with friendly time formatting.</li>
+<li><code>from_dict</code> public class method on <code>SfincsCreateConfig</code> and <code>CoastalCalibConfig</code> for
+    constructing configs from plain dictionaries in notebooks and scripts.</li>
+<li>Examples gallery in the documentation with two Lavaca Bay tutorial notebooks (CLI and
+    Python API) rendered via <code>mkdocs-jupyter</code>, a gallery index page with Material grid
+    cards, and restructured example configs under <code>docs/examples/</code>.</li>
 <li><code>create</code> CLI command for building SFINCS quadtree models from an AOI polygon. The
     workflow supports grid generation with quadtree refinement, automatic NOAA DEM
     discovery and download, elevation/bathymetry, active cell mask, boundary cells,
@@ -1221,6 +1385,13 @@ this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic V
 </ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">#</a></h3>
 <ul>
+<li>Rewrite NOAA station matching in <code>SfincsPlotStage</code> to use spatial KDTree
+    nearest-neighbor lookup instead of file-based <code>obs_station_map.json</code> / regex
+    fallback. Observation points are reprojected to WGS 84 and matched against the full
+    NOAA CO-OPS station catalog, making the run workflow work with any SFINCS model.</li>
+<li>Move stdout suppression for <code>hydromt-sfincs</code> from the CLI into a <code>_suppress_stdout()</code>
+    context manager in <code>SfincsCreator</code> that redirects both <code>fd 1</code> and <code>sys.stdout</code>,
+    fixing noisy print output in Jupyter notebooks.</li>
 <li>Remove the <code>submit</code> execution path and <code>SlurmConfig</code> entirely. The <code>run</code> command is
     now the sole entry point — use it inside user-written <code>sbatch</code> scripts instead. Old
     YAML configs with a <code>slurm:</code> key are silently ignored for backward compatibility.

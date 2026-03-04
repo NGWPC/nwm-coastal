@@ -310,6 +310,28 @@
   
   
   
+    
+    
+      <li class="md-tabs__item">
+        <a href="../examples/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Examples
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
     <li class="md-tabs__item">
       <a href="../DESIGN/" class="md-tabs__link">
         
@@ -791,6 +813,140 @@
   
   
   
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../examples/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Examples
+  
+
+          </label>
+          <ul class="md-nav__list">
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/notebooks/lavaca_cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lavaca Bay SFINCS Tutorial — CLI Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/notebooks/lavaca_api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lavaca Bay SFINCS Tutorial — Python API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
     <li class="md-nav__item">
       <a href="../DESIGN/" class="md-nav__link">
         
@@ -836,10 +992,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
         
           
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
             
   
   
@@ -857,8 +1013,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1164,7 +1320,7 @@ can segfault during the comparison read.</p>
 inside the HDF5 C library (<code>H5VL__native_blob_specific</code> → <code>H5T__vlen_disk_isnull</code>),
 which raises <code>SIGTERM</code>/<code>SIGSEGV</code> rather than a Python exception. The process is killed
 before the except clause can execute.</p>
-<h3 id="reproduction">Reproduction<a class="headerlink" href="#reproduction" title="Permanent link">#</a></h3>
+<p><strong>Reproduction</strong>:</p>
 <ol>
 <li>Run a SFINCS pipeline that writes <code>sfincs_netbndbzsbzifile.nc</code> with 119,903 stations
     (e.g. from un-interpolated STOFS data).</li>
@@ -1351,7 +1507,7 @@ attribute access itself (<code>self.geoms</code>), not by the <code>in</code> op
 propagates before the <code>in</code> check can execute, and the <code>else</code> branch
 (<code>data_catalog.get_geodataframe</code>) — which is the correct code path for new models — is
 never reached.</p>
-<h3 id="reproduction_1">Reproduction<a class="headerlink" href="#reproduction_1" title="Permanent link">#</a></h3>
+<p><strong>Reproduction</strong>:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">hydromt_sfincs</span><span class="w"> </span><span class="kn">import</span> <span class="n">SfincsModel</span>
 </span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>
 </span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="n">sf</span> <span class="o">=</span> <span class="n">SfincsModel</span><span class="p">(</span><span class="n">root</span><span class="o">=</span><span class="s2">&quot;./test_model&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;w+&quot;</span><span class="p">,</span> <span class="n">data_libs</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;my_catalog.yml&quot;</span><span class="p">])</span>
@@ -1385,6 +1541,77 @@ into the model instance's <code>__dict__</code> under the key <code>"geoms"</cod
 missing. Python's normal attribute lookup finds the instance dict entry before falling
 through to <code>__getattr__</code>, so <code>self.geoms</code> resolves to <code>{}</code> and the <code>in</code> check evaluates
 to <code>False</code>.</p>
+<hr />
+<h2 id="11-read_map_file-fails-for-quadtree-grids-missing-ugrid-topology">11. <code>read_map_file</code> fails for quadtree grids (missing UGRID topology)<a class="headerlink" href="#11-read_map_file-fails-for-quadtree-grids-missing-ugrid-topology" title="Permanent link">#</a></h2>
+<p><strong>Summary</strong>:</p>
+<p><code>SfincsOutput.read_map_file()</code> (<code>output.py</code>, line 149) calls <code>xugrid.load_dataset()</code> on
+<code>sfincs_map.nc</code> for quadtree grids, expecting UGRID mesh topology. The SFINCS Fortran
+executable writes the map output on a regular <em>(n, m)</em> structured grid — even for
+quadtree models — without any UGRID topology variables. <code>xugrid</code> raises:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="ne">ValueError</span><span class="p">:</span> <span class="n">The</span> <span class="n">file</span> <span class="ow">or</span> <span class="nb">object</span> <span class="n">does</span> <span class="ow">not</span> <span class="n">contain</span> <span class="n">UGRID</span> <span class="n">conventions</span> <span class="n">data</span><span class="o">.</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="n">One</span> <span class="ow">or</span> <span class="n">more</span> <span class="n">UGRID</span> <span class="n">topologies</span> <span class="n">are</span> <span class="n">required</span><span class="o">.</span>
+</span></code></pre></div>
+<p>This aborts the entire <code>output.read()</code> call, so history-file data (<code>point_zs</code>,
+<code>point_h</code>) is also lost even though <code>sfincs_his.nc</code> is plain NetCDF and would read fine.</p>
+<p><strong>Root cause</strong>:</p>
+<p>The SFINCS Fortran executable outputs map data on a flat <em>(n, m)</em> grid (dimensions
+matching the quadtree's structured index space) using SGRID conventions. The model's
+<code>sfincs.nc</code> stores <code>n</code> and <code>m</code> variables (indexed by <code>mesh2d_nFaces</code>) that map each
+UGRID face to its <em>(row, col)</em> position in this structured grid, but the map output
+itself contains no mesh topology.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1"># output.py, line 148-156 (upstream)</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">grid_type</span> <span class="o">==</span> <span class="s2">&quot;quadtree&quot;</span><span class="p">:</span>
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>    <span class="k">with</span> <span class="n">xu</span><span class="o">.</span><span class="n">load_dataset</span><span class="p">(</span><span class="n">fn_map</span><span class="p">)</span> <span class="k">as</span> <span class="n">ds</span><span class="p">:</span>     <span class="c1"># &lt;-- fails here</span>
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>        <span class="n">ds</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">set_coords</span><span class="p">([</span><span class="s2">&quot;mesh2d_node_x&quot;</span><span class="p">,</span> <span class="s2">&quot;mesh2d_node_y&quot;</span><span class="p">])</span>
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>        <span class="n">crs</span> <span class="o">=</span> <span class="n">ds</span><span class="p">[</span><span class="s2">&quot;crs&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
+</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>        <span class="n">ds</span><span class="o">.</span><span class="n">drop_vars</span><span class="p">(</span><span class="s2">&quot;crs&quot;</span><span class="p">)</span>
+</span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>        <span class="n">ds</span><span class="o">.</span><span class="n">grid</span><span class="o">.</span><span class="n">set_crs</span><span class="p">(</span><span class="n">CRS</span><span class="o">.</span><span class="n">from_user_input</span><span class="p">(</span><span class="n">crs</span><span class="p">))</span>
+</span><span id="__span-15-8"><a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="n">split_dataset</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span></code></pre></div>
+<p><strong>Suggested fix</strong>:</p>
+<p>When <code>xugrid.load_dataset</code> fails for a quadtree map file, read the file with plain
+<code>xarray</code>, re-index each <em>(n, m)</em> variable to the <code>mesh2d_nFaces</code> dimension using the
+<code>n</code>/<code>m</code> index arrays from the model grid, and wrap the result in a
+<code>xugrid.UgridDataset</code>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">grid_type</span> <span class="o">==</span> <span class="s2">&quot;quadtree&quot;</span><span class="p">:</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>    <span class="k">try</span><span class="p">:</span>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>        <span class="n">uds</span> <span class="o">=</span> <span class="n">xu</span><span class="o">.</span><span class="n">load_dataset</span><span class="p">(</span><span class="n">fn_map</span><span class="p">)</span>
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>        <span class="n">grid_ds</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">quadtree_grid</span><span class="o">.</span><span class="n">data</span>
+</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>        <span class="n">ugrid</span> <span class="o">=</span> <span class="n">grid_ds</span><span class="o">.</span><span class="n">ugrid</span><span class="o">.</span><span class="n">grid</span>
+</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>        <span class="n">n_idx</span> <span class="o">=</span> <span class="n">grid_ds</span><span class="p">[</span><span class="s2">&quot;n&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span> <span class="o">-</span> <span class="mi">1</span>   <span class="c1"># 0-indexed row</span>
+</span><span id="__span-16-8"><a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>        <span class="n">m_idx</span> <span class="o">=</span> <span class="n">grid_ds</span><span class="p">[</span><span class="s2">&quot;m&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span> <span class="o">-</span> <span class="mi">1</span>   <span class="c1"># 0-indexed col</span>
+</span><span id="__span-16-9"><a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a>
+</span><span id="__span-16-10"><a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a>        <span class="n">ds_map</span> <span class="o">=</span> <span class="n">xr</span><span class="o">.</span><span class="n">open_dataset</span><span class="p">(</span><span class="n">fn_map</span><span class="p">)</span>
+</span><span id="__span-16-11"><a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a>        <span class="n">face_vars</span> <span class="o">=</span> <span class="p">{}</span>
+</span><span id="__span-16-12"><a id="__codelineno-16-12" name="__codelineno-16-12" href="#__codelineno-16-12"></a>        <span class="k">for</span> <span class="n">vname</span><span class="p">,</span> <span class="n">da</span> <span class="ow">in</span> <span class="n">ds_map</span><span class="o">.</span><span class="n">data_vars</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+</span><span id="__span-16-13"><a id="__codelineno-16-13" name="__codelineno-16-13" href="#__codelineno-16-13"></a>            <span class="k">if</span> <span class="n">vname</span> <span class="ow">in</span> <span class="n">drop</span><span class="p">:</span>
+</span><span id="__span-16-14"><a id="__codelineno-16-14" name="__codelineno-16-14" href="#__codelineno-16-14"></a>                <span class="k">continue</span>
+</span><span id="__span-16-15"><a id="__codelineno-16-15" name="__codelineno-16-15" href="#__codelineno-16-15"></a>            <span class="n">dims</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">da</span><span class="o">.</span><span class="n">dims</span><span class="p">)</span>
+</span><span id="__span-16-16"><a id="__codelineno-16-16" name="__codelineno-16-16" href="#__codelineno-16-16"></a>            <span class="k">if</span> <span class="s2">&quot;n&quot;</span> <span class="ow">in</span> <span class="n">dims</span> <span class="ow">and</span> <span class="s2">&quot;m&quot;</span> <span class="ow">in</span> <span class="n">dims</span><span class="p">:</span>
+</span><span id="__span-16-17"><a id="__codelineno-16-17" name="__codelineno-16-17" href="#__codelineno-16-17"></a>                <span class="n">vals</span> <span class="o">=</span> <span class="n">da</span><span class="o">.</span><span class="n">values</span>
+</span><span id="__span-16-18"><a id="__codelineno-16-18" name="__codelineno-16-18" href="#__codelineno-16-18"></a>                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">dims</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>          <span class="c1"># (n, m) → (nFaces,)</span>
+</span><span id="__span-16-19"><a id="__codelineno-16-19" name="__codelineno-16-19" href="#__codelineno-16-19"></a>                    <span class="n">face_vars</span><span class="p">[</span><span class="n">vname</span><span class="p">]</span> <span class="o">=</span> <span class="n">xr</span><span class="o">.</span><span class="n">DataArray</span><span class="p">(</span>
+</span><span id="__span-16-20"><a id="__codelineno-16-20" name="__codelineno-16-20" href="#__codelineno-16-20"></a>                        <span class="n">vals</span><span class="p">[</span><span class="n">n_idx</span><span class="p">,</span> <span class="n">m_idx</span><span class="p">],</span>
+</span><span id="__span-16-21"><a id="__codelineno-16-21" name="__codelineno-16-21" href="#__codelineno-16-21"></a>                        <span class="n">dims</span><span class="o">=</span><span class="p">[</span><span class="n">ugrid</span><span class="o">.</span><span class="n">face_dimension</span><span class="p">],</span>
+</span><span id="__span-16-22"><a id="__codelineno-16-22" name="__codelineno-16-22" href="#__codelineno-16-22"></a>                    <span class="p">)</span>
+</span><span id="__span-16-23"><a id="__codelineno-16-23" name="__codelineno-16-23" href="#__codelineno-16-23"></a>                <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">dims</span><span class="p">)</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>        <span class="c1"># (time, n, m) → (time, nFaces)</span>
+</span><span id="__span-16-24"><a id="__codelineno-16-24" name="__codelineno-16-24" href="#__codelineno-16-24"></a>                    <span class="n">face_vars</span><span class="p">[</span><span class="n">vname</span><span class="p">]</span> <span class="o">=</span> <span class="n">xr</span><span class="o">.</span><span class="n">DataArray</span><span class="p">(</span>
+</span><span id="__span-16-25"><a id="__codelineno-16-25" name="__codelineno-16-25" href="#__codelineno-16-25"></a>                        <span class="n">vals</span><span class="p">[:,</span> <span class="n">n_idx</span><span class="p">,</span> <span class="n">m_idx</span><span class="p">],</span>
+</span><span id="__span-16-26"><a id="__codelineno-16-26" name="__codelineno-16-26" href="#__codelineno-16-26"></a>                        <span class="n">dims</span><span class="o">=</span><span class="p">[</span><span class="n">dims</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">ugrid</span><span class="o">.</span><span class="n">face_dimension</span><span class="p">],</span>
+</span><span id="__span-16-27"><a id="__codelineno-16-27" name="__codelineno-16-27" href="#__codelineno-16-27"></a>                        <span class="n">coords</span><span class="o">=</span><span class="p">{</span><span class="n">dims</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span> <span class="n">da</span><span class="o">.</span><span class="n">coords</span><span class="p">[</span><span class="n">dims</span><span class="p">[</span><span class="mi">0</span><span class="p">]]},</span>
+</span><span id="__span-16-28"><a id="__codelineno-16-28" name="__codelineno-16-28" href="#__codelineno-16-28"></a>                    <span class="p">)</span>
+</span><span id="__span-16-29"><a id="__codelineno-16-29" name="__codelineno-16-29" href="#__codelineno-16-29"></a>        <span class="n">ds_map</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+</span><span id="__span-16-30"><a id="__codelineno-16-30" name="__codelineno-16-30" href="#__codelineno-16-30"></a>        <span class="n">uds</span> <span class="o">=</span> <span class="n">xu</span><span class="o">.</span><span class="n">UgridDataset</span><span class="p">(</span><span class="n">xr</span><span class="o">.</span><span class="n">Dataset</span><span class="p">(</span><span class="n">face_vars</span><span class="p">),</span> <span class="n">grids</span><span class="o">=</span><span class="p">[</span><span class="n">ugrid</span><span class="p">])</span>
+</span><span id="__span-16-31"><a id="__codelineno-16-31" name="__codelineno-16-31" href="#__codelineno-16-31"></a>        <span class="n">uds</span><span class="o">.</span><span class="n">ugrid</span><span class="o">.</span><span class="n">grid</span><span class="o">.</span><span class="n">set_crs</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">crs</span><span class="p">)</span>
+</span><span id="__span-16-32"><a id="__codelineno-16-32" name="__codelineno-16-32" href="#__codelineno-16-32"></a>
+</span><span id="__span-16-33"><a id="__codelineno-16-33" name="__codelineno-16-33" href="#__codelineno-16-33"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">uds</span><span class="p">,</span> <span class="n">split_dataset</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span></code></pre></div>
+<p><strong>Current workaround</strong>:</p>
+<p><code>patch_quadtree_output_read()</code> in <code>_hydromt_compat.py</code> (called from
+<code>apply_all_patches()</code>) monkey-patches <code>SfincsOutput.read_map_file</code> to perform the
+re-indexing described above when the original <code>xugrid.load_dataset</code> call fails for
+quadtree grids.</p>
 
 
 
