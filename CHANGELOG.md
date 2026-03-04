@@ -9,6 +9,9 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 
+- NWM Coastal QGIS plugin with toolbar for basemap loading (NHF GeoPackage + CO-OPS
+    stations), polygon sketching and vertex editing, union with NHF divides, and
+    GeoJSON export.
 - Human-readable `__str__` methods on `WorkflowResult`, `DownloadResult`,
     `DownloadResults`, and `StageProgress` so that `print(result)` produces clean,
     indented output with friendly time formatting.
@@ -56,6 +59,11 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Update `_TEXAS_ZIP` path in test fixtures to match relocated archive at
+    `docs/examples/slurm/texas.zip`, restoring 18 previously-skipped SFINCS integration
+    tests.
+- Correct mock NOAA station IDs and coordinates in `test_sfincs_workflow` to fall within
+    the 0.1-degree spatial match radius of the pre-built model observation points.
 - Resolve all `ty` type-checker diagnostics across the codebase: invalid-assignment in
     `coops_api.get_datums`, stale `type: ignore` comments in `_hydromt_compat`,
     `download`, and `runner`, a possible `None` dereference in `logging` file-handler
