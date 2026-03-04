@@ -360,6 +360,10 @@ class StageProgress:
             return f"{minutes}m {seconds}s"
         return f"{seconds}s"
 
+    def __str__(self) -> str:
+        start = self.start_time.strftime("%H:%M:%S") if self.start_time else "-"
+        return f"{self.name}: {self.status.value} ({self.duration_str}, started {start})"
+
 
 class WorkflowMonitor:
     """Monitor and track workflow progress."""

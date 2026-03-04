@@ -40,6 +40,17 @@ class WorkflowResult:
             return (self.end_time - self.start_time).total_seconds()
         return None
 
+    @staticmethod
+    def _fmt_duration(seconds: float) -> str:
+        total = int(seconds)
+        h, remainder = divmod(total, 3600)
+        m, s = divmod(remainder, 60)
+        if h:
+            return f"{h}h {m}m {s}s"
+        if m:
+            return f"{m}m {s}s"
+        return f"{s}s"
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
@@ -66,6 +77,29 @@ class WorkflowResult:
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(self.to_dict(), indent=2))
+
+    def __str__(self) -> str:
+        status = "SUCCESS" if self.success else "FAILED"
+        start = self.start_time.strftime("%Y-%m-%d %H:%M:%S")
+        end = self.end_time.strftime("%Y-%m-%d %H:%M:%S") if self.end_time else "-"
+        dur = (
+            self._fmt_duration(self.duration_seconds) if self.duration_seconds is not None else "-"
+        )
+
+        lines = [
+            f"WorkflowResult: {status}",
+            f"  Start:     {start}",
+            f"  End:       {end}",
+            f"  Duration:  {dur}",
+        ]
+        if self.stages_completed:
+            lines.append(f"  Completed: {', '.join(self.stages_completed)}")
+        if self.stages_failed:
+            lines.append(f"  Failed:    {', '.join(self.stages_failed)}")
+        if self.errors:
+            lines.append("  Errors:")
+            lines.extend(f"    - {err}" for err in self.errors)
+        return "\n".join(lines)
 
 
 class CoastalCalibRunner:

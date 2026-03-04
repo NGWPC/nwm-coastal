@@ -271,6 +271,12 @@ class DownloadResult:
     file_paths: list[Path] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
+    def __str__(self) -> str:
+        status = "OK" if not self.errors else "ERRORS"
+        lines = [f"  {self.source}: {self.successful}/{self.total_files} files [{status}]"]
+        lines.extend(f"    - {err}" for err in self.errors)
+        return "\n".join(lines)
+
 
 @dataclass
 class DownloadResults:
@@ -288,6 +294,12 @@ class DownloadResults:
     def __iter__(self) -> Iterator[DownloadResult]:
         """Iterate over all download results."""
         return iter([self.meteo, self.hydro, self.coastal])
+
+    def __str__(self) -> str:
+        status = "ERRORS" if self.has_errors else "OK"
+        lines = [f"DownloadResults: {status}"]
+        lines.extend(str(result) for result in self)
+        return "\n".join(lines)
 
 
 # Domain mappings for URL builders
