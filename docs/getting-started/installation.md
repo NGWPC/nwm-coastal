@@ -95,6 +95,12 @@ pip install coastal-calibration[dev]
 pip install coastal-calibration[docs]
 ```
 
+## QGIS Plugin
+
+The repository includes a QGIS plugin for interactive AOI polygon creation. See the
+[QGIS Plugin guide](../user-guide/qgis-plugin.md) for installation and usage
+instructions.
+
 ## Verify Installation
 
 After installation, verify by running:

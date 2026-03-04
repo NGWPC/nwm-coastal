@@ -27,6 +27,9 @@ hindcast and operational forecast runs.
 - **SFINCS Model Creation**: Build SFINCS quadtree models from an AOI polygon with
     automatic NOAA DEM discovery, elevation/bathymetry, boundary cells, and subgrid
     tables
+- **QGIS Plugin**: Interactive domain definition with National HydroFabric basemaps,
+    polygon sketching, union with NHF divides, and GeoJSON export for the `create`
+    workflow
 - **Workflow Control**: `run` pipeline with `--start-from` / `--stop-after` support for
     partial workflows
 - **Configuration Inheritance**: Share common settings across multiple runs
