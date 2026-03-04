@@ -119,7 +119,7 @@ def clip_to_aoi(
     #
     # CPL_VSIL_CURL_CHUNK_SIZE: bytes per HTTP range request.
     #   Default 16 KB → ~125 000 requests for 2 GB of tiles.
-    #   10 MB → ~200 requests — 600× fewer round-trips.
+    #   10 MB → ~200 requests — 600x fewer round-trips.
     # VSI_CACHE_SIZE: in-memory cache for /vsicurl/ reads (100 MB).
     # GDAL_CACHEMAX: raster block cache in MB (512 MB).
     # GDAL_HTTP_MERGE_CONSECUTIVE_RANGES: merge adjacent byte-range
@@ -229,16 +229,15 @@ def compute_aoi_coverage(
             for col_off in range(0, src.width, block_size):
                 h = min(block_size, src.height - row_off)
                 w = min(block_size, src.width - col_off)
-                win = Window(col_off, row_off, w, h)
+                win = Window(col_off, row_off, w, h)  # ty: ignore[too-many-positional-arguments]
                 win_transform = src.window_transform(win)
 
-                # geometry_mask returns True *outside* geometries.
-                outside = geometry_mask(
+                inside = geometry_mask(
                     geometries,
                     out_shape=(h, w),
                     transform=win_transform,
+                    invert=True,
                 )
-                inside = ~outside
                 n_inside = int(inside.sum())
                 total_inside += n_inside
 
