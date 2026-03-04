@@ -43,46 +43,6 @@ class NWMCoastalPlugin:
         self._merged_layer: QgsVectorLayer | None = None
 
     # ------------------------------------------------------------------
-    # Plugin lifecycle
-    # ------------------------------------------------------------------
-
-    def initGui(self) -> None:  # noqa: N802
-        """Create the toolbar and register actions."""
-        self._toolbar = self.iface.addToolBar(PLUGIN_NAME)
-        self._toolbar.setObjectName("NWMCoastalToolbar")
-
-        self._add_action(
-            "mActionAddOgrLayer.svg", "Add Basemap", self._on_add_basemap
-        )
-        self._add_action(
-            "mActionCapturePolygon.svg", "Draw Polygon", self._on_draw_polygon
-        )
-        self._add_action(
-            "mActionNodeTool.svg", "Edit Polygon", self._on_edit_polygon
-        )
-        self._add_action(
-            "mActionMergeFeatures.svg",
-            "Union with NHF Divides",
-            self._on_union_divides,
-        )
-        self._add_action(
-            "mActionFileSaveAs.svg", "Save Polygon", self._on_save_polygon
-        )
-
-    def unload(self) -> None:
-        """Clean up toolbar, actions, and any active edits."""
-        if self._sketcher_layer is not None and self._sketcher_layer.isEditable():
-            self._sketcher_layer.commitChanges()
-
-        for action in self._actions:
-            self._toolbar.removeAction(action)
-        self._actions.clear()
-
-        if self._toolbar is not None:
-            del self._toolbar
-            self._toolbar = None
-
-    # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
 
@@ -105,59 +65,6 @@ class NWMCoastalPlugin:
         QgsMessageLog.logMessage(message, PLUGIN_NAME, level=level)
         if push:
             self.iface.messageBar().pushMessage(PLUGIN_NAME, message, level=level)
-
-    # ------------------------------------------------------------------
-    # Button 1: Add Basemap
-    # ------------------------------------------------------------------
-
-    def _on_add_basemap(self) -> None:
-        from .gui.dlg_basemap import BasemapDialog
-
-        dlg = BasemapDialog(self.iface.mainWindow())
-        if dlg.exec() != BasemapDialog.Accepted:
-            return
-
-        gpkg_path = dlg.gpkg_path
-        parquet_path = dlg.parquet_path
-        min_order = dlg.min_stream_order
-        project = QgsProject.instance()
-        root = project.layerTreeRoot()
-
-        # 1. OpenStreetMap (bottom layer)
-        osm_uri = (
-            "type=xyz"
-            "&url=https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-            "&zmax=19&zmin=0"
-        )
-        osm = QgsRasterLayer(osm_uri, "OpenStreetMap", "wms")
-        if osm.isValid():
-            project.addMapLayer(osm, False)
-            root.insertLayer(-1, osm)
-        else:
-            self._log("Failed to load OpenStreetMap.", Qgis.MessageLevel.Warning, push=True)
-
-        # 2. divides (polygon: transparent fill, black edge 0.1)
-        self._add_gpkg_layer(gpkg_path, "divides", project, self._style_divides)
-
-        # 3. flowpaths (linestring: blue, width 1, filtered)
-        self._add_gpkg_layer(
-            gpkg_path,
-            "flowpaths",
-            project,
-            lambda lyr: self._style_flowpaths(lyr, min_order),
-        )
-
-        # 4. gages (point: red, size 3) — optional
-        self._add_gpkg_layer(gpkg_path, "gages", project, self._style_gages, optional=True)
-
-        # 5. nexus (point: green, size 2) — optional
-        self._add_gpkg_layer(gpkg_path, "nexus", project, self._style_nexus, optional=True)
-
-        # 6. CO-OPS stations (point: orange star, size 7)
-        self._add_coops_layer(parquet_path, project)
-
-        self.iface.mapCanvas().refresh()
-        self._log("Basemap layers loaded.", Qgis.MessageLevel.Success, push=True)
 
     def _add_gpkg_layer(
         self,
@@ -248,6 +155,55 @@ class NWMCoastalPlugin:
         layer.renderer().setSymbol(symbol)
 
     # ------------------------------------------------------------------
+    # Button 1: Add Basemap
+    # ------------------------------------------------------------------
+
+    def _on_add_basemap(self) -> None:
+        from .gui.dlg_basemap import BasemapDialog
+
+        dlg = BasemapDialog(self.iface.mainWindow())
+        if dlg.exec() != BasemapDialog.Accepted:
+            return
+
+        gpkg_path = dlg.gpkg_path
+        parquet_path = dlg.parquet_path
+        min_order = dlg.min_stream_order
+        project = QgsProject.instance()
+        root = project.layerTreeRoot()
+
+        # 1. OpenStreetMap (bottom layer)
+        osm_uri = "type=xyz&url=https://tile.openstreetmap.org/{z}/{x}/{y}.png&zmax=19&zmin=0"
+        osm = QgsRasterLayer(osm_uri, "OpenStreetMap", "wms")
+        if osm.isValid():
+            project.addMapLayer(osm, False)
+            root.insertLayer(-1, osm)
+        else:
+            self._log("Failed to load OpenStreetMap.", Qgis.MessageLevel.Warning, push=True)
+
+        # 2. divides (polygon: transparent fill, black edge 0.1)
+        self._add_gpkg_layer(gpkg_path, "divides", project, self._style_divides)
+
+        # 3. flowpaths (linestring: blue, width 1, filtered)
+        self._add_gpkg_layer(
+            gpkg_path,
+            "flowpaths",
+            project,
+            lambda lyr: self._style_flowpaths(lyr, min_order),
+        )
+
+        # 4. gages (point: red, size 3) — optional
+        self._add_gpkg_layer(gpkg_path, "gages", project, self._style_gages, optional=True)
+
+        # 5. nexus (point: green, size 2) — optional
+        self._add_gpkg_layer(gpkg_path, "nexus", project, self._style_nexus, optional=True)
+
+        # 6. CO-OPS stations (point: orange star, size 7)
+        self._add_coops_layer(parquet_path, project)
+
+        self.iface.mapCanvas().refresh()
+        self._log("Basemap layers loaded.", Qgis.MessageLevel.Success, push=True)
+
+    # ------------------------------------------------------------------
     # Button 2: Draw Polygon
     # ------------------------------------------------------------------
 
@@ -325,6 +281,55 @@ class NWMCoastalPlugin:
     # Button 4: Union with NHF Divides
     # ------------------------------------------------------------------
 
+    def _collect_intersecting_divides(
+        self,
+        sketcher_geom: QgsGeometry,
+        divides_layer: QgsVectorLayer,
+    ) -> list[QgsGeometry]:
+        """Return geometries of divides that intersect *sketcher_geom*."""
+        request = QgsFeatureRequest().setFilterRect(sketcher_geom.boundingBox())
+        return [
+            feat.geometry()
+            for feat in divides_layer.getFeatures(request)
+            if sketcher_geom.intersects(feat.geometry())
+        ]
+
+    @staticmethod
+    def _union_and_clean(geometries: list[QgsGeometry]) -> QgsGeometry:
+        """Union *geometries*, collapse multiparts, and strip interior rings."""
+        union_geom = QgsGeometry.unaryUnion(geometries)
+        if union_geom.isMultipart():
+            union_geom = QgsGeometry.unaryUnion(union_geom.asGeometryCollection())
+
+        if union_geom.isMultipart():
+            largest = max(union_geom.asGeometryCollection(), key=lambda g: g.area())
+            polygon = largest.asPolygon()[0]
+        else:
+            polygon = union_geom.asPolygon()[0]
+        return QgsGeometry.fromPolygonXY([polygon])
+
+    def _create_merged_layer(self, crs_authid: str, geom: QgsGeometry) -> QgsVectorLayer:
+        """Create a styled memory layer containing *geom* and register it."""
+        from qgis.core import QgsFeature
+
+        layer = QgsVectorLayer(f"Polygon?crs={crs_authid}", "merged_polygon", "memory")
+
+        symbol = QgsFillSymbol.createSimple({})
+        symbol.deleteSymbolLayer(0)
+        fill = QgsSimpleFillSymbolLayer()
+        fill.setColor(QColor(50, 205, 50, 80))  # lime green, ~30% opacity
+        fill.setStrokeColor(QColor(0, 128, 0))
+        fill.setStrokeWidth(0.5)
+        symbol.appendSymbolLayer(fill)
+        layer.renderer().setSymbol(symbol)
+
+        layer.startEditing()
+        feat = QgsFeature()
+        feat.setGeometry(geom)
+        layer.addFeature(feat)
+        layer.commitChanges()
+        return layer
+
     def _on_union_divides(self) -> None:
         """Union the sketcher polygon with all intersecting NHF divides.
 
@@ -334,9 +339,7 @@ class NWMCoastalPlugin:
         """
         if self._sketcher_layer is None:
             self._log(
-                "No polygon layer. Use 'Draw Polygon' first.",
-                Qgis.MessageLevel.Warning,
-                push=True,
+                "No polygon layer. Use 'Draw Polygon' first.", Qgis.MessageLevel.Warning, push=True
             )
             return
 
@@ -362,7 +365,6 @@ class NWMCoastalPlugin:
             )
             return
 
-        # Find the divides layer
         divides_layers = project.mapLayersByName("divides")
         if not divides_layers:
             self._log(
@@ -371,98 +373,35 @@ class NWMCoastalPlugin:
                 push=True,
             )
             return
-        divides_layer = divides_layers[0]
 
-        # Get the sketcher polygon geometry
-        sketcher_feat = next(self._sketcher_layer.getFeatures())
-        sketcher_geom = sketcher_feat.geometry()
-
-        # Transform sketcher geometry to divides CRS if they differ
+        sketcher_geom = next(self._sketcher_layer.getFeatures()).geometry()
         sketcher_crs = self._sketcher_layer.crs()
-        divides_crs = divides_layer.crs()
+        divides_crs = divides_layers[0].crs()
 
         if sketcher_crs != divides_crs:
-            to_divides = QgsCoordinateTransform(sketcher_crs, divides_crs, project)
             sketcher_geom_div = QgsGeometry(sketcher_geom)
-            sketcher_geom_div.transform(to_divides)
+            sketcher_geom_div.transform(QgsCoordinateTransform(sketcher_crs, divides_crs, project))
         else:
             sketcher_geom_div = sketcher_geom
 
-        # Spatial query: find divides that intersect with the sketcher polygon
-        request = QgsFeatureRequest().setFilterRect(sketcher_geom_div.boundingBox())
-        geometries = [sketcher_geom_div]
-        n_intersecting = 0
-        for feat in divides_layer.getFeatures(request):
-            feat_geom = feat.geometry()
-            if sketcher_geom_div.intersects(feat_geom):
-                geometries.append(feat_geom)
-                n_intersecting += 1
-
-        if n_intersecting == 0:
-            self._log(
-                "No divides intersect the drawn polygon.",
-                Qgis.MessageLevel.Info,
-                push=True,
-            )
+        intersecting = self._collect_intersecting_divides(sketcher_geom_div, divides_layers[0])
+        if not intersecting:
+            self._log("No divides intersect the drawn polygon.", Qgis.MessageLevel.Info, push=True)
             return
 
-        # Union all geometries using native GEOS operation (in divides CRS)
-        union_geom = QgsGeometry.unaryUnion(geometries)
+        union_geom = self._union_and_clean([sketcher_geom_div, *intersecting])
 
-        # If result is MultiPolygon, merge into single polygon
-        if union_geom.isMultipart():
-            parts = union_geom.asGeometryCollection()
-            union_geom = QgsGeometry.unaryUnion(parts)
-
-        # Remove interior rings (holes) by keeping only the exterior ring
-        if union_geom.isMultipart():
-            largest = max(union_geom.asGeometryCollection(), key=lambda g: g.area())
-            exterior = QgsGeometry.fromPolygonXY([largest.asPolygon()[0]])
-        else:
-            exterior = QgsGeometry.fromPolygonXY([union_geom.asPolygon()[0]])
-        union_geom = exterior
-
-        # Transform union result back to sketcher CRS if needed
         if sketcher_crs != divides_crs:
-            to_sketcher = QgsCoordinateTransform(divides_crs, sketcher_crs, project)
-            union_geom.transform(to_sketcher)
+            union_geom.transform(QgsCoordinateTransform(divides_crs, sketcher_crs, project))
 
-        # Remove previous merged layer if it exists
-        if self._merged_layer is not None:
-            if project.mapLayer(self._merged_layer.id()) is not None:
-                project.removeMapLayer(self._merged_layer.id())
-            self._merged_layer = None
+        if self._merged_layer is not None and project.mapLayer(self._merged_layer.id()) is not None:
+            project.removeMapLayer(self._merged_layer.id())
 
-        # Create a new merged layer with the union result
-        crs_str = sketcher_crs.authid()
-        self._merged_layer = QgsVectorLayer(
-            f"Polygon?crs={crs_str}", "merged_polygon", "memory"
-        )
-
-        # Style: semi-transparent green fill to distinguish from sketcher
-        symbol = QgsFillSymbol.createSimple({})
-        symbol.deleteSymbolLayer(0)
-        fill = QgsSimpleFillSymbolLayer()
-        fill.setColor(QColor(50, 205, 50, 80))  # lime green, ~30% opacity
-        fill.setStrokeColor(QColor(0, 128, 0))
-        fill.setStrokeWidth(0.5)
-        symbol.appendSymbolLayer(fill)
-        self._merged_layer.renderer().setSymbol(symbol)
-
-        # Add the union feature
-        from qgis.core import QgsFeature
-
-        self._merged_layer.startEditing()
-        feat = QgsFeature()
-        feat.setGeometry(union_geom)
-        self._merged_layer.addFeature(feat)
-        self._merged_layer.commitChanges()
-
+        self._merged_layer = self._create_merged_layer(sketcher_crs.authid(), union_geom)
         project.addMapLayer(self._merged_layer)
-
         self.iface.mapCanvas().refresh()
         self._log(
-            f"Union complete: merged with {n_intersecting} divides.",
+            f"Union complete: merged with {len(intersecting)} divides.",
             Qgis.MessageLevel.Success,
             push=True,
         )
@@ -524,3 +463,35 @@ class NWMCoastalPlugin:
             self._log(f"Polygon saved to {save_path}", Qgis.MessageLevel.Success, push=True)
         else:
             self._log(f"Error saving polygon: {error_msg}", Qgis.MessageLevel.Critical, push=True)
+
+    # ------------------------------------------------------------------
+    # Plugin lifecycle
+    # ------------------------------------------------------------------
+
+    def initGui(self) -> None:  # noqa: N802
+        """Create the toolbar and register actions."""
+        self._toolbar = self.iface.addToolBar(PLUGIN_NAME)
+        self._toolbar.setObjectName("NWMCoastalToolbar")
+
+        self._add_action("mActionAddOgrLayer.svg", "Add Basemap", self._on_add_basemap)
+        self._add_action("mActionCapturePolygon.svg", "Draw Polygon", self._on_draw_polygon)
+        self._add_action("mActionNodeTool.svg", "Edit Polygon", self._on_edit_polygon)
+        self._add_action(
+            "mActionMergeFeatures.svg",
+            "Union with NHF Divides",
+            self._on_union_divides,
+        )
+        self._add_action("mActionFileSaveAs.svg", "Save Polygon", self._on_save_polygon)
+
+    def unload(self) -> None:
+        """Clean up toolbar, actions, and any active edits."""
+        if self._sketcher_layer is not None and self._sketcher_layer.isEditable():
+            self._sketcher_layer.commitChanges()
+
+        for action in self._actions:
+            self._toolbar.removeAction(action)
+        self._actions.clear()
+
+        if self._toolbar is not None:
+            del self._toolbar
+            self._toolbar = None
