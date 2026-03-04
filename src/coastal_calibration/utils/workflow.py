@@ -12,7 +12,6 @@ that are more naturally expressed in Python.
 
 from __future__ import annotations
 
-import logging
 import os
 import re
 import subprocess
@@ -30,9 +29,6 @@ def _validate_date_string(date_string: str) -> None:
         raise ValueError(
             f"date_string must be exactly 10 digits in YYYYMMDDHH format, got {date_string!r}"
         )
-
-
-logger = logging.getLogger(__name__)
 
 
 def pre_nwm_forcing_coastal(

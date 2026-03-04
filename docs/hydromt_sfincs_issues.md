@@ -159,7 +159,7 @@ inside the HDF5 C library (`H5VL__native_blob_specific` → `H5T__vlen_disk_isnu
 which raises `SIGTERM`/`SIGSEGV` rather than a Python exception. The process is killed
 before the except clause can execute.
 
-### Reproduction
+**Reproduction**:
 
 1. Run a SFINCS pipeline that writes `sfincs_netbndbzsbzifile.nc` with 119,903 stations
     (e.g. from un-interpolated STOFS data).
@@ -430,7 +430,7 @@ propagates before the `in` check can execute, and the `else` branch
 (`data_catalog.get_geodataframe`) — which is the correct code path for new models — is
 never reached.
 
-### Reproduction
+**Reproduction**:
 
 ```python
 from hydromt_sfincs import SfincsModel
@@ -472,3 +472,91 @@ into the model instance's `__dict__` under the key `"geoms"` when the component 
 missing. Python's normal attribute lookup finds the instance dict entry before falling
 through to `__getattr__`, so `self.geoms` resolves to `{}` and the `in` check evaluates
 to `False`.
+
+______________________________________________________________________
+
+## 11. `read_map_file` fails for quadtree grids (missing UGRID topology)
+
+**Summary**:
+
+`SfincsOutput.read_map_file()` (`output.py`, line 149) calls `xugrid.load_dataset()` on
+`sfincs_map.nc` for quadtree grids, expecting UGRID mesh topology. The SFINCS Fortran
+executable writes the map output on a regular *(n, m)* structured grid — even for
+quadtree models — without any UGRID topology variables. `xugrid` raises:
+
+```python
+ValueError: The file or object does not contain UGRID conventions data.
+One or more UGRID topologies are required.
+```
+
+This aborts the entire `output.read()` call, so history-file data (`point_zs`,
+`point_h`) is also lost even though `sfincs_his.nc` is plain NetCDF and would read fine.
+
+**Root cause**:
+
+The SFINCS Fortran executable outputs map data on a flat *(n, m)* grid (dimensions
+matching the quadtree's structured index space) using SGRID conventions. The model's
+`sfincs.nc` stores `n` and `m` variables (indexed by `mesh2d_nFaces`) that map each
+UGRID face to its *(row, col)* position in this structured grid, but the map output
+itself contains no mesh topology.
+
+```python
+# output.py, line 148-156 (upstream)
+elif self.model.grid_type == "quadtree":
+    with xu.load_dataset(fn_map) as ds:     # <-- fails here
+        ds = ds.set_coords(["mesh2d_node_x", "mesh2d_node_y"])
+        crs = ds["crs"].values
+        ds.drop_vars("crs")
+        ds.grid.set_crs(CRS.from_user_input(crs))
+        self.set(ds, split_dataset=True)
+```
+
+**Suggested fix**:
+
+When `xugrid.load_dataset` fails for a quadtree map file, read the file with plain
+`xarray`, re-index each *(n, m)* variable to the `mesh2d_nFaces` dimension using the
+`n`/`m` index arrays from the model grid, and wrap the result in a
+`xugrid.UgridDataset`:
+
+```python
+elif self.model.grid_type == "quadtree":
+    try:
+        uds = xu.load_dataset(fn_map)
+    except Exception:
+        grid_ds = self.model.quadtree_grid.data
+        ugrid = grid_ds.ugrid.grid
+        n_idx = grid_ds["n"].values - 1   # 0-indexed row
+        m_idx = grid_ds["m"].values - 1   # 0-indexed col
+
+        ds_map = xr.open_dataset(fn_map)
+        face_vars = {}
+        for vname, da in ds_map.data_vars.items():
+            if vname in drop:
+                continue
+            dims = list(da.dims)
+            if "n" in dims and "m" in dims:
+                vals = da.values
+                if len(dims) == 2:          # (n, m) → (nFaces,)
+                    face_vars[vname] = xr.DataArray(
+                        vals[n_idx, m_idx],
+                        dims=[ugrid.face_dimension],
+                    )
+                elif len(dims) == 3:        # (time, n, m) → (time, nFaces)
+                    face_vars[vname] = xr.DataArray(
+                        vals[:, n_idx, m_idx],
+                        dims=[dims[0], ugrid.face_dimension],
+                        coords={dims[0]: da.coords[dims[0]]},
+                    )
+        ds_map.close()
+        uds = xu.UgridDataset(xr.Dataset(face_vars), grids=[ugrid])
+        uds.ugrid.grid.set_crs(self.model.crs)
+
+    self.set(uds, split_dataset=True)
+```
+
+**Current workaround**:
+
+`patch_quadtree_output_read()` in `_hydromt_compat.py` (called from
+`apply_all_patches()`) monkey-patches `SfincsOutput.read_map_file` to perform the
+re-indexing described above when the original `xugrid.load_dataset` call fails for
+quadtree grids.

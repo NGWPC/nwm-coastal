@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import contextlib
-import logging
 import os
 import platform
 import re
 import subprocess
 
-logger = logging.getLogger(__name__)
+from coastal_calibration.utils.logging import logger
 
 
 def get_cpu_count() -> int:

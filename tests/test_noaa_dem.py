@@ -1,7 +1,7 @@
 """Tests for the NOAA DEM discovery and fetch utilities.
 
 Covers index loading, spatial querying, dataset selection, URL
-construction, and the fetch workflow with mocked rioxarray I/O.
+construction, and the fetch workflow with mocked GDAL CLI.
 
 Run with::
 
@@ -19,14 +19,14 @@ import numpy as np
 import pytest
 import yaml
 
-from coastal_calibration.utils.noaa_dem import (
+from coastal_calibration.utils.topobathy_noaa import (
     _overlap_fraction,
     get_vrt_url,
     load_index,
     query_overlapping,
     select_best,
 )
-from coastal_calibration.utils.topobathy import _write_catalog
+from coastal_calibration.utils.topobathy_nws import _write_catalog
 
 # ------------------------------------------------------------------
 # Fixtures
@@ -246,6 +246,12 @@ class TestGetVrtUrl:
 # ------------------------------------------------------------------
 
 
+def _mock_clip_side_effect(input_path, cutline_path, output_path, **kwargs):
+    """Create a dummy output file when clip_to_aoi is called."""
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+    Path(output_path).write_bytes(b"\x00" * 100)
+
+
 def _make_mock_da(dtype: str = "float32") -> MagicMock:
     """Create a mock DataArray with proper rioxarray attributes."""
     mock_da = MagicMock()
@@ -270,15 +276,29 @@ def _make_mock_da(dtype: str = "float32") -> MagicMock:
     return mock_da
 
 
+def _mock_localize_vrt(vrt_url, local_path, *, bbox=None):
+    """Create a dummy VRT file when _localize_vrt is called."""
+    Path(local_path).parent.mkdir(parents=True, exist_ok=True)
+    Path(local_path).write_text("<VRTDataset/>")
+    return 4  # pretend 4 tiles retained
+
+
 class TestFetchNoaaDem:
-    """Test fetch_noaa_dem with mocked rioxarray."""
+    """Test fetch_noaa_dem with mocked GDAL CLI."""
+
+    _VRT_PATCH = "coastal_calibration.utils.topobathy_noaa._localize_vrt"
+    _CLIP_PATCH = "coastal_calibration.utils._gdal.clip_to_aoi"
+    _COVERAGE_PATCH = "coastal_calibration.utils._gdal.compute_aoi_coverage"
 
     def test_fetch_with_auto_discovery(self, aoi_file: Path, tmp_path: Path) -> None:
         output_dir = tmp_path / "downloads"
-        mock_da = _make_mock_da("float32")
 
-        with patch("rioxarray.open_rasterio", return_value=mock_da):
-            from coastal_calibration.utils.noaa_dem import fetch_noaa_dem
+        with (
+            patch(self._VRT_PATCH, side_effect=_mock_localize_vrt),
+            patch(self._CLIP_PATCH, side_effect=_mock_clip_side_effect),
+            patch(self._COVERAGE_PATCH, return_value=85.0),
+        ):
+            from coastal_calibration.utils.topobathy_noaa import fetch_noaa_dem
 
             tif, cat, name = fetch_noaa_dem(
                 aoi=aoi_file,
@@ -287,17 +307,19 @@ class TestFetchNoaaDem:
 
         assert tif.exists()
         assert cat.exists()
-        assert name == "noaa_topobathy"
+        assert name == "noaa_3m"
         # Catalog YAML should reference the tif
-        assert "noaa_topobathy.tif" in cat.read_text()
+        assert "noaa_3m.tif" in cat.read_text()
 
     def test_fetch_with_explicit_dataset(self, aoi_file: Path, tmp_path: Path) -> None:
         output_dir = tmp_path / "downloads"
-        mock_da = _make_mock_da("float64")
-        mock_da.astype.return_value = mock_da
 
-        with patch("rioxarray.open_rasterio", return_value=mock_da):
-            from coastal_calibration.utils.noaa_dem import fetch_noaa_dem
+        with (
+            patch(self._VRT_PATCH, side_effect=_mock_localize_vrt),
+            patch(self._CLIP_PATCH, side_effect=_mock_clip_side_effect),
+            patch(self._COVERAGE_PATCH, return_value=85.0),
+        ):
+            from coastal_calibration.utils.topobathy_noaa import fetch_noaa_dem
 
             tif, _cat, name = fetch_noaa_dem(
                 aoi=aoi_file,
@@ -308,11 +330,9 @@ class TestFetchNoaaDem:
 
         assert name == "my_dem"
         assert tif.name == "my_dem.tif"
-        # float64 should trigger astype
-        mock_da.astype.assert_called_once_with("float32")
 
     def test_fetch_unknown_dataset_raises(self, aoi_file: Path, tmp_path: Path) -> None:
-        from coastal_calibration.utils.noaa_dem import fetch_noaa_dem
+        from coastal_calibration.utils.topobathy_noaa import fetch_noaa_dem
 
         with pytest.raises(ValueError, match="not found in NOAA DEM index"):
             fetch_noaa_dem(
@@ -321,38 +341,36 @@ class TestFetchNoaaDem:
                 dataset_name="NONEXISTENT_DEM",
             )
 
-    def test_nodata_masking_uses_equality(self, aoi_file: Path, tmp_path: Path) -> None:
-        """Ensure nodata masking uses ``!=`` so negative bathymetry is preserved."""
+    def test_clip_receives_local_vrt(self, aoi_file: Path, tmp_path: Path) -> None:
+        """clip_to_aoi should receive a local VRT path (not /vsicurl/)."""
         output_dir = tmp_path / "downloads"
-        mock_da = _make_mock_da("float32")
-        # Set a nodata value to activate the masking branch.
-        mock_da.rio.nodata = -9999.0
 
-        with patch("rioxarray.open_rasterio", return_value=mock_da):
-            from coastal_calibration.utils.noaa_dem import fetch_noaa_dem
+        with (
+            patch(self._VRT_PATCH, side_effect=_mock_localize_vrt),
+            patch(self._CLIP_PATCH, side_effect=_mock_clip_side_effect) as mock_clip,
+            patch(self._COVERAGE_PATCH, return_value=85.0),
+        ):
+            from coastal_calibration.utils.topobathy_noaa import fetch_noaa_dem
 
             fetch_noaa_dem(aoi=aoi_file, output_dir=output_dir)
 
-        # The .where() call should use ``da != nodata_val`` (not ``da > nodata_val``).
-        mock_da.where.assert_called_once()
-        call_args = mock_da.where.call_args
-        # First positional arg is the condition; verify it was built with __ne__.
-        assert call_args[1].get("drop") is False
+        mock_clip.assert_called_once()
+        input_arg = mock_clip.call_args[0][0]
+        assert Path(input_arg).name == "noaa_dem.vrt"
 
-    def test_clip_box_uses_geographic_crs(self, aoi_file: Path, tmp_path: Path) -> None:
-        """Buffer should be applied in EPSG:4326, not the dataset's native CRS."""
+    def test_low_coverage_raises(self, aoi_file: Path, tmp_path: Path) -> None:
+        """Coverage below 10% should raise a ValueError."""
         output_dir = tmp_path / "downloads"
-        mock_da = _make_mock_da("float32")
 
-        with patch("rioxarray.open_rasterio", return_value=mock_da):
-            from coastal_calibration.utils.noaa_dem import fetch_noaa_dem
+        with (
+            patch(self._VRT_PATCH, side_effect=_mock_localize_vrt),
+            patch(self._CLIP_PATCH, side_effect=_mock_clip_side_effect),
+            patch(self._COVERAGE_PATCH, return_value=5.0),
+        ):
+            from coastal_calibration.utils.topobathy_noaa import fetch_noaa_dem
 
-            fetch_noaa_dem(aoi=aoi_file, output_dir=output_dir)
-
-        # clip_box should be called with crs="EPSG:4326" regardless of dataset CRS.
-        mock_da.rio.clip_box.assert_called_once()
-        call_kwargs = mock_da.rio.clip_box.call_args[1]
-        assert call_kwargs["crs"] == "EPSG:4326"
+            with pytest.raises(ValueError, match=r"5\.0%.*coverage"):
+                fetch_noaa_dem(aoi=aoi_file, output_dir=output_dir)
 
 
 # ------------------------------------------------------------------
@@ -368,7 +386,7 @@ class TestWriteCatalog:
         _write_catalog(cat, "dem.tif", 32617)
 
         data = yaml.safe_load(cat.read_text())
-        assert data["nws_topobathy"]["metadata"]["crs"] == 32617
+        assert data["nws_30m"]["metadata"]["crs"] == 32617
 
     def test_rejects_non_integer(self, tmp_path: Path) -> None:
         """_write_catalog produces a clean integer EPSG in the YAML.
@@ -382,7 +400,7 @@ class TestWriteCatalog:
         _write_catalog(cat, "dem.tif", 4326)
 
         data = yaml.safe_load(cat.read_text())
-        assert isinstance(data["nws_topobathy"]["metadata"]["crs"], int)
+        assert isinstance(data["nws_30m"]["metadata"]["crs"], int)
 
 
 # ------------------------------------------------------------------
@@ -410,13 +428,17 @@ class TestFetchTopobathyBuffer:
             patch("icechunk.s3_storage"),
             patch("icechunk.Repository.open", return_value=mock_repo),
             patch("xarray.open_zarr", return_value=mock_zarr),
+            patch(
+                "coastal_calibration.utils._gdal.clip_to_aoi",
+                side_effect=_mock_clip_side_effect,
+            ),
         ):
             import geopandas as gpd
 
             mock_gdf = gpd.read_file(aoi_file)
             mock_read.return_value = mock_gdf
 
-            from coastal_calibration.utils.topobathy import fetch_topobathy
+            from coastal_calibration.utils.topobathy_nws import fetch_topobathy
 
             fetch_topobathy(
                 domain="atlgulf",

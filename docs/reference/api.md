@@ -11,6 +11,7 @@ This page provides detailed documentation for the NWM Coastal Python API.
       show_source: true
       members:
         - from_yaml
+        - from_dict
         - to_yaml
         - to_dict
         - validate
@@ -57,6 +58,7 @@ This page provides detailed documentation for the NWM Coastal Python API.
       show_source: true
       members:
         - from_yaml
+        - from_dict
         - to_yaml
         - to_dict
         - validate

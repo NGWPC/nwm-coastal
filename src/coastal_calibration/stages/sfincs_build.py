@@ -11,7 +11,6 @@ module-level registry keyed by config ``id``.
 
 from __future__ import annotations
 
-import contextlib
 import math
 import os
 import shutil
@@ -50,6 +49,9 @@ def _plotable_stations(
     A station is plotable only when *both* its simulated and observed
     time-series contain finite values — a comparison plot with only
     one series is not useful.
+
+    The returned list is sorted by numeric station ID so that figures
+    are deterministic across runs.
     """
     result: list[tuple[str, int]] = []
     for i, sid in enumerate(station_ids):
@@ -59,6 +61,10 @@ def _plotable_stations(
             has_obs = bool(np.isfinite(obs_ds.water_level.sel(station=sid)).any())
         if has_sim and has_obs:
             result.append((sid, i))
+    try:
+        result.sort(key=lambda pair: int(pair[0]))
+    except ValueError:
+        result.sort(key=lambda pair: pair[0])
     return result
 
 
@@ -123,7 +129,7 @@ def _get_model(config: CoastalCalibConfig) -> SfincsModel:
     inp_file = root / "sfincs.inp"
     if not inp_file.exists():
         raise RuntimeError(
-            "SFINCS model not initialised and no sfincs.inp found at "
+            "SFINCS model not initialized and no sfincs.inp found at "
             f"{root}.  Ensure the 'sfincs_init' stage runs first."
         )
 
@@ -206,7 +212,7 @@ def _clip_meteo_to_domain(
         Name of the meteo component (``"precipitation"``, ``"wind"``,
         or ``"pressure"``).
     buffer : float
-        Extra metres around the model region bounds to include.
+        Extra meters around the model region bounds to include.
         Default 10 km gives SFINCS comfortable headroom for
         interpolation near the boundary.
 
@@ -398,14 +404,14 @@ class _SfincsStageBase(WorkflowStage):
 
 
 class SfincsInitStage(_SfincsStageBase):
-    """Initialise the SFINCS model (pre-built mode).
+    """Initialize the SFINCS model (pre-built mode).
 
     Copies pre-built model files to the output directory, opens the model
     in ``r+`` mode, reads it, and clears missing file references.
     """
 
     name = "sfincs_init"
-    description = "Initialise SFINCS model (pre-built)"
+    description = "Initialize SFINCS model (pre-built)"
 
     #: Config attributes that reference external files.  When a pre-built
     #: ``sfincs.inp`` lists placeholder names for files that haven't been
@@ -445,7 +451,7 @@ class SfincsInitStage(_SfincsStageBase):
     #: Generated files that downstream stages will recreate.
     #: Stale files from a previous run can crash the HDF5 library when
     #: ``write_netcdf_safely`` (or a lazy ``model.read()``) tries to open
-    #: them, so we delete them at the start of every fresh initialisation.
+    #: them, so we delete them at the start of every fresh initialization.
     _STALE_OUTPUT_FILES: tuple[str, ...] = (
         "sfincs_netbndbzsbzifile.nc",
         "sfincs_netamuv.nc",
@@ -463,11 +469,21 @@ class SfincsInitStage(_SfincsStageBase):
     #: the pre-built model are always picked up.  Without overwriting,
     #: a stale file from a previous run would persist and cause silent
     #: errors (e.g. wrong boundary cells, wrong grid, etc.).
+    #:
+    #: ``sfincs_subgrid.nc`` must also be overwritten because it is
+    #: tightly coupled to the quadtree grid topology stored in
+    #: ``sfincs.nc``.  A stale subgrid file left by a previous run
+    #: with a different grid (e.g. different refinement) has a
+    #: different number of cells, causing SFINCS to read mismatched
+    #: bed-level data and produce incorrect (flat) water-level output.
     _ALWAYS_OVERWRITE_FILES: tuple[str, ...] = (
         "sfincs.inp",
         "sfincs.nc",
         "sfincs.bnd",
         "sfincs.obs",
+        "sfincs_subgrid.nc",
+        "sfincs.src",
+        "sfincs.dis",
     )
 
     def _remove_stale_outputs(self, root: Path) -> None:
@@ -545,7 +561,7 @@ class SfincsInitStage(_SfincsStageBase):
 
         _set_model(self.config, model)
 
-        self._log(f"SFINCS model initialised (grid_type={model.grid_type}) at {root}")
+        self._log(f"SFINCS model initialized (grid_type={model.grid_type}) at {root}")
 
         return {
             "model_root": str(root),
@@ -633,12 +649,12 @@ class SfincsForcingStage(_SfincsStageBase):
 
     @staticmethod
     def _parse_quadtree_bnd(nc_path: Path) -> list[tuple[float, float, str]]:
-        """Extract boundary-cell face centres from a quadtree ``sfincs.nc``.
+        """Extract boundary-cell face centers from a quadtree ``sfincs.nc``.
 
         For quadtree grids HydroMT-SFINCS stores boundary info in the
         mask array (value 2) inside ``sfincs.nc`` instead of writing a
         separate ``.bnd`` file.  This helper reads the UGRID mesh
-        connectivity, computes face centres for boundary cells, and
+        connectivity, computes face centers for boundary cells, and
         returns them in the same ``(x, y, name)`` format as
         :meth:`_parse_bnd_file`.
         """
@@ -647,14 +663,14 @@ class SfincsForcingStage(_SfincsStageBase):
 
         ds = xr.open_dataset(nc_path)
         try:
-            mask = ds["mask"].values
+            mask = ds["mask"].to_numpy()
             bnd_idx = np.where(mask == 2)[0]
             if len(bnd_idx) == 0:
                 return []
 
-            node_x = ds["mesh2d_node_x"].values
-            node_y = ds["mesh2d_node_y"].values
-            face_nodes = ds["mesh2d_face_nodes"].values  # (nFaces, max_nodes)
+            node_x = ds["mesh2d_node_x"].to_numpy()
+            node_y = ds["mesh2d_node_y"].to_numpy()
+            face_nodes = ds["mesh2d_face_nodes"].to_numpy()  # (nFaces, max_nodes)
 
             face_x = np.array(
                 [
@@ -682,7 +698,7 @@ class SfincsForcingStage(_SfincsStageBase):
     def _parse_regular_grid_bnd(
         model: SfincsModel,
     ) -> list[tuple[float, float, str]]:
-        """Extract boundary-cell centres from a regular-grid mask.
+        """Extract boundary-cell centers from a regular-grid mask.
 
         HydroMT-SFINCS marks boundary cells as ``mask==2`` but does not
         always write a separate ``.bnd`` file for regular grids.  This
@@ -699,8 +715,8 @@ class SfincsForcingStage(_SfincsStageBase):
         if len(y_idx) == 0:
             return []
 
-        x_coords = msk_var.coords["x"].values
-        y_coords = msk_var.coords["y"].values
+        x_coords = msk_var.coords["x"].to_numpy()
+        y_coords = msk_var.coords["y"].to_numpy()
         bnd_x = x_coords[x_idx]
         bnd_y = y_coords[y_idx]
 
@@ -1057,7 +1073,7 @@ class SfincsForcingStage(_SfincsStageBase):
         values : ndarray, shape (T, N)
             Timeseries values at each source point.
         k : int
-            Number of nearest neighbours to use (capped at N).
+            Number of nearest neighbors to use (capped at N).
 
         Returns
         -------
@@ -1215,326 +1231,6 @@ class SfincsForcingStage(_SfincsStageBase):
         return {"status": "completed", "source": wl_geodataset}
 
 
-class SfincsObservationPointsStage(_SfincsStageBase):
-    """Add observation points to the model."""
-
-    name = "sfincs_obs"
-    description = "Add observation points"
-
-    #: Bed-elevation threshold (m): cells at or above this are "dry".
-    _SNAP_DEPTH_THRESHOLD: float = -0.1
-    #: Maximum search radius (m) when looking for a replacement wet cell.
-    _SNAP_SEARCH_RADIUS_M: float = 1000.0
-
-    def _add_noaa_gages(self, model: SfincsModel) -> int:
-        """Query NOAA CO-OPS and add water-level stations as observation points.
-
-        Parameters
-        ----------
-        model : SfincsModel
-            Initialised SFINCS model with a region and CRS.
-
-        Returns
-        -------
-        int
-            Number of NOAA stations added.
-        """
-        from coastal_calibration.coops_api import COOPSAPIClient
-
-        model_crs = model.crs
-        if model_crs is None:
-            self._log("Model CRS is undefined, cannot add NOAA CO-OPS stations")
-            return 0
-
-        # Get domain boundary in EPSG:4326 (lon/lat) for the COOPS query
-        region_4326 = model.region.to_crs(4326)
-        domain_geom = region_4326.union_all()
-
-        client = COOPSAPIClient()
-        stations_gdf = client.stations_metadata
-        selected = stations_gdf[stations_gdf.within(domain_geom)]
-
-        if selected.empty:
-            self._log("No NOAA CO-OPS stations found within model domain")
-            return 0
-
-        # Keep only stations with valid MSL/MLLW datums so that the
-        # plotting stage can convert observations from MLLW to MSL.
-        candidate_ids = selected["station_id"].tolist()
-        valid_ids = client.filter_stations_by_datum(candidate_ids)
-        dropped = set(candidate_ids) - valid_ids
-        if dropped:
-            self._log(
-                f"Excluded {len(dropped)} station(s) without datum data: "
-                f"{', '.join(sorted(dropped))}",
-                "warning",
-            )
-        selected = selected[selected["station_id"].isin(sorted(valid_ids))]
-        if selected.empty:
-            self._log("No NOAA CO-OPS stations with valid datum data in domain")
-            return 0
-
-        # Skip stations that already have an observation point nearby.
-        # Pre-built models may use a different naming convention
-        # (e.g. ``Sargent (8772985)`` vs ``noaa_8772985``), so we
-        # compare projected coordinates rather than names.  Two points
-        # within ``dedup_distance_m`` metres are considered the same
-        # location.
-        dedup_distance_m = 100.0
-        existing_points: list[tuple[float, float]] = []
-        try:
-            gdf = model.observation_points.data
-            if gdf is not None and not gdf.empty:
-                existing_points = [(geom.x, geom.y) for geom in gdf.geometry if geom is not None]
-        except Exception:  # noqa: S110
-            pass
-
-        # Project selected stations into the model CRS
-        selected_projected = selected.to_crs(model_crs)
-
-        added = 0
-        for _, row in selected_projected.iterrows():
-            cx, cy = row.geometry.x, row.geometry.y
-            if any(math.hypot(cx - ex, cy - ey) < dedup_distance_m for ex, ey in existing_points):
-                continue
-            sid = row["station_id"]
-            model.observation_points.add_point(x=cx, y=cy, name=f"noaa_{sid}")
-            # Track the new point so subsequent iterations can dedup
-            # against it within the same batch.
-            existing_points.append((cx, cy))
-            added += 1
-
-        return added
-
-    # ------------------------------------------------------------------
-    # Observation-point snapping
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def _grid_face_centres(grid_ds: xr.Dataset) -> tuple[Any, Any, Any, Any]:
-        """Compute face centres, bed elevations, and mask from a UGRID mesh.
-
-        Returns ``(fx, fy, z_elev, mask_arr)`` as numpy arrays.
-        """
-        import numpy as np
-
-        z_elev = grid_ds["z"].values
-        mask_arr = grid_ds["mask"].values
-
-        face_nodes_raw = grid_ds["mesh2d_face_nodes"].values
-        fn_valid = ~np.isnan(face_nodes_raw)
-        fn_int = np.zeros(face_nodes_raw.shape, dtype=int)
-        fn_int[fn_valid] = face_nodes_raw[fn_valid].astype(int)
-        nodes_x = grid_ds.coords["mesh2d_node_x"].values
-        nodes_y = grid_ds.coords["mesh2d_node_y"].values
-        fx = np.nanmean(np.where(fn_valid, nodes_x[fn_int], np.nan), axis=1)
-        fy = np.nanmean(np.where(fn_valid, nodes_y[fn_int], np.nan), axis=1)
-        return fx, fy, z_elev, mask_arr
-
-    def _try_snap_point(
-        self,
-        obs_gdf: Any,
-        idx: int,
-        tree: Any,
-        fx: Any,
-        fy: Any,
-        z_elev: Any,
-        mask_arr: Any,
-        depth_threshold: float,
-        search_radius: float,
-    ) -> bool | None:
-        """Snap a single observation point if its cell is dry.
-
-        Returns ``True`` if the point was moved, ``None`` otherwise.
-        """
-        import numpy as np
-        from shapely.geometry import Point
-
-        geom = obs_gdf.geometry.iloc[idx]
-        if geom is None:
-            return None
-        ox, oy = geom.x, geom.y
-        name = obs_gdf.index[idx] if obs_gdf.index.name else str(idx)
-        with contextlib.suppress(KeyError, IndexError):
-            name = obs_gdf["name"].iloc[idx]
-
-        _, cell_idx = tree.query([ox, oy])
-        cell_z = z_elev[cell_idx]
-        if cell_z < depth_threshold:
-            return None  # already wet
-
-        candidates = tree.query_ball_point([ox, oy], r=search_radius)
-        cand_arr = np.array(candidates) if candidates else np.array([], dtype=int)
-        if len(cand_arr) == 0:
-            self._log(
-                f"  {name}: z={cell_z:.3f} m (dry), no cells within {search_radius:.0f} m",
-                "warning",
-            )
-            return None
-
-        wet = (z_elev[cand_arr] < depth_threshold) & (mask_arr[cand_arr] > 0)
-        if not np.any(wet):
-            self._log(
-                f"  {name}: z={cell_z:.3f} m (dry), no wet cell within {search_radius:.0f} m",
-                "warning",
-            )
-            return None
-
-        wet_idxs = cand_arr[wet]
-        wet_dists = np.sqrt((fx[wet_idxs] - ox) ** 2 + (fy[wet_idxs] - oy) ** 2)
-        best = wet_idxs[np.argmin(wet_dists)]
-        new_z = z_elev[best]
-        move_dist = float(np.min(wet_dists))
-
-        obs_gdf.geometry.iloc[idx] = Point(float(fx[best]), float(fy[best]))
-        self._log(
-            f"  {name}: snapped from z={cell_z:.3f} m to z={new_z:.3f} m ({move_dist:.0f} m away)"
-        )
-        return True
-
-    def _snap_obs_to_wet_cells(self, model: SfincsModel) -> int:
-        """Relocate observation points on dry cells to the nearest wet cell.
-
-        A cell is considered "dry" when its bed elevation is at or above
-        ``_SNAP_DEPTH_THRESHOLD``.
-
-        Returns the number of points that were relocated.
-        """
-        import numpy as np
-        import xarray as xr
-        from scipy.spatial import KDTree
-
-        depth_threshold = self._SNAP_DEPTH_THRESHOLD
-        search_radius = self._SNAP_SEARCH_RADIUS_M
-
-        obs_gdf = model.observation_points.data
-        if obs_gdf is None or obs_gdf.empty:
-            return 0
-
-        # Read the combined grid file (sfincs.nc) directly — the model
-        # splits grid/elevation/mask into separate HydroMT components,
-        # but the written NetCDF merges them into one file.
-        grid_path = get_model_root(self.config) / "sfincs.nc"
-        if not grid_path.exists():
-            self._log("sfincs.nc not found - cannot snap observation points", "warning")
-            return 0
-
-        with xr.open_dataset(grid_path) as grid_ds:
-            fx, fy, z_elev, mask_arr = self._grid_face_centres(grid_ds)
-        tree = KDTree(np.column_stack([fx, fy]))
-
-        snapped = 0
-        for idx in range(len(obs_gdf)):
-            result = self._try_snap_point(
-                obs_gdf, idx, tree, fx, fy, z_elev, mask_arr, depth_threshold, search_radius
-            )
-            if result is not None:
-                snapped += 1
-
-        if snapped > 0:
-            model.observation_points._data = obs_gdf
-        return snapped
-
-    def _write_obs_station_map(self, model: SfincsModel) -> None:
-        """Write ``obs_station_map.json`` mapping obs indices to station IDs.
-
-        The file is written next to the model files so the plot stage
-        can read it instead of re-discovering the mapping via name
-        parsing or spatial proximity.
-        """
-        import json
-
-        obs_gdf = model.observation_points.data
-        if obs_gdf is None or obs_gdf.empty:
-            return
-
-        station_map: list[dict[str, Any]] = []
-        for idx in range(len(obs_gdf)):
-            name = ""
-            with contextlib.suppress(KeyError, IndexError):
-                name = str(obs_gdf["name"].iloc[idx])
-            if not name:
-                with contextlib.suppress(Exception):
-                    name = str(obs_gdf.index[idx])
-
-            # Extract NOAA station ID from the "noaa_<id>" naming convention.
-            station_id = ""
-            if name.startswith("noaa_"):
-                station_id = name[len("noaa_") :]
-
-            geom = obs_gdf.geometry.iloc[idx]
-            entry: dict[str, Any] = {
-                "index": idx,
-                "name": name,
-                "x": float(geom.x) if geom else None,
-                "y": float(geom.y) if geom else None,
-            }
-            if station_id:
-                entry["station_id"] = station_id
-            station_map.append(entry)
-
-        map_path = get_model_root(self.config) / "obs_station_map.json"
-        map_path.write_text(json.dumps(station_map, indent=2))
-
-    def run(self) -> dict[str, Any]:
-        """Add observation points from config, file, and/or NOAA gages."""
-        model = _get_model(self.config)
-
-        has_file = self.sfincs.observation_locations_file is not None
-        has_points = bool(self.sfincs.observation_points)
-        has_noaa = self.sfincs.include_noaa_gages
-
-        if not has_file and not has_points and not has_noaa:
-            self._log("No observation points configured, skipping")
-            return {"status": "skipped"}
-
-        self._update_substep("Adding observation points")
-
-        # When merge=False, clear existing observation points first
-        if not self.sfincs.merge_observations:
-            try:
-                existing = model.observation_points.nr_points
-                if existing > 0:
-                    model.observation_points.clear()
-                    self._log(f"Cleared {existing} existing observation point(s)")
-            except Exception:  # noqa: S110
-                pass  # No existing points to clear
-
-        if has_file:
-            model.observation_points.create(
-                locations=str(self.sfincs.observation_locations_file),
-                merge=self.sfincs.merge_observations,
-            )
-            self._log(f"Observation points added from {self.sfincs.observation_locations_file}")
-        elif has_points:
-            for pt in self.sfincs.observation_points:
-                model.observation_points.add_point(
-                    x=pt["x"],
-                    y=pt["y"],
-                    name=pt.get("name", f"obs_{self.sfincs.observation_points.index(pt)}"),
-                )
-            self._log(f"Added {len(self.sfincs.observation_points)} observation point(s)")
-
-        noaa_count = 0
-        if has_noaa:
-            self._update_substep("Querying NOAA CO-OPS stations")
-            noaa_count = self._add_noaa_gages(model)
-            self._log(f"Added {noaa_count} NOAA CO-OPS observation point(s)")
-
-        # Snap observation points that sit on dry cells to the nearest
-        # wet cell so that they produce dynamic water-level output.
-        snapped = self._snap_obs_to_wet_cells(model)
-        if snapped:
-            self._log(f"Snapped {snapped} observation point(s) to nearest wet cell")
-
-        # Persist obs-index → station-ID mapping so downstream stages
-        # (e.g. plotting) can look it up directly instead of re-matching
-        # by name or spatial proximity.
-        self._write_obs_station_map(model)
-
-        return {"status": "completed", "noaa_stations": noaa_count}
-
-
 class SfincsDischargeStage(_SfincsStageBase):
     """Add discharge source points to the model."""
 
@@ -1573,7 +1269,7 @@ class SfincsDischargeStage(_SfincsStageBase):
         SFINCS grids.  For regular grids the cell index is computed
         arithmetically via ``SfincsGrid.get_indices_at_points`` (O(1)
         per point, handles rotated grids).  For quadtree grids a KDTree
-        lookup over face centres is used.
+        lookup over face centers is used.
 
         Returns
         -------
@@ -1862,11 +1558,15 @@ class SfincsPlotStage(_SfincsStageBase):
     """Plot simulated water levels against NOAA CO-OPS observations.
 
     After the SFINCS run, this stage reads ``point_zs`` (water surface
-    elevation) from the model output (``sfincs_his.nc``), identifies
-    observation points whose names start with ``noaa_`` (added by
-    :class:`SfincsObservationPointsStage`), fetches observed water levels
-    from the NOAA CO-OPS API, and produces a comparison time-series
-    figure saved to ``<model_root>/figs/``.
+    elevation) from the model output (``sfincs_his.nc``), spatially
+    matches each model observation point to the nearest NOAA CO-OPS
+    tide-gauge station, fetches observed water levels from the CO-OPS
+    API, and produces a comparison time-series figure saved to
+    ``<model_root>/figs/``.
+
+    Station matching is purely spatial (KDTree nearest-neighbor in
+    WGS 84) so the stage works with **any** SFINCS model — not only
+    models created by this package.
 
     Observations are fetched in MLLW (universally supported by all
     CO-OPS stations) and then converted to MSL using per-station datum
@@ -1877,11 +1577,16 @@ class SfincsPlotStage(_SfincsStageBase):
 
     * The model output file (``sfincs_his.nc``) does not exist.
     * No ``point_zs`` (or ``point_h``) variable is present in the output.
-    * No observation points with the ``noaa_`` prefix are found.
+    * No observation points are within range of a NOAA CO-OPS station.
     """
 
     name = "sfincs_plot"
     description = "Plot simulated vs observed water levels"
+
+    #: Maximum distance (degrees) between an observation point and a NOAA
+    #: station to consider them a match.  0.1° ≈ 11 km — generous because
+    #: obs points may be snapped to wet cells some distance from the gauge.
+    _NOAA_MATCH_RADIUS_DEG: float = 0.1
 
     @staticmethod
     def _station_dim(point_h: Any) -> str:
@@ -2086,7 +1791,22 @@ class SfincsPlotStage(_SfincsStageBase):
         return obs_ds
 
     def _match_noaa_stations(self) -> tuple[list[int], list[str]]:
-        """Read the obs → station-ID mapping written by :class:`SfincsObsStage`.
+        """Find the nearest NOAA CO-OPS station for each observation point.
+
+        Uses a spatial lookup so that the run workflow works with **any**
+        SFINCS model, not only models created by this package.
+
+        Steps:
+
+        1. Read observation-point coordinates from the loaded model.
+        2. Reproject to WGS 84.
+        3. Query the full NOAA CO-OPS station catalog and build a KDTree.
+        4. For each observation point, find the nearest station within
+           :attr:`_NOAA_MATCH_RADIUS_DEG`.
+        5. Keep only stations that have valid MSL and MLLW datum values
+           (required for the MLLW → MSL conversion in the comparison plot).
+        6. Deduplicate — if multiple obs points match the same station,
+           keep the closest one.
 
         Returns
         -------
@@ -2095,33 +1815,99 @@ class SfincsPlotStage(_SfincsStageBase):
         noaa_station_ids : list[str]
             Corresponding CO-OPS station IDs (same order as *noaa_indices*).
         """
-        import json
+        import numpy as np
+        from scipy.spatial import KDTree
 
-        map_path = get_model_root(self.config) / "obs_station_map.json"
-        entries = json.loads(map_path.read_text())
-        noaa_indices = [e["index"] for e in entries if "station_id" in e]
-        noaa_station_ids = [e["station_id"] for e in entries if "station_id" in e]
+        from coastal_calibration.coops_api import COOPSAPIClient
+
+        model = _get_model(self.config)
+
+        obs_gdf = model.observation_points.data
+        if obs_gdf is None or obs_gdf.empty:
+            return [], []
+
+        # Reproject observation points to WGS 84 for comparison with the
+        # NOAA station catalog (also in EPSG:4326).
+        obs_4326 = obs_gdf.to_crs(4326)
+        obs_xy = np.column_stack(
+            [
+                obs_4326.geometry.x.to_numpy(),
+                obs_4326.geometry.y.to_numpy(),
+            ]
+        )
+
+        client = COOPSAPIClient()
+        stations_gdf = client.stations_metadata
+        if stations_gdf.empty:
+            self._log("NOAA station catalog is empty", "warning")
+            return [], []
+
+        sta_xy = np.column_stack(
+            [
+                stations_gdf.geometry.x.to_numpy(),
+                stations_gdf.geometry.y.to_numpy(),
+            ]
+        )
+        sta_ids = stations_gdf["station_id"].to_numpy()
+        tree = KDTree(sta_xy)
+
+        # For each observation point, find the nearest NOAA station.
+        dists, idxs = tree.query(obs_xy)
+        radius = self._NOAA_MATCH_RADIUS_DEG
+
+        # Collect (obs_index, station_id, distance) for matches within radius.
+        candidates: dict[str, tuple[int, float]] = {}  # sid → (obs_idx, dist)
+        for obs_idx, (dist, sta_idx) in enumerate(zip(dists, idxs, strict=True)):
+            if dist > radius:
+                continue
+            sid = str(sta_ids[sta_idx])
+            # Deduplicate: keep the closest obs point per station.
+            if sid not in candidates or dist < candidates[sid][1]:
+                candidates[sid] = (obs_idx, float(dist))
+
+        if not candidates:
+            return [], []
+
+        # Validate datum availability (same filter as the create step).
+        valid_ids = client.filter_stations_by_datum(list(candidates.keys()))
+        dropped = set(candidates.keys()) - valid_ids
+        if dropped:
+            self._log(
+                f"Excluded {len(dropped)} station(s) without datum data: "
+                f"{', '.join(sorted(dropped))}",
+                "warning",
+            )
+
+        # Build the final lists, sorted by observation-point index.
+        pairs = sorted(
+            ((obs_idx, sid) for sid, (obs_idx, _) in candidates.items() if sid in valid_ids),
+            key=lambda t: t[0],
+        )
+        noaa_indices = [p[0] for p in pairs]
+        noaa_station_ids = [p[1] for p in pairs]
+
+        self._log(
+            f"Matched {len(noaa_station_ids)} observation point(s) "
+            f"to NOAA station(s): {', '.join(noaa_station_ids)}"
+        )
         return noaa_indices, noaa_station_ids
 
-    def run(self) -> dict[str, Any]:
-        """Read SFINCS output, fetch NOAA observations, and plot comparison."""
-        model_root = get_model_root(self.config)
-        his_file = model_root / "sfincs_his.nc"
+    def _read_point_zs(self, his_file: Path) -> xr.DataArray | None:
+        """Read ``point_zs`` (or ``point_h``) from SFINCS output.
 
-        if not his_file.exists():
-            self._log("sfincs_his.nc not found, skipping plot stage")
-            return {"status": "skipped", "reason": "no output"}
-
-        self._update_substep("Reading SFINCS output")
+        Tries HydroMT's output reader first, then falls back to a
+        direct :mod:`xarray` open of *sfincs_his.nc*.
+        """
         # Reuse the model already in the registry (read during init)
         # instead of opening a fresh SfincsModel.  Creating a new model
         # and calling read() can fail for quadtree grids when the
         # written sfincs.nc is not fully UGRID-compatible.
         mod = _get_model(self.config)
 
-        # Try reading output via the HydroMT component first; fall back
-        # to a direct xarray open of sfincs_his.nc when the output
-        # component fails (e.g. quadtree map output lacks UGRID topology).
+        # Read output via HydroMT (the compat patch in
+        # _hydromt_compat.patch_quadtree_output_read handles the
+        # missing UGRID topology in quadtree map files).  Fall back
+        # to a direct xarray open when HydroMT still fails.
         point_zs: xr.DataArray | None = None
         try:
             mod.output.read()
@@ -2134,7 +1920,6 @@ class SfincsPlotStage(_SfincsStageBase):
             self._log(f"HydroMT output.read() failed ({exc}), reading sfincs_his.nc directly")
 
         if point_zs is None:
-            # Direct read of the history file (always plain NetCDF).
             import xarray as xr_mod
 
             his_ds = xr_mod.open_dataset(his_file)
@@ -2144,6 +1929,20 @@ class SfincsPlotStage(_SfincsStageBase):
                     if var == "point_h":
                         self._log("point_zs not found, falling back to point_h (water depth)")
                     break
+
+        return point_zs
+
+    def run(self) -> dict[str, Any]:
+        """Read SFINCS output, fetch NOAA observations, and plot comparison."""
+        model_root = get_model_root(self.config)
+        his_file = model_root / "sfincs_his.nc"
+
+        if not his_file.exists():
+            self._log("sfincs_his.nc not found, skipping plot stage")
+            return {"status": "skipped", "reason": "no output"}
+
+        self._update_substep("Reading SFINCS output")
+        point_zs = self._read_point_zs(his_file)
 
         if point_zs is None:
             self._log("No point_zs or point_h in output, skipping plot stage")
@@ -2156,6 +1955,22 @@ class SfincsPlotStage(_SfincsStageBase):
         if not noaa_station_ids:
             self._log("No NOAA observation points found, skipping plot stage")
             return {"status": "skipped", "reason": "no noaa stations"}
+
+        # Guard against matched station indices that exceed the number
+        # of observation points in the current model output.
+        n_stations = point_zs.sizes[station_dim]
+        valid = [
+            (idx, sid)
+            for idx, sid in zip(noaa_indices, noaa_station_ids, strict=False)
+            if idx < n_stations
+        ]
+        if not valid:
+            self._log("All NOAA station indices are out of bounds, skipping plot stage")
+            return {"status": "skipped", "reason": "noaa indices out of bounds"}
+        if len(valid) < len(noaa_indices):
+            dropped = len(noaa_indices) - len(valid)
+            self._log(f"Dropped {dropped} NOAA station(s) with out-of-bounds indices")
+        noaa_indices, noaa_station_ids = [v[0] for v in valid], [v[1] for v in valid]
 
         # Extract numpy arrays from xarray for the selected NOAA stations
         sim_times = point_zs["time"].to_numpy()

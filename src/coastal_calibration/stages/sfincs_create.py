@@ -11,6 +11,9 @@ as :mod:`coastal_calibration.stages.sfincs_build`.
 
 from __future__ import annotations
 
+import contextlib
+import json
+import math
 import os
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
@@ -172,18 +175,18 @@ class _CreateStageBase(CreateStage):
 
 
 class CreateGridStage(CreateStage):
-    """Initialise a new ``SfincsModel`` and generate the quadtree grid."""
+    """Initialize a new ``SfincsModel`` and generate the quadtree grid."""
 
     name = "create_grid"
     description = "Create SFINCS grid from AOI"
 
     def run(self) -> dict[str, Any]:
-        """Initialise SfincsModel and generate the quadtree grid."""
+        """Initialize SfincsModel and generate the quadtree grid."""
         from hydromt_sfincs import SfincsModel
 
         cfg = self.config
 
-        self._update_substep("Initialising SfincsModel")
+        self._update_substep("Initializing SfincsModel")
         sf = SfincsModel(
             root=str(cfg.output_dir),
             mode="w+",
@@ -206,7 +209,7 @@ class CreateGridStage(CreateStage):
 
             # HydroMT's quadtree builder compares polygon coordinates
             # directly against the grid (no CRS reprojection).  Determine
-            # the grid CRS first so we can reproject + buffer in metres.
+            # the grid CRS first so we can reproject + buffer in meters.
             grid_crs_str = cfg.grid.crs
             if grid_crs_str == "utm":
                 aoi_gdf = gpd.read_file(str(cfg.aoi))
@@ -220,7 +223,7 @@ class CreateGridStage(CreateStage):
             parts: list[gpd.GeoDataFrame] = []
             for ref in cfg.grid.refinement:
                 gdf = gpd.read_file(ref.polygon)
-                # Reproject to the grid CRS first (buffer is in metres).
+                # Reproject to the grid CRS first (buffer is in meters).
                 if gdf.crs is not None and gdf.crs != target_crs:
                     gdf = gdf.to_crs(target_crs)
                 # Apply inward buffer (negative = shrink) so that
@@ -229,14 +232,32 @@ class CreateGridStage(CreateStage):
                 if ref.buffer_m != 0.0:
                     gdf = gdf.copy()
                     gdf["geometry"] = gdf.geometry.buffer(ref.buffer_m)
+                    # Drop geometries that collapsed to empty after buffering.
+                    empty = gdf.geometry.is_empty
+                    if empty.any():
+                        n_dropped = int(empty.sum())
+                        self._log(
+                            f"Refinement polygon '{ref.polygon.name}': "
+                            f"{n_dropped} geometry(ies) collapsed to empty after "
+                            f"buffer_m={ref.buffer_m} m — dropped",
+                            "warning",
+                        )
+                        gdf = gdf[~empty]
+                if gdf.empty:
+                    continue
                 gdf["refinement_level"] = ref.level
                 parts.append(gdf)
-            refinement_gdf = gpd.GeoDataFrame(pd.concat(parts, ignore_index=True))
-
-            self._log(
-                f"Refinement: {len(cfg.grid.refinement)} polygon(s), "
-                f"max level {max(r.level for r in cfg.grid.refinement)}"
-            )
+            if parts:
+                refinement_gdf = gpd.GeoDataFrame(pd.concat(parts, ignore_index=True))
+                self._log(
+                    f"Refinement: {len(parts)} polygon(s), "
+                    f"max level {max(r.level for r in cfg.grid.refinement)}"
+                )
+            else:
+                self._log(
+                    "All refinement polygons collapsed after buffering — building uniform grid",
+                    "warning",
+                )
 
         with _suppress_stdout():
             sf.quadtree_grid.create_from_region(
@@ -253,11 +274,16 @@ class CreateGridStage(CreateStage):
         return {"status": "completed"}
 
 
-class CreateFetchElevationStage(_CreateStageBase):
-    """Fetch NOAA DEM(s) for the AOI before elevation creation."""
+class CreateFetchDataStage(_CreateStageBase):
+    """Fetch elevation and land-cover data for the AOI.
 
-    name = "create_fetch_elevation"
-    description = "Fetch NOAA topobathy DEM for AOI"
+    Dispatches to source-specific fetchers based on the ``source``
+    field of each :class:`ElevationDataset` and the ``lulc_source``
+    field of :class:`SubgridConfig`.
+    """
+
+    name = "create_fetch_data"
+    description = "Fetch elevation and land cover data for AOI"
 
     def _register_catalog(self, catalog_path: Path) -> None:
         """Add *catalog_path* to both config data_libs and the live model."""
@@ -266,16 +292,13 @@ class CreateFetchElevationStage(_CreateStageBase):
             self.config.data_catalog.data_libs.append(path_str)
         self.sfincs.data_catalog.from_yml(path_str)
 
-    def run(self) -> dict[str, Any]:
-        """Discover and download NOAA DEM(s) overlapping the AOI."""
-        from coastal_calibration.utils.noaa_dem import fetch_noaa_dem
-
+    def _fetch_elevation(self, fetched: list[str]) -> None:
+        """Fetch elevation datasets that have a ``source`` set."""
         cfg = self.config
         dl_dir = cfg.effective_download_dir
 
-        fetched: list[str] = []
         for ds in cfg.elevation.datasets:
-            if ds.source != "noaa":
+            if ds.source is None:
                 continue
 
             catalog_name = ds.name
@@ -289,20 +312,105 @@ class CreateFetchElevationStage(_CreateStageBase):
                 fetched.append(catalog_name)
                 continue
 
-            self._update_substep(f"Fetching NOAA DEM for '{catalog_name}'")
-            _, cat_path, _ = fetch_noaa_dem(
-                aoi=cfg.aoi,
-                output_dir=dl_dir,
-                dataset_name=ds.noaa_dataset,
-                buffer_deg=0.1,
-                catalog_name=catalog_name,
-                log=self._log,
-            )
+            if ds.source == "nws_30m":
+                from coastal_calibration.utils.topobathy_nws import fetch_topobathy
+
+                if ds.coastal_domain is None:
+                    raise ValueError(
+                        f"elevation.datasets[{ds.name}].coastal_domain is required "
+                        f"when source is 'nws_30m'"
+                    )
+                self._update_substep(f"Fetching NWS topobathy for '{catalog_name}'")
+                _, cat_path, _ = fetch_topobathy(
+                    domain=ds.coastal_domain,
+                    aoi=cfg.aoi,
+                    output_dir=dl_dir,
+                    buffer_deg=0.1,
+                    catalog_name=catalog_name,
+                    log=self._log,
+                )
+            elif ds.source == "noaa_3m":
+                from coastal_calibration.utils.topobathy_noaa import fetch_noaa_dem
+
+                self._update_substep(f"Fetching NOAA DEM for '{catalog_name}'")
+                _, cat_path, _ = fetch_noaa_dem(
+                    aoi=cfg.aoi,
+                    output_dir=dl_dir,
+                    dataset_name=ds.noaa_dataset,
+                    buffer_deg=0.1,
+                    catalog_name=catalog_name,
+                    log=self._log,
+                )
+            elif ds.source == "copdem_30m":
+                from coastal_calibration.utils.copdem import fetch_copdem30
+
+                self._update_substep(f"Fetching Copernicus DEM 30m for '{catalog_name}'")
+                _, cat_path, _ = fetch_copdem30(
+                    aoi=cfg.aoi,
+                    output_dir=dl_dir,
+                    catalog_name=catalog_name,
+                    log=self._log,
+                )
+            elif ds.source == "gebco_15arcs":
+                from coastal_calibration.utils.gebco_wms import fetch_gebco
+
+                self._update_substep(f"Fetching GEBCO 15-arcsec bathymetry for '{catalog_name}'")
+                _, cat_path, _ = fetch_gebco(
+                    aoi=cfg.aoi,
+                    output_dir=dl_dir,
+                    catalog_name=catalog_name,
+                    log=self._log,
+                )
+            else:
+                raise ValueError(f"Unknown elevation source: {ds.source!r}")
+
             self._register_catalog(cat_path)
             fetched.append(catalog_name)
 
-        self._log(f"Fetched {len(fetched)} NOAA DEM(s): {fetched}")
+    def _fetch_lulc(self, fetched: list[str]) -> None:
+        """Fetch the LULC dataset if ``lulc_source`` is set."""
+        cfg = self.config
+        if cfg.subgrid.lulc_source is None:
+            return
+
+        dl_dir = cfg.effective_download_dir
+        lulc_name = cfg.subgrid.lulc_dataset
+        tif = dl_dir / f"{lulc_name}.tif"
+        cat = dl_dir / f"{lulc_name}_catalog.yml"
+
+        if tif.exists() and cat.exists():
+            self._log(f"Reusing existing {tif.name}")
+            self._register_catalog(cat)
+            fetched.append(lulc_name)
+            return
+
+        if cfg.subgrid.lulc_source == "esa_worldcover":
+            from coastal_calibration.utils.esa_worldcover import fetch_esa_worldcover
+
+            self._update_substep(f"Fetching ESA WorldCover for '{lulc_name}'")
+            _, cat_path, _ = fetch_esa_worldcover(
+                aoi=cfg.aoi,
+                output_dir=dl_dir,
+                catalog_name=lulc_name,
+                log=self._log,
+            )
+        else:
+            raise ValueError(f"Unknown LULC source: {cfg.subgrid.lulc_source!r}")
+
+        self._register_catalog(cat_path)
+        fetched.append(lulc_name)
+
+    def run(self) -> dict[str, Any]:
+        """Fetch elevation and LULC datasets for the AOI."""
+        fetched: list[str] = []
+        self._fetch_elevation(fetched)
+        self._fetch_lulc(fetched)
+        self._log(f"Fetched {len(fetched)} dataset(s): {fetched}")
         return {"status": "completed", "fetched": fetched}
+
+
+# Backward-compatible alias.
+CreateFetchElevationStage = CreateFetchDataStage
 
 
 class CreateElevationStage(_CreateStageBase):
@@ -442,7 +550,7 @@ class CreateDischargeStage(_CreateStageBase):
             try:
                 ds = xr.open_dataset(paths[0])
                 try:
-                    nwm_ids = set(ds["feature_id"].values.tolist())
+                    nwm_ids = set(ds["feature_id"].to_numpy().tolist())
                 finally:
                     ds.close()
             except Exception as exc:
@@ -513,7 +621,7 @@ class CreateDischargeStage(_CreateStageBase):
         For each point, if it already sits on an active cell (``mask == 1``)
         it is kept as-is.  Otherwise the nearest active cell is found via
         a KDTree search and the point is relocated to that cell's face
-        centre.  Points with no active cell within the search radius are
+        center.  Points with no active cell within the search radius are
         dropped with a warning.
 
         Returns the list of (x, y, name) tuples on active cells.
@@ -526,8 +634,8 @@ class CreateDischargeStage(_CreateStageBase):
         face_xy = np.column_stack([ugrid.face_x, ugrid.face_y])
         mask = grid_ds["mask"].to_numpy()
 
-        # Build a KDTree of *all* face centres for initial lookup,
-        # and a separate tree of *active-only* centres for snapping.
+        # Build a KDTree of *all* face centers for initial lookup,
+        # and a separate tree of *active-only* centers for snapping.
         tree_all = KDTree(face_xy)
         active_idx = np.where(mask == 1)[0]
         if len(active_idx) == 0:
@@ -652,6 +760,263 @@ class CreateDischargeStage(_CreateStageBase):
         }
 
 
+class CreateObservationPointsStage(_CreateStageBase):
+    """Add observation points to the model during creation.
+
+    Supports three sources of observation points:
+
+    * A GeoJSON file (``observation_locations_file``).
+    * An inline list (``observation_points``).
+    * Automatic NOAA CO-OPS station discovery (``add_noaa_gages``).
+
+    After adding points, all are snapped to the nearest wet cell so
+    that they produce dynamic water-level output during the SFINCS run.
+    A mapping file (``obs_station_map.json``) is written next to the
+    model files for downstream stages (e.g. plotting) to use.
+    """
+
+    name = "create_obs"
+    description = "Add observation points"
+
+    #: Bed-elevation threshold (m): cells at or above this are "dry".
+    _SNAP_DEPTH_THRESHOLD: float = -0.1
+    #: Maximum search radius (m) when looking for a replacement wet cell.
+    _SNAP_SEARCH_RADIUS_M: float = 1000.0
+
+    # ------------------------------------------------------------------
+    # NOAA CO-OPS helpers
+    # ------------------------------------------------------------------
+
+    def _add_noaa_gages(self, model: SfincsModel) -> int:
+        """Query NOAA CO-OPS and add water-level stations as observation points.
+
+        Returns the number of NOAA stations added.
+        """
+        from coastal_calibration.coops_api import COOPSAPIClient
+
+        model_crs = model.crs
+        if model_crs is None:
+            self._log("Model CRS is undefined, cannot add NOAA CO-OPS stations")
+            return 0
+
+        region_4326 = model.region.to_crs(4326)
+        domain_geom = region_4326.union_all()
+
+        client = COOPSAPIClient()
+        stations_gdf = client.stations_metadata
+        selected = stations_gdf[stations_gdf.within(domain_geom)]
+
+        if selected.empty:
+            self._log("No NOAA CO-OPS stations found within model domain")
+            return 0
+
+        candidate_ids = selected["station_id"].tolist()
+        valid_ids = client.filter_stations_by_datum(candidate_ids)
+        dropped = set(candidate_ids) - valid_ids
+        if dropped:
+            self._log(
+                f"Excluded {len(dropped)} station(s) without datum data: "
+                f"{', '.join(sorted(dropped))}",
+                "warning",
+            )
+        selected = selected[selected["station_id"].isin(sorted(valid_ids))]
+        if selected.empty:
+            self._log("No NOAA CO-OPS stations with valid datum data in domain")
+            return 0
+
+        dedup_distance_m = 100.0
+        existing_points: list[tuple[float, float]] = []
+        try:
+            gdf = model.observation_points.data
+            if gdf is not None and not gdf.empty:
+                existing_points = [(geom.x, geom.y) for geom in gdf.geometry if geom is not None]
+        except Exception:  # noqa: S110
+            pass
+
+        selected_projected = selected.to_crs(model_crs)
+
+        added = 0
+        for _, row in selected_projected.iterrows():
+            cx, cy = row.geometry.x, row.geometry.y
+            if any(math.hypot(cx - ex, cy - ey) < dedup_distance_m for ex, ey in existing_points):
+                continue
+            sid = row["station_id"]
+            model.observation_points.add_point(x=cx, y=cy, name=f"noaa_{sid}")
+            existing_points.append((cx, cy))
+            added += 1
+
+        return added
+
+    # ------------------------------------------------------------------
+    # Observation-point snapping
+    # ------------------------------------------------------------------
+
+    def _snap_obs_to_wet_cells(self, model: SfincsModel) -> int:
+        """Snap every observation point to the center of the nearest wet cell.
+
+        SFINCS's internal quadtree cell lookup maps (x, y) coordinates
+        to cells via the (n, m) index structure.  When a point is *not*
+        at the exact face center, the lookup can land on a neighboring
+        (potentially dry or inactive) cell — especially after grid
+        refinement changes the (n, m) layout.
+
+        To guarantee correct placement we *always* relocate each point
+        to the center of the nearest active wet face, regardless of
+        whether the current cell appears wet.
+        """
+        import numpy as np
+        from scipy.spatial import KDTree
+        from shapely.geometry import Point
+
+        depth_threshold = self._SNAP_DEPTH_THRESHOLD
+        search_radius = self._SNAP_SEARCH_RADIUS_M
+
+        obs_gdf = model.observation_points.data
+        if obs_gdf is None or obs_gdf.empty:
+            return 0
+
+        grid_ds = model.quadtree_grid.data
+        ugrid = grid_ds.ugrid.grid
+        fx = np.asarray(ugrid.face_x)
+        fy = np.asarray(ugrid.face_y)
+        z_elev = grid_ds["z"].to_numpy()  # type: ignore[index]
+        mask_arr = grid_ds["mask"].to_numpy()  # type: ignore[index]
+
+        # Build a KDTree of active wet face centers only.
+        wet_active = (z_elev < depth_threshold) & (mask_arr > 0)
+        wet_idx = np.where(wet_active)[0]
+        if len(wet_idx) == 0:
+            self._log("No active wet cells in grid — cannot snap observation points", "warning")
+            return 0
+        tree_wet = KDTree(np.column_stack([fx[wet_idx], fy[wet_idx]]))
+
+        snapped = 0
+        for i in range(len(obs_gdf)):
+            geom = obs_gdf.geometry.iloc[i]
+            if geom is None:
+                continue
+            ox, oy = geom.x, geom.y
+            name = str(i)
+            with contextlib.suppress(KeyError, IndexError):
+                name = obs_gdf["name"].iloc[i]
+
+            dist, pos = tree_wet.query([ox, oy])
+            if dist > search_radius:
+                self._log(
+                    f"  {name}: no wet cell within {search_radius:.0f} m "
+                    f"(nearest {dist:.0f} m away)",
+                    "warning",
+                )
+                continue
+
+            best = wet_idx[pos]
+            new_x, new_y = float(fx[best]), float(fy[best])
+            new_z = z_elev[best]
+            obs_gdf.geometry.iloc[i] = Point(new_x, new_y)
+            self._log(
+                f"  {name}: placed at face center z={new_z:.3f} m ({dist:.0f} m from original)"
+            )
+            snapped += 1
+
+        if snapped > 0:
+            model.observation_points._data = obs_gdf
+        return snapped
+
+    # ------------------------------------------------------------------
+    # Station mapping file
+    # ------------------------------------------------------------------
+
+    def _write_obs_station_map(self, model: SfincsModel) -> None:
+        """Write ``obs_station_map.json`` mapping obs indices to station IDs."""
+        obs_gdf = model.observation_points.data
+        if obs_gdf is None or obs_gdf.empty:
+            return
+
+        station_map: list[dict[str, Any]] = []
+        for idx in range(len(obs_gdf)):
+            name = ""
+            with contextlib.suppress(KeyError, IndexError):
+                name = str(obs_gdf["name"].iloc[idx])
+            if not name:
+                with contextlib.suppress(Exception):
+                    name = str(obs_gdf.index[idx])
+
+            station_id = ""
+            if name.startswith("noaa_"):
+                station_id = name[len("noaa_") :]
+
+            geom = obs_gdf.geometry.iloc[idx]
+            entry: dict[str, Any] = {
+                "index": idx,
+                "name": name,
+                "x": float(geom.x) if geom else None,
+                "y": float(geom.y) if geom else None,
+            }
+            if station_id:
+                entry["station_id"] = station_id
+            station_map.append(entry)
+
+        map_path = self.config.output_dir / "obs_station_map.json"
+        map_path.write_text(json.dumps(station_map, indent=2))
+
+    # ------------------------------------------------------------------
+    # Main entry point
+    # ------------------------------------------------------------------
+
+    def run(self) -> dict[str, Any]:
+        """Add observation points from config, file, and/or NOAA gages."""
+        cfg = self.config
+        model = _get_model(cfg)
+
+        has_file = cfg.observation_locations_file is not None
+        has_points = bool(cfg.observation_points)
+        has_noaa = cfg.add_noaa_gages
+
+        if not has_file and not has_points and not has_noaa:
+            self._log("No observation points configured, skipping")
+            return {"status": "skipped"}
+
+        self._update_substep("Adding observation points")
+
+        if not cfg.merge_observations:
+            try:
+                existing = model.observation_points.nr_points
+                if existing > 0:
+                    model.observation_points.clear()
+                    self._log(f"Cleared {existing} existing observation point(s)")
+            except Exception:  # noqa: S110
+                pass
+
+        if has_file:
+            model.observation_points.create(
+                locations=str(cfg.observation_locations_file),
+                merge=cfg.merge_observations,
+            )
+            self._log(f"Observation points added from {cfg.observation_locations_file}")
+        elif has_points:
+            for pt in cfg.observation_points:
+                model.observation_points.add_point(
+                    x=pt["x"],
+                    y=pt["y"],
+                    name=pt.get("name", f"obs_{cfg.observation_points.index(pt)}"),
+                )
+            self._log(f"Added {len(cfg.observation_points)} observation point(s)")
+
+        noaa_count = 0
+        if has_noaa:
+            self._update_substep("Querying NOAA CO-OPS stations")
+            noaa_count = self._add_noaa_gages(model)
+            self._log(f"Added {noaa_count} NOAA CO-OPS observation point(s)")
+
+        snapped = self._snap_obs_to_wet_cells(model)
+        if snapped:
+            self._log(f"Snapped {snapped} observation point(s) to nearest wet cell")
+
+        self._write_obs_station_map(model)
+
+        return {"status": "completed", "noaa_stations": noaa_count}
+
+
 class CreateSubgridStage(_CreateStageBase):
     """Generate subgrid-derived lookup tables.
 
@@ -715,12 +1080,15 @@ class CreateWriteStage(_CreateStageBase):
 #: Mapping from stage name to its class.
 STAGE_CLASSES: dict[str, type[CreateStage]] = {
     "create_grid": CreateGridStage,
-    "create_fetch_elevation": CreateFetchElevationStage,
+    "create_fetch_data": CreateFetchDataStage,
+    # Backward-compatible alias for saved status files.
+    "create_fetch_elevation": CreateFetchDataStage,
     "create_elevation": CreateElevationStage,
     "create_mask": CreateMaskStage,
     "create_boundary": CreateBoundaryStage,
     "create_discharge": CreateDischargeStage,
     "create_subgrid": CreateSubgridStage,
+    "create_obs": CreateObservationPointsStage,
     "create_write": CreateWriteStage,
 }
 

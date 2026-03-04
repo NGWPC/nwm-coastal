@@ -146,21 +146,10 @@ def create(
 
     CONFIG is the path to a YAML configuration file.
     """
-    import os
-
     from coastal_calibration.config.create_schema import SfincsCreateConfig
     from coastal_calibration.creator import SfincsCreator
 
     config_path = config.resolve()
-
-    # Redirect stdout to /dev/null for the entire create workflow.
-    # hydromt-sfincs's quadtree builders use raw print() calls that
-    # cannot be silenced through the logging system.  All our own
-    # output goes to stderr via RichHandler so nothing is lost.
-    _devnull = os.open(os.devnull, os.O_WRONLY)
-    _saved_stdout = os.dup(1)
-    os.dup2(_devnull, 1)
-    os.close(_devnull)
 
     try:
         cfg = SfincsCreateConfig.from_yaml(config_path)
@@ -189,13 +178,6 @@ def create(
         raise
     except Exception as e:
         _raise_cli_error(str(e))
-    finally:
-        # Do NOT restore stdout — leave it redirected to /dev/null.
-        # hydromt-sfincs's quadtree builder fires raw print() calls
-        # during lazy XUGrid construction triggered by SfincsModel
-        # garbage collection after this function returns.  All our
-        # own output goes to stderr (RichHandler), so nothing is lost.
-        os.close(_saved_stdout)
 
 
 @cli.command()
@@ -261,7 +243,7 @@ def prepare_topobathy(
     Requires AWS credentials (via environment or ~/.aws) and the
     ``icechunk`` Python package.
     """
-    from coastal_calibration.utils.topobathy import fetch_topobathy
+    from coastal_calibration.utils.topobathy_nws import fetch_topobathy
 
     if output_dir is None:
         output_dir = aoi.resolve().parent
@@ -269,7 +251,7 @@ def prepare_topobathy(
     configure_logger(level="INFO")
 
     try:
-        tif_path, cat_path = fetch_topobathy(
+        tif_path, cat_path, _ = fetch_topobathy(
             domain=domain,
             aoi=aoi.resolve(),
             output_dir=output_dir.resolve(),
@@ -285,7 +267,7 @@ def prepare_topobathy(
         "\nUpdate your create config:\n"
         "  elevation:\n"
         "    datasets:\n"
-        "      - name: nws_topobathy\n"
+        "      - name: nws_30m\n"
         "        zmin: -20000\n"
         "  data_catalog:\n"
         "    data_libs:\n"
@@ -415,12 +397,12 @@ def update_dem_index(output: Path | None, max_datasets: int | None) -> None:
 
     Scans the ``noaa-nos-coastal-lidar-pds`` S3 bucket (public,
     anonymous access) for coastal DEM datasets and writes a JSON
-    index used by the ``create_fetch_elevation`` stage.
+    index used by the ``create_fetch_data`` stage.
     """
     import importlib.resources
     import json
 
-    from coastal_calibration.utils.noaa_dem import build_index_from_s3
+    from coastal_calibration.utils.topobathy_noaa import build_index_from_s3
 
     configure_logger(level="INFO")
 
@@ -465,10 +447,9 @@ def stages(model: str | None) -> None:
         ("download", "Download NWM/STOFS data (optional)"),
         ("sfincs_symlinks", "Create .nc symlinks for NWM data"),
         ("sfincs_data_catalog", "Generate HydroMT data catalog"),
-        ("sfincs_init", "Initialise SFINCS model (pre-built)"),
+        ("sfincs_init", "Initialize SFINCS model (pre-built)"),
         ("sfincs_timing", "Set SFINCS timing"),
         ("sfincs_forcing", "Add water level forcing"),
-        ("sfincs_obs", "Add observation points"),
         ("sfincs_discharge", "Add discharge sources"),
         ("sfincs_precip", "Add precipitation forcing"),
         ("sfincs_wind", "Add wind forcing"),
@@ -480,11 +461,12 @@ def stages(model: str | None) -> None:
 
     create_stages_list = [
         ("create_grid", "Create SFINCS grid from AOI polygon"),
-        ("create_fetch_elevation", "Fetch NOAA topobathy DEM for AOI"),
+        ("create_fetch_data", "Fetch elevation and land cover data for AOI"),
         ("create_elevation", "Add elevation and bathymetry data"),
         ("create_mask", "Create active cell mask"),
         ("create_boundary", "Create water level boundary cells"),
         ("create_subgrid", "Create subgrid tables"),
+        ("create_obs", "Add observation points (NOAA CO-OPS, file, inline)"),
         ("create_write", "Write SFINCS model to disk"),
     ]
 

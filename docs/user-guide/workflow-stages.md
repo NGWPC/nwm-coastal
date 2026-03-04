@@ -297,7 +297,7 @@ STOFS water level data.
 
 ### 4. sfincs_init
 
-**Purpose:** Initialise the SFINCS model from a pre-built template.
+**Purpose:** Initialize the SFINCS model from a pre-built template.
 
 **Tasks:**
 
@@ -335,7 +335,7 @@ STOFS water level data.
 
 !!! tip "Forcing vertical datum offset"
 
-    Tidal-only sources like TPXO provide oscillations centred on zero (MSL) but carry no
+    Tidal-only sources like TPXO provide oscillations centered on zero (MSL) but carry no
     information about where MSL sits on the mesh's vertical datum. The
     `forcing_to_mesh_offset_m` parameter anchors the tidal signal to the correct geodetic
     height on the mesh. For sources already in the mesh datum (e.g. STOFS on a NAVD88 mesh),
@@ -516,12 +516,14 @@ separate configuration schema (`SfincsCreateConfig`) and a dedicated runner
 
 ```mermaid
 flowchart TD
-    A[create_grid] --> B[create_fetch_elevation]
+    A[create_grid] --> B[create_fetch_data]
     B --> C[create_elevation]
     C --> D[create_mask]
     D --> E[create_boundary]
-    E --> F[create_subgrid]
-    F --> G[create_write]
+    E --> F["create_discharge (optional)"]
+    F --> G[create_subgrid]
+    G --> H["create_obs (optional)"]
+    H --> I[create_write]
 ```
 
 ### 1. create_grid
@@ -534,16 +536,23 @@ flowchart TD
 - Create the base grid in the specified CRS
 - Apply quadtree refinement based on configured levels and criteria
 
-### 2. create_fetch_elevation
+### 2. create_fetch_data
 
-**Purpose:** Fetch a NOAA coastal DEM covering the AOI.
+**Purpose:** Fetch elevation and land cover data for the AOI.
+
+**Enabled by:** Any elevation dataset with a `source` field, or `subgrid.lulc_source`.
+Skipped when all datasets are user-provided (no auto-fetch configured).
 
 **Tasks:**
 
-- Query the packaged NOAA DEM spatial index to find the best-matching dataset based on
-    AOI overlap, resolution, and year
-- Download the DEM tiles from the NOAA `noaa-nos-coastal-lidar-pds` S3 bucket
-- Mosaic tiles and clip to the AOI extent
+- For NOAA DEM sources: query the packaged spatial index to find the best-matching
+    dataset based on AOI overlap, resolution, and year, download DEM tiles from S3,
+    mosaic, and clip to the AOI extent
+- For NWS topobathy sources: fetch from the NWS `icechunk` S3 store clipped to the AOI
+    bounding box
+- For Copernicus DEM / GEBCO sources: download tiles and mosaic
+- For ESA WorldCover land cover: download and mosaic land-use / land-cover tiles
+- Write a HydroMT data catalog YAML for the fetched datasets
 
 ### 3. create_elevation
 
@@ -573,7 +582,22 @@ flowchart TD
 - Identify grid cells along the open ocean boundary
 - Assign boundary condition flags
 
-### 6. create_subgrid
+### 6. create_discharge _(optional)_
+
+**Purpose:** Add NWM discharge source points to the model.
+
+**Enabled by:** Configuring a `nwm_discharge` section in the creation config. Skipped
+when `nwm_discharge` is not present.
+
+**Tasks:**
+
+- Read NWM hydrofabric flowpath linestrings from a GeoPackage
+- Intersect selected flowpaths with the AOI boundary to locate discharge inflow points
+- Snap source points to the nearest active grid cell
+- Write the SFINCS `.src` file and a discharge locations file usable by the simulation
+    workflow
+
+### 7. create_subgrid
 
 **Purpose:** Generate subgrid lookup tables.
 
@@ -583,7 +607,23 @@ flowchart TD
 - These tables allow SFINCS to use coarse computational cells while capturing fine-scale
     topographic detail
 
-### 7. create_write
+### 8. create_obs _(optional)_
+
+**Purpose:** Add observation points to the model.
+
+**Enabled by:** Setting `add_noaa_gages: true`, providing `observation_points`, or
+providing an `observation_locations_file` in the creation config. Skipped when none of
+these are configured.
+
+**Tasks:**
+
+- When `add_noaa_gages` is true: query NOAA CO-OPS for active water level stations
+    within the model domain and add them as observation points
+- When `observation_points` or `observation_locations_file` is provided: add the
+    user-specified observation points
+- Write observation point locations into the SFINCS model
+
+### 9. create_write
 
 **Purpose:** Write the complete SFINCS model to disk.
 

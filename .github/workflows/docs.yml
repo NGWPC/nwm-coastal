@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Tag version to deploy (e.g., 3.1.1.0.0). Leave empty to deploy dev.'
+        description: Tag version to deploy (e.g., 3.1.1.0.0). Leave empty to deploy dev.
         required: false
 
 permissions:

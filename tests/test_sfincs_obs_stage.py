@@ -1,46 +1,31 @@
-"""Tests for SfincsObservationPointsStage including NOAA gage support."""
+"""Tests for CreateObservationPointsStage including NOAA gage support."""
 
 from __future__ import annotations
 
-from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import geopandas as gpd
 import pytest
 import shapely
 
-from coastal_calibration.config.schema import (
-    BoundaryConfig,
-    CoastalCalibConfig,
-    DownloadConfig,
-    PathConfig,
-    SfincsModelConfig,
-    SimulationConfig,
-)
-from coastal_calibration.stages.sfincs_build import (
-    SfincsObservationPointsStage,
+from coastal_calibration.config.create_schema import SfincsCreateConfig
+from coastal_calibration.stages.sfincs_create import (
+    CreateObservationPointsStage,
     _set_model,
 )
 
 
 @pytest.fixture
-def sfincs_config(tmp_path):
-    """Create a SFINCS CoastalCalibConfig for testing."""
-    prebuilt = tmp_path / "prebuilt"
-    prebuilt.mkdir()
-    (prebuilt / "sfincs.inp").write_text("")
+def create_config(tmp_path):
+    """Create a SfincsCreateConfig for testing."""
+    aoi = tmp_path / "aoi.geojson"
+    aoi.write_text('{"type": "FeatureCollection", "features": []}')
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
 
-    return CoastalCalibConfig(
-        simulation=SimulationConfig(
-            start_date=datetime(2021, 6, 11),
-            duration_hours=3,
-            coastal_domain="atlgulf",
-            meteo_source="nwm_retro",
-        ),
-        boundary=BoundaryConfig(source="tpxo"),
-        paths=PathConfig(work_dir=tmp_path / "work", raw_download_dir=tmp_path / "dl"),
-        model_config=SfincsModelConfig(prebuilt_dir=prebuilt),
-        download=DownloadConfig(enabled=False),
+    return SfincsCreateConfig(
+        aoi=aoi,
+        output_dir=output_dir,
     )
 
 
@@ -104,44 +89,44 @@ def noaa_stations_gdf():
     )
 
 
-class TestSfincsObservationPointsStageSkip:
-    def test_skip_when_nothing_configured(self, sfincs_config, mock_model):
-        _set_model(sfincs_config, mock_model)
-        stage = SfincsObservationPointsStage(sfincs_config)
+class TestCreateObservationPointsStageSkip:
+    def test_skip_when_nothing_configured(self, create_config, mock_model):
+        _set_model(create_config, mock_model)
+        stage = CreateObservationPointsStage(create_config)
         result = stage.run()
         assert result["status"] == "skipped"
 
-    def test_skip_when_noaa_false_and_no_points(self, sfincs_config, mock_model):
-        sfincs_config.model_config.include_noaa_gages = False
-        _set_model(sfincs_config, mock_model)
-        stage = SfincsObservationPointsStage(sfincs_config)
+    def test_skip_when_noaa_false_and_no_points(self, create_config, mock_model):
+        create_config.add_noaa_gages = False
+        _set_model(create_config, mock_model)
+        stage = CreateObservationPointsStage(create_config)
         result = stage.run()
         assert result["status"] == "skipped"
 
 
-class TestSfincsObservationPointsStageManual:
-    def test_add_manual_points(self, sfincs_config, mock_model):
-        sfincs_config.model_config.observation_points = [
+class TestCreateObservationPointsStageManual:
+    def test_add_manual_points(self, create_config, mock_model):
+        create_config.observation_points = [
             {"x": 310000, "y": 3250000, "name": "pt1"},
             {"x": 320000, "y": 3260000, "name": "pt2"},
         ]
-        _set_model(sfincs_config, mock_model)
-        stage = SfincsObservationPointsStage(sfincs_config)
+        _set_model(create_config, mock_model)
+        stage = CreateObservationPointsStage(create_config)
         result = stage.run()
         assert result["status"] == "completed"
         assert mock_model.observation_points.add_point.call_count == 2
 
 
-class TestSfincsObservationPointsStageNOAA:
-    def test_add_noaa_gages(self, sfincs_config, mock_model, noaa_stations_gdf):
-        sfincs_config.model_config.include_noaa_gages = True
-        _set_model(sfincs_config, mock_model)
+class TestCreateObservationPointsStageNOAA:
+    def test_add_noaa_gages(self, create_config, mock_model, noaa_stations_gdf):
+        create_config.add_noaa_gages = True
+        _set_model(create_config, mock_model)
 
         with patch("coastal_calibration.coops_api.COOPSAPIClient") as mock_cls:
             mock_client = mock_cls.return_value
             mock_client.stations_metadata = noaa_stations_gdf
 
-            stage = SfincsObservationPointsStage(sfincs_config)
+            stage = CreateObservationPointsStage(create_config)
             result = stage.run()
 
         assert result["status"] == "completed"
@@ -152,9 +137,9 @@ class TestSfincsObservationPointsStageNOAA:
         for call in mock_model.observation_points.add_point.call_args_list:
             assert call.kwargs["name"].startswith("noaa_")
 
-    def test_noaa_no_stations_in_domain(self, sfincs_config, mock_model):
-        sfincs_config.model_config.include_noaa_gages = True
-        _set_model(sfincs_config, mock_model)
+    def test_noaa_no_stations_in_domain(self, create_config, mock_model):
+        create_config.add_noaa_gages = True
+        _set_model(create_config, mock_model)
 
         # Empty stations GDF
         empty_gdf = gpd.GeoDataFrame(
@@ -167,25 +152,25 @@ class TestSfincsObservationPointsStageNOAA:
             mock_client = mock_cls.return_value
             mock_client.stations_metadata = empty_gdf
 
-            stage = SfincsObservationPointsStage(sfincs_config)
+            stage = CreateObservationPointsStage(create_config)
             result = stage.run()
 
         assert result["status"] == "completed"
         assert result["noaa_stations"] == 0
         mock_model.observation_points.add_point.assert_not_called()
 
-    def test_noaa_combined_with_manual_points(self, sfincs_config, mock_model, noaa_stations_gdf):
-        sfincs_config.model_config.include_noaa_gages = True
-        sfincs_config.model_config.observation_points = [
+    def test_noaa_combined_with_manual_points(self, create_config, mock_model, noaa_stations_gdf):
+        create_config.add_noaa_gages = True
+        create_config.observation_points = [
             {"x": 315000, "y": 3255000, "name": "manual_pt"},
         ]
-        _set_model(sfincs_config, mock_model)
+        _set_model(create_config, mock_model)
 
         with patch("coastal_calibration.coops_api.COOPSAPIClient") as mock_cls:
             mock_client = mock_cls.return_value
             mock_client.stations_metadata = noaa_stations_gdf
 
-            stage = SfincsObservationPointsStage(sfincs_config)
+            stage = CreateObservationPointsStage(create_config)
             result = stage.run()
 
         assert result["status"] == "completed"
@@ -199,17 +184,17 @@ class TestSfincsObservationPointsStageNOAA:
         assert result["noaa_stations"] == len(noaa_names)
 
     def test_noaa_stations_projected_to_model_crs(
-        self, sfincs_config, mock_model, noaa_stations_gdf
+        self, create_config, mock_model, noaa_stations_gdf
     ):
         """Verify that station coordinates are projected into the model CRS."""
-        sfincs_config.model_config.include_noaa_gages = True
-        _set_model(sfincs_config, mock_model)
+        create_config.add_noaa_gages = True
+        _set_model(create_config, mock_model)
 
         with patch("coastal_calibration.coops_api.COOPSAPIClient") as mock_cls:
             mock_client = mock_cls.return_value
             mock_client.stations_metadata = noaa_stations_gdf
 
-            stage = SfincsObservationPointsStage(sfincs_config)
+            stage = CreateObservationPointsStage(create_config)
             stage._add_noaa_gages(mock_model)
 
         for call in mock_model.observation_points.add_point.call_args_list:

@@ -233,9 +233,7 @@ class TestSfincsModelConfig:
         cfg = SfincsModelConfig(prebuilt_dir=tmp_path)
         assert cfg.omp_num_threads == get_cpu_count()
         assert cfg.container_tag == "latest"
-        assert cfg.merge_observations is False
         assert cfg.merge_discharge is False
-        assert cfg.include_noaa_gages is False
         assert cfg.forcing_to_mesh_offset_m == 0.0
         assert cfg.vdatum_mesh_to_msl_m == 0.0
 
@@ -252,7 +250,6 @@ class TestSfincsModelConfig:
             "sfincs_init",
             "sfincs_timing",
             "sfincs_forcing",
-            "sfincs_obs",
             "sfincs_discharge",
             "sfincs_precip",
             "sfincs_wind",
@@ -269,7 +266,6 @@ class TestSfincsModelConfig:
         assert d["prebuilt_dir"] == str(tmp_path)
         assert d["omp_num_threads"] == get_cpu_count()
         assert "container_tag" in d
-        assert d["include_noaa_gages"] is False
 
     def test_explicit_vdatum_offsets(self, tmp_path):
         cfg = SfincsModelConfig(
@@ -291,13 +287,11 @@ class TestSfincsModelConfig:
             prebuilt_dir="./texas",
             model_root="./tmp_run/sfincs_model",
             discharge_locations_file="./texas/sfincs_nwm.src",
-            observation_locations_file="./texas/obs.geojson",
             container_image="./images/sfincs.sif",
         )
         assert cfg.prebuilt_dir.is_absolute()
         assert cfg.model_root.is_absolute()
         assert cfg.discharge_locations_file.is_absolute()
-        assert cfg.observation_locations_file.is_absolute()
         assert cfg.container_image.is_absolute()
 
 

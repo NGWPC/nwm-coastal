@@ -175,7 +175,7 @@ class TestCOOPSAPIClientInit:
         gdf = client.stations_metadata
         assert isinstance(gdf, gpd.GeoDataFrame)
         assert len(gdf) == 2
-        assert "8771450" in gdf["station_id"].values
+        assert "8771450" in gdf["station_id"].to_numpy()
 
 
 class TestValidateParameters:
@@ -458,7 +458,7 @@ class TestFilterStationsByDatum:
 
 
 # ---------------------------------------------------------------------------
-# _get_stations_metadata (cache behaviour)
+# _get_stations_metadata (cache behavior)
 # ---------------------------------------------------------------------------
 
 
@@ -600,7 +600,9 @@ class TestProcessResponses:
         assert ds.attrs["product"] == "water_level"
         assert ds.attrs["datum"] == "MLLW"
         assert ds.attrs["source"] == "NOAA CO-OPS API"
-        np.testing.assert_allclose(ds["water_level"].values[:, 0], [0.412, 0.418, 0.425], atol=1e-6)
+        np.testing.assert_allclose(
+            ds["water_level"].to_numpy()[:, 0], [0.412, 0.418, 0.425], atol=1e-6
+        )
 
     def test_multiple_stations(self, water_level_response):
         resp2 = {
@@ -694,7 +696,7 @@ class TestProcessResponses:
         assert "station_name" in ds
         assert "latitude" in ds
         assert "longitude" in ds
-        assert ds["station_id"].values[0] == "8771450"
+        assert ds["station_id"].to_numpy()[0] == "8771450"
         assert ds["latitude"].attrs["standard_name"] == "latitude"
 
     def test_nan_and_empty_values_handled(self):
@@ -713,9 +715,9 @@ class TestProcessResponses:
             units="metric",
             time_zone="gmt",
         )
-        assert ds["water_level"].values[0, 0] == pytest.approx(0.5)
-        assert np.isnan(ds["water_level"].values[1, 0])
-        assert np.isnan(ds["sigma"].values[1, 0])
+        assert ds["water_level"].to_numpy()[0, 0] == pytest.approx(0.5)
+        assert np.isnan(ds["water_level"].to_numpy()[1, 0])
+        assert np.isnan(ds["sigma"].to_numpy()[1, 0])
 
 
 # ---------------------------------------------------------------------------

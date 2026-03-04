@@ -231,7 +231,7 @@ model_config:
   include_pressure: true          # Add atmospheric pressure forcing
   forcing_to_mesh_offset_m: 0.0  # Vertical offset added to boundary forcing
   vdatum_mesh_to_msl_m: 0.0      # Vertical offset converting model output to MSL
-  meteo_res:                      # Meteo forcing resolution in metres (auto if null)
+  meteo_res:                      # Meteo forcing resolution in meters (auto if null)
   sfincs_exe:                     # Local SFINCS executable (bypasses container)
   omp_num_threads: 36             # OpenMP threads (defaults to CPU count)
   container_tag: latest           # SFINCS container tag
@@ -271,7 +271,7 @@ model_config:
     SFINCS operates in the vertical datum of the mesh (e.g. NAVD88). When the boundary
     forcing is in a different datum, `forcing_to_mesh_offset_m` anchors the forcing signal
     to the correct height on the mesh. For tidal-only sources like TPXO, whose oscillations
-    are centred on zero (MSL), this places the mean water level at the geodetic height of
+    are centered on zero (MSL), this places the mean water level at the geodetic height of
     MSL on the mesh. For sources that already report water levels in the mesh datum (e.g.
     STOFS on a NAVD88 mesh), set this to `0.0`.
 
@@ -386,11 +386,15 @@ data_catalog:
 
 #### Top-Level Fields
 
-| Parameter      | Type | Default                  | Description                                    |
-| -------------- | ---- | ------------------------ | ---------------------------------------------- |
-| `aoi`          | path | **required**             | Path to AOI polygon (GeoJSON, Shapefile, etc.) |
-| `output_dir`   | path | **required**             | Directory where the model will be written      |
-| `download_dir` | path | `{output_dir}/downloads` | Directory for downloaded data (NOAA DEMs)      |
+| Parameter                    | Type | Default                  | Description                                         |
+| ---------------------------- | ---- | ------------------------ | --------------------------------------------------- |
+| `aoi`                        | path | **required**             | Path to AOI polygon (GeoJSON, Shapefile, etc.)      |
+| `output_dir`                 | path | **required**             | Directory where the model will be written           |
+| `download_dir`               | path | `{output_dir}/downloads` | Directory for downloaded data (NOAA DEMs)           |
+| `add_noaa_gages`             | bool | false                    | Auto-discover NOAA CO-OPS stations as obs points    |
+| `observation_points`         | list | `[]`                     | Observation point dicts (`x`, `y`, `name`)          |
+| `observation_locations_file` | path | null                     | GeoJSON file with observation point locations       |
+| `merge_observations`         | bool | false                    | Merge with pre-existing observation points in model |
 
 #### Grid Settings (`grid`)
 
@@ -407,7 +411,7 @@ grid:
 
 | Parameter    | Type  | Default | Description                                         |
 | ------------ | ----- | ------- | --------------------------------------------------- |
-| `resolution` | float | 50.0    | Base grid cell resolution in metres                 |
+| `resolution` | float | 50.0    | Base grid cell resolution in meters                 |
 | `crs`        | str   | `utm`   | CRS (`"utm"` for auto-detection, or `"EPSG:xxxxx"`) |
 | `rotated`    | bool  | true    | Allow grid rotation for tighter bounding-box fit    |
 | `refinement` | list  | `[]`    | Quadtree refinement levels (see below)              |
@@ -418,7 +422,7 @@ Each refinement entry:
 | ---------- | ----- | ------------------------------------------------------ |
 | `polygon`  | path  | Polygon defining the area to refine                    |
 | `level`    | int   | Refinement level (1 = base, 2 = base/2, 3 = base/4, …) |
-| `buffer_m` | float | Inward buffer in metres (negative shrinks the polygon) |
+| `buffer_m` | float | Inward buffer in meters (negative shrinks the polygon) |
 
 #### Elevation Settings (`elevation`)
 

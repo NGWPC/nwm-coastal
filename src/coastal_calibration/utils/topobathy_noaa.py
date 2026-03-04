@@ -6,8 +6,10 @@ verified NCEI 1/9 arc-second topobathy datasets with bounding boxes,
 resolution, year, and VRT filenames.
 
 At runtime, :func:`fetch_noaa_dem` uses the index to select the best
-DEM overlapping the user's AOI, clips it via ``rioxarray``, and writes
-a local GeoTIFF plus a HydroMT data-catalog YAML.
+DEM overlapping the user's AOI, clips it via ``gdalwarp`` with GDAL
+``/vsicurl/`` for remote access, and writes a local GeoTIFF plus a
+HydroMT data-catalog YAML.  Only the pixels within the AOI extent are
+transferred over the network.
 
 .. note::
 
@@ -21,14 +23,13 @@ from __future__ import annotations
 
 import importlib.resources
 import json
-import logging
 from typing import TYPE_CHECKING, Any
+
+from coastal_calibration.utils.logging import logger
 
 if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
-
-logger = logging.getLogger(__name__)
 
 _S3_BASE = "https://noaa-nos-coastal-lidar-pds.s3.amazonaws.com/dem"
 
@@ -223,28 +224,108 @@ def _resolve_record(
     return select_best(candidates, bbox)
 
 
-def _validate_raster(da: Any, dataset_name: str) -> None:
-    """Raise if the clipped raster has no valid (non-NaN) pixels."""
-    import numpy as np
+def _localize_vrt(
+    vrt_url: str,
+    local_path: Path,
+    *,
+    bbox: tuple[float, float, float, float] | None = None,
+) -> int:
+    """Download a remote VRT, rewrite tile refs, and optionally filter by bbox.
 
-    if da.size < 1_000_000:
-        sample = da.values
+    GDAL must issue an HTTP HEAD request for *every* tile listed in a
+    VRT to determine its internal block layout — even when ``-te``
+    restricts the output extent.  For CONUS-wide VRTs with ~500 tiles
+    this means hundreds of round-trips before any pixel data flows.
+
+    This helper:
+
+    1. Downloads the VRT XML in a single HTTP request.
+    2. Rewrites each relative ``<SourceFilename>`` to an absolute
+       ``/vsicurl/`` URL.
+    3. When *bbox* is given, removes every tile whose geographic extent
+       does not overlap, reducing the VRT from ~500 tiles to typically
+       2-6.  ``gdalwarp`` then only issues HEAD requests for the tiles
+       it will actually read.
+
+    Parameters
+    ----------
+    vrt_url
+        HTTPS URL of the remote VRT.
+    local_path
+        Where to save the rewritten VRT.
+    bbox
+        ``(west, south, east, north)`` in the VRT's native CRS.
+        Tiles with no overlap are removed.  When ``None`` all tiles
+        are kept.
+
+    Returns
+    -------
+    int
+        Number of tiles retained in the written VRT.
+    """
+    import urllib.request
+    import xml.etree.ElementTree as ET
+
+    base_url = vrt_url.rsplit("/", 1)[0]
+
+    with urllib.request.urlopen(vrt_url) as resp:
+        root = ET.fromstring(resp.read())  # noqa: S314
+
+    # Rewrite relative tile paths to absolute /vsicurl/ URLs.
+    for elem in root.iter("SourceFilename"):
+        if elem.get("relativeToVRT", "0") == "1":
+            elem.text = f"/vsicurl/{base_url}/{elem.text}"
+            elem.set("relativeToVRT", "0")
+
+    # Filter tiles to only those overlapping the bbox.
+    kept = 0
+    if bbox is not None:
+        gt_text = root.findtext("GeoTransform")
+        if gt_text is not None:
+            gt = [float(v) for v in gt_text.split(",")]
+            bw, bs, be, bn = bbox
+            for band in root.findall("VRTRasterBand"):
+                for src in list(band):
+                    if src.tag not in ("SimpleSource", "ComplexSource"):
+                        continue
+                    dst_rect = src.find("DstRect")
+                    if dst_rect is None:
+                        continue
+                    x_off = float(dst_rect.get("xOff", "0"))
+                    y_off = float(dst_rect.get("yOff", "0"))
+                    x_size = float(dst_rect.get("xSize", "0"))
+                    y_size = float(dst_rect.get("ySize", "0"))
+
+                    # Convert pixel coordinates to geographic coordinates
+                    # using the VRT's GeoTransform.
+                    tile_west = gt[0] + x_off * gt[1]
+                    tile_east = gt[0] + (x_off + x_size) * gt[1]
+                    tile_north = gt[3] + y_off * gt[5]
+                    tile_south = gt[3] + (y_off + y_size) * gt[5]
+
+                    # Remove tiles with no overlap.
+                    if tile_east <= bw or tile_west >= be or tile_north <= bs or tile_south >= bn:
+                        band.remove(src)
+                    else:
+                        kept += 1
+        else:
+            # No GeoTransform — keep all tiles.
+            kept = sum(
+                1
+                for band in root.findall("VRTRasterBand")
+                for src in band
+                if src.tag in ("SimpleSource", "ComplexSource")
+            )
     else:
-        ny, nx = da.shape[-2], da.shape[-1]
-        cy, cx = ny // 2, nx // 2
-        hw = min(250, nx // 2)
-        hh = min(250, ny // 2)
-        sample = da.isel(
-            x=slice(cx - hw, cx + hw),
-            y=slice(cy - hh, cy + hh),
-        ).values
-    if int(np.sum(~np.isnan(sample))) == 0:
-        raise ValueError(
-            f"NOAA DEM '{dataset_name}' has no valid pixels in the "
-            f"clipped region. The VRT may lack data coverage for this area. "
-            f"Try a different dataset or use 'prepare-topobathy' to fetch "
-            f"from NWS icechunk instead."
+        kept = sum(
+            1
+            for band in root.findall("VRTRasterBand")
+            for src in band
+            if src.tag in ("SimpleSource", "ComplexSource")
         )
+
+    ET.ElementTree(root).write(local_path, xml_declaration=True, encoding="UTF-8")
+    return kept
 
 
 def fetch_noaa_dem(
@@ -253,14 +334,15 @@ def fetch_noaa_dem(
     *,
     dataset_name: str | None = None,
     buffer_deg: float = 0.1,
-    catalog_name: str = "noaa_topobathy",
+    catalog_name: str = "noaa_3m",
     log: Callable[[str], None] | None = None,
 ) -> tuple[Path, Path, str]:
     """Discover, clip, and save a NOAA DEM overlapping *aoi*.
 
-    Uses ``rioxarray.open_rasterio`` to lazily read a remote VRT,
-    clips to the buffered AOI bounding box, masks nodata values,
-    and writes a local GeoTIFF + HydroMT data-catalog YAML.
+    Uses ``gdalwarp`` with GDAL ``/vsicurl/`` to remotely access the
+    dataset's VRT, clips to the AOI polygon, and writes a local GeoTIFF
+    plus a HydroMT data-catalog YAML.  Only the pixels within the AOI
+    extent are transferred over the network.
 
     Parameters
     ----------
@@ -297,13 +379,14 @@ def fetch_noaa_dem(
     from pathlib import Path
 
     import geopandas as gpd
-    import numpy as np
-    import rioxarray
+
+    from coastal_calibration.utils._gdal import clip_to_aoi, compute_aoi_coverage
 
     _log = log if log is not None else logger.info
 
     aoi = Path(aoi)
     output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     aoi_gdf = gpd.read_file(aoi)
     if aoi_gdf.crs is None:
@@ -318,48 +401,65 @@ def fetch_noaa_dem(
     )
 
     vrt_url = get_vrt_url(record)
-    _log(f"Opening VRT: {vrt_url}")
+    _log(f"VRT: {vrt_url}")
 
-    # Buffer the AOI in geographic coordinates (degrees) before
-    # reprojecting so the buffer unit is always meaningful.
+    sub_dir = output_dir / "_noaa_temp"
+    sub_dir.mkdir(parents=True, exist_ok=True)
+
+    # Write AOI as a GeoJSON cutline for gdalwarp.
     aoi_4326 = aoi_gdf.to_crs(epsg=4326)
     geo_bounds = aoi_4326.total_bounds  # (w, s, e, n)
-    buffered_4326 = (
+    buffered_bbox = (
         geo_bounds[0] - buffer_deg,
         geo_bounds[1] - buffer_deg,
         geo_bounds[2] + buffer_deg,
         geo_bounds[3] + buffer_deg,
     )
+    cutline_path = sub_dir / "cutline.geojson"
+    aoi_4326.to_file(cutline_path, driver="GeoJSON")
 
-    # Reproject AOI to the dataset's native CRS for polygon clipping.
-    aoi_native = aoi_gdf.to_crs(epsg=target_epsg)
+    # Download the remote VRT XML once, rewrite tile paths to
+    # /vsicurl/ URLs, and drop tiles outside the buffered bbox.
+    # This avoids the per-tile HEAD requests that make large remote
+    # VRTs (CONUS-wide, ~500 tiles) extremely slow: gdalwarp now
+    # only issues HEAD + GET for the 2-6 tiles it actually reads.
+    local_vrt = sub_dir / "noaa_dem.vrt"
+    n_tiles = _localize_vrt(vrt_url, local_vrt, bbox=buffered_bbox)
+    _log(f"VRT localized: {local_vrt.stat().st_size / 1e3:.0f} KB, {n_tiles} tiles")
 
-    # Use rioxarray.open_rasterio for robust remote VRT access.
-    da = rioxarray.open_rasterio(vrt_url, chunks={"x": 4096, "y": 4096})
-    da = da.rio.clip_box(*buffered_4326, crs="EPSG:4326")  # type: ignore[union-attr]
-    da = da.squeeze(drop=True)
-
-    # Clip to AOI polygon and mask nodata values.
-    da = da.rio.clip(aoi_native.geometry, aoi_native.crs, drop=True)
-    nodata_val = da.rio.nodata
-    if nodata_val is not None:
-        da = da.where(da != nodata_val, drop=False)
-
-    _validate_raster(da, record["dataset_name"])
-
-    # Finalize raster metadata before writing.
-    da = da.rio.write_transform()
-    da = da.rio.write_nodata(np.nan, encoded=True)
-
-    output_dir.mkdir(parents=True, exist_ok=True)
+    # Clip the local VRT to AOI polygon with gdalwarp.
+    # Passing -te limits which remote tiles GDAL touches.
     tif_name = f"{catalog_name}.tif"
     geotiff_path = output_dir / tif_name
-
-    _log(f"Writing GeoTIFF: {geotiff_path}")
-    if da.dtype != "float32":
-        da = da.astype("float32")
-    da.rio.to_raster(str(geotiff_path), driver="GTiff", compress="deflate")
+    _log(f"Clipping to AOI via gdalwarp: {geotiff_path}")
+    clip_to_aoi(
+        local_vrt,
+        cutline_path,
+        geotiff_path,
+        nodata="nan",
+        output_type="Float32",
+        target_extent=buffered_bbox,
+        target_extent_srs="EPSG:4326",
+    )
     _log(f"GeoTIFF written ({geotiff_path.stat().st_size / 1e6:.1f} MB)")
+
+    # Check data coverage within AOI.
+    coverage_pct = compute_aoi_coverage(geotiff_path, cutline_path)
+
+    # Clean up temporary files.
+    for f in [cutline_path, local_vrt]:
+        f.unlink(missing_ok=True)
+    sub_dir.rmdir()
+
+    _log(f"Data coverage within AOI: {coverage_pct:.1f}%")
+    if coverage_pct < 10.0:
+        geotiff_path.unlink(missing_ok=True)
+        raise ValueError(
+            f"NOAA DEM '{record['dataset_name']}' has only {coverage_pct:.1f}% "
+            f"data coverage within the AOI (minimum 10% required). "
+            f"The VRT may lack data for this area. Try a different dataset "
+            f"or use 'prepare-topobathy' to fetch from NWS icechunk instead."
+        )
 
     catalog_path = output_dir / f"{catalog_name}_catalog.yml"
     _write_catalog(catalog_path, tif_name, catalog_name, target_epsg)

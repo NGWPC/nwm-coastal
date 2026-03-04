@@ -19,7 +19,7 @@ class RefinementLevel:
 
     level: int
 
-    #: Inward (negative) buffer in metres applied to the polygon before
+    #: Inward (negative) buffer in meters applied to the polygon before
     #: refinement.  A negative value shrinks the polygon so that cells
     #: near the grid boundary remain at a coarser level — required for
     #: valid quadtree transitions.  Set to ``0`` to disable buffering.
@@ -36,7 +36,7 @@ class RefinementLevel:
 class GridConfig:
     """Grid generation configuration."""
 
-    #: Grid cell resolution in metres (base resolution for quadtree grids).
+    #: Grid cell resolution in meters (base resolution for quadtree grids).
     resolution: float = 50.0
 
     #: Coordinate reference system.  Use ``"utm"`` for automatic UTM zone
@@ -64,21 +64,32 @@ class ElevationDataset:
     """A single elevation/bathymetry dataset entry."""
 
     #: HydroMT data-catalog dataset name.
-    name: str = "copdem30"
+    name: str = "copdem_30m"
 
     #: Minimum elevation threshold for this dataset.
     zmin: float = 0.001
 
-    #: Data source for auto-fetching.  Currently only ``"noaa"`` is
-    #: supported.  When set, the ``create_fetch_elevation`` stage discovers
-    #: and downloads the best NOAA DEM overlapping the AOI.  When ``None``
-    #: (default), the dataset must already exist in ``data_catalog.data_libs``.
+    #: Data source for auto-fetching.  Supported values:
+    #:
+    #: - ``"nws_30m"`` — NWS 30 m topo-bathymetric DEM from icechunk (S3)
+    #: - ``"noaa_3m"`` — NOAA ~3 m coastal topobathy DEM from S3
+    #: - ``"copdem_30m"`` — Copernicus DEM 30 m from AWS S3
+    #: - ``"gebco_15arcs"`` — GEBCO 15 arc-second bathymetry (~450 m) via CEDA
+    #:
+    #: When set, the ``create_fetch_data`` stage downloads the dataset
+    #: for the AOI automatically.  When ``None``, the dataset must
+    #: already exist in ``data_catalog.data_libs``.
     source: str | None = None
 
     #: Explicit NOAA dataset name (e.g. ``"TX_Coastal_DEM_2018_8899"``).
-    #: Only used when ``source`` is ``"noaa"``.  When ``None``, the best
+    #: Only used when ``source`` is ``"noaa_3m"``.  When ``None``, the best
     #: dataset is auto-discovered based on AOI overlap and resolution.
     noaa_dataset: str | None = None
+
+    #: NWS topobathy coastal domain identifier (e.g. ``"atlgulf"``,
+    #: ``"hi"``, ``"prvi"``, ``"pacific"``, ``"ak"``).
+    #: Only used when ``source`` is ``"nws_30m"``.
+    coastal_domain: str | None = None
 
 
 @dataclass
@@ -87,8 +98,8 @@ class ElevationConfig:
 
     datasets: list[ElevationDataset] = field(
         default_factory=lambda: [
-            ElevationDataset(name="copdem30", zmin=0.001),
-            ElevationDataset(name="gebco", zmin=-20000),
+            ElevationDataset(name="copdem_30m", zmin=0.001, source="copdem_30m"),
+            ElevationDataset(name="gebco_15arcs", zmin=-20000, source="gebco_15arcs"),
         ]
     )
 
@@ -122,7 +133,13 @@ class SubgridConfig:
     nr_subgrid_pixels: int = 5
 
     #: Land-use / land-cover dataset for roughness classification.
-    lulc_dataset: str = "esa_worldcover_2021"
+    lulc_dataset: str = "esa_worldcover"
+
+    #: Data source for auto-fetching the LULC dataset.  Currently
+    #: only ``"esa_worldcover"`` is supported (tiles from AWS S3).
+    #: When ``None``, the dataset must already exist in
+    #: ``data_catalog.data_libs``.
+    lulc_source: str | None = "esa_worldcover"
 
     #: Optional CSV path for custom reclassification table.  When ``None``,
     #: the HydroMT-SFINCS built-in table for the chosen dataset is used.
@@ -137,6 +154,9 @@ class SubgridConfig:
     def __post_init__(self) -> None:
         if self.reclass_table is not None:
             self.reclass_table = Path(self.reclass_table).expanduser().resolve()
+        # Backward compatibility: normalize legacy name.
+        if self.lulc_dataset == "esa_worldcover_2021":
+            self.lulc_dataset = "esa_worldcover"
 
 
 @dataclass
@@ -209,9 +229,38 @@ class SfincsCreateConfig:
     monitoring: MonitoringConfig = field(default_factory=MonitoringConfig)
     nwm_discharge: NWMDischargeConfig | None = None
 
+    #: When True, automatically query NOAA CO-OPS for water level
+    #: stations within the model domain and add them as observation
+    #: points.  Requires the ``plot`` optional dependencies.
+    add_noaa_gages: bool = False
+
+    #: Observation point specifications as list of dicts with
+    #: ``x``, ``y``, ``name`` keys (coordinates in model CRS).
+    observation_points: list[dict[str, Any]] = field(default_factory=list)
+
+    #: Path to a GeoJSON file with observation point locations.
+    observation_locations_file: Path | None = None
+
+    #: Whether to merge with pre-existing observation points.
+    merge_observations: bool = False
+
+    # ------------------------------------------------------------------
+    # Validation
+    # ------------------------------------------------------------------
+
+    #: Valid ``ElevationDataset.source`` values.
+    _VALID_ELEV_SOURCES = frozenset({"nws_30m", "noaa_3m", "copdem_30m", "gebco_15arcs"})
+
+    #: Valid ``SubgridConfig.lulc_source`` values.
+    _VALID_LULC_SOURCES = frozenset({"esa_worldcover"})
+
     def __post_init__(self) -> None:
         self.aoi = Path(self.aoi).expanduser().resolve()
         self.output_dir = Path(self.output_dir).expanduser().resolve()
+        if self.observation_locations_file is not None:
+            self.observation_locations_file = (
+                Path(self.observation_locations_file).expanduser().resolve()
+            )
         if self.download_dir is not None:
             self.download_dir = Path(self.download_dir).expanduser().resolve()
 
@@ -233,8 +282,10 @@ class SfincsCreateConfig:
         is included only when :attr:`nwm_discharge` is configured.
         """
         stages = ["create_grid"]
-        if any(d.source is not None for d in self.elevation.datasets):
-            stages.append("create_fetch_elevation")
+        has_elev_source = any(d.source is not None for d in self.elevation.datasets)
+        has_lulc_source = self.subgrid.lulc_source is not None
+        if has_elev_source or has_lulc_source:
+            stages.append("create_fetch_data")
         stages.extend(
             [
                 "create_elevation",
@@ -244,16 +295,35 @@ class SfincsCreateConfig:
         )
         if self.nwm_discharge is not None:
             stages.append("create_discharge")
-        stages.extend(["create_subgrid", "create_write"])
+        stages.append("create_subgrid")
+        has_obs = (
+            self.add_noaa_gages
+            or bool(self.observation_points)
+            or self.observation_locations_file is not None
+        )
+        if has_obs:
+            stages.append("create_obs")
+        stages.append("create_write")
         return stages
 
     # ------------------------------------------------------------------
-    # YAML I/O
+    # Serialisation / deserialisation
     # ------------------------------------------------------------------
 
     @classmethod
-    def _from_dict(cls, data: dict[str, Any]) -> SfincsCreateConfig:
-        """Create config from a raw dictionary."""
+    def from_dict(cls, data: dict[str, Any]) -> SfincsCreateConfig:
+        """Create config from a plain dictionary.
+
+        Parameters
+        ----------
+        data : dict
+            Configuration dictionary with the same structure as the YAML
+            file (see :meth:`to_dict` for the expected keys).
+
+        Returns
+        -------
+        SfincsCreateConfig
+        """
         aoi = data.get("aoi")
         if aoi is None:
             raise ValueError("'aoi' is required (path to AOI polygon file)")
@@ -298,6 +368,12 @@ class SfincsCreateConfig:
         download_dir_raw = data.get("download_dir")
         download_dir = Path(download_dir_raw) if download_dir_raw else None
 
+        add_noaa_gages = data.get("add_noaa_gages", False)
+        observation_points = data.get("observation_points", [])
+        obs_file_raw = data.get("observation_locations_file")
+        observation_locations_file = Path(obs_file_raw) if obs_file_raw else None
+        merge_observations = data.get("merge_observations", False)
+
         return cls(
             aoi=Path(aoi),
             output_dir=Path(output_dir),
@@ -309,12 +385,16 @@ class SfincsCreateConfig:
             data_catalog=data_catalog,
             monitoring=monitoring,
             nwm_discharge=nwm_discharge,
+            add_noaa_gages=add_noaa_gages,
+            observation_points=observation_points,
+            observation_locations_file=observation_locations_file,
+            merge_observations=merge_observations,
         )
 
     @staticmethod
     def _resolve_relative_paths(data: dict[str, Any], yaml_dir: Path) -> None:
         """Resolve relative paths in *data* against *yaml_dir* in place."""
-        for key in ("aoi", "output_dir", "download_dir"):
+        for key in ("aoi", "output_dir", "download_dir", "observation_locations_file"):
             val = data.get(key)
             if val and not Path(val).is_absolute():
                 data[key] = str(yaml_dir / val)
@@ -380,11 +460,7 @@ class SfincsCreateConfig:
             raise ValueError(f"Configuration file is empty: {config_path}")
 
         cls._resolve_relative_paths(data, config_path.parent)
-        return cls._from_dict(data)
-
-    # ------------------------------------------------------------------
-    # Validation
-    # ------------------------------------------------------------------
+        return cls.from_dict(data)
 
     def _validate_elevation(self) -> list[str]:
         """Validate elevation configuration."""
@@ -394,14 +470,22 @@ class SfincsCreateConfig:
         if not self.elevation.datasets:
             errors.append("elevation.datasets must contain at least one entry")
         for ds in self.elevation.datasets:
-            if ds.source is not None and ds.source != "noaa":
+            if ds.source is not None and ds.source not in self._VALID_ELEV_SOURCES:
                 errors.append(
-                    f"elevation.datasets[{ds.name}].source must be 'noaa' or None, "
-                    f"got '{ds.source}'"
+                    f"elevation.datasets[{ds.name}].source must be one of "
+                    f"{sorted(self._VALID_ELEV_SOURCES)} or None, got '{ds.source}'"
                 )
-            if ds.noaa_dataset is not None and ds.source != "noaa":
+            if ds.noaa_dataset is not None and ds.source != "noaa_3m":
                 errors.append(
-                    f"elevation.datasets[{ds.name}].noaa_dataset is set but source is not 'noaa'"
+                    f"elevation.datasets[{ds.name}].noaa_dataset is set but source is not 'noaa_3m'"
+                )
+            if ds.coastal_domain is not None and ds.source != "nws_30m":
+                errors.append(
+                    f"elevation.datasets[{ds.name}].coastal_domain is set but source is not 'nws_30m'"
+                )
+            if ds.source == "nws_30m" and ds.coastal_domain is None:
+                errors.append(
+                    f"elevation.datasets[{ds.name}].coastal_domain is required when source is 'nws_30m'"
                 )
         return errors
 
@@ -416,6 +500,15 @@ class SfincsCreateConfig:
             errors.append(f"subgrid.reclass_table not found: {self.subgrid.reclass_table}")
         if self.subgrid.nr_subgrid_pixels < 1:
             errors.append("subgrid.nr_subgrid_pixels must be >= 1")
+        if (
+            self.subgrid.lulc_source is not None
+            and self.subgrid.lulc_source not in self._VALID_LULC_SOURCES
+        ):
+            errors.append(
+                f"subgrid.lulc_source must be one of "
+                f"{sorted(self._VALID_LULC_SOURCES)} or None, "
+                f"got '{self.subgrid.lulc_source}'"
+            )
         return errors
 
     def validate(self) -> list[str]:
@@ -487,6 +580,7 @@ class SfincsCreateConfig:
                         "zmin": d.zmin,
                         **({"source": d.source} if d.source else {}),
                         **({"noaa_dataset": d.noaa_dataset} if d.noaa_dataset else {}),
+                        **({"coastal_domain": d.coastal_domain} if d.coastal_domain else {}),
                     }
                     for d in self.elevation.datasets
                 ],
@@ -500,6 +594,7 @@ class SfincsCreateConfig:
             "subgrid": {
                 "nr_subgrid_pixels": self.subgrid.nr_subgrid_pixels,
                 "lulc_dataset": self.subgrid.lulc_dataset,
+                **({"lulc_source": self.subgrid.lulc_source} if self.subgrid.lulc_source else {}),
                 "reclass_table": (
                     str(self.subgrid.reclass_table) if self.subgrid.reclass_table else None
                 ),
@@ -526,6 +621,12 @@ class SfincsCreateConfig:
                 if self.nwm_discharge is not None
                 else None
             ),
+            "add_noaa_gages": self.add_noaa_gages,
+            "observation_points": self.observation_points,
+            "observation_locations_file": (
+                str(self.observation_locations_file) if self.observation_locations_file else None
+            ),
+            "merge_observations": self.merge_observations,
         }
 
     def to_yaml(self, path: Path | str) -> None:

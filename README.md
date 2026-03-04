@@ -283,12 +283,13 @@ Each stage is classified as Python-only or container-based (requires Singularity
 Used by the `create` command to build a new SFINCS model from an AOI polygon:
 
 1. **`create_grid`** - Create SFINCS quadtree grid from AOI polygon
-1. **`create_fetch_elevation`** - Fetch NOAA topobathy DEM for AOI
+1. **`create_fetch_data`** - Fetch elevation and land cover data for AOI
 1. **`create_elevation`** - Add elevation and bathymetry data
 1. **`create_mask`** - Create active cell mask
 1. **`create_boundary`** - Create water level boundary cells
 1. **`create_discharge`** - Add NWM discharge source points _(optional)_
 1. **`create_subgrid`** - Create subgrid tables
+1. **`create_obs`** - Add observation points _(optional)_
 1. **`create_write`** - Write SFINCS model to disk
 
 ## Configuration Inheritance

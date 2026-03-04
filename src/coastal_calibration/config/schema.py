@@ -362,7 +362,7 @@ class SchismModelConfig(ModelConfig):
 
         # MPI / AWS EFA fabric tuning — required for reliable MPI
         # on EFA-enabled instances (e.g. c5n-18xlarge).  Without
-        # these, MPI collectives can hang during ESMF initialisation.
+        # these, MPI collectives can hang during ESMF initialization.
         env["MPICH_OFI_STARTUP_CONNECT"] = "1"
         env["MPICH_COLL_SYNC"] = "MPI_Bcast"
         env["MPICH_REDUCE_NO_SMP"] = "1"
@@ -476,17 +476,6 @@ class SfincsModelConfig(ModelConfig):
     model_root : Path, optional
         Output directory for the built model.  Defaults to
         ``{work_dir}/sfincs_model``.
-    include_noaa_gages : bool
-        When True, automatically query NOAA CO-OPS for water level
-        stations within the model domain and add them as observation
-        points.  Requires the ``plot`` optional dependencies.
-    observation_points : list, optional
-        Observation point specifications as list of dicts with
-        ``x``, ``y``, ``name`` keys (coordinates in model CRS).
-    observation_locations_file : Path, optional
-        Path to a GeoJSON file with observation point locations.
-    merge_observations : bool
-        Whether to merge with pre-existing observation points.
     discharge_locations_file : Path, optional
         Path to a SFINCS ``.src`` or GeoJSON with discharge source point
         locations.
@@ -517,10 +506,10 @@ class SfincsModelConfig(ModelConfig):
            full CONUS extent, producing multi-GB files and very slow
            simulations.
     forcing_to_mesh_offset_m : float
-        Vertical offset in metres *added* to the boundary-condition water
+        Vertical offset in meters *added* to the boundary-condition water
         levels before they enter SFINCS.
 
-        Tidal-only sources such as TPXO provide oscillations centred on
+        Tidal-only sources such as TPXO provide oscillations centered on
         zero (MSL) but carry no information about where MSL sits on the
         mesh's vertical datum.  This parameter anchors the forcing signal
         to the correct geodetic height on the mesh.  Set it to the
@@ -533,7 +522,7 @@ class SfincsModelConfig(ModelConfig):
 
         Defaults to ``0.0``.
     vdatum_mesh_to_msl_m : float
-        Vertical offset in metres *added* to the simulated water level
+        Vertical offset in meters *added* to the simulated water level
         before comparison with NOAA CO-OPS observations (which are in
         MSL).  The model output inherits the mesh vertical datum, so
         this converts it to MSL (e.g. ``0.171`` for a NAVD88 mesh on
@@ -566,10 +555,6 @@ class SfincsModelConfig(ModelConfig):
 
     prebuilt_dir: Path
     model_root: Path | None = None
-    include_noaa_gages: bool = False
-    observation_points: list[dict[str, Any]] = field(default_factory=list)
-    observation_locations_file: Path | None = None
-    merge_observations: bool = False
     discharge_locations_file: Path | None = None
     merge_discharge: bool = False
     include_precip: bool = False
@@ -588,10 +573,6 @@ class SfincsModelConfig(ModelConfig):
         self.prebuilt_dir = Path(self.prebuilt_dir).expanduser().resolve()
         if self.model_root is not None:
             self.model_root = Path(self.model_root).expanduser().resolve()
-        if self.observation_locations_file is not None:
-            self.observation_locations_file = (
-                Path(self.observation_locations_file).expanduser().resolve()
-            )
         if self.discharge_locations_file is not None:
             self.discharge_locations_file = (
                 Path(self.discharge_locations_file).expanduser().resolve()
@@ -618,7 +599,6 @@ class SfincsModelConfig(ModelConfig):
             "sfincs_init",
             "sfincs_timing",
             "sfincs_forcing",
-            "sfincs_obs",
             "sfincs_discharge",
             "sfincs_precip",
             "sfincs_wind",
@@ -647,12 +627,6 @@ class SfincsModelConfig(ModelConfig):
                 if not (self.prebuilt_dir / fname).exists()
             )
 
-        if self.observation_locations_file and not self.observation_locations_file.exists():
-            errors.append(
-                "model_config.observation_locations_file not found: "
-                f"{self.observation_locations_file}"
-            )
-
         if self.discharge_locations_file and not self.discharge_locations_file.exists():
             errors.append(
                 f"model_config.discharge_locations_file not found: {self.discharge_locations_file}"
@@ -675,7 +649,6 @@ class SfincsModelConfig(ModelConfig):
             SfincsDischargeStage,
             SfincsForcingStage,
             SfincsInitStage,
-            SfincsObservationPointsStage,
             SfincsPlotStage,
             SfincsPrecipitationStage,
             SfincsPressureStage,
@@ -693,7 +666,6 @@ class SfincsModelConfig(ModelConfig):
             "sfincs_init": SfincsInitStage(config, monitor),
             "sfincs_timing": SfincsTimingStage(config, monitor),
             "sfincs_forcing": SfincsForcingStage(config, monitor),
-            "sfincs_obs": SfincsObservationPointsStage(config, monitor),
             "sfincs_discharge": SfincsDischargeStage(config, monitor),
             "sfincs_precip": SfincsPrecipitationStage(config, monitor),
             "sfincs_wind": SfincsWindStage(config, monitor),
@@ -707,12 +679,6 @@ class SfincsModelConfig(ModelConfig):
         return {
             "prebuilt_dir": str(self.prebuilt_dir),
             "model_root": str(self.model_root) if self.model_root else None,
-            "include_noaa_gages": self.include_noaa_gages,
-            "observation_points": self.observation_points,
-            "observation_locations_file": (
-                str(self.observation_locations_file) if self.observation_locations_file else None
-            ),
-            "merge_observations": self.merge_observations,
             "discharge_locations_file": (
                 str(self.discharge_locations_file) if self.discharge_locations_file else None
             ),
@@ -856,9 +822,6 @@ _SFINCS_FIELD_MIGRATION: dict[str, str] = {
     "model_dir": "prebuilt_dir",
     "docker_tag": "container_tag",
     "sif_path": "container_image",
-    "obs_points": "observation_points",
-    "obs_locations": "observation_locations_file",
-    "obs_merge": "merge_observations",
     "src_locations": "discharge_locations_file",
     "src_merge": "merge_discharge",
 }
@@ -942,10 +905,24 @@ class CoastalCalibConfig:
         return self.model_config.model_name
 
     @classmethod
-    def _from_dict(
+    def from_dict(
         cls, data: dict[str, Any], base_config_path: Path | None = None
     ) -> CoastalCalibConfig:
-        """Create config from dictionary."""
+        """Create config from a plain dictionary.
+
+        Parameters
+        ----------
+        data : dict
+            Configuration dictionary with the same structure as the YAML
+            file (see :meth:`to_dict` for the expected keys).
+        base_config_path : Path, optional
+            Path to a base configuration file (for YAML inheritance).
+            Only needed when the config was loaded via ``_base`` key.
+
+        Returns
+        -------
+        CoastalCalibConfig
+        """
         if "model" not in data:
             raise ValueError("'model' is required (e.g., model: schism or model: sfincs)")
         model_type: str = data["model"]
@@ -1064,7 +1041,7 @@ class CoastalCalibConfig:
         # Interpolate variables after merging
         data = _interpolate_config(data)
 
-        return cls._from_dict(data, base_config_path=config_path if base_config else None)
+        return cls.from_dict(data, base_config_path=config_path if base_config else None)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert config to dictionary."""

@@ -22,7 +22,7 @@ def register_round_coords_preprocessor() -> None:
     NWM LDASIN files store projected coordinates (LCC, in meters) with
     floating-point rounding errors up to ~0.125 m.  hydromt's raster
     accessor rejects them as "not a regular grid" because its tolerance
-    (``atol=5e-4``) is far too tight for metre-scale coordinates.
+    (``atol=5e-4``) is far too tight for meter-scale coordinates.
 
     This preprocessor rounds x/y coordinates to the nearest integer,
     which makes the grid perfectly regular.
@@ -55,7 +55,7 @@ def patch_serialize_crs() -> None:
     hydromt's ``_serialize_crs`` calls ``list(crs.to_authority())`` without
     guarding against ``to_authority()`` returning ``None``, which raises
     ``TypeError: 'NoneType' object is not iterable`` for any CRS that has
-    no EPSG code and no recognised authority (e.g. custom proj strings).
+    no EPSG code and no recognized authority (e.g. custom proj strings).
 
     Pydantic's ``PlainSerializer`` captures a direct reference to the
     function object at class-definition time, so replacing the function
@@ -112,15 +112,15 @@ def patch_boundary_conditions_index_dim() -> None:
     if getattr(_original_validate, "_patched", False):
         return
 
-    def _validate_and_normalise(self: Any, gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    def _validate_and_normalize(self: Any, gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
         gdf = _original_validate(self, gdf)
         if gdf.index.name != "index":
             gdf.index.name = "index"
         return gdf
 
-    SfincsBoundaryBase._validate_and_prepare_gdf = _validate_and_normalise  # type: ignore[reportPrivateUsage]
+    SfincsBoundaryBase._validate_and_prepare_gdf = _validate_and_normalize  # type: ignore[reportPrivateUsage]
     SfincsBoundaryBase._validate_and_prepare_gdf._patched = True  # type: ignore[reportPrivateUsage, attr-defined]
-    _log.info("Patched hydromt-sfincs _validate_and_prepare_gdf to normalise index name.")
+    _log.info("Patched hydromt-sfincs _validate_and_prepare_gdf to normalize index name.")
 
 
 def patch_meteo_write_gridded() -> None:
@@ -170,7 +170,7 @@ def patch_meteo_write_gridded() -> None:
         out_path = Path(filename) if filename is not None else Path("output.nc")
         out_path.parent.mkdir(parents=True, exist_ok=True)
 
-        time_vals = ds["time"].values
+        time_vals = ds["time"].to_numpy()
         var_names = list(ds.data_vars)
 
         nc = netCDF4.Dataset(str(out_path), "w")
@@ -189,7 +189,7 @@ def patch_meteo_write_gridded() -> None:
             for coord in ds.coords:
                 if coord == "time":
                     continue
-                arr = ds.coords[coord].values
+                arr = ds.coords[coord].to_numpy()
                 nc_coord = nc.createVariable(coord, arr.dtype, ds.coords[coord].dims)
                 nc_coord[:] = arr
 
@@ -206,7 +206,7 @@ def patch_meteo_write_gridded() -> None:
                 time_var[i] = (time_vals[i] - t0) / np.timedelta64(1, "m")
                 chunk = ds.isel(time=i).compute()
                 for vname in var_names:
-                    nc_vars[vname][i, :] = chunk[vname].values
+                    nc_vars[vname][i, :] = chunk[vname].to_numpy()
                 del chunk
         finally:
             nc.close()
@@ -294,6 +294,116 @@ def patch_parse_river_list_geoms() -> None:
     _log.info("Patched SfincsModel._parse_river_list to handle missing 'geoms' component.")
 
 
+def patch_quadtree_output_read() -> None:
+    """Re-grid quadtree ``sfincs_map.nc`` from structured *(n, m)* to UGRID.
+
+    The SFINCS Fortran executable writes map output on a regular *(n, m)*
+    grid even for quadtree models, whereas ``hydromt_sfincs`` expects
+    UGRID topology and calls ``xugrid.load_dataset`` which fails.
+
+    This patch intercepts ``read_map_file`` for quadtree grids, reads the
+    file with plain *xarray*, re-indexes every variable from *(n, m)* to
+    the ``mesh2d_nFaces`` dimension using the ``n`` / ``m`` index arrays
+    stored in ``sfincs.nc``, wraps the result in a
+    ``xugrid.UgridDataset``, and hands it back to the normal output
+    pipeline.
+    """
+    try:
+        from hydromt_sfincs.components.output import SfincsOutput
+    except ImportError:
+        return
+
+    _original = SfincsOutput.read_map_file
+
+    if getattr(_original, "_patched", False):
+        return
+
+    def _read_map_file_safe(
+        self: Any,
+        fn_map: str = "sfincs_map.nc",
+        drop: list[str] | None = None,
+        **kwargs: Any,
+    ) -> Any:
+        _drop: list[str] = drop if drop is not None else ["crs", "sfincsgrid"]
+
+        if self.model.grid_type != "quadtree":
+            return _original(self, fn_map=fn_map, drop=_drop, **kwargs)
+
+        # Try the original first — works if UGRID topology is present.
+        try:
+            return _original(self, fn_map=fn_map, drop=_drop, **kwargs)
+        except Exception:  # noqa: S110
+            # Silently fall through to the manual UGRID reconstruction below.
+            pass
+
+        import xarray as xr
+        import xugrid as xu
+        from pyproj import CRS
+
+        grid_ds = self.model.quadtree_grid.data
+        ugrid = grid_ds.ugrid.grid
+        face_dim = ugrid.face_dimension  # "mesh2d_nFaces"
+
+        # n, m arrays map each face → its (row, col) in the structured
+        # output grid (1-indexed).
+        n_idx = grid_ds["n"].to_numpy() - 1  # → 0-indexed row
+        m_idx = grid_ds["m"].to_numpy() - 1  # → 0-indexed col
+
+        ds_map = xr.open_dataset(fn_map)
+
+        # Build a new dataset with face-indexed variables.
+        face_vars: dict[str, xr.DataArray] = {}
+        for vname, da in ds_map.data_vars.items():
+            if vname in _drop:
+                continue
+            dims = [str(d) for d in da.dims]
+
+            # Only remap variables that live on the (n, m) grid.
+            if "n" not in dims or "m" not in dims:
+                continue
+
+            vals = da.values  # e.g. (n, m) or (time, n, m)
+            n_pos = dims.index("n")
+            m_pos = dims.index("m")
+
+            if n_pos == 0 and m_pos == 1 and len(dims) == 2:
+                # (n, m) → (nFaces,)
+                face_data = vals[n_idx, m_idx]
+                face_vars[vname] = xr.DataArray(
+                    face_data,
+                    dims=[face_dim],
+                )
+            elif len(dims) == 3 and n_pos > 0 and m_pos > 0:
+                # (time, n, m) → (time, nFaces)
+                leading_dim = dims[0]
+                face_data = vals[:, n_idx, m_idx]
+                face_vars[vname] = xr.DataArray(
+                    face_data,
+                    dims=[leading_dim, face_dim],
+                    coords={leading_dim: da.coords[leading_dim]},
+                )
+
+        ds_map.close()
+
+        if not face_vars:
+            return None
+
+        ds_face = xr.Dataset(face_vars)
+        uds = xu.UgridDataset(ds_face, grids=[ugrid])
+
+        model_crs = self.model.crs
+        if model_crs is not None:
+            uds.ugrid.grid.set_crs(
+                model_crs if isinstance(model_crs, CRS) else CRS.from_user_input(model_crs),
+            )
+
+        self.set(uds, split_dataset=True)
+
+    SfincsOutput.read_map_file = _read_map_file_safe  # type: ignore[assignment]
+    SfincsOutput.read_map_file._patched = True  # type: ignore[attr-defined]
+    _log.info("Patched SfincsOutput.read_map_file to re-grid quadtree map output to UGRID.")
+
+
 def apply_all_patches() -> None:
     """Apply all hydromt/hydromt-sfincs compatibility patches."""
     patch_serialize_crs()
@@ -302,3 +412,4 @@ def apply_all_patches() -> None:
     patch_meteo_write_gridded()
     patch_quadtree_subgrid_data_setter()
     patch_parse_river_list_geoms()
+    patch_quadtree_output_read()

@@ -66,6 +66,9 @@ hooks:
 
 plugins:
 - search
+- mkdocs-jupyter:
+    include: ['*.ipynb']
+    include_source: true
 - mike:
     alias_type: symlink
     canonical_version: stable
@@ -155,6 +158,10 @@ nav:
   - CLI Reference: user-guide/cli.md
   - Python API: user-guide/python-api.md
   - Workflow Stages: user-guide/workflow-stages.md
+- Examples:
+  - Overview: examples/index.md
+  - CLI Tutorial: examples/notebooks/lavaca_cli.ipynb
+  - Python API Tutorial: examples/notebooks/lavaca_api.ipynb
 - Design: DESIGN.md
 - Reference:
   - API Reference: reference/api.md

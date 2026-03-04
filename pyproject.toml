@@ -51,6 +51,7 @@ dev = [
 docs = [
   "mike>=2",
   "mkdocs>=1.6",
+  "mkdocs-jupyter",
   "mkdocs-materialx",
   "mkdocstrings[python]>=0.27",
   "ruff",
@@ -111,7 +112,7 @@ source = "vcs"
 target-version = "py311"
 line-length = 100
 include = [ "src/coastal_calibration/**/*.py", "src/coastal_calibration/*.py" ]
-exclude = [ "src/coastal_calibration/scripts/**" ]
+exclude = [ "docs/examples/notebooks/*.py", "src/coastal_calibration/scripts/**" ]
 [tool.ruff.lint]
 select = [
   # flake8-bugbear
@@ -215,6 +216,16 @@ per-file-ignores."tests/*.py" = [
   # insecure use of path
   "S108",
 ]
+per-file-ignores."docs/examples/notebooks/*.{ipynb,py}" = [
+  # missing module docstring
+  "D100",
+  # module level import not at top
+  "E402",
+  # use of "assert"
+  "S101",
+  # print statements
+  "T20",
+]
 extend-safe-fixes = [
   # module level imports
   "E402",
@@ -232,7 +243,7 @@ isort.required-imports = [ "from __future__ import annotations" ]
 pydocstyle.convention = "numpy"
 
 [tool.codespell]
-skip = "__pycache__,_build,.git,./htmlcov,pixi.lock,./site,./cache"
+skip = "__pycache__,_build,.git,./htmlcov,pixi.lock,./site,./cache,*.ipynb"
 ignore-words-list = "gages,parm,oce,gage,nd"
 
 [tool.pyproject-fmt]

@@ -360,6 +360,10 @@ class StageProgress:
             return f"{minutes}m {seconds}s"
         return f"{seconds}s"
 
+    def __str__(self) -> str:
+        start = self.start_time.strftime("%H:%M:%S") if self.start_time else "-"
+        return f"{self.name}: {self.status.value} ({self.duration_str}, started {start})"
+
 
 class WorkflowMonitor:
     """Monitor and track workflow progress."""
@@ -541,7 +545,7 @@ class WorkflowMonitor:
     def stage_context(self, name: str, message: str = "") -> Iterator[StageProgress]:
         """Context manager for stage execution with automatic status updates."""
         # Re-silence third-party loggers in case libraries (e.g. hydromt)
-        # re-added console handlers during import or initialisation.
+        # re-added console handlers during import or initialization.
         silence_third_party_loggers()
         self.start_stage(name, message)
         stage = self.stages[name]
