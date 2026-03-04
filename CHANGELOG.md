@@ -10,8 +10,8 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 
 - NWM Coastal QGIS plugin with toolbar for basemap loading (NHF GeoPackage + CO-OPS
-    stations), polygon sketching and vertex editing, union with NHF divides, and
-    GeoJSON export.
+    stations), polygon sketching and vertex editing, union with NHF divides, and GeoJSON
+    export.
 - Human-readable `__str__` methods on `WorkflowResult`, `DownloadResult`,
     `DownloadResults`, and `StageProgress` so that `print(result)` produces clean,
     indented output with friendly time formatting.
