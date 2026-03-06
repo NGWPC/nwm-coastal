@@ -256,6 +256,7 @@ class TestSfincsModelConfig:
             "sfincs_pressure",
             "sfincs_write",
             "sfincs_run",
+            "sfincs_floodmap",
             "sfincs_plot",
         ]
         assert cfg.stage_order == expected
