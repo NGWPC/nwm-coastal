@@ -353,7 +353,8 @@ def patch_quadtree_output_read() -> None:
 
         # Build a new dataset with face-indexed variables.
         face_vars: dict[str, xr.DataArray] = {}
-        for vname, da in ds_map.data_vars.items():
+        for _vname, da in ds_map.data_vars.items():
+            vname = str(_vname)
             if vname in _drop:
                 continue
             dims = [str(d) for d in da.dims]

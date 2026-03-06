@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -28,7 +29,7 @@ def _path_str(path: Path | str) -> str:
     return path.resolve().as_posix()
 
 
-def build_vrt(vrt_path: Path, tiff_files: list[Path | str]) -> None:
+def build_vrt(vrt_path: Path, tiff_files: Sequence[Path | str]) -> None:
     """Create a VRT from a list of GeoTIFF tiles.
 
     Parameters
