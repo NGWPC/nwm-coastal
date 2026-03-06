@@ -2,6 +2,13 @@
 
 from __future__ import annotations
 
+import matplotlib
+
+# Force non-interactive backend for the entire test suite so stages that
+# trigger matplotlib indirectly (e.g., via hydromt-sfincs) never attempt
+# to open a display and hang the process.
+matplotlib.use("Agg")
+
 import zipfile
 from datetime import datetime
 from pathlib import Path
