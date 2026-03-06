@@ -614,9 +614,14 @@ class SchismPlotStage(WorkflowStage):
         list[Path]
             Paths to the saved figures.
         """
+        import sys
+
         import matplotlib
 
-        matplotlib.use("Agg")
+        # Force non-interactive backend except inside Jupyter kernels.
+        if "ipykernel" not in sys.modules:
+            matplotlib.use("Agg")
+
         import matplotlib.dates as mdates
         import matplotlib.pyplot as plt
 
