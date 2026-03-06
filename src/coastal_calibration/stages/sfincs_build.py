@@ -1554,6 +1554,64 @@ class SfincsRunStage(_SfincsStageBase):
         return {"status": "completed", "mode": mode}
 
 
+class SfincsFloodMapStage(_SfincsStageBase):
+    """Downscale SFINCS water levels to a high-resolution flood depth map.
+
+    Reads ``zsmax`` (maximum water surface elevation) from the SFINCS
+    map output, creates an index COG that maps DEM pixels to SFINCS
+    grid cells, and calls :func:`hydromt_sfincs.utils.downscale_floodmap`
+    to produce a Cloud Optimized GeoTIFF of flood depth.
+
+    The stage is a no-op when:
+
+    * ``floodmap_dem`` is not configured.
+    * ``sfincs_map.nc`` does not exist.
+    * ``zsmax`` is not present in the map output.
+    """
+
+    name = "sfincs_floodmap"
+    description = "Downscale flood depth map"
+
+    def run(self) -> dict[str, Any]:
+        """Generate a downscaled flood depth COG from SFINCS output."""
+        if self.sfincs.floodmap_dem is None:
+            self._log("floodmap_dem not configured, skipping flood map stage")
+            return {"status": "skipped", "reason": "no DEM configured"}
+
+        if not self.sfincs.floodmap_enabled:
+            self._log("Flood map generation disabled, skipping")
+            return {"status": "skipped", "reason": "disabled"}
+
+        model_root = get_model_root(self.config)
+        map_file = model_root / "sfincs_map.nc"
+
+        if not map_file.exists():
+            self._log("sfincs_map.nc not found, skipping flood map stage")
+            return {"status": "skipped", "reason": "no map output"}
+
+        dem_path = self.sfincs.floodmap_dem
+        if not dem_path.exists():
+            self._log(f"DEM not found: {dem_path}, skipping flood map stage", "warning")
+            return {"status": "skipped", "reason": "DEM not found"}
+
+        self._update_substep("Reading SFINCS output")
+        model = _get_model(self.config)
+
+        from coastal_calibration.utils.floodmap import create_flood_depth_map
+
+        self._update_substep("Downscaling flood depth")
+        output_path = create_flood_depth_map(
+            model_root=model_root,
+            dem_path=dem_path,
+            hmin=self.sfincs.floodmap_hmin,
+            model=model,
+            log=self._log,
+        )
+
+        self._log(f"Flood depth map: {output_path}")
+        return {"status": "completed", "floodmap": str(output_path)}
+
+
 class SfincsPlotStage(_SfincsStageBase):
     """Plot simulated water levels against NOAA CO-OPS observations.
 
@@ -1630,11 +1688,16 @@ class SfincsPlotStage(_SfincsStageBase):
         list[Path]
             Paths to the saved figures.
         """
+        import sys
+
+        import matplotlib
+
+        # Force non-interactive backend except inside Jupyter kernels.
+        if "ipykernel" not in sys.modules:
+            matplotlib.use("Agg")
+
         import matplotlib.dates as mdates
         import matplotlib.pyplot as plt
-
-        # Use non-interactive backend for figure generation without display
-        plt.matplotlib.use("Agg")
 
         # ── Pre-filter: keep only stations with both obs and sim ──
         plotable = _plotable_stations(station_ids, sim_elevation, obs_ds)

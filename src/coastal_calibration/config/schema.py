@@ -568,6 +568,9 @@ class SfincsModelConfig(ModelConfig):
     container_image: Path | None = None
     omp_num_threads: int = field(default=0)
     inp_overrides: dict[str, Any] = field(default_factory=dict)
+    floodmap_dem: Path | None = None
+    floodmap_hmin: float = 0.05
+    floodmap_enabled: bool = True
 
     def __post_init__(self) -> None:
         self.prebuilt_dir = Path(self.prebuilt_dir).expanduser().resolve()
@@ -581,6 +584,8 @@ class SfincsModelConfig(ModelConfig):
             self.sfincs_exe = Path(self.sfincs_exe).expanduser().resolve()
         if self.container_image is not None:
             self.container_image = Path(self.container_image).expanduser().resolve()
+        if self.floodmap_dem is not None:
+            self.floodmap_dem = Path(self.floodmap_dem).expanduser().resolve()
         if self.omp_num_threads <= 0:
             from coastal_calibration.utils.system import get_cpu_count
 
@@ -605,6 +610,7 @@ class SfincsModelConfig(ModelConfig):
             "sfincs_pressure",
             "sfincs_write",
             "sfincs_run",
+            "sfincs_floodmap",
             "sfincs_plot",
         ]
 
@@ -647,6 +653,7 @@ class SfincsModelConfig(ModelConfig):
         from coastal_calibration.stages.sfincs_build import (
             SfincsDataCatalogStage,
             SfincsDischargeStage,
+            SfincsFloodMapStage,
             SfincsForcingStage,
             SfincsInitStage,
             SfincsPlotStage,
@@ -672,6 +679,7 @@ class SfincsModelConfig(ModelConfig):
             "sfincs_pressure": SfincsPressureStage(config, monitor),
             "sfincs_write": SfincsWriteStage(config, monitor),
             "sfincs_run": SfincsRunStage(config, monitor),
+            "sfincs_floodmap": SfincsFloodMapStage(config, monitor),
             "sfincs_plot": SfincsPlotStage(config, monitor),
         }
 
@@ -693,6 +701,9 @@ class SfincsModelConfig(ModelConfig):
             "container_image": (str(self.container_image) if self.container_image else None),
             "omp_num_threads": self.omp_num_threads,
             "inp_overrides": self.inp_overrides,
+            "floodmap_dem": (str(self.floodmap_dem) if self.floodmap_dem else None),
+            "floodmap_hmin": self.floodmap_hmin,
+            "floodmap_enabled": self.floodmap_enabled,
         }
 
 

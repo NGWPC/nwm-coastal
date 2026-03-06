@@ -404,6 +404,259 @@ def patch_quadtree_output_read() -> None:
     _log.info("Patched SfincsOutput.read_map_file to re-grid quadtree map output to UGRID.")
 
 
+def patch_quadtree_get_indices_at_points() -> None:  # noqa: PLR0915
+    """Fix broken line-continuation in ``get_indices_at_points``.
+
+    The upstream code has::
+
+        ifirst[ilev] = np.where(self.data["level"].to_numpy()[:] == ilev + 1)
+        [0][0]
+
+    Because the closing ``)`` on the first line terminates the expression,
+    ``[0][0]`` on the second line is a standalone no-op.  ``ifirst[ilev]``
+    therefore receives the raw ``np.where`` tuple instead of the scalar
+    first-index, which eventually raises
+    ``TypeError: int() argument … not 'tuple'``.
+
+    The intended code is::
+
+        ifirst[ilev] = np.where(self.data["level"].to_numpy()[:] == ilev + 1)[0][0]
+    """
+    try:
+        from hydromt_sfincs.components.quadtree.quadtree import (
+            SfincsQuadtreeGrid,
+        )
+    except ImportError:
+        return
+
+    _original = SfincsQuadtreeGrid.get_indices_at_points
+
+    if getattr(_original, "_patched", False):
+        return
+
+    import numpy as np
+    from hydromt_sfincs.components.quadtree.quadtree import binary_search
+
+    def _get_indices_at_points_fixed(self: Any, x: Any, y: Any) -> Any:  # noqa: PLR0915
+        """Corrected ``get_indices_at_points`` (fixed ifirst computation)."""
+        if np.ndim(x) == 0:
+            x = np.array([[x]])
+        if np.ndim(y) == 0:
+            y = np.array([[y]])
+
+        x0 = self.data.attrs["x0"]
+        y0 = self.data.attrs["y0"]
+        dx = self.data.attrs["dx"]
+        dy = self.data.attrs["dy"]
+        nmax = self.data.attrs["nmax"]
+        mmax = self.data.attrs["mmax"]
+        rotation = self.data.attrs["rotation"]
+        nr_refinement_levels = self.data.attrs["nr_levels"]
+
+        nr_cells = len(self.data["level"])
+
+        cosrot = np.cos(-rotation * np.pi / 180)
+        sinrot = np.sin(-rotation * np.pi / 180)
+
+        x00 = x - x0
+        y00 = y - y0
+        xg = x00 * cosrot - y00 * sinrot
+        yg = x00 * sinrot + y00 * cosrot
+
+        if not hasattr(self, "_ifirst_fixed"):
+            ifirst = np.zeros(nr_refinement_levels, dtype=int)
+            for ilev in range(nr_refinement_levels):
+                # FIX: [0][0] must be on the same line as np.where()
+                ifirst[ilev] = np.where(self.data["level"].to_numpy()[:] == ilev + 1)[0][0]
+            self._ifirst_fixed = ifirst
+
+        ifirst = self._ifirst_fixed
+
+        i0_lev = []
+        i1_lev = []
+        nmax_lev = []
+        mmax_lev = []
+        nm_lev = []
+
+        for level in range(nr_refinement_levels):
+            i0 = ifirst[level]
+            i1 = ifirst[level + 1] if level < nr_refinement_levels - 1 else nr_cells
+            i0_lev.append(i0)
+            i1_lev.append(i1)
+            nmax_lev.append(np.amax(self.data["n"].to_numpy()[i0:i1]) + 1)
+            mmax_lev.append(np.amax(self.data["m"].to_numpy()[i0:i1]) + 1)
+            nn = self.data["n"].to_numpy()[i0:i1] - 1
+            mm = self.data["m"].to_numpy()[i0:i1] - 1
+            nm_lev.append(mm * nmax_lev[level] + nn)
+
+        result = np.full(np.shape(x), -999, dtype=np.int32)
+
+        for ilev in range(nr_refinement_levels):
+            nmax = nmax_lev[ilev]
+            mmax = mmax_lev[ilev]
+            dxr = dx / 2**ilev
+            dyr = dy / 2**ilev
+            iind = np.floor(xg / dxr).astype(int)
+            jind = np.floor(yg / dyr).astype(int)
+            ind = iind * nmax + jind
+            ind[iind < 0] = -999
+            ind[jind < 0] = -999
+            ind[iind >= mmax] = -999
+            ind[jind >= nmax] = -999
+
+            ingrid = np.isin(ind, nm_lev[ilev], assume_unique=False)
+            incell = np.where(ingrid)
+
+            if incell[0].size > 0:
+                try:
+                    cell_indices = (
+                        binary_search(nm_lev[ilev], ind[incell[0], incell[1]]) + i0_lev[ilev]
+                    )
+                    result[incell[0], incell[1]] = cell_indices
+                except Exception:  # noqa: S110 — matches upstream
+                    pass
+
+        return result
+
+    SfincsQuadtreeGrid.get_indices_at_points = _get_indices_at_points_fixed  # type: ignore[assignment]
+    SfincsQuadtreeGrid.get_indices_at_points._patched = True  # type: ignore[attr-defined]
+    _log.info(
+        "Patched SfincsQuadtreeGrid.get_indices_at_points to fix broken ifirst line-continuation."
+    )
+
+
+def patch_make_index_cog() -> None:  # noqa: PLR0915
+    """Fix ``make_index_cog`` — wrong attribute names, no CRS reprojection.
+
+    The upstream code has three bugs:
+
+    1. Accesses ``model.quadtree`` / ``model.reggrid`` but the actual
+       HydroMT component names are ``"quadtree_grid"`` and ``"grid"``.
+    2. Accesses ``src.transform`` after the rasterio dataset is closed.
+    3. Passes DEM coordinates directly to ``get_indices_at_points``
+       without reprojecting them to the model CRS.  When the DEM is in
+       a geographic CRS (e.g. EPSG:4269, degrees) and the model is in a
+       projected CRS (e.g. EPSG:32614, metres), every point falls
+       outside the grid and the entire index COG is filled with nodata.
+    """
+    try:
+        import hydromt_sfincs.workflows.downscaling as _ds_mod
+    except ImportError:
+        return
+
+    _original = _ds_mod.make_index_cog
+
+    if getattr(_original, "_patched", False):
+        return
+
+    import numpy as np
+    import rasterio
+    from hydromt_sfincs.utils import build_overviews
+    from pyproj import Transformer
+    from rasterio.windows import Window
+
+    def _make_index_cog_fixed(
+        model: Any,
+        indices_fn: Any,
+        topobathy_fn: Any,
+        nrmax: int = 2000,
+        nodata: int = 2147483647,
+    ) -> None:
+        with rasterio.open(topobathy_fn) as src:
+            dem_crs = src.crs
+            transform = src.transform
+            width = src.width
+            height = src.height
+            n1, m1 = src.shape
+
+        nrcb = nrmax
+        nrbn = int(np.ceil(n1 / nrcb))
+        nrbm = int(np.ceil(m1 / nrcb))
+
+        merge_last_col = False
+        merge_last_row = False
+        if m1 % nrcb == 1:
+            nrbm -= 1
+            merge_last_col = True
+        if n1 % nrcb == 1:
+            nrbn -= 1
+            merge_last_row = True
+
+        profile = {
+            "driver": "GTiff",
+            "height": height,
+            "width": width,
+            "count": 1,
+            "dtype": np.uint32,
+            "crs": dem_crs,
+            "tiled": True,
+            "blockxsize": 256,
+            "blockysize": 256,
+            "compress": "deflate",
+            "transform": transform,
+            "nodata": nodata,
+            "predictor": 2,
+            "profile": "COG",
+            "BIGTIFF": "YES",
+        }
+
+        with rasterio.open(indices_fn, "w", **profile):
+            pass
+
+        # FIX: resolve the correct grid component
+        grid_comp = model.quadtree_grid if model.grid_type == "quadtree" else model.grid
+
+        # FIX: build a CRS transformer (DEM CRS → model CRS) so that
+        # get_indices_at_points receives coordinates in the model's
+        # projection.  When both CRSs are identical the transformer
+        # is a no-op.
+        model_crs = model.crs
+        need_reproject = dem_crs != model_crs
+        proj: Transformer | None = None
+        if need_reproject:
+            proj = Transformer.from_crs(dem_crs, model_crs, always_xy=True)
+
+        for block_col in range(nrbm):
+            bm0 = block_col * nrcb
+            bm1 = min(bm0 + nrcb, m1)
+            if merge_last_col and block_col == (nrbm - 1):
+                bm1 += 1
+
+            for block_row in range(nrbn):
+                bn0 = block_row * nrcb
+                bn1 = min(bn0 + nrcb, n1)
+                if merge_last_row and block_row == (nrbn - 1):
+                    bn1 += 1
+
+                window = Window(bm0, bn0, bm1 - bm0, bn1 - bn0)  # type: ignore[too-many-positional-arguments]
+
+                # FIX: use saved ``transform`` instead of closed ``src.transform``
+                x_coords = transform[2] + (np.arange(bm0, bm1) + 0.5) * transform[0]
+                y_coords = transform[5] + (np.arange(bn0, bn1) + 0.5) * transform[4]
+
+                xx, yy = np.meshgrid(x_coords, y_coords)
+
+                # FIX: reproject DEM coordinates → model CRS
+                if proj is not None:
+                    xx, yy = proj.transform(xx, yy)
+
+                indices = grid_comp.get_indices_at_points(xx, yy)
+                indices[np.where(indices == -999)] = nodata
+                block_data = indices.astype(np.uint32)
+
+                with rasterio.open(indices_fn, "r+") as fm_tif:
+                    fm_tif.write(block_data, window=window, indexes=1)
+
+            build_overviews(fn=indices_fn, resample_method="nearest")
+
+    _ds_mod.make_index_cog = _make_index_cog_fixed  # type: ignore[assignment]
+    _ds_mod.make_index_cog._patched = True  # type: ignore[attr-defined]
+    _log.info(
+        "Patched make_index_cog to fix component names, CRS reprojection,"
+        " and closed-dataset access."
+    )
+
+
 def apply_all_patches() -> None:
     """Apply all hydromt/hydromt-sfincs compatibility patches."""
     patch_serialize_crs()
@@ -413,3 +666,5 @@ def apply_all_patches() -> None:
     patch_quadtree_subgrid_data_setter()
     patch_parse_river_list_geoms()
     patch_quadtree_output_read()
+    patch_quadtree_get_indices_at_points()
+    patch_make_index_cog()
