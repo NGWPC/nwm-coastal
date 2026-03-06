@@ -236,6 +236,9 @@ model_config:
   omp_num_threads: 36             # OpenMP threads (defaults to CPU count)
   container_tag: latest           # SFINCS container tag
   container_image:                # Singularity image path
+  floodmap_dem:                   # High-resolution DEM for flood depth map
+  floodmap_hmin: 0.05             # Minimum flood depth threshold (m)
+  floodmap_enabled: true          # Enable flood depth map generation
 ```
 
 | Parameter                    | Type   | Default  | Description                                                          |
@@ -258,6 +261,9 @@ model_config:
 | `omp_num_threads`            | int    | auto     | OpenMP threads (defaults to CPU count)                               |
 | `container_tag`              | string | latest   | SFINCS container tag                                                 |
 | `container_image`            | path   | null     | Singularity image path                                               |
+| `floodmap_dem`               | path   | null     | High-resolution DEM GeoTIFF for flood depth downscaling              |
+| `floodmap_hmin`              | float  | 0.05     | Minimum flood depth threshold (m); shallower cells are masked out    |
+| `floodmap_enabled`           | bool   | true     | Enable flood depth map generation after SFINCS run                   |
 
 !!! note "Meteorological forcing resolution"
 

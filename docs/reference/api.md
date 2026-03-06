@@ -107,6 +107,12 @@ This page provides detailed documentation for the NWM Coastal Python API.
 
 ::: coastal_calibration.runner.WorkflowResult
 
+## Flood Depth Map
+
+### create_flood_depth_map
+
+::: coastal_calibration.utils.floodmap.create_flood_depth_map
+
 ## Downloader
 
 ### validate_date_ranges

@@ -135,6 +135,7 @@ coastal-calibration run <config> [OPTIONS]
 - `sfincs_pressure`
 - `sfincs_write`
 - `sfincs_run`
+- `sfincs_floodmap`
 - `sfincs_plot`
 
 **Examples:**
@@ -382,7 +383,8 @@ SFINCS workflow stages:
   11. sfincs_pressure: Add atmospheric pressure forcing
   12. sfincs_write: Write SFINCS model
   13. sfincs_run: Run SFINCS model (Singularity)
-  14. sfincs_plot: Plot simulated vs observed water levels
+  14. sfincs_floodmap: Downscale flood depth map
+  15. sfincs_plot: Plot simulated vs observed water levels
 
 SFINCS creation stages (create subcommand):
   1. create_grid: Create SFINCS grid from AOI polygon
