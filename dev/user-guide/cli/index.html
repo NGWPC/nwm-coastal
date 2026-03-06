@@ -1612,6 +1612,7 @@ and SFINCS coastal model workflows.</p>
 <li><code>sfincs_pressure</code></li>
 <li><code>sfincs_write</code></li>
 <li><code>sfincs_run</code></li>
+<li><code>sfincs_floodmap</code></li>
 <li><code>sfincs_plot</code></li>
 </ul>
 <p><strong>Examples:</strong></p>
@@ -1903,18 +1904,19 @@ self-contained file and gives you full control over SLURM resource allocation:</
 </span><span id="__span-18-25"><a id="__codelineno-18-25" name="__codelineno-18-25" href="#__codelineno-18-25"></a><span class="go">  11. sfincs_pressure: Add atmospheric pressure forcing</span>
 </span><span id="__span-18-26"><a id="__codelineno-18-26" name="__codelineno-18-26" href="#__codelineno-18-26"></a><span class="go">  12. sfincs_write: Write SFINCS model</span>
 </span><span id="__span-18-27"><a id="__codelineno-18-27" name="__codelineno-18-27" href="#__codelineno-18-27"></a><span class="go">  13. sfincs_run: Run SFINCS model (Singularity)</span>
-</span><span id="__span-18-28"><a id="__codelineno-18-28" name="__codelineno-18-28" href="#__codelineno-18-28"></a><span class="go">  14. sfincs_plot: Plot simulated vs observed water levels</span>
-</span><span id="__span-18-29"><a id="__codelineno-18-29" name="__codelineno-18-29" href="#__codelineno-18-29"></a>
-</span><span id="__span-18-30"><a id="__codelineno-18-30" name="__codelineno-18-30" href="#__codelineno-18-30"></a><span class="go">SFINCS creation stages (create subcommand):</span>
-</span><span id="__span-18-31"><a id="__codelineno-18-31" name="__codelineno-18-31" href="#__codelineno-18-31"></a><span class="go">  1. create_grid: Create SFINCS grid from AOI polygon</span>
-</span><span id="__span-18-32"><a id="__codelineno-18-32" name="__codelineno-18-32" href="#__codelineno-18-32"></a><span class="go">  2. create_fetch_data: Fetch elevation and land cover data for AOI</span>
-</span><span id="__span-18-33"><a id="__codelineno-18-33" name="__codelineno-18-33" href="#__codelineno-18-33"></a><span class="go">  3. create_elevation: Add elevation and bathymetry data</span>
-</span><span id="__span-18-34"><a id="__codelineno-18-34" name="__codelineno-18-34" href="#__codelineno-18-34"></a><span class="go">  4. create_mask: Create active cell mask</span>
-</span><span id="__span-18-35"><a id="__codelineno-18-35" name="__codelineno-18-35" href="#__codelineno-18-35"></a><span class="go">  5. create_boundary: Create water level boundary cells</span>
-</span><span id="__span-18-36"><a id="__codelineno-18-36" name="__codelineno-18-36" href="#__codelineno-18-36"></a><span class="go">  6. create_discharge: Add NWM discharge source points</span>
-</span><span id="__span-18-37"><a id="__codelineno-18-37" name="__codelineno-18-37" href="#__codelineno-18-37"></a><span class="go">  7. create_subgrid: Create subgrid tables</span>
-</span><span id="__span-18-38"><a id="__codelineno-18-38" name="__codelineno-18-38" href="#__codelineno-18-38"></a><span class="go">  8. create_obs: Add observation points (NOAA CO-OPS, file, inline)</span>
-</span><span id="__span-18-39"><a id="__codelineno-18-39" name="__codelineno-18-39" href="#__codelineno-18-39"></a><span class="go">  9. create_write: Write SFINCS model to disk</span>
+</span><span id="__span-18-28"><a id="__codelineno-18-28" name="__codelineno-18-28" href="#__codelineno-18-28"></a><span class="go">  14. sfincs_floodmap: Downscale flood depth map</span>
+</span><span id="__span-18-29"><a id="__codelineno-18-29" name="__codelineno-18-29" href="#__codelineno-18-29"></a><span class="go">  15. sfincs_plot: Plot simulated vs observed water levels</span>
+</span><span id="__span-18-30"><a id="__codelineno-18-30" name="__codelineno-18-30" href="#__codelineno-18-30"></a>
+</span><span id="__span-18-31"><a id="__codelineno-18-31" name="__codelineno-18-31" href="#__codelineno-18-31"></a><span class="go">SFINCS creation stages (create subcommand):</span>
+</span><span id="__span-18-32"><a id="__codelineno-18-32" name="__codelineno-18-32" href="#__codelineno-18-32"></a><span class="go">  1. create_grid: Create SFINCS grid from AOI polygon</span>
+</span><span id="__span-18-33"><a id="__codelineno-18-33" name="__codelineno-18-33" href="#__codelineno-18-33"></a><span class="go">  2. create_fetch_data: Fetch elevation and land cover data for AOI</span>
+</span><span id="__span-18-34"><a id="__codelineno-18-34" name="__codelineno-18-34" href="#__codelineno-18-34"></a><span class="go">  3. create_elevation: Add elevation and bathymetry data</span>
+</span><span id="__span-18-35"><a id="__codelineno-18-35" name="__codelineno-18-35" href="#__codelineno-18-35"></a><span class="go">  4. create_mask: Create active cell mask</span>
+</span><span id="__span-18-36"><a id="__codelineno-18-36" name="__codelineno-18-36" href="#__codelineno-18-36"></a><span class="go">  5. create_boundary: Create water level boundary cells</span>
+</span><span id="__span-18-37"><a id="__codelineno-18-37" name="__codelineno-18-37" href="#__codelineno-18-37"></a><span class="go">  6. create_discharge: Add NWM discharge source points</span>
+</span><span id="__span-18-38"><a id="__codelineno-18-38" name="__codelineno-18-38" href="#__codelineno-18-38"></a><span class="go">  7. create_subgrid: Create subgrid tables</span>
+</span><span id="__span-18-39"><a id="__codelineno-18-39" name="__codelineno-18-39" href="#__codelineno-18-39"></a><span class="go">  8. create_obs: Add observation points (NOAA CO-OPS, file, inline)</span>
+</span><span id="__span-18-40"><a id="__codelineno-18-40" name="__codelineno-18-40" href="#__codelineno-18-40"></a><span class="go">  9. create_write: Write SFINCS model to disk</span>
 </span></code></pre></div>
 <h2 id="exit-codes">Exit Codes<a class="headerlink" href="#exit-codes" title="Permanent link">#</a></h2>
 <table>

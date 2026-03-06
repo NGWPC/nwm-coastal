@@ -1642,6 +1642,116 @@ itself contains no mesh topology.</p>
 <code>apply_all_patches()</code>) monkey-patches <code>SfincsOutput.read_map_file</code> to perform the
 re-indexing described above when the original <code>xugrid.load_dataset</code> call fails for
 quadtree grids.</p>
+<hr />
+<h2 id="12-sfincsquadtreesubgridtabledata-property-has-no-setter-read-crashes">12. <code>SfincsQuadtreeSubgridTable.data</code> property has no setter (read crashes)<a class="headerlink" href="#12-sfincsquadtreesubgridtabledata-property-has-no-setter-read-crashes" title="Permanent link">#</a></h2>
+<p><strong>Summary</strong>:</p>
+<p><code>SfincsQuadtreeSubgridTable.read()</code> (<code>quadtree_subgrid.py</code>, line 82) assigns
+<code>self.data = xr.load_dataset(...)</code>, but <code>data</code> is a read-only <code>@property</code> (getter only,
+no setter). This raises
+<code>AttributeError: property 'data' of 'SfincsQuadtreeSubgridTable' object has no setter</code>
+when reading a model that contains quadtree subgrid tables.</p>
+<p><strong>Root cause</strong>:</p>
+<p>The <code>data</code> property (line 28) is defined as a getter that returns <code>self._data</code> with lazy
+initialization, but has no corresponding setter:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="nd">@property</span>
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">data</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>      <span class="c1"># recursion if read() also uses self.data</span>
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span>
+</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>
+</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="k">def</span><span class="w"> </span><span class="nf">read</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">...</span><span class="p">):</span>
+</span><span id="__span-17-8"><a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>    <span class="o">...</span>
+</span><span id="__span-17-9"><a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">xr</span><span class="o">.</span><span class="n">load_dataset</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>  <span class="c1"># &lt;-- AttributeError: no setter</span>
+</span></code></pre></div>
+<p>The <code>create()</code> method (line 193) correctly uses <code>self._data = ...</code>, so the <code>read()</code>
+method simply needs to follow the same pattern.</p>
+<p><strong>Suggested fix</strong>:</p>
+<p>Add a setter to the <code>data</code> property:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="nd">@data</span><span class="o">.</span><span class="n">setter</span>
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_data</span> <span class="o">=</span> <span class="n">value</span>
+</span></code></pre></div>
+<p><strong>Current workaround</strong>:</p>
+<p><code>patch_quadtree_subgrid_data_setter()</code> in <code>_hydromt_compat.py</code> (called from
+<code>apply_all_patches()</code>) adds a setter to the <code>data</code> property that forwards to
+<code>self._data</code>.</p>
+<hr />
+<h2 id="13-get_indices_at_points-broken-line-continuation-ifirst-receives-a-tuple">13. <code>get_indices_at_points</code> broken line-continuation (<code>ifirst</code> receives a tuple)<a class="headerlink" href="#13-get_indices_at_points-broken-line-continuation-ifirst-receives-a-tuple" title="Permanent link">#</a></h2>
+<p><strong>Summary</strong>:</p>
+<p><code>SfincsQuadtreeGrid.get_indices_at_points()</code> (<code>quadtree.py</code>, line 581) has a broken line
+continuation that causes <code>ifirst[ilev]</code> to receive the raw <code>np.where</code> tuple instead of
+the scalar first-index. This eventually raises
+<code>TypeError: int() argument must be a string, a bytes-like object or a real number, not 'tuple'</code>
+when <code>ifirst</code> values are used in arithmetic.</p>
+<p><strong>Root cause</strong>:</p>
+<p>The upstream code (lines 581–582) reads:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="n">ifirst</span><span class="p">[</span><span class="n">ilev</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;level&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()[:]</span> <span class="o">==</span> <span class="n">ilev</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>                <span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+</span></code></pre></div>
+<p>Because the closing <code>)</code> on line 581 terminates the expression, <code>[0][0]</code> on line 582 is
+parsed as a standalone no-op statement (list literal indexing). <code>ifirst[ilev]</code> receives
+the full <code>np.where</code> result tuple <code>(array([...]),)</code> instead of the intended scalar
+first-index.</p>
+<p><strong>Suggested fix</strong>:</p>
+<p>Put <code>[0][0]</code> on the same line as <code>np.where()</code>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="n">ifirst</span><span class="p">[</span><span class="n">ilev</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;level&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()[:]</span> <span class="o">==</span> <span class="n">ilev</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+</span></code></pre></div>
+<p><strong>Current workaround</strong>:</p>
+<p><code>patch_quadtree_get_indices_at_points()</code> in <code>_hydromt_compat.py</code> (called from
+<code>apply_all_patches()</code>) replaces the entire method with a corrected copy that fixes the
+<code>ifirst</code> computation and caches the result for reuse.</p>
+<hr />
+<h2 id="14-make_index_cog-wrong-component-names-closed-dataset-access-missing-crs-reprojection">14. <code>make_index_cog</code> — wrong component names, closed-dataset access, missing CRS reprojection<a class="headerlink" href="#14-make_index_cog-wrong-component-names-closed-dataset-access-missing-crs-reprojection" title="Permanent link">#</a></h2>
+<p><strong>Summary</strong>:</p>
+<p><code>make_index_cog()</code> (<code>workflows/downscaling.py</code>) has three bugs that collectively make it
+impossible to build a flood-depth index COG for quadtree models when the DEM uses a
+different CRS than the model grid.</p>
+<p><strong>Root cause</strong>:</p>
+<p><strong>(a) Wrong component attribute names</strong> (lines 113–116):</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="k">if</span> <span class="n">model</span><span class="o">.</span><span class="n">grid_type</span> <span class="o">==</span> <span class="s2">&quot;quadtree&quot;</span><span class="p">:</span>
+</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>    <span class="n">indices</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">quadtree</span><span class="o">.</span><span class="n">get_indices_at_points</span><span class="p">(</span><span class="n">xx</span><span class="p">,</span> <span class="n">yy</span><span class="p">)</span>  <span class="c1"># &lt;-- wrong</span>
+</span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="k">elif</span> <span class="n">model</span><span class="o">.</span><span class="n">grid_type</span> <span class="o">==</span> <span class="s2">&quot;regular&quot;</span><span class="p">:</span>
+</span><span id="__span-21-4"><a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>    <span class="n">indices</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">reggrid</span><span class="o">.</span><span class="n">get_indices_at_points</span><span class="p">(</span><span class="n">xx</span><span class="p">,</span> <span class="n">yy</span><span class="p">)</span>  <span class="c1"># &lt;-- wrong</span>
+</span></code></pre></div>
+<p>The actual HydroMT component names are <code>"quadtree_grid"</code> and <code>"grid"</code>, not <code>"quadtree"</code>
+and <code>"reggrid"</code>. These raise <code>AttributeError</code>.</p>
+<p><strong>(b) Closed-dataset access</strong> (lines 107–108):</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="k">with</span> <span class="n">rasterio</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">topobathy_fn</span><span class="p">)</span> <span class="k">as</span> <span class="n">src</span><span class="p">:</span>
+</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>    <span class="o">...</span>  <span class="c1"># src closes here</span>
+</span><span id="__span-22-3"><a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>
+</span><span id="__span-22-4"><a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a><span class="c1"># Later, inside the block loop:</span>
+</span><span id="__span-22-5"><a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a><span class="n">x_coords</span> <span class="o">=</span> <span class="n">transform</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">+</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">bm0</span><span class="p">,</span> <span class="n">bm1</span><span class="p">)</span> <span class="o">+</span> <span class="mf">0.5</span><span class="p">)</span> <span class="o">*</span> <span class="n">src</span><span class="o">.</span><span class="n">transform</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>  <span class="c1"># &lt;-- closed</span>
+</span><span id="__span-22-6"><a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a><span class="n">y_coords</span> <span class="o">=</span> <span class="n">transform</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span> <span class="o">+</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">bn0</span><span class="p">,</span> <span class="n">bn1</span><span class="p">)</span> <span class="o">+</span> <span class="mf">0.5</span><span class="p">)</span> <span class="o">*</span> <span class="n">src</span><span class="o">.</span><span class="n">transform</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span>  <span class="c1"># &lt;-- closed</span>
+</span></code></pre></div>
+<p><code>src</code> is accessed after the <code>with</code> block exits, reading from a closed rasterio dataset.
+<code>transform</code> was correctly saved earlier, but the code inconsistently references both
+<code>transform[2]</code> (saved) and <code>src.transform[0]</code> (closed).</p>
+<p><strong>&copy; Missing CRS reprojection</strong> (lines 107–114):</p>
+<p>The <code>xx</code>, <code>yy</code> meshgrid coordinates are in the DEM's CRS (e.g. EPSG:4269, NAD83
+geographic, degrees), but <code>get_indices_at_points</code> expects coordinates in the model's CRS
+(e.g. EPSG:32614, UTM, metres). Without reprojection, every point falls outside the grid
+and the entire index COG is filled with nodata.</p>
+<p><strong>Suggested fix</strong>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="c1"># (a) Use correct component names:</span>
+</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="n">grid_comp</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">quadtree_grid</span> <span class="k">if</span> <span class="n">model</span><span class="o">.</span><span class="n">grid_type</span> <span class="o">==</span> <span class="s2">&quot;quadtree&quot;</span> <span class="k">else</span> <span class="n">model</span><span class="o">.</span><span class="n">grid</span>
+</span><span id="__span-23-3"><a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>
+</span><span id="__span-23-4"><a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="c1"># (b) Use saved transform, not src.transform:</span>
+</span><span id="__span-23-5"><a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="n">x_coords</span> <span class="o">=</span> <span class="n">transform</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">+</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">bm0</span><span class="p">,</span> <span class="n">bm1</span><span class="p">)</span> <span class="o">+</span> <span class="mf">0.5</span><span class="p">)</span> <span class="o">*</span> <span class="n">transform</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+</span><span id="__span-23-6"><a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a><span class="n">y_coords</span> <span class="o">=</span> <span class="n">transform</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span> <span class="o">+</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">bn0</span><span class="p">,</span> <span class="n">bn1</span><span class="p">)</span> <span class="o">+</span> <span class="mf">0.5</span><span class="p">)</span> <span class="o">*</span> <span class="n">transform</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span>
+</span><span id="__span-23-7"><a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a>
+</span><span id="__span-23-8"><a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a><span class="c1"># (c) Reproject DEM coordinates → model CRS before indexing:</span>
+</span><span id="__span-23-9"><a id="__codelineno-23-9" name="__codelineno-23-9" href="#__codelineno-23-9"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pyproj</span><span class="w"> </span><span class="kn">import</span> <span class="n">Transformer</span>
+</span><span id="__span-23-10"><a id="__codelineno-23-10" name="__codelineno-23-10" href="#__codelineno-23-10"></a>
+</span><span id="__span-23-11"><a id="__codelineno-23-11" name="__codelineno-23-11" href="#__codelineno-23-11"></a><span class="n">proj</span> <span class="o">=</span> <span class="n">Transformer</span><span class="o">.</span><span class="n">from_crs</span><span class="p">(</span><span class="n">dem_crs</span><span class="p">,</span> <span class="n">model</span><span class="o">.</span><span class="n">crs</span><span class="p">,</span> <span class="n">always_xy</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="__span-23-12"><a id="__codelineno-23-12" name="__codelineno-23-12" href="#__codelineno-23-12"></a><span class="n">xx</span><span class="p">,</span> <span class="n">yy</span> <span class="o">=</span> <span class="n">proj</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">xx</span><span class="p">,</span> <span class="n">yy</span><span class="p">)</span>
+</span><span id="__span-23-13"><a id="__codelineno-23-13" name="__codelineno-23-13" href="#__codelineno-23-13"></a><span class="n">indices</span> <span class="o">=</span> <span class="n">grid_comp</span><span class="o">.</span><span class="n">get_indices_at_points</span><span class="p">(</span><span class="n">xx</span><span class="p">,</span> <span class="n">yy</span><span class="p">)</span>
+</span></code></pre></div>
+<p><strong>Current workaround</strong>:</p>
+<p><code>patch_make_index_cog()</code> in <code>_hydromt_compat.py</code> (called from <code>apply_all_patches()</code>)
+replaces <code>make_index_cog</code> with a corrected version that fixes all three bugs: resolves
+the correct grid component, uses the saved <code>transform</code> variable, and adds a
+<code>pyproj.Transformer</code> to reproject DEM coordinates to the model CRS before calling
+<code>get_indices_at_points</code>.</p>
 
 
 

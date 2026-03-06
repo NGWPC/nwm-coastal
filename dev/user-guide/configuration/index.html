@@ -1870,6 +1870,9 @@ Python-only stages.</p>
 </span><span id="__span-9-19"><a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a><span class="w">  </span><span class="nt">omp_num_threads</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">36</span><span class="w">             </span><span class="c1"># OpenMP threads (defaults to CPU count)</span>
 </span><span id="__span-9-20"><a id="__codelineno-9-20" name="__codelineno-9-20" href="#__codelineno-9-20"></a><span class="w">  </span><span class="nt">container_tag</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">latest</span><span class="w">           </span><span class="c1"># SFINCS container tag</span>
 </span><span id="__span-9-21"><a id="__codelineno-9-21" name="__codelineno-9-21" href="#__codelineno-9-21"></a><span class="w">  </span><span class="nt">container_image</span><span class="p">:</span><span class="w">                </span><span class="c1"># Singularity image path</span>
+</span><span id="__span-9-22"><a id="__codelineno-9-22" name="__codelineno-9-22" href="#__codelineno-9-22"></a><span class="w">  </span><span class="nt">floodmap_dem</span><span class="p">:</span><span class="w">                   </span><span class="c1"># High-resolution DEM for flood depth map</span>
+</span><span id="__span-9-23"><a id="__codelineno-9-23" name="__codelineno-9-23" href="#__codelineno-9-23"></a><span class="w">  </span><span class="nt">floodmap_hmin</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.05</span><span class="w">             </span><span class="c1"># Minimum flood depth threshold (m)</span>
+</span><span id="__span-9-24"><a id="__codelineno-9-24" name="__codelineno-9-24" href="#__codelineno-9-24"></a><span class="w">  </span><span class="nt">floodmap_enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">          </span><span class="c1"># Enable flood depth map generation</span>
 </span></code></pre></div>
 <table>
 <thead>
@@ -1988,6 +1991,24 @@ Python-only stages.</p>
 <td>path</td>
 <td>null</td>
 <td>Singularity image path</td>
+</tr>
+<tr>
+<td><code>floodmap_dem</code></td>
+<td>path</td>
+<td>null</td>
+<td>High-resolution DEM GeoTIFF for flood depth downscaling</td>
+</tr>
+<tr>
+<td><code>floodmap_hmin</code></td>
+<td>float</td>
+<td>0.05</td>
+<td>Minimum flood depth threshold (m); shallower cells are masked out</td>
+</tr>
+<tr>
+<td><code>floodmap_enabled</code></td>
+<td>bool</td>
+<td>true</td>
+<td>Enable flood depth map generation after SFINCS run</td>
 </tr>
 </tbody>
 </table>

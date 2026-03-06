@@ -1388,6 +1388,17 @@ this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic V
 <h2 id="unreleased"><a href="https://github.com/NGWPC/nwm-coastal/compare/3.1.1.0.0...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">#</a></h3>
 <ul>
+<li><code>SfincsFloodMapStage</code> that downscales SFINCS <code>zsmax</code> (maximum water surface elevation)
+    onto a high-resolution DEM to produce a Cloud Optimized GeoTIFF of maximum flood
+    depth via <code>hydromt_sfincs.utils.downscale_floodmap</code>.</li>
+<li><code>create_flood_depth_map()</code> utility in <code>utils/floodmap.py</code> with automatic index COG
+    creation, DEM overview building, and configurable depth threshold (<code>hmin</code>).</li>
+<li><code>floodmap_dem</code>, <code>floodmap_hmin</code>, and <code>floodmap_enabled</code> configuration fields on
+    <code>SfincsModelConfig</code>.</li>
+<li>Hydromt-sfincs compatibility patch for <code>make_index_cog</code> fixing CRS reprojection,
+    closed-dataset access, and grid component names.</li>
+<li><code>hydromt_sfincs_issues.md</code> document tracking upstream hydromt-sfincs bugs and
+    workarounds.</li>
 <li>NWM Coastal QGIS plugin with toolbar for basemap loading (NHF GeoPackage + CO-OPS
     stations), polygon sketching and vertex editing, union with NHF divides, and GeoJSON
     export.</li>
@@ -1418,6 +1429,12 @@ this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic V
 </ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">#</a></h3>
 <ul>
+<li>Conditionally set matplotlib <code>Agg</code> backend only outside Jupyter kernels in
+    <code>SchismPlotStage</code> and <code>SfincsPlotStage</code>, enabling inline plotting in notebooks.</li>
+<li>Update Lavaca Bay tutorial notebooks (API and CLI) to cover the flood map generation
+    phase.</li>
+<li>Bump pre-commit hooks: <code>ruff-pre-commit</code> v0.15.4 → v0.15.5, <code>codespell</code> v2.4.1 →
+    v2.4.2.</li>
 <li>Rewrite NOAA station matching in <code>SfincsPlotStage</code> to use spatial KDTree
     nearest-neighbor lookup instead of file-based <code>obs_station_map.json</code> / regex
     fallback. Observation points are reprojected to WGS 84 and matched against the full
