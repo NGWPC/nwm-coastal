@@ -9,6 +9,17 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 
+- `SfincsFloodMapStage` that downscales SFINCS `zsmax` (maximum water surface elevation)
+    onto a high-resolution DEM to produce a Cloud Optimized GeoTIFF of maximum flood
+    depth via `hydromt_sfincs.utils.downscale_floodmap`.
+- `create_flood_depth_map()` utility in `utils/floodmap.py` with automatic index COG
+    creation, DEM overview building, and configurable depth threshold (`hmin`).
+- `floodmap_dem`, `floodmap_hmin`, and `floodmap_enabled` configuration fields on
+    `SfincsModelConfig`.
+- Hydromt-sfincs compatibility patch for `make_index_cog` fixing CRS reprojection,
+    closed-dataset access, and grid component names.
+- `hydromt_sfincs_issues.md` document tracking upstream hydromt-sfincs bugs and
+    workarounds.
 - NWM Coastal QGIS plugin with toolbar for basemap loading (NHF GeoPackage + CO-OPS
     stations), polygon sketching and vertex editing, union with NHF divides, and GeoJSON
     export.
@@ -39,6 +50,12 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
+- Conditionally set matplotlib `Agg` backend only outside Jupyter kernels in
+    `SchismPlotStage` and `SfincsPlotStage`, enabling inline plotting in notebooks.
+- Update Lavaca Bay tutorial notebooks (API and CLI) to cover the flood map generation
+    phase.
+- Bump pre-commit hooks: `ruff-pre-commit` v0.15.4 → v0.15.5, `codespell` v2.4.1 →
+    v2.4.2.
 - Rewrite NOAA station matching in `SfincsPlotStage` to use spatial KDTree
     nearest-neighbor lookup instead of file-based `obs_station_map.json` / regex
     fallback. Observation points are reprojected to WGS 84 and matched against the full
