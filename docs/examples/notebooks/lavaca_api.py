@@ -184,7 +184,7 @@ run_config = CoastalCalibConfig.from_dict(
 runner = CoastalCalibRunner(run_config)
 result = runner.run()
 if not result.success:
-    raise RuntimeError(f"Model creation failed at stage '{result.stages_failed}': {result.errors}")
+    raise RuntimeError(f"Model run failed at stage '{result.stages_failed}': {result.errors}")
 print(result)
 
 # %% [markdown]

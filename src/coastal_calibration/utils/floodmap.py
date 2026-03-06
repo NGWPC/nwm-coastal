@@ -101,7 +101,7 @@ def create_flood_depth_map(
         ``model_root`` is still used to resolve default output paths but
         the model is **not** re-read from disk.
     log : callable, optional
-        Logging callback ``(message, level)``; falls back to the module
+        Logging callback accepting a single message; falls back to the module
         logger when *None*.
 
     Returns
@@ -138,12 +138,13 @@ def create_flood_depth_map(
         else:
             _log.info(msg)
 
+    # ── Ensure patches are applied before any hydromt-sfincs call ──
+    from coastal_calibration.stages._hydromt_compat import apply_all_patches
+
+    apply_all_patches()
+
     # ── Load model and read output ──────────────────────────────
     if model is None:
-        from coastal_calibration.stages._hydromt_compat import apply_all_patches
-
-        apply_all_patches()
-
         from hydromt_sfincs import SfincsModel as _Sfincs
 
         # Use "r+" (same as the pipeline) so all components are writable
@@ -164,6 +165,7 @@ def create_flood_depth_map(
     # ── Optionally create index COG ─────────────────────────────
     if create_index and not index_path.exists():
         _info(f"Creating index COG: {index_path}")
+        index_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         make_index_cog(
             model=model,

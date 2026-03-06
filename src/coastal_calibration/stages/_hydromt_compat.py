@@ -648,7 +648,7 @@ def patch_make_index_cog() -> None:  # noqa: PLR0915
                 with rasterio.open(indices_fn, "r+") as fm_tif:
                     fm_tif.write(block_data, window=window, indexes=1)
 
-            build_overviews(fn=indices_fn, resample_method="nearest")
+        build_overviews(fn=indices_fn, resample_method="nearest")
 
     _ds_mod.make_index_cog = _make_index_cog_fixed  # type: ignore[assignment]
     _ds_mod.make_index_cog._patched = True  # type: ignore[attr-defined]

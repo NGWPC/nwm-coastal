@@ -1600,13 +1600,27 @@ class SfincsFloodMapStage(_SfincsStageBase):
         from coastal_calibration.utils.floodmap import create_flood_depth_map
 
         self._update_substep("Downscaling flood depth")
-        output_path = create_flood_depth_map(
-            model_root=model_root,
-            dem_path=dem_path,
-            hmin=self.sfincs.floodmap_hmin,
-            model=model,
-            log=self._log,
-        )
+        try:
+            output_path = create_flood_depth_map(
+                model_root=model_root,
+                dem_path=dem_path,
+                hmin=self.sfincs.floodmap_hmin,
+                model=model,
+                log=self._log,
+            )
+        except KeyError as exc:
+            self._log(
+                f"Required variable missing in sfincs_map.nc ({exc}); "
+                "skipping flood map stage",
+                "warning",
+            )
+            return {"status": "skipped", "reason": "zsmax not found in map output"}
+        except FileNotFoundError as exc:
+            self._log(
+                f"Required map data not found ({exc}); skipping flood map stage",
+                "warning",
+            )
+            return {"status": "skipped", "reason": "required map data not found"}
 
         self._log(f"Flood depth map: {output_path}")
         return {"status": "completed", "floodmap": str(output_path)}
