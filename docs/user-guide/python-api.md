@@ -172,6 +172,9 @@ config = CoastalCalibConfig(
         forcing_to_mesh_offset_m=0.0,  # STOFS already in mesh datum
         vdatum_mesh_to_msl_m=0.171,  # mesh datum (NAVD88) → MSL for obs comparison
         meteo_res=2000,  # meteo output resolution in meters (auto-derived if None)
+        floodmap_dem=TEXAS_DIR / "dem.tif",  # high-res DEM for flood depth map
+        floodmap_hmin=0.05,  # minimum flood depth threshold (m)
+        floodmap_enabled=True,  # enable flood depth map generation
     ),
 )
 ```

@@ -40,7 +40,8 @@ flowchart TD
     J --> K[sfincs_pressure]
     K --> L[sfincs_write]
     L --> M[sfincs_run]
-    M --> N[sfincs_plot]
+    M --> N[sfincs_floodmap]
+    N --> O[sfincs_plot]
 ```
 
 ## SCHISM Stage Details
@@ -419,7 +420,40 @@ STOFS water level data.
 
 **Runs On:** Compute node (OpenMP, inside Singularity)
 
-### 14. sfincs_plot
+### 14. sfincs_floodmap
+
+**Purpose:** Downscale SFINCS water levels to a high-resolution flood depth map.
+
+**Tasks:**
+
+- Read `zsmax` (maximum water surface elevation) from the SFINCS map output
+    (`sfincs_map.nc`)
+- Create an index COG that maps high-resolution DEM pixels to SFINCS grid cells
+- Call `hydromt_sfincs.utils.downscale_floodmap` to produce a Cloud Optimized GeoTIFF of
+    flood depth (`floodmap_hmax.tif`)
+
+**Enabled by:** `model_config.floodmap_dem` pointing to a high-resolution DEM. The stage
+is skipped when `floodmap_dem` is not configured, `floodmap_enabled` is false,
+`sfincs_map.nc` does not exist, or `zsmax` is not present in the map output.
+
+**Configuration:**
+
+- `floodmap_dem` — path to the high-resolution DEM GeoTIFF
+- `floodmap_hmin` — minimum depth threshold (default: `0.05` m); shallower cells are
+    masked out
+- `floodmap_enabled` — set to `false` to skip this stage entirely (default: `true`)
+
+**Runs On:** Login node or compute node (Python-only)
+
+**Outputs:**
+
+```
+model_root/
+├── floodmap_hmax.tif    # Flood depth COG
+└── floodmap_index.tif   # Index COG (DEM pixel → SFINCS cell mapping)
+```
+
+### 15. sfincs_plot
 
 **Purpose:** Compare simulated water levels against observations.
 

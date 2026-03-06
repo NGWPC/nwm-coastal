@@ -24,6 +24,7 @@ workflow_*.json
 *.tif
 *.tiff
 *.yml
+*.qmd
 !create_sfincs.yaml
 figs/
 gis/

@@ -2,6 +2,14 @@
 
 from __future__ import annotations
 
+import os
+
+# Force non-interactive backend for the entire test suite so stages that
+# trigger matplotlib indirectly (e.g., via hydromt-sfincs) never attempt
+# to open a display and hang the process.  Set via env var to avoid
+# importing matplotlib at collection time (which can stall on CI).
+os.environ.setdefault("MPLBACKEND", "Agg")
+
 import zipfile
 from datetime import datetime
 from pathlib import Path

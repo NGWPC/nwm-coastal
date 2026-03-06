@@ -28,6 +28,7 @@ from coastal_calibration.stages.sfincs import (
 from coastal_calibration.stages.sfincs_build import (
     SfincsDataCatalogStage,
     SfincsDischargeStage,
+    SfincsFloodMapStage,
     SfincsForcingStage,
     SfincsInitStage,
     SfincsPrecipitationStage,
@@ -69,6 +70,7 @@ __all__ = [
     "STOFSBoundaryStage",
     "SfincsDataCatalogStage",
     "SfincsDischargeStage",
+    "SfincsFloodMapStage",
     "SfincsForcingStage",
     "SfincsInitStage",
     "SfincsPrecipitationStage",

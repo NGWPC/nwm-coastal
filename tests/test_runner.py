@@ -123,6 +123,7 @@ class TestCoastalCalibRunner:
             "sfincs_pressure",
             "sfincs_write",
             "sfincs_run",
+            "sfincs_floodmap",
             "sfincs_plot",
         ]
         assert expected == SfincsModelConfig(prebuilt_dir=tmp_path).stage_order
