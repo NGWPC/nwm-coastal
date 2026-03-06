@@ -560,3 +560,163 @@ elif self.model.grid_type == "quadtree":
 `apply_all_patches()`) monkey-patches `SfincsOutput.read_map_file` to perform the
 re-indexing described above when the original `xugrid.load_dataset` call fails for
 quadtree grids.
+
+______________________________________________________________________
+
+## 12. `SfincsQuadtreeSubgridTable.data` property has no setter (read crashes)
+
+**Summary**:
+
+`SfincsQuadtreeSubgridTable.read()` (`quadtree_subgrid.py`, line 82) assigns
+`self.data = xr.load_dataset(...)`, but `data` is a read-only `@property` (getter only,
+no setter). This raises
+`AttributeError: property 'data' of 'SfincsQuadtreeSubgridTable' object has no setter`
+when reading a model that contains quadtree subgrid tables.
+
+**Root cause**:
+
+The `data` property (line 28) is defined as a getter that returns `self._data` with lazy
+initialization, but has no corresponding setter:
+
+```python
+@property
+def data(self):
+    if self._data is None:
+        self.read()      # recursion if read() also uses self.data
+    return self._data
+
+def read(self, filename=None, ...):
+    ...
+    self.data = xr.load_dataset(filename)  # <-- AttributeError: no setter
+```
+
+The `create()` method (line 193) correctly uses `self._data = ...`, so the `read()`
+method simply needs to follow the same pattern.
+
+**Suggested fix**:
+
+Add a setter to the `data` property:
+
+```python
+@data.setter
+def data(self, value):
+    self._data = value
+```
+
+**Current workaround**:
+
+`patch_quadtree_subgrid_data_setter()` in `_hydromt_compat.py` (called from
+`apply_all_patches()`) adds a setter to the `data` property that forwards to
+`self._data`.
+
+______________________________________________________________________
+
+## 13. `get_indices_at_points` broken line-continuation (`ifirst` receives a tuple)
+
+**Summary**:
+
+`SfincsQuadtreeGrid.get_indices_at_points()` (`quadtree.py`, line 581) has a broken line
+continuation that causes `ifirst[ilev]` to receive the raw `np.where` tuple instead of
+the scalar first-index. This eventually raises
+`TypeError: int() argument must be a string, a bytes-like object or a real number, not 'tuple'`
+when `ifirst` values are used in arithmetic.
+
+**Root cause**:
+
+The upstream code (lines 581–582) reads:
+
+```python
+ifirst[ilev] = np.where(self.data["level"].to_numpy()[:] == ilev + 1)
+                [0][0]
+```
+
+Because the closing `)` on line 581 terminates the expression, `[0][0]` on line 582 is
+parsed as a standalone no-op statement (list literal indexing). `ifirst[ilev]` receives
+the full `np.where` result tuple `(array([...]),)` instead of the intended scalar
+first-index.
+
+**Suggested fix**:
+
+Put `[0][0]` on the same line as `np.where()`:
+
+```python
+ifirst[ilev] = np.where(self.data["level"].to_numpy()[:] == ilev + 1)[0][0]
+```
+
+**Current workaround**:
+
+`patch_quadtree_get_indices_at_points()` in `_hydromt_compat.py` (called from
+`apply_all_patches()`) replaces the entire method with a corrected copy that fixes the
+`ifirst` computation and caches the result for reuse.
+
+______________________________________________________________________
+
+## 14. `make_index_cog` — wrong component names, closed-dataset access, missing CRS reprojection
+
+**Summary**:
+
+`make_index_cog()` (`workflows/downscaling.py`) has three bugs that collectively make it
+impossible to build a flood-depth index COG for quadtree models when the DEM uses a
+different CRS than the model grid.
+
+**Root cause**:
+
+**(a) Wrong component attribute names** (lines 113–116):
+
+```python
+if model.grid_type == "quadtree":
+    indices = model.quadtree.get_indices_at_points(xx, yy)  # <-- wrong
+elif model.grid_type == "regular":
+    indices = model.reggrid.get_indices_at_points(xx, yy)  # <-- wrong
+```
+
+The actual HydroMT component names are `"quadtree_grid"` and `"grid"`, not `"quadtree"`
+and `"reggrid"`. These raise `AttributeError`.
+
+**(b) Closed-dataset access** (lines 107–108):
+
+```python
+with rasterio.open(topobathy_fn) as src:
+    ...  # src closes here
+
+# Later, inside the block loop:
+x_coords = transform[2] + (np.arange(bm0, bm1) + 0.5) * src.transform[0]  # <-- closed
+y_coords = transform[5] + (np.arange(bn0, bn1) + 0.5) * src.transform[4]  # <-- closed
+```
+
+`src` is accessed after the `with` block exits, reading from a closed rasterio dataset.
+`transform` was correctly saved earlier, but the code inconsistently references both
+`transform[2]` (saved) and `src.transform[0]` (closed).
+
+**(c) Missing CRS reprojection** (lines 107–114):
+
+The `xx`, `yy` meshgrid coordinates are in the DEM's CRS (e.g. EPSG:4269, NAD83
+geographic, degrees), but `get_indices_at_points` expects coordinates in the model's CRS
+(e.g. EPSG:32614, UTM, metres). Without reprojection, every point falls outside the grid
+and the entire index COG is filled with nodata.
+
+**Suggested fix**:
+
+```python
+# (a) Use correct component names:
+grid_comp = model.quadtree_grid if model.grid_type == "quadtree" else model.grid
+
+# (b) Use saved transform, not src.transform:
+x_coords = transform[2] + (np.arange(bm0, bm1) + 0.5) * transform[0]
+y_coords = transform[5] + (np.arange(bn0, bn1) + 0.5) * transform[4]
+
+# (c) Reproject DEM coordinates → model CRS before indexing:
+from pyproj import Transformer
+
+proj = Transformer.from_crs(dem_crs, model.crs, always_xy=True)
+xx, yy = proj.transform(xx, yy)
+indices = grid_comp.get_indices_at_points(xx, yy)
+```
+
+**Current workaround**:
+
+`patch_make_index_cog()` in `_hydromt_compat.py` (called from `apply_all_patches()`)
+replaces `make_index_cog` with a corrected version that fixes all three bugs: resolves
+the correct grid component, uses the saved `transform` variable, and adds a
+`pyproj.Transformer` to reproject DEM coordinates to the model CRS before calling
+`get_indices_at_points`.
