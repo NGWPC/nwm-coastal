@@ -61,7 +61,6 @@ lint = [
   "pre-commit",
 ]
 plot = [
-  "cartopy",
   "contextily>=1.6",
   "geopandas>=1",
   "matplotlib>=3.9",

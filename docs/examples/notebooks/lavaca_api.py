@@ -270,7 +270,7 @@ ax.autoscale_view()
 # Satellite basemap via contextily (tiles are reprojected to match the data CRS).
 import contextily as cx
 
-cx.add_basemap(ax, crs=grid_crs.to_epsg(), source=cx.providers.Esri.WorldImagery, zoom=11)
+cx.add_basemap(ax, crs=grid_crs, source=cx.providers.Esri.WorldImagery, zoom=11)
 
 # Legend
 legend_handles = [
@@ -356,7 +356,7 @@ im = ax.imshow(
     zorder=2,
 )
 
-cx.add_basemap(ax, crs=raster_crs.to_epsg(), source=cx.providers.Esri.WorldImagery, zoom=12)
+cx.add_basemap(ax, crs=raster_crs, source=cx.providers.Esri.WorldImagery, zoom=12)
 
 fig.colorbar(im, ax=ax, label="Flood depth (m)", shrink=0.6, pad=0.02, extend="both")
 ax.set_title("Lavaca Bay flood depth (hmax) from SFINCS simulation")
