@@ -9,10 +9,10 @@ from __future__ import annotations
 
 import shutil
 import subprocess
-from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
     from pathlib import Path
 
 __all__ = ["build_vrt", "clip_to_aoi", "compute_aoi_coverage"]
