@@ -213,15 +213,13 @@ for png in sorted(figs_dir.glob("stations_comparison_*.png")):
 # immediately shows the refinement structure.
 
 # %%
-import cartopy.crs as ccrs
-import cartopy.io.img_tiles as cimgt
 import matplotlib.pyplot as plt
 import numpy as np
 import xugrid as xu
 from matplotlib.collections import PolyCollection
 from matplotlib.colors import BoundaryNorm, ListedColormap
 from matplotlib.patches import Patch
-from pyproj import CRS, Transformer
+from pyproj import CRS
 
 map_file = Path("run/sfincs_model/sfincs_map.nc")
 assert map_file.exists(), (
@@ -248,27 +246,14 @@ for lv, cnt in zip(levels, counts, strict=True):
     print(f"  Level {lv}:   {cnt:>6,} cells ({base_res / 2**(lv-1):.0f} m)")
 
 # %%
-# Transform node coordinates to geographic CRS for the cartopy overlay.
-transformer = Transformer.from_crs(grid_crs, "EPSG:4326", always_xy=True)
-node_lon, node_lat = transformer.transform(node_x, node_y)
-
-# Build vertex arrays for PolyCollection (all faces are quads).
+# Build vertex arrays for PolyCollection in the grid's native CRS (UTM).
 n_verts = fnc.shape[1]
 verts = np.zeros((grid.n_face, n_verts, 2))
 for j in range(n_verts):
-    verts[:, j, 0] = node_lon[fnc[:, j]]
-    verts[:, j, 1] = node_lat[fnc[:, j]]
+    verts[:, j, 0] = node_x[fnc[:, j]]
+    verts[:, j, 1] = node_y[fnc[:, j]]
 
-fig = plt.figure(figsize=(11, 7))
-ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
-ax.set_extent(
-    [node_lon.min(), node_lon.max(), node_lat.min(), node_lat.max()],
-    crs=ccrs.PlateCarree(),
-)
-
-# Satellite background
-tiles = cimgt.QuadtreeTiles()
-ax.add_image(tiles, 11)
+fig, ax = plt.subplots(figsize=(11, 7))
 
 # Overlay mesh cells colored by refinement level
 colors = ["#4575b4", "#91bfdb", "#fee090", "#d73027"]
@@ -280,6 +265,12 @@ pc.set_array(level.astype(float))
 pc.set_cmap(cmap)
 pc.set_norm(norm)
 ax.add_collection(pc)
+ax.autoscale_view()
+
+# Satellite basemap via contextily (tiles are reprojected to match the data CRS).
+import contextily as cx
+
+cx.add_basemap(ax, crs=grid_crs, source=cx.providers.Esri.WorldImagery, zoom=11)
 
 # Legend
 legend_handles = [
@@ -303,8 +294,6 @@ plt.show()
 # writes a Cloud Optimized GeoTIFF of flood depth at the DEM resolution.
 
 # %%
-import cartopy.crs as ccrs
-import cartopy.io.img_tiles as cimgt
 import matplotlib.pyplot as plt
 import numpy as np
 import rasterio
@@ -316,7 +305,7 @@ assert floodmap.exists(), (
 )
 
 # Print metadata at full resolution, then read at a coarser overview
-# for display — the full raster can be too large for cartopy to render.
+# for display — the full raster can be too large to render.
 with rasterio.open(floodmap) as src:
     bounds = src.bounds
     raster_crs = src.crs
@@ -345,26 +334,13 @@ if valid.any():
     print(f"  Depth range:  {np.nanmin(hmax_masked):.2f} - {np.nanmax(hmax_masked):.2f} m")
 
 # %%
-# Build a cartopy projection that matches the raster CRS.
-if raster_crs.is_projected:
-    proj = ccrs.epsg(raster_crs.to_epsg())
-    data_crs = proj
-else:
-    proj = ccrs.PlateCarree()
-    data_crs = ccrs.PlateCarree()
+# Plot flood depth with satellite basemap using contextily.
+import contextily as cx
 
 extent = [bounds.left, bounds.right, bounds.bottom, bounds.top]
 
-fig = plt.figure(figsize=(11, 7))
-ax = fig.add_subplot(1, 1, 1, projection=proj)
-ax.set_extent(extent, crs=data_crs)
+fig, ax = plt.subplots(figsize=(11, 7))
 
-# Satellite background tiles
-tiles = cimgt.QuadtreeTiles()
-ax.add_image(tiles, 12)
-
-# Overlay flood depth — use a masked array so cartopy renders
-# invalid pixels as fully transparent over the satellite tiles.
 cmap = plt.cm.viridis.copy()
 cmap.set_bad(alpha=0)
 hmax_plot = np.ma.masked_invalid(hmax_masked)
@@ -373,13 +349,15 @@ im = ax.imshow(
     hmax_plot,
     extent=extent,
     origin="upper",
-    transform=data_crs,
     cmap=cmap,
     vmin=0,
     vmax=np.nanpercentile(hmax_masked, 98),
     interpolation="nearest",
     zorder=2,
 )
+
+cx.add_basemap(ax, crs=raster_crs, source=cx.providers.Esri.WorldImagery, zoom=12)
+
 fig.colorbar(im, ax=ax, label="Flood depth (m)", shrink=0.6, pad=0.02, extend="both")
 ax.set_title("Lavaca Bay flood depth (hmax) from SFINCS simulation")
 plt.show()
