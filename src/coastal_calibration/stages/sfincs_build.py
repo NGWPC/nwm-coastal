@@ -1608,19 +1608,12 @@ class SfincsFloodMapStage(_SfincsStageBase):
                 model=model,
                 log=self._log,
             )
-        except KeyError as exc:
+        except (KeyError, FileNotFoundError) as exc:
             self._log(
-                f"Required variable missing in sfincs_map.nc ({exc}); "
-                "skipping flood map stage",
+                f"Flood map generation failed ({exc}); skipping flood map stage",
                 "warning",
             )
-            return {"status": "skipped", "reason": "zsmax not found in map output"}
-        except FileNotFoundError as exc:
-            self._log(
-                f"Required map data not found ({exc}); skipping flood map stage",
-                "warning",
-            )
-            return {"status": "skipped", "reason": "required map data not found"}
+            return {"status": "skipped", "reason": str(exc)}
 
         self._log(f"Flood depth map: {output_path}")
         return {"status": "completed", "floodmap": str(output_path)}
