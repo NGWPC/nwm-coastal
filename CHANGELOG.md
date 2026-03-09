@@ -9,6 +9,10 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 
+- `clip_and_reproject()` utility in `utils/raster.py` for memory-safe raster clipping
+    and reprojection. Clips in the **source** CRS first, then reprojects with a
+    constrained output grid, preventing `rasterio.warp.calculate_default_transform` from
+    inflating the grid to the full source extent (e.g. CONUS-scale for NWM LCC → UTM).
 - SFINCS compilation guide (`docs/sfincs_compilation.md`) with platform-specific build
     instructions for Ubuntu and macOS.
 - Pixi activation script (`scripts/ensure-sfincs.sh`) that automatically compiles SFINCS
@@ -56,6 +60,14 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
+- Replace `_clip_meteo_to_domain()` + upstream `component.create()` with
+    `_create_meteo_forcing()` that fetches meteo data with a small buffer (30 cells
+    instead of the upstream default of 5 000), clips in the source CRS via
+    `clip_and_reproject()`, and constrains the output grid to model domain bounds. This
+    prevents the LCC → UTM reprojection from allocating a CONUS-scale grid (the root
+    cause of intermittent OOM kernel crashes in `sfincs_wind`). All three meteo stages
+    (precipitation, wind, pressure) use `try`/`finally` to guarantee `component.clear()`
+    runs even on failure.
 - Conditionally set matplotlib `Agg` backend only outside Jupyter kernels in
     `SchismPlotStage` and `SfincsPlotStage`, enabling inline plotting in notebooks.
 - Update Lavaca Bay tutorial notebooks (API and CLI) to cover the flood map generation
