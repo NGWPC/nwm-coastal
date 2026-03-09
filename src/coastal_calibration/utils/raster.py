@@ -74,34 +74,52 @@ def clip_and_reproject(
     import rasterio.warp
     from affine import Affine
 
+    if dst_res <= 0:
+        msg = f"dst_res must be positive, got {dst_res}"
+        raise ValueError(msg)
+
+    xmin_dst, ymin_dst, xmax_dst, ymax_dst = dst_bounds
+    if xmax_dst <= xmin_dst or ymax_dst <= ymin_dst:
+        msg = f"Invalid dst_bounds (need xmax > xmin, ymax > ymin): {dst_bounds}"
+        raise ValueError(msg)
+
     # ------------------------------------------------------------------
     # 1. Clip in source CRS
     # ------------------------------------------------------------------
     src_crs = data.raster.crs
-    src_bounds = rasterio.warp.transform_bounds(dst_crs, src_crs, *dst_bounds)
 
-    # Buffer in source-CRS units: at least ``buffer`` (which is in
-    # dst_crs units, used as a rough lower bound), or 30 source cells.
+    # Buffer the destination bounds first, then transform to source CRS.
+    # This avoids mixing units between dst_crs and src_crs.
+    buffered_dst = (
+        xmin_dst - buffer,
+        ymin_dst - buffer,
+        xmax_dst + buffer,
+        ymax_dst + buffer,
+    )
+    src_bounds = rasterio.warp.transform_bounds(dst_crs, src_crs, *buffered_dst)
+
+    # Add extra padding in source-CRS units (30 cells) to ensure the
+    # clip region fully covers the buffered destination after reprojection.
     src_res = abs(float(data.raster.res[0]))
-    src_buf = max(buffer, src_res * 30)
+    src_pad = src_res * 30
     src_clip = (
-        src_bounds[0] - src_buf,
-        src_bounds[1] - src_buf,
-        src_bounds[2] + src_buf,
-        src_bounds[3] + src_buf,
+        src_bounds[0] - src_pad,
+        src_bounds[1] - src_pad,
+        src_bounds[2] + src_pad,
+        src_bounds[3] + src_pad,
     )
     data = data.raster.clip_bbox(src_clip)
 
     # ------------------------------------------------------------------
     # 2. Reproject with a constrained output grid
     # ------------------------------------------------------------------
-    xmin = dst_bounds[0] - buffer
-    ymin = dst_bounds[1] - buffer
-    xmax = dst_bounds[2] + buffer
-    ymax = dst_bounds[3] + buffer
+    xmin = buffered_dst[0]
+    ymin = buffered_dst[1]
+    xmax = buffered_dst[2]
+    ymax = buffered_dst[3]
 
-    dst_width = int(np.ceil((xmax - xmin) / dst_res))
-    dst_height = int(np.ceil((ymax - ymin) / dst_res))
+    dst_width = max(1, int(np.ceil((xmax - xmin) / dst_res)))
+    dst_height = max(1, int(np.ceil((ymax - ymin) / dst_res)))
     dst_transform = Affine(dst_res, 0.0, xmin, 0.0, -dst_res, ymax)
 
     return (

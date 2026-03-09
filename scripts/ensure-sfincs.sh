@@ -17,9 +17,9 @@ echo "SFINCS binary not found in this environment — building …"
         autoreconf -vif
         FCFLAGS='-fopenmp -O3 -fallow-argument-mismatch -w' \
         FFLAGS='-fopenmp -O3 -fallow-argument-mismatch -w' \
-        ./configure --disable-shared --disable-openacc
+        ./configure --prefix="$CONDA_PREFIX" --disable-shared --disable-openacc
     fi
     make -j1
-    make install prefix="$CONDA_PREFIX"
+    make install
 )
 echo "SFINCS build complete — binary installed to $CONDA_PREFIX/bin/sfincs"

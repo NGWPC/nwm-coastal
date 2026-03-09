@@ -149,6 +149,18 @@ def _clear_model(config: CoastalCalibConfig) -> None:
     _MODEL_REGISTRY.pop(id(config), None)
 
 
+def _set_forcing_filename(component: object, filename: str) -> None:
+    """Set the output filename on a HydroMT-SFINCS forcing component.
+
+    HydroMT-SFINCS (v2.0.0.dev0) does not expose a public API for
+    overriding the forcing output filename — only the private
+    ``_filename`` attribute exists.  This helper centralises that
+    access so it is easy to find and update if the upstream API
+    changes.
+    """
+    component._filename = filename  # noqa: SLF001
+
+
 def _meteo_dst_res(config: CoastalCalibConfig, model: SfincsModel) -> float:
     """Return the output resolution (m) for gridded meteo forcing.
 
@@ -1394,7 +1406,7 @@ class SfincsPrecipitationStage(_SfincsStageBase):
             precip = precip.rename("precip_2d")
             model.precipitation.set(precip, name="precip_2d")
             model.config.set("netamprfile", "sfincs_netampr.nc")
-            model.precipitation._filename = "sfincs_netampr.nc"
+            _set_forcing_filename(model.precipitation, "sfincs_netampr.nc")
 
             self._log(f"Precipitation forcing added from {meteo_dataset} (res={dst_res:.0f} m)")
 
@@ -1436,7 +1448,7 @@ class SfincsWindStage(_SfincsStageBase):
 
             model.wind.set(wind, name="wind_2d")
             model.config.set("netamuamvfile", "sfincs_netamuv.nc")
-            model.wind._filename = "sfincs_netamuv.nc"
+            _set_forcing_filename(model.wind, "sfincs_netamuv.nc")
 
             self._log(f"Wind forcing added from {meteo_dataset} (res={dst_res:.0f} m)")
 
@@ -1481,7 +1493,7 @@ class SfincsPressureStage(_SfincsStageBase):
             press = press.rename("press_2d")
             model.pressure.set(press, name="press_2d")
             model.config.set("netampfile", "sfincs_netamp.nc")
-            model.pressure._filename = "sfincs_netamp.nc"
+            _set_forcing_filename(model.pressure, "sfincs_netamp.nc")
 
             # Enable barometric pressure correction so SFINCS uses the forcing.
             # pavbnd / gapres set the reference atmospheric pressure (Pa) at the
