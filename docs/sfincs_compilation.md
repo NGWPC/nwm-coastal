@@ -1,33 +1,31 @@
 # Compiling SFINCS from Source
 
-SFINCS is included as a Git submodule under `SFINCS/`. The `sfincs_run`
-workflow stage requires the `sfincs` binary to be on `PATH` (or pointed
-to via the `sfincs_exe` config option).
+SFINCS is included as a Git submodule under `SFINCS/`. The `sfincs_run` workflow stage
+requires the `sfincs` binary to be on `PATH` (or pointed to via the `sfincs_exe` config
+option).
 
----
+______________________________________________________________________
 
 ## Using Pixi (Recommended)
 
-All build dependencies (compilers, autotools, NetCDF) are declared in the
-`sfincs` pixi feature. Any environment that includes this feature
-(**`sfincs`**, **`dev`**, **`test311`**, **`test314`**) will
-**automatically compile SFINCS** on first activation if the binary is
-not already present. Subsequent activations skip the build instantly
+All build dependencies (compilers, autotools, NetCDF) are declared in the `sfincs` pixi
+feature. Any environment that includes this feature (**`sfincs`**, **`dev`**,
+**`test311`**, **`test314`**) will **automatically compile SFINCS** on first activation
+if the binary is not already present. Subsequent activations skip the build instantly
 (just a file-existence check).
 
-The binary is installed into the active pixi environment
-(`$CONDA_PREFIX/bin/sfincs`), so it is immediately available on `PATH`
-when running inside that environment. The build is **incremental** --
-if you have already configured once, subsequent runs skip `autoreconf`
-and `configure` and only recompile changed source files.
+The binary is installed into the active pixi environment (`$CONDA_PREFIX/bin/sfincs`),
+so it is immediately available on `PATH` when running inside that environment. The build
+is **incremental** -- if you have already configured once, subsequent runs skip
+`autoreconf` and `configure` and only recompile changed source files.
 
----
+______________________________________________________________________
 
 ## Manual Build
 
-If you prefer to build outside pixi, follow the platform-specific
-instructions below. The resulting binary has no runtime library
-dependencies -- just copy it wherever you need it and run.
+If you prefer to build outside pixi, follow the platform-specific instructions below.
+The resulting binary has no runtime library dependencies -- just copy it wherever you
+need it and run.
 
 ### Ubuntu
 
@@ -80,14 +78,14 @@ file ~/.local/bin/sfincs   # should show "statically linked"
 ldd ~/.local/bin/sfincs    # should print "not a dynamic executable"
 ```
 
----
+______________________________________________________________________
 
 ### macOS
 
-> **Note:** macOS does not support fully static executables (Apple does not ship
-> static versions of system libraries). The instructions below statically link
-> all non-system libraries (netCDF, HDF5, gfortran runtime, etc.) so the binary
-> is as self-contained as possible.
+> **Note:** macOS does not support fully static executables (Apple does not ship static
+> versions of system libraries). The instructions below statically link all non-system
+> libraries (netCDF, HDF5, gfortran runtime, etc.) so the binary is as self-contained as
+> possible.
 
 #### Install Dependencies
 
@@ -105,8 +103,8 @@ brew install gcc autoconf automake libtool pkg-config netcdf
 
 #### Build
 
-Homebrew installs GCC as versioned commands (`gcc-14`, `gfortran-14`, etc.).
-The snippet below detects the version automatically:
+Homebrew installs GCC as versioned commands (`gcc-14`, `gfortran-14`, etc.). The snippet
+below detects the version automatically:
 
 ```bash
 cd SFINCS/source
@@ -138,14 +136,14 @@ make install
 
 The executable is at `~/.local/bin/sfincs`.
 
-> **Apple Silicon (M1/M2/M3/M4):** Homebrew installs to `/opt/homebrew`. If
-> `pkg-config` cannot find `netcdf`, export the path before running `configure`:
+> **Apple Silicon (M1/M2/M3/M4):** Homebrew installs to `/opt/homebrew`. If `pkg-config`
+> cannot find `netcdf`, export the path before running `configure`:
 >
 > ```bash
 > export PKG_CONFIG_PATH="/opt/homebrew/lib/pkgconfig:$PKG_CONFIG_PATH"
 > ```
 
----
+______________________________________________________________________
 
 ## Verifying the Build
 
@@ -156,14 +154,14 @@ cd SFINCS/source
 make test   # runs test/01_noadv
 ```
 
----
+______________________________________________________________________
 
 ## Quick Reference
 
-| Item | Ubuntu | macOS (Homebrew) |
-| ---- | ------ | ---------------- |
-| Fortran compiler | `gfortran` (via `apt`) | `gfortran` (via `brew install gcc`) |
-| C compiler | `gcc` (via `build-essential`) | `gcc-N` (via `brew install gcc`) |
-| Autotools | `autoconf automake libtool m4` | `autoconf automake libtool` |
-| NetCDF C library | `libnetcdf-dev` | `netcdf` |
-| pkg-config | `pkg-config` | `pkg-config` |
+| Item             | Ubuntu                         | macOS (Homebrew)                    |
+| ---------------- | ------------------------------ | ----------------------------------- |
+| Fortran compiler | `gfortran` (via `apt`)         | `gfortran` (via `brew install gcc`) |
+| C compiler       | `gcc` (via `build-essential`)  | `gcc-N` (via `brew install gcc`)    |
+| Autotools        | `autoconf automake libtool m4` | `autoconf automake libtool`         |
+| NetCDF C library | `libnetcdf-dev`                | `netcdf`                            |
+| pkg-config       | `pkg-config`                   | `pkg-config`                        |

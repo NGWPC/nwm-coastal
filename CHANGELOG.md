@@ -79,7 +79,8 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     statements are stripped by `python -O`.
 - Replace Singularity container execution with native binary execution for the SFINCS
     workflow. The `sfincs_run` stage now resolves the SFINCS binary from `PATH` (or an
-    explicit `sfincs_exe` config path) instead of pulling and running a Singularity image.
+    explicit `sfincs_exe` config path) instead of pulling and running a Singularity
+    image.
 - Update `sfincs_exe` field description from "bypasses container" to "overrides PATH
     lookup".
 - Switch type checker from `pyright` to `ty`.
@@ -99,8 +100,8 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Removed
 
-- Singularity container support for SFINCS: `resolve_sif_path`, `_pull_singularity_image`,
-    `_run_singularity`, and `SFINCS_DOCKER_IMAGE`.
+- Singularity container support for SFINCS: `resolve_sif_path`,
+    `_pull_singularity_image`, `_run_singularity`, and `SFINCS_DOCKER_IMAGE`.
 - `container_tag` and `container_image` fields from `SfincsModelConfig`.
 - `docker_tag` → `container_tag` and `sif_path` → `container_image` field migration
     aliases.
