@@ -16,6 +16,7 @@ import os
 import shutil
 import subprocess
 from datetime import timedelta
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
@@ -25,8 +26,6 @@ from coastal_calibration.stages.base import WorkflowStage
 from coastal_calibration.stages.sfincs import create_nc_symlinks, generate_data_catalog
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     import xarray as xr
     from hydromt_sfincs import SfincsModel
     from numpy.typing import NDArray
@@ -34,7 +33,6 @@ if TYPE_CHECKING:
     from coastal_calibration.config.schema import CoastalCalibConfig
     from coastal_calibration.utils.logging import WorkflowMonitor
 
-SFINCS_DOCKER_IMAGE = "deltares/sfincs-cpu"
 # Maximum number of stations per figure (2x2 layout).
 _STATIONS_PER_FIGURE = 4
 
@@ -263,44 +261,8 @@ def _waterlevel_geodataset(config: CoastalCalibConfig) -> str | None:
 
 
 # ---------------------------------------------------------------------------
-# Singularity helpers (used by the run stage)
+# Subprocess helpers (used by the run stage)
 # ---------------------------------------------------------------------------
-
-
-def resolve_sif_path(config: CoastalCalibConfig) -> Path:
-    """Resolve the Singularity SIF path from configuration.
-
-    When no explicit ``container_image`` is set, the SIF file is stored
-    in the download directory so that it can be reused across runs
-    without re-downloading.
-    """
-    sfincs = _sfincs_cfg(config)
-    if sfincs.container_image is not None:
-        return sfincs.container_image
-    return config.paths.download_dir / f"sfincs-cpu_{sfincs.container_tag}.sif"
-
-
-def _pull_singularity_image(
-    config: CoastalCalibConfig,
-    sif_path: Path | None = None,
-) -> Path:
-    """Pull the SFINCS Docker image as a Singularity SIF file."""
-    if sif_path is None:
-        sif_path = resolve_sif_path(config)
-
-    if sif_path.exists():
-        return sif_path
-
-    sif_path.parent.mkdir(parents=True, exist_ok=True)
-    sfincs = _sfincs_cfg(config)
-    docker_uri = f"docker://{SFINCS_DOCKER_IMAGE}:{sfincs.container_tag}"
-    cmd = ["singularity", "pull", str(sif_path), docker_uri]
-
-    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-    if result.returncode != 0:
-        raise RuntimeError(f"singularity pull failed: {result.stderr}")
-
-    return sif_path
 
 
 def _run_and_log(
@@ -310,9 +272,6 @@ def _run_and_log(
     env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run a command, stream output to ``sfincs_log.txt``, and raise on failure.
-
-    This is the shared subprocess helper used by both the Singularity and
-    native-executable code paths.
 
     Parameters
     ----------
@@ -366,19 +325,6 @@ def _run_and_log(
         stdout="".join(stdout_lines),
         stderr="".join(stderr_lines),
     )
-
-
-def _run_singularity(
-    config: CoastalCalibConfig,
-    sif_path: Path,
-    model_root: Path | None = None,
-) -> subprocess.CompletedProcess[str]:
-    """Run SFINCS inside a Singularity container."""
-    if model_root is None:
-        model_root = get_model_root(config)
-
-    cmd = ["singularity", "run", f"-B{model_root}:/data", str(sif_path)]
-    return _run_and_log(cmd, model_root)
 
 
 # ---------------------------------------------------------------------------
@@ -1500,49 +1446,47 @@ class SfincsWriteStage(WorkflowStage):
 
 
 class SfincsRunStage(_SfincsStageBase):
-    """Run the SFINCS model via a native executable or Singularity container.
+    """Run the SFINCS model via a compiled native executable.
 
-    When ``model_config.sfincs_exe`` is set the stage invokes the binary
-    directly, which avoids the Singularity dependency (useful on macOS or
-    other systems where Singularity is unavailable).  Otherwise it falls
-    back to the Singularity container workflow.
+    Resolution order for the SFINCS binary:
+
+    1. ``model_config.sfincs_exe`` -- explicit path set in the config.
+    2. ``sfincs`` found on ``PATH``.
+
+    If neither is available the stage raises :class:`RuntimeError`.
     """
 
     name = "sfincs_run"
     description = "Run SFINCS model"
 
-    def __init__(
-        self,
-        config: CoastalCalibConfig,
-        monitor: WorkflowMonitor | None = None,
-    ) -> None:
-        super().__init__(config, monitor)
-        # Only require a container when no native exe is configured.
-        self.requires_container = self.sfincs.sfincs_exe is None
+    @staticmethod
+    def _resolve_exe(sfincs_cfg: SfincsModelConfig) -> Path:
+        """Return the SFINCS executable or raise with a helpful message."""
+        if sfincs_cfg.sfincs_exe is not None:
+            return sfincs_cfg.sfincs_exe
+        found = shutil.which("sfincs")
+        if found is not None:
+            return Path(found)
+        raise RuntimeError(
+            "SFINCS executable not found.  Either:\n"
+            "  1. Activate a pixi environment with the 'sfincs' feature"
+            " (builds automatically on first activation).\n"
+            "  2. Set 'sfincs_exe' in the config to the path of an existing binary."
+        )
 
     # ------------------------------------------------------------------ #
     # Stage entry-point
     # ------------------------------------------------------------------ #
 
     def run(self) -> dict[str, Any]:
-        """Execute SFINCS via native binary or Singularity."""
+        """Execute SFINCS via native binary."""
         model_root = get_model_root(self.config)
+        exe = self._resolve_exe(self.sfincs)
 
-        if self.sfincs.sfincs_exe is not None:
-            # ── Native executable ──
-            self._log(f"Running SFINCS via native executable: {self.sfincs.sfincs_exe}")
-            self._update_substep("Running SFINCS (native)")
-            env = {**os.environ, "OMP_NUM_THREADS": str(self.sfincs.omp_num_threads)}
-            _run_and_log([str(self.sfincs.sfincs_exe)], model_root, env=env)
-            mode = "native"
-        else:
-            # ── Singularity container ──
-            self._update_substep("Pulling Singularity image")
-            sif_path = _pull_singularity_image(self.config)
-
-            self._update_substep("Running SFINCS (Singularity)")
-            _run_singularity(self.config, sif_path)
-            mode = "singularity"
+        self._log(f"Running SFINCS via native executable: {exe}")
+        self._update_substep("Running SFINCS")
+        env = {**os.environ, "OMP_NUM_THREADS": str(self.sfincs.omp_num_threads)}
+        _run_and_log([str(exe)], model_root, env=env)
 
         self._log("SFINCS run completed")
 
@@ -1551,7 +1495,7 @@ class SfincsRunStage(_SfincsStageBase):
         # avoid a UGRID re-read error on quadtree grids.  The registry
         # is garbage-collected when the process exits.
 
-        return {"status": "completed", "mode": mode}
+        return {"status": "completed", "mode": "native"}
 
 
 class SfincsFloodMapStage(_SfincsStageBase):

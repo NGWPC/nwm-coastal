@@ -455,7 +455,7 @@ def stages(model: str | None) -> None:
         ("sfincs_wind", "Add wind forcing"),
         ("sfincs_pressure", "Add atmospheric pressure forcing"),
         ("sfincs_write", "Write SFINCS model"),
-        ("sfincs_run", "Run SFINCS model (Singularity)"),
+        ("sfincs_run", "Run SFINCS model (OpenMP)"),
         ("sfincs_plot", "Plot simulated vs observed water levels"),
     ]
 
