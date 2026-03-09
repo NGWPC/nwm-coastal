@@ -37,10 +37,10 @@ model_config:
   include_precip: true
   include_wind: true
   include_pressure: true
-  # SFINCS executable path. Either:
-  #   1. Compile SFINCS and set the path here, or
-  #   2. Comment out this line to use Singularity (requires ngen-coastal.sif)
-  sfincs_exe: ~/.local/bin/sfincs
+  # SFINCS executable path — only needed to override the default PATH lookup.
+  # When running inside a pixi environment with the sfincs feature, the binary
+  # is compiled automatically and available on PATH.
+  # sfincs_exe: ~/.local/bin/sfincs
   # Flood depth map — reuse the NOAA 3 m DEM fetched during model creation.
   # The sfincs_floodmap stage downscales zsmax onto this DEM to produce a
   # Cloud Optimized GeoTIFF of maximum flood depth.
