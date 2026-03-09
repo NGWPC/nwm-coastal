@@ -282,8 +282,7 @@ class SchismModelConfig(ModelConfig):
     singularity_image : Path
         Path to the Singularity/Apptainer SIF image used to run
         SCHISM and its pre-/post-processing scripts inside a
-        container.  SFINCS manages its own container independently
-        (see :attr:`SfincsModelConfig.container_tag`).
+        container.  SFINCS uses a natively compiled binary instead.
     nodes : int
         Number of SLURM nodes.
     ntasks_per_node : int
@@ -530,16 +529,11 @@ class SfincsModelConfig(ModelConfig):
 
         Defaults to ``0.0``.
     sfincs_exe : Path, optional
-        Path to a locally compiled SFINCS executable.  When set, the
-        ``sfincs_run`` stage invokes this binary directly instead of
-        using a Singularity container, making it possible to run on
-        systems where Singularity is unavailable (e.g. macOS laptops).
-        The container-related options (``container_tag``,
-        ``container_image``) are ignored when ``sfincs_exe`` is set.
-    container_tag : str
-        Tag for the ``deltares/sfincs-cpu`` Docker/Singularity image.
-    container_image : Path, optional
-        Path to a pre-pulled Singularity SIF file.
+        Path to a compiled SFINCS executable.  When set, the
+        ``sfincs_run`` stage uses this binary instead of discovering
+        ``sfincs`` on ``PATH``.  Normally not needed -- SFINCS is
+        compiled automatically when activating a pixi environment
+        with the ``sfincs`` feature.
     omp_num_threads : int
         Number of OpenMP threads.  Defaults to the number of physical CPU
         cores on the current machine (see :func:`~coastal_calibration.utils.system.get_cpu_count`).
@@ -564,8 +558,6 @@ class SfincsModelConfig(ModelConfig):
     forcing_to_mesh_offset_m: float = 0.0
     vdatum_mesh_to_msl_m: float = 0.0
     sfincs_exe: Path | None = None
-    container_tag: str = "latest"
-    container_image: Path | None = None
     omp_num_threads: int = field(default=0)
     inp_overrides: dict[str, Any] = field(default_factory=dict)
     floodmap_dem: Path | None = None
@@ -582,8 +574,6 @@ class SfincsModelConfig(ModelConfig):
             )
         if self.sfincs_exe is not None:
             self.sfincs_exe = Path(self.sfincs_exe).expanduser().resolve()
-        if self.container_image is not None:
-            self.container_image = Path(self.container_image).expanduser().resolve()
         if self.floodmap_dem is not None:
             self.floodmap_dem = Path(self.floodmap_dem).expanduser().resolve()
         if self.omp_num_threads <= 0:
@@ -641,9 +631,6 @@ class SfincsModelConfig(ModelConfig):
         if self.sfincs_exe and not self.sfincs_exe.exists():
             errors.append(f"model_config.sfincs_exe not found: {self.sfincs_exe}")
 
-        if self.container_image and not self.container_image.exists():
-            errors.append(f"model_config.container_image not found: {self.container_image}")
-
         return errors
 
     def create_stages(  # noqa: D102
@@ -697,8 +684,6 @@ class SfincsModelConfig(ModelConfig):
             "forcing_to_mesh_offset_m": self.forcing_to_mesh_offset_m,
             "vdatum_mesh_to_msl_m": self.vdatum_mesh_to_msl_m,
             "sfincs_exe": (str(self.sfincs_exe) if self.sfincs_exe else None),
-            "container_tag": self.container_tag,
-            "container_image": (str(self.container_image) if self.container_image else None),
             "omp_num_threads": self.omp_num_threads,
             "inp_overrides": self.inp_overrides,
             "floodmap_dem": (str(self.floodmap_dem) if self.floodmap_dem else None),
@@ -831,8 +816,6 @@ def _interpolate_config(data: dict[str, Any]) -> dict[str, Any]:
 # Maps old SfincsModelConfig field names to new names.
 _SFINCS_FIELD_MIGRATION: dict[str, str] = {
     "model_dir": "prebuilt_dir",
-    "docker_tag": "container_tag",
-    "sif_path": "container_image",
     "src_locations": "discharge_locations_file",
     "src_merge": "merge_discharge",
 }

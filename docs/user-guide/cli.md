@@ -382,7 +382,7 @@ SFINCS workflow stages:
   10. sfincs_wind: Add wind forcing
   11. sfincs_pressure: Add atmospheric pressure forcing
   12. sfincs_write: Write SFINCS model
-  13. sfincs_run: Run SFINCS model (Singularity)
+  13. sfincs_run: Run SFINCS model (OpenMP)
   14. sfincs_floodmap: Downscale flood depth map
   15. sfincs_plot: Plot simulated vs observed water levels
 

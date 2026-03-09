@@ -9,6 +9,16 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 
+- `clip_and_reproject()` utility in `utils/raster.py` for memory-safe raster clipping
+    and reprojection. Clips in the **source** CRS first, then reprojects with a
+    constrained output grid, preventing `rasterio.warp.calculate_default_transform` from
+    inflating the grid to the full source extent (e.g. CONUS-scale for NWM LCC → UTM).
+- SFINCS compilation guide (`docs/sfincs_compilation.md`) with platform-specific build
+    instructions for Ubuntu and macOS.
+- Pixi activation script (`scripts/ensure-sfincs.sh`) that automatically compiles SFINCS
+    from the Git submodule on first environment activation.
+- Build dependencies (compilers, autotools, NetCDF-Fortran) in the `sfincs` pixi feature
+    for native SFINCS compilation.
 - `SfincsFloodMapStage` that downscales SFINCS `zsmax` (maximum water surface elevation)
     onto a high-resolution DEM to produce a Cloud Optimized GeoTIFF of maximum flood
     depth via `hydromt_sfincs.utils.downscale_floodmap`.
@@ -50,6 +60,14 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
+- Replace `_clip_meteo_to_domain()` + upstream `component.create()` with
+    `_create_meteo_forcing()` that fetches meteo data with a small buffer (30 cells
+    instead of the upstream default of 5 000), clips in the source CRS via
+    `clip_and_reproject()`, and constrains the output grid to model domain bounds. This
+    prevents the LCC → UTM reprojection from allocating a CONUS-scale grid (the root
+    cause of intermittent OOM kernel crashes in `sfincs_wind`). All three meteo stages
+    (precipitation, wind, pressure) use `try`/`finally` to guarantee `component.clear()`
+    runs even on failure.
 - Conditionally set matplotlib `Agg` backend only outside Jupyter kernels in
     `SchismPlotStage` and `SfincsPlotStage`, enabling inline plotting in notebooks.
 - Update Lavaca Bay tutorial notebooks (API and CLI) to cover the flood map generation
@@ -71,6 +89,12 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Replace `assert isinstance(...)` with `typing.cast()` for `SchismModelConfig` type
     narrowing in all stage modules (`boundary`, `forcing`, `schism`), since `assert`
     statements are stripped by `python -O`.
+- Replace Singularity container execution with native binary execution for the SFINCS
+    workflow. The `sfincs_run` stage now resolves the SFINCS binary from `PATH` (or an
+    explicit `sfincs_exe` config path) instead of pulling and running a Singularity
+    image.
+- Update `sfincs_exe` field description from "bypasses container" to "overrides PATH
+    lookup".
 - Switch type checker from `pyright` to `ty`.
 - Switch documentation theme from `mkdocs-material` to `mkdocs-materialx`.
 
@@ -88,6 +112,12 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Removed
 
+- Singularity container support for SFINCS: `resolve_sif_path`,
+    `_pull_singularity_image`, `_run_singularity`, and `SFINCS_DOCKER_IMAGE`.
+- `container_tag` and `container_image` fields from `SfincsModelConfig`.
+- `docker_tag` → `container_tag` and `sif_path` → `container_image` field migration
+    aliases.
+- `pyright` configuration section in `pyproject.toml` (superseded by `ty`).
 - `SlurmConfig`, `SlurmManager`, `JobState`, and the `submit` CLI command.
 - `utils/slurm.py` module.
 - All submit/slurm-related tests and fixtures.
@@ -186,8 +216,7 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     purposes and may have different values depending on the boundary source.
 - SFINCS field renames: `model_dir` -> `prebuilt_dir`, `obs_points` ->
     `observation_points`, `obs_merge` -> `merge_observations`, `src_locations` ->
-    `discharge_locations_file`, `src_merge` -> `merge_discharge`, `docker_tag` ->
-    `container_tag`, `sif_path` -> `container_image`
+    `discharge_locations_file`, `src_merge` -> `merge_discharge`
 
 ### Fixed
 

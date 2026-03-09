@@ -95,17 +95,14 @@ print(Path("run.yaml").read_text())
 # %% [markdown]
 # ### Note on the SFINCS executable
 #
-# The `sfincs_exe` field in `run.yaml` points to a compiled SFINCS binary.
-# You have two options:
+# The `sfincs_exe` field in `run.yaml` overrides the default PATH lookup for the
+# SFINCS binary. When running inside a pixi environment with the `sfincs` feature,
+# the binary is compiled automatically and available on PATH — no `sfincs_exe` needed.
 #
-# 1. **Compile SFINCS** yourself and update the path in the config if it
-#    differs from `~/.local/bin/sfincs`.
-# 2. **Use Singularity** — comment out the `sfincs_exe` line entirely.
-#    The pipeline will then use the `ngen-coastal.sif` Singularity image.
-#
+# If you compiled SFINCS manually, set `sfincs_exe` to the path of the binary.
 # If neither is available, the pipeline will complete all stages up to
 # `sfincs_run` (downloading data, writing inputs) and then fail at the
-# model execution step.  You can re-start from that point later with
+# model execution step. You can re-start from that point later with
 # `--start-from sfincs_run`.
 
 # %% [markdown]

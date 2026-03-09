@@ -4,3 +4,4 @@
 [submodule "SFINCS"]
 	path = SFINCS
 	url = https://github.com/Deltares/SFINCS.git
+	ignore = dirty

@@ -232,38 +232,34 @@ model_config:
   forcing_to_mesh_offset_m: 0.0  # Vertical offset added to boundary forcing
   vdatum_mesh_to_msl_m: 0.0      # Vertical offset converting model output to MSL
   meteo_res:                      # Meteo forcing resolution in meters (auto if null)
-  sfincs_exe:                     # Local SFINCS executable (bypasses container)
+  sfincs_exe:                     # Explicit SFINCS executable path (overrides PATH lookup)
   omp_num_threads: 36             # OpenMP threads (defaults to CPU count)
-  container_tag: latest           # SFINCS container tag
-  container_image:                # Singularity image path
   floodmap_dem:                   # High-resolution DEM for flood depth map
   floodmap_hmin: 0.05             # Minimum flood depth threshold (m)
   floodmap_enabled: true          # Enable flood depth map generation
 ```
 
-| Parameter                    | Type   | Default  | Description                                                          |
-| ---------------------------- | ------ | -------- | -------------------------------------------------------------------- |
-| `prebuilt_dir`               | path   | required | Path to pre-built SFINCS model                                       |
-| `model_root`                 | path   | null     | Output directory (defaults to `{work_dir}/sfincs_model`)             |
-| `observation_points`         | list   | `[]`     | Observation point coordinates                                        |
-| `observation_locations_file` | path   | null     | Observation locations file                                           |
-| `merge_observations`         | bool   | false    | Merge observations into model                                        |
-| `discharge_locations_file`   | path   | null     | Discharge source locations file                                      |
-| `merge_discharge`            | bool   | false    | Merge discharge into model                                           |
-| `include_noaa_gages`         | bool   | false    | Enable NOAA station discovery and comparison plots                   |
-| `include_precip`             | bool   | false    | Add precipitation forcing from meteo data source                     |
-| `include_wind`               | bool   | false    | Add spatially-varying wind forcing                                   |
-| `include_pressure`           | bool   | false    | Add atmospheric pressure forcing with barometric correction          |
-| `forcing_to_mesh_offset_m`   | float  | 0.0      | Vertical offset (m) added to boundary forcing before simulation      |
-| `vdatum_mesh_to_msl_m`       | float  | 0.0      | Vertical offset (m) added to model output for MSL comparison         |
-| `meteo_res`                  | float  | null     | Meteo output resolution (m). Auto-derived from quadtree grid if null |
-| `sfincs_exe`                 | path   | null     | Local SFINCS executable (bypasses Singularity container)             |
-| `omp_num_threads`            | int    | auto     | OpenMP threads (defaults to CPU count)                               |
-| `container_tag`              | string | latest   | SFINCS container tag                                                 |
-| `container_image`            | path   | null     | Singularity image path                                               |
-| `floodmap_dem`               | path   | null     | High-resolution DEM GeoTIFF for flood depth downscaling              |
-| `floodmap_hmin`              | float  | 0.05     | Minimum flood depth threshold (m); shallower cells are masked out    |
-| `floodmap_enabled`           | bool   | true     | Enable flood depth map generation after SFINCS run                   |
+| Parameter                    | Type  | Default  | Description                                                          |
+| ---------------------------- | ----- | -------- | -------------------------------------------------------------------- |
+| `prebuilt_dir`               | path  | required | Path to pre-built SFINCS model                                       |
+| `model_root`                 | path  | null     | Output directory (defaults to `{work_dir}/sfincs_model`)             |
+| `observation_points`         | list  | `[]`     | Observation point coordinates                                        |
+| `observation_locations_file` | path  | null     | Observation locations file                                           |
+| `merge_observations`         | bool  | false    | Merge observations into model                                        |
+| `discharge_locations_file`   | path  | null     | Discharge source locations file                                      |
+| `merge_discharge`            | bool  | false    | Merge discharge into model                                           |
+| `include_noaa_gages`         | bool  | false    | Enable NOAA station discovery and comparison plots                   |
+| `include_precip`             | bool  | false    | Add precipitation forcing from meteo data source                     |
+| `include_wind`               | bool  | false    | Add spatially-varying wind forcing                                   |
+| `include_pressure`           | bool  | false    | Add atmospheric pressure forcing with barometric correction          |
+| `forcing_to_mesh_offset_m`   | float | 0.0      | Vertical offset (m) added to boundary forcing before simulation      |
+| `vdatum_mesh_to_msl_m`       | float | 0.0      | Vertical offset (m) added to model output for MSL comparison         |
+| `meteo_res`                  | float | null     | Meteo output resolution (m). Auto-derived from quadtree grid if null |
+| `sfincs_exe`                 | path  | null     | Explicit SFINCS executable path (overrides PATH lookup)              |
+| `omp_num_threads`            | int   | auto     | OpenMP threads (defaults to CPU count)                               |
+| `floodmap_dem`               | path  | null     | High-resolution DEM GeoTIFF for flood depth downscaling              |
+| `floodmap_hmin`              | float | 0.05     | Minimum flood depth threshold (m); shallower cells are masked out    |
+| `floodmap_enabled`           | bool  | true     | Enable flood depth map generation after SFINCS run                   |
 
 !!! note "Meteorological forcing resolution"
 

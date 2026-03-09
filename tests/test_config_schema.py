@@ -232,7 +232,6 @@ class TestSfincsModelConfig:
     def test_defaults(self, tmp_path):
         cfg = SfincsModelConfig(prebuilt_dir=tmp_path)
         assert cfg.omp_num_threads == get_cpu_count()
-        assert cfg.container_tag == "latest"
         assert cfg.merge_discharge is False
         assert cfg.forcing_to_mesh_offset_m == 0.0
         assert cfg.vdatum_mesh_to_msl_m == 0.0
@@ -266,7 +265,6 @@ class TestSfincsModelConfig:
         d = cfg.to_dict()
         assert d["prebuilt_dir"] == str(tmp_path)
         assert d["omp_num_threads"] == get_cpu_count()
-        assert "container_tag" in d
 
     def test_explicit_vdatum_offsets(self, tmp_path):
         cfg = SfincsModelConfig(
@@ -288,12 +286,10 @@ class TestSfincsModelConfig:
             prebuilt_dir="./texas",
             model_root="./tmp_run/sfincs_model",
             discharge_locations_file="./texas/sfincs_nwm.src",
-            container_image="./images/sfincs.sif",
         )
         assert cfg.prebuilt_dir.is_absolute()
         assert cfg.model_root.is_absolute()
         assert cfg.discharge_locations_file.is_absolute()
-        assert cfg.container_image.is_absolute()
 
 
 class TestMonitoringConfig:
@@ -590,11 +586,9 @@ class TestCoastalCalibConfig:
 
         When users specify ``work_dir: ./tmp_run`` or
         ``prebuilt_dir: ./texas`` in YAML, all derived paths (model root,
-        SIF path, etc.) must be absolute.  Previously relative paths were
-        kept as-is, which caused Singularity to double the model root when
-        ``cwd`` was set to ``model_root``.
+        etc.) must be absolute.
         """
-        from coastal_calibration.stages.sfincs_build import get_model_root, resolve_sif_path
+        from coastal_calibration.stages.sfincs_build import get_model_root
 
         # Simulate running from a subdirectory with relative paths in YAML
         run_dir = tmp_path / "project" / "examples"
@@ -630,18 +624,8 @@ class TestCoastalCalibConfig:
         assert cfg.paths.raw_download_dir.is_absolute()
         assert cfg.model_config.prebuilt_dir.is_absolute()
 
-        # get_model_root and resolve_sif_path must also be absolute
         model_root = get_model_root(cfg)
-        sif_path = resolve_sif_path(cfg)
         assert model_root.is_absolute()
-        assert sif_path.is_absolute()
-
-        # The SIF path must live inside the download directory so that
-        # it can be reused across runs without re-downloading.
-        download_dir = cfg.paths.download_dir
-        sif_relative = sif_path.relative_to(download_dir)
-        assert ".." not in sif_relative.parts
-        assert sif_relative == Path(f"sfincs-cpu_{cfg.model_config.container_tag}.sif")
 
     def test_unknown_model_type(self, tmp_path):
         """Unknown model type raises ValueError."""

@@ -16,6 +16,7 @@ import os
 import shutil
 import subprocess
 from datetime import timedelta
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
@@ -25,8 +26,6 @@ from coastal_calibration.stages.base import WorkflowStage
 from coastal_calibration.stages.sfincs import create_nc_symlinks, generate_data_catalog
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     import xarray as xr
     from hydromt_sfincs import SfincsModel
     from numpy.typing import NDArray
@@ -34,7 +33,6 @@ if TYPE_CHECKING:
     from coastal_calibration.config.schema import CoastalCalibConfig
     from coastal_calibration.utils.logging import WorkflowMonitor
 
-SFINCS_DOCKER_IMAGE = "deltares/sfincs-cpu"
 # Maximum number of stations per figure (2x2 layout).
 _STATIONS_PER_FIGURE = 4
 
@@ -151,6 +149,18 @@ def _clear_model(config: CoastalCalibConfig) -> None:
     _MODEL_REGISTRY.pop(id(config), None)
 
 
+def _set_forcing_filename(component: object, filename: str) -> None:
+    """Set the output filename on a HydroMT-SFINCS forcing component.
+
+    HydroMT-SFINCS (v2.0.0.dev0) does not expose a public API for
+    overriding the forcing output filename — only the private
+    ``_filename`` attribute exists.  This helper centralises that
+    access so it is easy to find and update if the upstream API
+    changes.
+    """
+    component._filename = filename  # noqa: SLF001
+
+
 def _meteo_dst_res(config: CoastalCalibConfig, model: SfincsModel) -> float:
     """Return the output resolution (m) for gridded meteo forcing.
 
@@ -190,67 +200,112 @@ def _meteo_dst_res(config: CoastalCalibConfig, model: SfincsModel) -> float:
     return 1000.0
 
 
-def _clip_meteo_to_domain(
+def _create_meteo_forcing(
     model: SfincsModel,
-    component_name: str,
-    buffer: float = 10_000.0,
-) -> tuple[int, int]:
-    """Clip a gridded meteo component to the model domain.
+    dataset_name: str,
+    variables: list[str],
+    dst_res: float,
+    *,
+    fill_value: float = 0.0,
+    domain_buffer: float = 10_000.0,
+) -> tuple[xr.Dataset | xr.DataArray, float]:
+    """Fetch meteo data, clip in source CRS, and reproject to model CRS.
 
-    After ``rioxarray.reproject`` converts NWM data from Lambert
-    Conformal Conic to UTM, the output grid can cover the entire CONUS
-    extent, producing multi-GB files that cripple the SFINCS simulation.
-    This helper uses :meth:`rioxarray.Dataset.rio.clip_box` to trim the
-    named component to the model region bounds plus a generous buffer so
-    that only the data the SFINCS binary actually reads is kept on disk.
+    This replaces the upstream ``component.create()`` +
+    ``_clip_meteo_to_domain()`` pattern.  The heavy lifting (clip in
+    source CRS, constrained reproject) is delegated to
+    :func:`~coastal_calibration.utils.raster.clip_and_reproject`.
 
     Parameters
     ----------
     model : SfincsModel
-        The HydroMT SFINCS model with meteo data already loaded.
-    component_name : str
-        Name of the meteo component (``"precipitation"``, ``"wind"``,
-        or ``"pressure"``).
-    buffer : float
-        Extra meters around the model region bounds to include.
-        Default 10 km gives SFINCS comfortable headroom for
-        interpolation near the boundary.
+        HydroMT SFINCS model (already initialised with data catalog).
+    dataset_name : str
+        Catalog key for the meteo dataset.
+    variables : list[str]
+        Variable names to select (e.g. ``["wind10_u", "wind10_v"]``).
+    dst_res : float
+        Target resolution in metres (model CRS units).
+    fill_value : float
+        Value used where no data is available after reprojection.
+    domain_buffer : float
+        Buffer in metres around the model region for the output grid.
+        Default 10 km gives SFINCS comfortable interpolation headroom.
 
     Returns
     -------
-    (nx_before, nx_after)
-        Number of x-cells before and after clipping, for logging.
+    (data, time_interval_s)
+        *data* — reprojected :class:`xarray.Dataset` (or DataArray for
+        single-variable requests) with dimensions renamed to ``x``/``y``.
+        *time_interval_s* — time step of the source data in seconds.
     """
-    component = getattr(model, component_name)
-    ds: xr.Dataset = component.data
-    nx_before = ds.sizes.get("x", 0)
+    import pandas as pd
 
-    # Determine the clip bounds in UTM from the model grid.
-    region_bounds = model.region.total_bounds  # (xmin, ymin, xmax, ymax)
-    minx = region_bounds[0] - buffer
-    miny = region_bounds[1] - buffer
-    maxx = region_bounds[2] + buffer
-    maxy = region_bounds[3] + buffer
+    from coastal_calibration.utils.raster import clip_and_reproject
 
-    # rio.clip_box handles CRS-aware clipping and automatically deals
-    # with descending y-coordinates, unlike a raw ds.sel() slice.
+    # ------------------------------------------------------------------
+    # 1. Fetch data clipped roughly to the model domain
+    # ------------------------------------------------------------------
+    # ``buffer`` in ``get_rasterdataset`` is expressed as a number of
+    # source-resolution cells.  30 cells is generous enough to survive
+    # the bbox round-trip through WGS 84 without missing any data near
+    # the boundary, while staying far below the upstream default of 5 000
+    # (which returns essentially all of CONUS for NWM).
+    fetch_buffer_cells = 30
 
-    # Ensure the CRS is set — hydromt's reproject → rename → set chain
-    # can lose the spatial_ref coordinate.
-    if ds.rio.crs is None:
-        ds = ds.rio.write_crs(model.crs)
+    data_or_none = model.data_catalog.get_rasterdataset(
+        dataset_name,
+        bbox=model.bbox,  # WGS 84
+        buffer=fetch_buffer_cells,
+        time_range=model.get_model_time(),
+        variables=variables,
+        single_var_as_array=len(variables) == 1,
+    )
+    if data_or_none is None:
+        msg = f"Meteo dataset '{dataset_name}' not found in data catalog."
+        raise ValueError(msg)
+    data: xr.Dataset | xr.DataArray = data_or_none
 
-    clipped = ds.rio.clip_box(minx=minx, miny=miny, maxx=maxx, maxy=maxy)
-    nx_after = clipped.sizes.get("x", 0)
+    # ------------------------------------------------------------------
+    # 2. Validate spatial / temporal extent
+    # ------------------------------------------------------------------
+    y_dim, x_dim = data.raster.dims
+    if data.coords[x_dim].size < 2 or data.coords[y_dim].size < 2:
+        msg = (
+            f"Meteo data '{dataset_name}' has fewer than 2 cells on "
+            f"the x or y axis after spatial clipping.  Check the input "
+            f"data and the model region or increase the fetch buffer."
+        )
+        raise ValueError(msg)
+    if data.coords["time"].size < 2:
+        msg = (
+            f"Meteo data '{dataset_name}' does not overlap with the "
+            f"model time range.  Check input data and model config."
+        )
+        raise ValueError(msg)
 
-    if nx_after > 0 and clipped.sizes.get("y", 0) > 0:
-        # Replace the in-memory data with the clipped version.
-        # We assign ``_data`` directly because ``set()`` checks that
-        # spatial coordinates match, which would fail when the new
-        # data has different dimensions.
-        component._data = clipped
+    time_interval_s: float = pd.to_timedelta(
+        np.diff(data.time).mean(),
+    ).total_seconds()
 
-    return nx_before, nx_after
+    # ------------------------------------------------------------------
+    # 3. Clip in source CRS + constrained reproject
+    # ------------------------------------------------------------------
+    region = model.region.total_bounds  # (xmin, ymin, xmax, ymax)
+    data = clip_and_reproject(
+        data,
+        dst_bounds=tuple(region),
+        dst_crs=model.crs,
+        dst_res=dst_res,
+        fill_value=fill_value,
+        buffer=domain_buffer,
+    )
+
+    # Rename dims to SFINCS convention (always x / y).
+    y_dim, x_dim = data.raster.dims
+    data = data.rename({y_dim: "y", x_dim: "x"})
+
+    return data, time_interval_s
 
 
 def _waterlevel_geodataset(config: CoastalCalibConfig) -> str | None:
@@ -263,44 +318,8 @@ def _waterlevel_geodataset(config: CoastalCalibConfig) -> str | None:
 
 
 # ---------------------------------------------------------------------------
-# Singularity helpers (used by the run stage)
+# Subprocess helpers (used by the run stage)
 # ---------------------------------------------------------------------------
-
-
-def resolve_sif_path(config: CoastalCalibConfig) -> Path:
-    """Resolve the Singularity SIF path from configuration.
-
-    When no explicit ``container_image`` is set, the SIF file is stored
-    in the download directory so that it can be reused across runs
-    without re-downloading.
-    """
-    sfincs = _sfincs_cfg(config)
-    if sfincs.container_image is not None:
-        return sfincs.container_image
-    return config.paths.download_dir / f"sfincs-cpu_{sfincs.container_tag}.sif"
-
-
-def _pull_singularity_image(
-    config: CoastalCalibConfig,
-    sif_path: Path | None = None,
-) -> Path:
-    """Pull the SFINCS Docker image as a Singularity SIF file."""
-    if sif_path is None:
-        sif_path = resolve_sif_path(config)
-
-    if sif_path.exists():
-        return sif_path
-
-    sif_path.parent.mkdir(parents=True, exist_ok=True)
-    sfincs = _sfincs_cfg(config)
-    docker_uri = f"docker://{SFINCS_DOCKER_IMAGE}:{sfincs.container_tag}"
-    cmd = ["singularity", "pull", str(sif_path), docker_uri]
-
-    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-    if result.returncode != 0:
-        raise RuntimeError(f"singularity pull failed: {result.stderr}")
-
-    return sif_path
 
 
 def _run_and_log(
@@ -310,9 +329,6 @@ def _run_and_log(
     env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run a command, stream output to ``sfincs_log.txt``, and raise on failure.
-
-    This is the shared subprocess helper used by both the Singularity and
-    native-executable code paths.
 
     Parameters
     ----------
@@ -366,19 +382,6 @@ def _run_and_log(
         stdout="".join(stdout_lines),
         stderr="".join(stderr_lines),
     )
-
-
-def _run_singularity(
-    config: CoastalCalibConfig,
-    sif_path: Path,
-    model_root: Path | None = None,
-) -> subprocess.CompletedProcess[str]:
-    """Run SFINCS inside a Singularity container."""
-    if model_root is None:
-        model_root = get_model_root(config)
-
-    cmd = ["singularity", "run", f"-B{model_root}:/data", str(sif_path)]
-    return _run_and_log(cmd, model_root)
 
 
 # ---------------------------------------------------------------------------
@@ -1378,21 +1381,38 @@ class SfincsPrecipitationStage(_SfincsStageBase):
 
         self._update_substep("Adding precipitation forcing")
         dst_res = _meteo_dst_res(self.config, model)
-        model.precipitation.create(precip=meteo_dataset, dst_res=dst_res)
+        try:
+            precip_data, dt_s = _create_meteo_forcing(
+                model,
+                meteo_dataset,
+                ["precip"],
+                dst_res,
+            )
+            precip = cast("xr.DataArray", precip_data)
 
-        # Clip the reprojected grid to the model domain.  Without this
-        # the LCC → UTM reprojection inflates the grid to cover the
-        # entire CONUS extent (~5 000 x 4 200 km).
-        nx_before, nx_after = _clip_meteo_to_domain(model, "precipitation")
-        self._log(
-            f"Precipitation forcing added from {meteo_dataset} "
-            f"(res={dst_res:.0f} m, clipped {nx_before}→{nx_after} x-cells)"
-        )
+            # Convert cumulative precipitation (mm) → rate (mm/hr).
+            # NWM LDASIN stores accumulated precip over each time step
+            # with the timestamp at the end of the interval ("right"
+            # label).  Shift left so the rate applies to the upcoming
+            # interval, matching SFINCS convention.
+            precip = precip / (dt_s / 3600.0)
+            precip = precip.shift(time=-1, fill_value=0)
 
-        # Write immediately and release memory so subsequent forcing
-        # stages don't accumulate large gridded data in RAM.
-        model.precipitation.write()
-        model.precipitation.clear()
+            # Lower dtwnd if the source data has a finer time step.
+            dtwnd = model.config.get("dtwnd", 1800)
+            if dtwnd > dt_s:
+                model.config.set("dtwnd", dt_s)
+
+            precip = precip.rename("precip_2d")
+            model.precipitation.set(precip, name="precip_2d")
+            model.config.set("netamprfile", "sfincs_netampr.nc")
+            _set_forcing_filename(model.precipitation, "sfincs_netampr.nc")
+
+            self._log(f"Precipitation forcing added from {meteo_dataset} (res={dst_res:.0f} m)")
+
+            model.precipitation.write()
+        finally:
+            model.precipitation.clear()
 
         return {"status": "completed"}
 
@@ -1414,17 +1434,27 @@ class SfincsWindStage(_SfincsStageBase):
 
         self._update_substep("Adding wind forcing")
         dst_res = _meteo_dst_res(self.config, model)
-        model.wind.create(wind=meteo_dataset, dst_res=dst_res)
+        try:
+            wind, dt_s = _create_meteo_forcing(
+                model,
+                meteo_dataset,
+                ["wind10_u", "wind10_v"],
+                dst_res,
+            )
 
-        nx_before, nx_after = _clip_meteo_to_domain(model, "wind")
-        self._log(
-            f"Wind forcing added from {meteo_dataset} "
-            f"(res={dst_res:.0f} m, clipped {nx_before}→{nx_after} x-cells)"
-        )
+            dtwnd = model.config.get("dtwnd", 1800)
+            if dtwnd > dt_s:
+                model.config.set("dtwnd", dt_s)
 
-        # Write immediately and release memory (see SfincsPrecipitationStage).
-        model.wind.write()
-        model.wind.clear()
+            model.wind.set(wind, name="wind_2d")
+            model.config.set("netamuamvfile", "sfincs_netamuv.nc")
+            _set_forcing_filename(model.wind, "sfincs_netamuv.nc")
+
+            self._log(f"Wind forcing added from {meteo_dataset} (res={dst_res:.0f} m)")
+
+            model.wind.write()
+        finally:
+            model.wind.clear()
 
         return {"status": "completed"}
 
@@ -1446,26 +1476,42 @@ class SfincsPressureStage(_SfincsStageBase):
 
         self._update_substep("Adding atmospheric pressure forcing")
         dst_res = _meteo_dst_res(self.config, model)
-        model.pressure.create(press=meteo_dataset, dst_res=dst_res)
+        try:
+            press_data, dt_s = _create_meteo_forcing(
+                model,
+                meteo_dataset,
+                ["press_msl"],
+                dst_res,
+                fill_value=101325.0,
+            )
+            press = cast("xr.DataArray", press_data)
 
-        nx_before, nx_after = _clip_meteo_to_domain(model, "pressure")
+            dtwnd = model.config.get("dtwnd", 1800)
+            if dtwnd > dt_s:
+                model.config.set("dtwnd", dt_s)
 
-        # Enable barometric pressure correction so SFINCS uses the forcing.
-        # pavbnd / gapres set the reference atmospheric pressure (Pa) at the
-        # open boundaries and the "gap" pressure for inverse-barometer
-        # correction.  Standard atmosphere ≈ 101 325 Pa; 101 200 Pa is the
-        # conventional SFINCS default.
-        model.config.set("baro", 1)
-        model.config.set("pavbnd", 101200)
-        model.config.set("gapres", 101200)
-        self._log(
-            f"Atmospheric pressure forcing added from {meteo_dataset} "
-            f"(baro=1, res={dst_res:.0f} m, clipped {nx_before}→{nx_after} x-cells)"
-        )
+            press = press.rename("press_2d")
+            model.pressure.set(press, name="press_2d")
+            model.config.set("netampfile", "sfincs_netamp.nc")
+            _set_forcing_filename(model.pressure, "sfincs_netamp.nc")
 
-        # Write immediately and release memory (see SfincsPrecipitationStage).
-        model.pressure.write()
-        model.pressure.clear()
+            # Enable barometric pressure correction so SFINCS uses the forcing.
+            # pavbnd / gapres set the reference atmospheric pressure (Pa) at the
+            # open boundaries and the "gap" pressure for inverse-barometer
+            # correction.  Standard atmosphere ≈ 101 325 Pa; 101 200 Pa is the
+            # conventional SFINCS default.
+            model.config.set("baro", 1)
+            model.config.set("pavbnd", 101200)
+            model.config.set("gapres", 101200)
+
+            self._log(
+                f"Atmospheric pressure forcing added from {meteo_dataset} "
+                f"(baro=1, res={dst_res:.0f} m)"
+            )
+
+            model.pressure.write()
+        finally:
+            model.pressure.clear()
 
         return {"status": "completed"}
 
@@ -1500,49 +1546,47 @@ class SfincsWriteStage(WorkflowStage):
 
 
 class SfincsRunStage(_SfincsStageBase):
-    """Run the SFINCS model via a native executable or Singularity container.
+    """Run the SFINCS model via a compiled native executable.
 
-    When ``model_config.sfincs_exe`` is set the stage invokes the binary
-    directly, which avoids the Singularity dependency (useful on macOS or
-    other systems where Singularity is unavailable).  Otherwise it falls
-    back to the Singularity container workflow.
+    Resolution order for the SFINCS binary:
+
+    1. ``model_config.sfincs_exe`` -- explicit path set in the config.
+    2. ``sfincs`` found on ``PATH``.
+
+    If neither is available the stage raises :class:`RuntimeError`.
     """
 
     name = "sfincs_run"
     description = "Run SFINCS model"
 
-    def __init__(
-        self,
-        config: CoastalCalibConfig,
-        monitor: WorkflowMonitor | None = None,
-    ) -> None:
-        super().__init__(config, monitor)
-        # Only require a container when no native exe is configured.
-        self.requires_container = self.sfincs.sfincs_exe is None
+    @staticmethod
+    def _resolve_exe(sfincs_cfg: SfincsModelConfig) -> Path:
+        """Return the SFINCS executable or raise with a helpful message."""
+        if sfincs_cfg.sfincs_exe is not None:
+            return sfincs_cfg.sfincs_exe
+        found = shutil.which("sfincs")
+        if found is not None:
+            return Path(found)
+        raise RuntimeError(
+            "SFINCS executable not found.  Either:\n"
+            "  1. Activate a pixi environment with the 'sfincs' feature"
+            " (builds automatically on first activation).\n"
+            "  2. Set 'sfincs_exe' in the config to the path of an existing binary."
+        )
 
     # ------------------------------------------------------------------ #
     # Stage entry-point
     # ------------------------------------------------------------------ #
 
     def run(self) -> dict[str, Any]:
-        """Execute SFINCS via native binary or Singularity."""
+        """Execute SFINCS via native binary."""
         model_root = get_model_root(self.config)
+        exe = self._resolve_exe(self.sfincs)
 
-        if self.sfincs.sfincs_exe is not None:
-            # ── Native executable ──
-            self._log(f"Running SFINCS via native executable: {self.sfincs.sfincs_exe}")
-            self._update_substep("Running SFINCS (native)")
-            env = {**os.environ, "OMP_NUM_THREADS": str(self.sfincs.omp_num_threads)}
-            _run_and_log([str(self.sfincs.sfincs_exe)], model_root, env=env)
-            mode = "native"
-        else:
-            # ── Singularity container ──
-            self._update_substep("Pulling Singularity image")
-            sif_path = _pull_singularity_image(self.config)
-
-            self._update_substep("Running SFINCS (Singularity)")
-            _run_singularity(self.config, sif_path)
-            mode = "singularity"
+        self._log(f"Running SFINCS via native executable: {exe}")
+        self._update_substep("Running SFINCS")
+        env = {**os.environ, "OMP_NUM_THREADS": str(self.sfincs.omp_num_threads)}
+        _run_and_log([str(exe)], model_root, env=env)
 
         self._log("SFINCS run completed")
 
@@ -1551,7 +1595,7 @@ class SfincsRunStage(_SfincsStageBase):
         # avoid a UGRID re-read error on quadtree grids.  The registry
         # is garbage-collected when the process exits.
 
-        return {"status": "completed", "mode": mode}
+        return {"status": "completed", "mode": "native"}
 
 
 class SfincsFloodMapStage(_SfincsStageBase):

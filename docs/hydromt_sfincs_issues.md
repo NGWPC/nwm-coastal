@@ -84,11 +84,13 @@ This applies identically to `SfincsPrecipitation.create()` (line 411),
 
 **Current workaround**:
 
-In our pipeline we (a) pass an explicit `dst_res` derived from the SFINCS quadtree grid
-base cell size (via `_meteo_dst_res()`), and (b) clip each meteo component after
-`create()` and before `write()` using `_clip_meteo_to_domain()` (in `sfincs_build.py`).
-This is applied identically to precipitation, wind, and pressure stages. The `meteo_res`
-config option allows users to override the automatic resolution.
+In our pipeline we bypass the upstream `component.create()` entirely via
+`_create_meteo_forcing()` (in `sfincs_build.py`), which clips the source data in its
+**native CRS** before reprojecting — so the CONUS-scale grid is never allocated. The
+destination grid is also constrained to the model domain bounds. This replaces the
+earlier post-hoc `_clip_meteo_to_domain()` approach that still triggered the full CONUS
+reprojection in memory. The `meteo_res` config option allows users to override the
+automatic resolution.
 
 ______________________________________________________________________
 
