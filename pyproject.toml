@@ -294,28 +294,6 @@ source_pkgs = [
   "coastal_calibration",
 ]
 
-[tool.pyright]
-exclude = [
-  "**/__pycache__",
-  "**/__init__.py",
-  "src/coastal_calibration/coops_api.py",
-  "src/coastal_calibration/scripts/**",
-]
-include = [
-  "src/coastal_calibration",
-]
-reportMissingTypeStubs = false
-reportUnknownArgumentType = false
-reportUnknownLambdaType = false
-reportUnknownMemberType = false
-reportUnknownParameterType = false
-reportUnknownVariableType = false
-reportUnnecessaryIsInstance = false
-reportUntypedFunctionDecorator = false
-reportAttributeAccessIssue = false
-reportInvalidTypeForm = false
-typeCheckingMode = "strict"
-
 [tool.ty.environment]
 python-version = "3.11"
 [tool.ty.rules]
@@ -365,11 +343,22 @@ libnetcdf = "*"
 esmpy = "*"
 mpi4py = "*"
 openmpi = "*"
+[tool.pixi.feature.sfincs.activation]
+scripts = [ "scripts/ensure-sfincs.sh" ]
 [tool.pixi.feature.sfincs.dependencies]
 proj = "*"
 libgdal-core = "*"
 hdf5 = "*"
 libnetcdf = "*"
+netcdf-fortran = "*"
+c-compiler = "*"
+fortran-compiler = "*"
+autoconf = "*"
+automake = "*"
+libtool = "*"
+m4 = "*"
+make = "*"
+pkg-config = "*"
 [tool.pixi.feature.sfincs.pypi-dependencies]
 hydromt-sfincs = { git = "https://github.com/Deltares/hydromt_sfincs", rev = "41aac0a3980fc2714ec28eafb0463d40abfc979a" }
 [tool.pixi.feature.test.tasks]
