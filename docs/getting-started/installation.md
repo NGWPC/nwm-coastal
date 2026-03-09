@@ -3,15 +3,17 @@
 ## Requirements
 
 - Python >= 3.11
-- Access to an HPC cluster with Singularity
+- Access to an HPC cluster with Singularity (SCHISM workflow only)
 - NFS mount point (default: `/ngen-test`)
-- Singularity image with SCHISM and/or SFINCS and dependencies pre-compiled
+- Singularity image with SCHISM and dependencies pre-compiled (SCHISM workflow only)
+- Compiled SFINCS binary (SFINCS workflow only — see
+    [Compiling SFINCS](../sfincs_compilation.md))
 
 !!! note "Model Executables"
 
-    This package orchestrates SCHISM and SFINCS workflows on HPC clusters where the models
-    are **already compiled and available** (typically inside a Singularity container). You
-    do not need to install SCHISM or SFINCS locally to use this package.
+    The SCHISM workflow requires a pre-compiled Singularity container on the HPC cluster.
+    The SFINCS workflow uses a natively compiled binary — pixi environments with the
+    `sfincs` feature build it automatically on first activation.
 
 ## Install from PyPI
 
@@ -78,8 +80,8 @@ useful for:
 !!! warning "Not Required for Cluster Execution"
 
     These optional dependencies are **not required** to submit and run jobs on the cluster.
-    The actual SCHISM and SFINCS executables must be pre-compiled and available on the HPC
-    cluster (inside the Singularity container).
+    SCHISM must be pre-compiled inside a Singularity container on the HPC cluster. SFINCS is
+    compiled natively (see [Compiling SFINCS](../sfincs_compilation.md)).
 
 ```bash
 # SCHISM I/O dependencies (netCDF, numpy, etc.) - for local development

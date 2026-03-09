@@ -415,10 +415,10 @@ STOFS water level data.
 
 **Tasks:**
 
-- Run SFINCS inside Singularity container
+- Run SFINCS via compiled native binary
 - Uses single-node OpenMP parallelism (`omp_num_threads`)
 
-**Runs On:** Compute node (OpenMP, inside Singularity)
+**Runs On:** Compute node (OpenMP, native binary)
 
 ### 14. sfincs_floodmap
 

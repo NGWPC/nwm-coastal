@@ -16,8 +16,8 @@ Both notebooks cover the same three-phase workflow:
 !!! note "Prerequisites"
 
     The examples require the downloaded forcing data cache (`docs/examples/downloads/`) and
-    a compiled SFINCS executable (or Singularity image). See the
-    [Quick Start](../getting-started/quickstart.md) for setup details.
+    a compiled SFINCS executable. See [Compiling SFINCS](../sfincs_compilation.md) for build
+    instructions.
 
 <div class="grid cards" markdown>
 

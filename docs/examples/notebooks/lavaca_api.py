@@ -143,10 +143,6 @@ run_config = CoastalCalibConfig.from_dict(
             "include_precip": True,
             "include_wind": True,
             "include_pressure": True,
-            # SFINCS executable path. Either:
-            #   1. Compile SFINCS and set the path here, or
-            #   2. Remove this key to use Singularity (requires ngen-coastal.sif)
-            "sfincs_exe": "~/.local/bin/sfincs",
             "inp_overrides": {
                 "tspinup": 10800,
                 "advection": 0,
@@ -166,14 +162,11 @@ run_config = CoastalCalibConfig.from_dict(
 # %% [markdown]
 # ### Note on the SFINCS executable
 #
-# The `sfincs_exe` field points to a compiled SFINCS binary.
-# You have two options:
+# The `sfincs_exe` field overrides the default PATH lookup for the SFINCS binary.
+# When running inside a pixi environment with the `sfincs` feature, the binary
+# is compiled automatically and available on PATH — no `sfincs_exe` needed.
 #
-# 1. **Compile SFINCS** yourself and update the path if it differs
-#    from `~/.local/bin/sfincs`.
-# 2. **Use Singularity** — remove the `sfincs_exe` key from the dict.
-#    The pipeline will then use the `ngen-coastal.sif` Singularity image.
-#
+# If you compiled SFINCS manually, set `sfincs_exe` to the path of the binary.
 # If neither is available, the pipeline will complete all stages up to
 # `sfincs_run` and then fail at model execution.
 

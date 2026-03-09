@@ -196,10 +196,8 @@ present.
 | `forcing_to_mesh_offset_m`   | float | 0.0      | Vertical offset (m) added to boundary forcing            |
 | `vdatum_mesh_to_msl_m`       | float | 0.0      | Vertical offset (m) converting model output to MSL       |
 | `meteo_res`                  | float | null     | Meteo forcing output resolution (m)                      |
-| `sfincs_exe`                 | path  | null     | Local SFINCS executable (bypasses container)             |
+| `sfincs_exe`                 | path  | null     | Explicit SFINCS executable path (overrides PATH lookup)  |
 | `omp_num_threads`            | int   | auto     | OpenMP threads (defaults to CPU count)                   |
-| `container_tag`              | str   | latest   | SFINCS container tag                                     |
-| `container_image`            | path  | null     | Singularity image path                                   |
 | `floodmap_dem`               | path  | null     | High-resolution DEM for flood depth downscaling          |
 | `floodmap_hmin`              | float | 0.05     | Minimum flood depth threshold (m)                        |
 | `floodmap_enabled`           | bool  | true     | Enable flood depth map generation                        |
@@ -278,7 +276,7 @@ Each stage is classified as Python-only or container-based (requires Singularity
 1. **`sfincs_wind`** - Add wind forcing _(Python-only)_
 1. **`sfincs_pressure`** - Add atmospheric pressure forcing _(Python-only)_
 1. **`sfincs_write`** - Write SFINCS model _(Python-only)_
-1. **`sfincs_run`** - Run SFINCS model (Singularity) _(container)_
+1. **`sfincs_run`** - Run SFINCS model (OpenMP) _(native binary)_
 1. **`sfincs_floodmap`** - Downscale flood depth map _(Python-only)_
 1. **`sfincs_plot`** - Plot simulated vs observed water levels _(Python-only)_
 
