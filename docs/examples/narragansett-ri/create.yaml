@@ -1,0 +1,46 @@
+# Narragansett Bay, Rhode Island — SFINCS model creation from AOI
+#
+# Creates a quadtree mesh using HydroMT-SFINCS. The resulting model
+# directory (./output) can be used as ``prebuilt_dir`` in the run config.
+#
+# Usage:
+#   coastal-calibration create create.yaml
+#   coastal-calibration create create.yaml --dry-run
+
+aoi: ./aoi.geojson
+output_dir: ./output
+download_dir: ../downloads/narragansett_grid
+
+grid:
+  resolution: 512        # base resolution in meters
+  crs: utm               # auto-detect UTM zone (-> EPSG:32619)
+  rotated: false
+
+elevation:
+  datasets:
+  - name: nws_30m                 # NOAA NWS 30 m topobathy
+    zmin: -20000
+    source: nws_30m
+  - name: gebco_15arcs            # global fallback for areas without NOAA coverage
+    zmin: -20000
+    source: gebco_15arcs
+  buffer_cells: 1
+
+mask:
+  zmin: -50.0             # minimum elevation for active cells
+  boundary_zmax: -1.0     # max elevation for waterlevel boundary cells
+  reset_bounds: true
+
+subgrid:
+  nr_subgrid_pixels: 4
+  lulc_dataset: esa_worldcover
+  manning_land: 0.04
+  manning_sea: 0.02
+
+nwm_discharge:
+  coastal_domain: atlgulf
+
+add_noaa_gages: true           # discover NOAA CO-OPS stations in domain
+
+monitoring:
+  log_level: INFO

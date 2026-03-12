@@ -1,0 +1,22 @@
+{
+  "type": "FeatureCollection",
+  "name": "narragansett_aoi",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {},
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-71.571, 41.356],
+            [-71.128, 41.356],
+            [-71.128, 41.903],
+            [-71.571, 41.903],
+            [-71.571, 41.356]
+          ]
+        ]
+      }
+    }
+  ]
+}

@@ -24,6 +24,8 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     selection on the flowpaths layer to a GeoPackage file.
 - QGIS plugin: stream order validation against the actual min/max range in the data,
     with a clear error when the user-specified value is out of range.
+- Narragansett Bay, RI CLI example (`narragansett_cli` notebook and configs) showing
+    compound forcing (ocean + river discharge + meteo) with NWM streamflow.
 
 ### Changed
 
