@@ -1332,6 +1332,13 @@ this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic V
     and raw xarray <code>open_mfdataset</code> loading strategies.</li>
 <li><code>tests/test_floodmap.py</code> with unit tests for <code>_write_floodmap_cog</code>,
     <code>_ensure_overviews</code>, and an integration test for <code>create_flood_depth_map</code>.</li>
+<li>QGIS plugin: optional NWM Flowlines Override in the basemap dialog, allowing users to
+    load flowpaths from a separate NWM GeoPackage with configurable layer name and
+    stream order column.</li>
+<li>QGIS plugin: "Export Selected Flowpaths" toolbar button that saves the current
+    selection on the flowpaths layer to a GeoPackage file.</li>
+<li>QGIS plugin: stream order validation against the actual min/max range in the data,
+    with a clear error when the user-specified value is out of range.</li>
 </ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">#</a></h3>
 <ul>
@@ -1357,6 +1364,8 @@ this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic V
 <li><code>_downstream_endpoint</code> now compares both endpoints of NWM hydrofabric flowpath
     linestrings and returns whichever is closest to the AOI boundary, fixing incorrect
     discharge point placement when flowpath direction is reversed.</li>
+<li>QGIS plugin: use <code>mActionVertexToolActiveLayer.svg</code> icon for the Edit Polygon toolbar
+    button (previously used the removed <code>mActionNodeTool.svg</code>).</li>
 </ul>
 <h2 id="31100-2026-02-19"><a href="https://github.com/NGWPC/nwm-coastal/releases/tag/3.1.1.0.0">3.1.1.0.0</a> - 2026-02-19<a class="headerlink" href="#31100-2026-02-19" title="Permanent link">#</a></h2>
 <h3 id="added_1">Added<a class="headerlink" href="#added_1" title="Permanent link">#</a></h3>
