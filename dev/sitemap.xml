@@ -2,74 +2,74 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://NGWPC.github.io/nwm-coastal/stable/</loc>
-         <lastmod>2026-03-09</lastmod>
+         <lastmod>2026-03-12</lastmod>
     </url>
     <url>
          <loc>https://NGWPC.github.io/nwm-coastal/stable/hydromt_sfincs_issues/</loc>
-         <lastmod>2026-03-09</lastmod>
+         <lastmod>2026-03-12</lastmod>
     </url>
     <url>
          <loc>https://NGWPC.github.io/nwm-coastal/stable/sfincs_compilation/</loc>
-         <lastmod>2026-03-09</lastmod>
+         <lastmod>2026-03-12</lastmod>
     </url>
     <url>
          <loc>https://NGWPC.github.io/nwm-coastal/stable/examples/</loc>
-         <lastmod>2026-03-09</lastmod>
+         <lastmod>2026-03-12</lastmod>
     </url>
     <url>
          <loc>https://NGWPC.github.io/nwm-coastal/stable/examples/notebooks/lavaca_api/</loc>
-         <lastmod>2026-03-09</lastmod>
+         <lastmod>2026-03-12</lastmod>
     </url>
     <url>
          <loc>https://NGWPC.github.io/nwm-coastal/stable/examples/notebooks/lavaca_cli/</loc>
-         <lastmod>2026-03-09</lastmod>
+         <lastmod>2026-03-12</lastmod>
     </url>
     <url>
          <loc>https://NGWPC.github.io/nwm-coastal/stable/getting-started/installation/</loc>
-         <lastmod>2026-03-09</lastmod>
+         <lastmod>2026-03-12</lastmod>
     </url>
     <url>
          <loc>https://NGWPC.github.io/nwm-coastal/stable/getting-started/quickstart/</loc>
-         <lastmod>2026-03-09</lastmod>
+         <lastmod>2026-03-12</lastmod>
     </url>
     <url>
          <loc>https://NGWPC.github.io/nwm-coastal/stable/reference/api/</loc>
-         <lastmod>2026-03-09</lastmod>
+         <lastmod>2026-03-12</lastmod>
     </url>
     <url>
          <loc>https://NGWPC.github.io/nwm-coastal/stable/user-guide/cli/</loc>
-         <lastmod>2026-03-09</lastmod>
+         <lastmod>2026-03-12</lastmod>
     </url>
     <url>
          <loc>https://NGWPC.github.io/nwm-coastal/stable/user-guide/configuration/</loc>
-         <lastmod>2026-03-09</lastmod>
+         <lastmod>2026-03-12</lastmod>
     </url>
     <url>
          <loc>https://NGWPC.github.io/nwm-coastal/stable/user-guide/python-api/</loc>
-         <lastmod>2026-03-09</lastmod>
+         <lastmod>2026-03-12</lastmod>
     </url>
     <url>
          <loc>https://NGWPC.github.io/nwm-coastal/stable/user-guide/qgis-plugin/</loc>
-         <lastmod>2026-03-09</lastmod>
+         <lastmod>2026-03-12</lastmod>
     </url>
     <url>
          <loc>https://NGWPC.github.io/nwm-coastal/stable/user-guide/workflow-stages/</loc>
-         <lastmod>2026-03-09</lastmod>
+         <lastmod>2026-03-12</lastmod>
     </url>
     <url>
          <loc>https://NGWPC.github.io/nwm-coastal/stable/CHANGELOG/</loc>
-         <lastmod>2026-03-09</lastmod>
+         <lastmod>2026-03-12</lastmod>
     </url>
     <url>
          <loc>https://NGWPC.github.io/nwm-coastal/stable/CONTRIBUTING/</loc>
-         <lastmod>2026-03-09</lastmod>
+         <lastmod>2026-03-12</lastmod>
     </url>
     <url>
          <loc>https://NGWPC.github.io/nwm-coastal/stable/DESIGN/</loc>
-         <lastmod>2026-03-09</lastmod>
+         <lastmod>2026-03-12</lastmod>
     </url>
     <url>
          <loc>https://NGWPC.github.io/nwm-coastal/stable/LICENSE/</loc>
-         <lastmod>2026-03-09</lastmod>
+         <lastmod>2026-03-12</lastmod>
     </url>
 </urlset>
