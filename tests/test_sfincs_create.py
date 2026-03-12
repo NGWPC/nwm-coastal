@@ -1182,11 +1182,13 @@ class TestDischargeStageRun:
 
         assert result["status"] == "completed"
         assert result["points_added"] > 0
-        # Verify add_point was called for each intersection
-        assert mock_sfincs_model.discharge_points.add_point.call_count == result["points_added"]
-        # Verify .src file was written
+        # Create stage writes a .src file but does NOT add points to the
+        # model — the run stage handles that with real timeseries.
+        mock_sfincs_model.discharge_points.add_point.assert_not_called()
         src_file = discharge_create_config.output_dir / "sfincs_nwm.src"
         assert src_file.exists()
+        src_lines = src_file.read_text().strip().splitlines()
+        assert len(src_lines) == result["points_added"]
         _clear_model(discharge_create_config)
 
     def test_run_no_matching_flowpaths(
@@ -1286,7 +1288,10 @@ class TestDischargeStageRun:
         stage = CreateDischargeStage(cfg)
         result = stage.run()
         assert result["points_added"] == 1
-        mock_sfincs_model.discharge_points.add_point.assert_called_once()
+        mock_sfincs_model.discharge_points.add_point.assert_not_called()
+        src_file = cfg.output_dir / "sfincs_nwm.src"
+        assert src_file.exists()
+        assert len(src_file.read_text().strip().splitlines()) == 1
         _clear_model(cfg)
 
     def test_create_stages_includes_discharge(

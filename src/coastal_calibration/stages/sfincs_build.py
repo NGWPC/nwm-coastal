@@ -149,7 +149,7 @@ def _clear_model(config: CoastalCalibConfig) -> None:
     _MODEL_REGISTRY.pop(id(config), None)
 
 
-def _set_forcing_filename(component: object, filename: str) -> None:
+def _set_forcing_filename(component: Any, filename: str) -> None:
     """Set the output filename on a HydroMT-SFINCS forcing component.
 
     HydroMT-SFINCS (v2.0.0.dev0) does not expose a public API for
@@ -158,7 +158,7 @@ def _set_forcing_filename(component: object, filename: str) -> None:
     access so it is easy to find and update if the upstream API
     changes.
     """
-    component._filename = filename  # noqa: SLF001
+    component._filename = filename
 
 
 def _meteo_dst_res(config: CoastalCalibConfig, model: SfincsModel) -> float:
@@ -1318,6 +1318,204 @@ class SfincsDischargeStage(_SfincsStageBase):
 
         return kept, dropped
 
+    @staticmethod
+    def _load_discharge_dataframe(
+        model: Any,
+        source_name: str,
+        feature_ids: list[int],
+        tstart: Any,
+        tstop: Any,
+    ) -> Any:
+        """Load discharge timeseries from the data catalog.
+
+        First tries ``get_geodataset`` (works for data with embedded
+        lat/lon such as test fixtures).  If that fails because of
+        missing spatial coordinates (real NWM CHRTOUT files), falls
+        back to direct xarray loading of the catalog source files.
+
+        Returns a DataFrame (rows = time, columns = feature_ids) or
+        ``None`` on failure.
+        """
+        import pandas as pd
+        import xarray as xr
+
+        # --- attempt 1: HydroMT GeoDataset path ---
+        try:
+            da = model.data_catalog.get_geodataset(
+                source_name,
+                variables=["discharge"],
+                time_range=(tstart, tstop),
+            )
+            idx_dim = da.vector.index_dim if hasattr(da, "vector") else "feature_id"
+            discharge_da = da["discharge"] if hasattr(da, "data_vars") else da
+            discharge_da = discharge_da.sel(
+                {idx_dim: [f for f in feature_ids if f in da[idx_dim].values]}
+            )
+            time_idx = discharge_da.indexes["time"]
+            if time_idx.duplicated().any():
+                discharge_da = discharge_da.sel(time=~time_idx.duplicated())
+            return discharge_da.to_pandas()
+        except Exception:  # noqa: S110
+            pass
+
+        # --- attempt 2: direct xarray (NWM CHRTOUT without lat/lon) ---
+        # Each CHRTOUT file stores streamflow(feature_id) with a scalar
+        # time coordinate. Using a ``preprocess`` callback to (a) select
+        # only the needed feature_ids (saves ~99.99% of memory) and
+        # (b) drop ``reference_time`` to avoid join conflicts.
+        try:
+            source = model.data_catalog.get_source(source_name)
+            full_uri = str(Path(source.root) / source.uri)
+            rename_map = dict(source.data_adapter.rename)
+
+            fid_set = set(feature_ids)
+
+            def _preprocess(ds_file: xr.Dataset) -> xr.Dataset:
+                """Select needed features and apply rename per file."""
+                avail = ds_file["feature_id"].values
+                keep_ids = [f for f in avail if f in fid_set]
+                if not keep_ids:
+                    ds_file = ds_file.isel(feature_id=slice(0, 0))
+                else:
+                    ds_file = ds_file.sel(feature_id=keep_ids)
+                rn = {k: v for k, v in rename_map.items() if k in ds_file}
+                if rn:
+                    ds_file = ds_file.rename(rn)
+                return ds_file.drop_vars(
+                    ["reference_time", "crs"],
+                    errors="ignore",
+                )
+
+            ds = xr.open_mfdataset(
+                full_uri,
+                preprocess=_preprocess,
+                combine="nested",
+                concat_dim="time",
+            )
+
+            var = "discharge" if "discharge" in ds else "streamflow"
+            if var not in ds or ds.sizes.get("feature_id", 0) == 0:
+                return None
+
+            da_sel = ds[var]
+
+            # Filter to model time range & drop duplicates
+            da_sel = da_sel.sel(time=slice(pd.Timestamp(tstart), pd.Timestamp(tstop)))
+            time_idx = da_sel.indexes["time"]
+            if time_idx.duplicated().any():
+                da_sel = da_sel.sel(time=~time_idx.duplicated())
+
+            return da_sel.to_pandas()
+        except Exception:
+            import logging
+
+            logging.getLogger(__name__).debug(
+                "Failed to load discharge from '%s' via xarray fallback",
+                source_name,
+                exc_info=True,
+            )
+            return None
+
+    def _assign_discharge_timeseries(self, model: Any) -> None:
+        """Assign NWM CHRTOUT discharge timeseries to existing source points.
+
+        Uses the model's data catalog to load streamflow data and maps it
+        to the discharge source points by NWM ``feature_id``.  Points whose
+        feature_id is not found in the CHRTOUT data keep their default
+        zero-discharge value.
+        """
+        streamflow_name = f"{self.config.simulation.meteo_source}_streamflow"
+
+        # Guard: catalog must exist and contain the streamflow entry.
+        # Use ``contains_source`` rather than ``in`` because the
+        # DataCatalog ``__iter__`` yields (name, source) tuples.
+        catalog_path = _data_catalog_path(self.config)
+        if catalog_path is None or not model.data_catalog.contains_source(streamflow_name):
+            self._log(
+                f"Streamflow data ('{streamflow_name}') not available, "
+                "skipping discharge timeseries"
+            )
+            return
+
+        if model.discharge_points.nr_points == 0:
+            return
+
+        # Map point index → feature_id from the GeoDataFrame
+        gdf = model.discharge_points.gdf
+        if "name" not in gdf.columns or gdf.empty:
+            self._log("Discharge points have no 'name' column, cannot match feature_ids")
+            return
+
+        # Convert string feature_id names to integers for matching
+        # against CHRTOUT's integer feature_id dimension.
+        try:
+            fid_by_idx = {idx: int(name) for idx, name in gdf["name"].items()}
+        except (ValueError, TypeError):
+            self._log(
+                "Discharge point names are not integer feature_ids, skipping timeseries assignment"
+            )
+            return
+
+        self._update_substep("Loading discharge timeseries from catalog")
+        tstart, tstop = model.get_model_time()
+        needed_fids = list(fid_by_idx.values())
+        df_fid = self._load_discharge_dataframe(
+            model,
+            streamflow_name,
+            needed_fids,
+            tstart,
+            tstop,
+        )
+        if df_fid is None:
+            self._log(
+                f"Could not load '{streamflow_name}' from catalog, "
+                "discharge points will use default (zero) values"
+            )
+            return
+
+        # df_fid has feature_id columns; keep only those that match
+        available_fids = {int(c) for c in df_fid.columns}
+        valid_fids = sorted(set(needed_fids) & available_fids)
+        missing_fids = set(needed_fids) - available_fids
+
+        if not valid_fids:
+            self._log(
+                f"No matching feature_ids in '{streamflow_name}' — "
+                f"all {len(missing_fids)} point(s) keep zero discharge"
+            )
+            return
+
+        # Map feature_id columns → integer point indices expected by
+        # set_timeseries (columns must match the GeoDataFrame index).
+        # Multiple points may share the same feature_id (e.g. duplicate
+        # source entries), so we build a one-to-many mapping and create
+        # a column for every point index.
+        import pandas as pd
+
+        idxs_by_fid: dict[int, list[int]] = {}
+        for idx, fid in fid_by_idx.items():
+            idxs_by_fid.setdefault(fid, []).append(idx)
+
+        df_ts = pd.DataFrame(index=df_fid.index)
+        n_assigned = 0
+        for fid in valid_fids:
+            for idx in idxs_by_fid[fid]:
+                df_ts[idx] = df_fid[fid].values
+                n_assigned += 1
+        df_ts.index.name = "time"
+        df_ts.columns.name = "index"
+
+        model.discharge_points.set_timeseries(df_ts)
+
+        msg = (
+            f"Assigned discharge timeseries to {n_assigned} point(s) "
+            f"({len(valid_fids)} unique feature_id(s)) from '{streamflow_name}'"
+        )
+        if missing_fids:
+            examples = ", ".join(str(f) for f in sorted(missing_fids)[:5])
+            msg += f"; {len(missing_fids)} point(s) not found in data (zero discharge): {examples}"
+        self._log(msg)
+
     def run(self) -> dict[str, Any]:
         """Add discharge source points from a ``.src`` or GeoJSON file."""
         model = _get_model(self.config)
@@ -1351,6 +1549,15 @@ class SfincsDischargeStage(_SfincsStageBase):
                     f"Dropped {len(dropped)} source point(s) on inactive "
                     f"cells: {', '.join(dropped)}"
                 )
+            # When merging, skip points that already exist (by name)
+            # to prevent duplicates on re-runs.
+            if self.sfincs.merge_discharge and model.discharge_points.nr_points > 0:
+                existing_names = set(model.discharge_points.gdf.get("name", []))
+                before = len(kept)
+                kept = [(x, y, n) for x, y, n in kept if n not in existing_names]
+                n_skipped = before - len(kept)
+                if n_skipped:
+                    self._log(f"Skipped {n_skipped} duplicate source point(s)")
             for x, y, name in kept:
                 model.discharge_points.add_point(x=x, y=y, name=name)
             self._log(f"Added {len(kept)} discharge source point(s) from {src_path}")
@@ -1360,6 +1567,11 @@ class SfincsDischargeStage(_SfincsStageBase):
                 merge=self.sfincs.merge_discharge,
             )
             self._log(f"Discharge source points added from {src_path}")
+
+        # Assign real discharge timeseries from the NWM CHRTOUT data
+        # catalog entry.  If no streamflow data is available the method
+        # is a no-op and the points keep their default zero discharge.
+        self._assign_discharge_timeseries(model)
 
         return {"status": "completed"}
 
@@ -1528,6 +1740,8 @@ class SfincsWriteStage(WorkflowStage):
 
         # Apply user-specified sfincs.inp overrides (e.g. physics params)
         # right before writing so they take final precedence.
+        # Parameter name validation is done at config load time in
+        # SfincsModelConfig.__post_init__.
         overrides: dict[str, Any] = getattr(self.config.model_config, "inp_overrides", {})
         if overrides:
             model.config.update(overrides)

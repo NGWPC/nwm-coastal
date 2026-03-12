@@ -122,13 +122,10 @@ def clip_and_reproject(
     dst_height = max(1, int(np.ceil((ymax - ymin) / dst_res)))
     dst_transform = Affine(dst_res, 0.0, xmin, 0.0, -dst_res, ymax)
 
-    return (
-        data.raster.reproject(
-            dst_crs=dst_crs,
-            dst_transform=dst_transform,
-            dst_width=dst_width,
-            dst_height=dst_height,
-            method=reproject_method,
-        )
-        .fillna(fill_value)
-    )
+    return data.raster.reproject(
+        dst_crs=dst_crs,
+        dst_transform=dst_transform,
+        dst_width=dst_width,
+        dst_height=dst_height,
+        method=reproject_method,
+    ).fillna(fill_value)

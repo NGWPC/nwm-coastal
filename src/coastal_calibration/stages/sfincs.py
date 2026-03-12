@@ -428,6 +428,31 @@ def _build_streamflow_entry(
     )
 
 
+def _stofs_uri(sim: SimulationConfig) -> str:
+    """Build the URI for the STOFS file matching this simulation.
+
+    The path mirrors the layout produced by
+    :func:`coastal_calibration.downloader.get_stofs_path`.  Using an
+    exact path instead of a recursive glob (``stofs/**/*.fields.cwl.nc``)
+    avoids picking up STOFS files from other simulations that may sit in
+    the same shared download cache.  Different STOFS versions can have
+    incompatible mesh dimensions (e.g. ``nbou``, ``node``), and xarray
+    cannot concatenate files whose unindexed dimensions differ in size.
+    """
+    from datetime import datetime as _dt
+
+    name_change_date = _dt(2023, 1, 8)
+    start = sim.start_date
+    product = "estofs" if start < name_change_date else "stofs_2d_glo"
+    date_str = start.strftime("%Y%m%d")
+    cycle_hour = (start.hour // 6) * 6
+    hour_str = f"{cycle_hour:02d}"
+    return (
+        f"{PathConfig.COASTAL_SUBDIR}/stofs/"
+        f"{product}.{date_str}/{product}.t{hour_str}z.fields.cwl.nc"
+    )
+
+
 def _build_coastal_stofs_entry(
     sim: SimulationConfig,
 ) -> CatalogEntry:
@@ -443,9 +468,12 @@ def _build_coastal_stofs_entry(
     CatalogEntry
         Catalog entry for STOFS data.
     """
-    # URI is relative to the root (download_dir)
-    # STOFS files have specific naming: estofs or stofs_2d_glo
-    uri = f"{PathConfig.COASTAL_SUBDIR}/stofs/**/*.fields.cwl.nc"
+    # URI points to the specific file for *this* simulation, not a
+    # recursive glob.  The shared download cache may contain STOFS
+    # files from other runs whose mesh dimensions (``node``, ``nbou``,
+    # ``nvel``) differ across STOFS versions, and xarray cannot
+    # concatenate files with incompatible unindexed dimensions.
+    uri = _stofs_uri(sim)
 
     temporal_extent = _get_temporal_extent(sim)
 
@@ -473,6 +501,11 @@ def _build_coastal_stofs_entry(
     # We also drop the scalar ``nvel`` which clashes with the ``nvel``
     # dimension.  Only the node coordinates (``x``, ``y``) and the water
     # level variable (``zeta``/``cwl``) are needed.
+    #
+    # The boundary-topology variables (``nvell``, ``ibtype``, ``nbvv``,
+    # ``max_nvell``) and the bathymetry (``depth``) are also dropped
+    # because they are unused and would inflate memory for the
+    # ~12-million-node STOFS mesh.
     driver: dict[str, Any] = {
         "name": "geodataset_xarray",
         "options": {
@@ -481,6 +514,11 @@ def _build_coastal_stofs_entry(
                 "adcirc_mesh",
                 "element",
                 "mesh",
+                "nvell",
+                "ibtype",
+                "nbvv",
+                "max_nvell",
+                "depth",
             ],
         },
     }

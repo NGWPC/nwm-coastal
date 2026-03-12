@@ -83,47 +83,99 @@ def _create_fake_meteo_nc(path: Path, start: datetime) -> None:
 
 
 def _create_fake_streamflow_nc(path: Path, start: datetime) -> None:
-    """Write a tiny NWM-like CHRTOUT file (10 reaches, 2 time steps)."""
+    """Write a tiny NWM-like CHRTOUT file with feature_ids from the Texas model.
+
+    Each file contains a single timestep (matching real CHRTOUT files which
+    cover one hour each).  The first 10 NWM feature_ids from
+    ``texas/sfincs_nwm.src`` are used so that the discharge timeseries
+    assignment can find matching reaches.
+    """
     import pandas as pd
 
-    times = pd.date_range(start, periods=2, freq="h")
-    feature_ids = np.arange(1, 11, dtype=np.int64)
+    times = pd.date_range(start, periods=1, freq="h")
+    # Feature IDs matching the first 10 entries in the Texas sfincs_nwm.src
+    feature_ids = np.array(
+        [1614588, 1614624, 1614632, 1614660, 1614692, 1614710, 3765398, 3765432, 7847403, 7847427],
+        dtype=np.int64,
+    )
+    n = len(feature_ids)
 
     ds = xr.Dataset(
         {
-            "streamflow": (("time", "feature_id"), np.full((2, 10), 5.0, dtype=np.float32)),
-            "q_lateral": (("time", "feature_id"), np.full((2, 10), 0.1, dtype=np.float32)),
+            "streamflow": (
+                ("time", "feature_id"),
+                np.full((1, n), 5.0, dtype=np.float32),
+            ),
+            "q_lateral": (
+                ("time", "feature_id"),
+                np.full((1, n), 0.1, dtype=np.float32),
+            ),
         },
         coords={
             "time": times,
             "feature_id": feature_ids,
-            "latitude": ("feature_id", np.linspace(_TX_LAT_MIN, _TX_LAT_MAX, 10)),
-            "longitude": ("feature_id", np.linspace(_TX_LON_MIN, _TX_LON_MAX, 10)),
+            "latitude": ("feature_id", np.linspace(_TX_LAT_MIN, _TX_LAT_MAX, n)),
+            "longitude": ("feature_id", np.linspace(_TX_LON_MIN, _TX_LON_MAX, n)),
         },
     )
     ds.to_netcdf(path)
 
 
-def _create_fake_stofs_nc(path: Path, start: datetime) -> None:
-    """Write a tiny STOFS-like unstructured water level file (25 nodes, 2 time steps)."""
+def _create_fake_stofs_nc(
+    path: Path,
+    start: datetime,
+    *,
+    n_grid: int = 5,
+    n_nbou: int = 3,
+    n_nvel: int = 10,
+    seed: int = 42,
+) -> None:
+    """Write a tiny STOFS-like unstructured water level file.
+
+    Parameters
+    ----------
+    path : Path
+        Output NetCDF path.
+    start : datetime
+        Start time for the 2-step timeseries.
+    n_grid : int
+        Side length of the lon/lat node grid (total nodes = n_grid**2).
+    n_nbou : int
+        Size of the ``nbou`` dimension (flow boundary segments).
+    n_nvel : int
+        Size of the ``nvel`` dimension (boundary node indices).
+    seed : int
+        RNG seed for reproducibility.
+    """
     import pandas as pd
 
     times = pd.date_range(start, periods=2, freq="h")
 
     # Create a small grid of nodes covering the Texas coast
-    lons = np.linspace(_TX_LON_MIN, _TX_LON_MAX, 5)
-    lats = np.linspace(_TX_LAT_MIN, _TX_LAT_MAX, 5)
+    lons = np.linspace(_TX_LON_MIN, _TX_LON_MAX, n_grid)
+    lats = np.linspace(_TX_LAT_MIN, _TX_LAT_MAX, n_grid)
     lon_grid, lat_grid = np.meshgrid(lons, lats)
     lon_flat = lon_grid.ravel()
     lat_flat = lat_grid.ravel()
     n_nodes = len(lon_flat)
 
+    rng = np.random.default_rng(seed)
+
     # Small water level signal (metres)
-    wl = np.random.default_rng(42).normal(0.2, 0.05, (2, n_nodes)).astype(np.float32)
+    wl = rng.normal(0.2, 0.05, (2, n_nodes)).astype(np.float32)
 
     ds = xr.Dataset(
         {
+            # Water level — the only variable the forcing stage needs
             "zeta": (("time", "node"), wl),
+            # ADCIRC boundary-topology variables that ride on nbou/nvel
+            # dimensions whose sizes change across STOFS mesh versions.
+            "nvell": (("nbou",), rng.integers(1, 5, n_nbou).astype(np.int32)),
+            "ibtype": (("nbou",), np.zeros(n_nbou, dtype=np.int32)),
+            "max_nvell": ((), np.int32(4)),
+            "nbvv": (("nvel",), rng.integers(0, n_nodes, n_nvel).astype(np.int32)),
+            # Bathymetry
+            "depth": (("node",), rng.uniform(2, 20, n_nodes).astype(np.float32)),
         },
         coords={
             "time": times,
@@ -415,6 +467,58 @@ class TestSfincsForcingStage:
         assert result["status"] == "completed"
         assert result["source"] == "stofs_waterlevel"
 
+    def test_forcing_ignores_stale_stofs_files_in_cache(self, sfincs_workflow_config):
+        """Regression: stale STOFS files from other mesh versions must not interfere.
+
+        When the shared download cache contains STOFS files from different
+        dates that use incompatible ADCIRC meshes (different ``nbou``,
+        ``node``, and ``nvel`` dimensions), the forcing stage must only
+        load the file matching the current simulation.  Prior to the fix,
+        a recursive glob picked up all files, and xarray raised:
+        ``cannot reindex or align along dimension 'nbou' because of
+        conflicting dimension sizes: {2530, 262}``
+        """
+        from coastal_calibration.stages.sfincs_build import (
+            SfincsDataCatalogStage,
+            SfincsForcingStage,
+            SfincsInitStage,
+            SfincsSymlinksStage,
+            SfincsTimingStage,
+        )
+
+        # Plant a second STOFS file in the download cache with a
+        # *different* mesh (different node count and nbou/nvel sizes).
+        # This simulates a cache that holds data from both the old and
+        # new STOFS-2D-Global meshes.
+        stale_dir = (
+            sfincs_workflow_config.paths.download_dir
+            / "coastal"
+            / "stofs"
+            / "stofs_2d_glo.20240109"
+        )
+        stale_dir.mkdir(parents=True, exist_ok=True)
+        _create_fake_stofs_nc(
+            stale_dir / "stofs_2d_glo.t00z.fields.cwl.nc",
+            datetime(2024, 1, 9),
+            # Intentionally different dimensions to trigger the old bug
+            n_grid=4,  # 16 nodes  (vs 25 in the primary file)
+            n_nbou=7,  # different nbou
+            n_nvel=20,  # different nvel
+            seed=99,
+        )
+
+        # Run prerequisite stages and the forcing stage — this must
+        # succeed without an alignment error.
+        SfincsSymlinksStage(sfincs_workflow_config).run()
+        SfincsDataCatalogStage(sfincs_workflow_config).run()
+        SfincsInitStage(sfincs_workflow_config).run()
+        SfincsTimingStage(sfincs_workflow_config).run()
+
+        result = SfincsForcingStage(sfincs_workflow_config).run()
+
+        assert result["status"] == "completed"
+        assert result["source"] == "stofs_waterlevel"
+
 
 class TestSfincsDischargeStage:
     """Test the discharge source points stage."""
@@ -429,6 +533,41 @@ class TestSfincsDischargeStage:
 
         result = SfincsDischargeStage(sfincs_workflow_config).run()
         assert result["status"] == "completed"
+
+    def test_discharge_assigns_timeseries(self, sfincs_workflow_config):
+        """Verify that NWM CHRTOUT timeseries are assigned to source points.
+
+        When the data catalog contains a streamflow entry whose feature_ids
+        overlap with the ``.src`` file, the discharge stage should populate
+        the discharge timeseries with non-zero values.
+        """
+        from coastal_calibration.stages.sfincs_build import (
+            SfincsDataCatalogStage,
+            SfincsDischargeStage,
+            SfincsInitStage,
+            SfincsSymlinksStage,
+            SfincsTimingStage,
+            _get_model,
+        )
+
+        # Run prerequisites so the data catalog is available
+        SfincsSymlinksStage(sfincs_workflow_config).run()
+        SfincsDataCatalogStage(sfincs_workflow_config).run()
+        SfincsInitStage(sfincs_workflow_config).run()
+        SfincsTimingStage(sfincs_workflow_config).run()
+
+        result = SfincsDischargeStage(sfincs_workflow_config).run()
+        assert result["status"] == "completed"
+
+        # Retrieve the model to inspect the discharge timeseries
+        model = _get_model(sfincs_workflow_config)
+        assert model.discharge_points.nr_points > 0
+
+        da_dis = model.discharge_points.data["dis"]
+        # At least some values must be non-zero (5.0 from the fake data)
+        assert float(da_dis.max()) > 0, (
+            "Expected non-zero discharge timeseries but all values are zero"
+        )
 
 
 class TestSfincsMeteoStages:
