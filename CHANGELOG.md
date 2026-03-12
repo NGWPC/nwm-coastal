@@ -17,6 +17,13 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     and raw xarray `open_mfdataset` loading strategies.
 - `tests/test_floodmap.py` with unit tests for `_write_floodmap_cog`,
     `_ensure_overviews`, and an integration test for `create_flood_depth_map`.
+- QGIS plugin: optional NWM Flowlines Override in the basemap dialog, allowing users to
+    load flowpaths from a separate NWM GeoPackage with configurable layer name and
+    stream order column.
+- QGIS plugin: "Export Selected Flowpaths" toolbar button that saves the current
+    selection on the flowpaths layer to a GeoPackage file.
+- QGIS plugin: stream order validation against the actual min/max range in the data,
+    with a clear error when the user-specified value is out of range.
 
 ### Changed
 
@@ -42,6 +49,8 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - `_downstream_endpoint` now compares both endpoints of NWM hydrofabric flowpath
     linestrings and returns whichever is closest to the AOI boundary, fixing incorrect
     discharge point placement when flowpath direction is reversed.
+- QGIS plugin: use `mActionVertexToolActiveLayer.svg` icon for the Edit Polygon toolbar
+    button (previously used the removed `mActionNodeTool.svg`).
 
 ## [3.1.1.0.0] - 2026-02-19
 

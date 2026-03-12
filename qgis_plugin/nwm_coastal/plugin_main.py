@@ -80,9 +80,10 @@ class NWMCoastalPlugin:
         style_fn,
         *,
         optional: bool = False,
+        display_name: str | None = None,
     ) -> None:
         uri = f"{gpkg_path}|layername={layer_name}"
-        layer = QgsVectorLayer(uri, layer_name, "ogr")
+        layer = QgsVectorLayer(uri, display_name or layer_name, "ogr")
         if not layer.isValid():
             if optional:
                 self._log(f"Optional layer '{layer_name}' not found, skipping.")
@@ -130,8 +131,13 @@ class NWMCoastalPlugin:
         layer.renderer().setSymbol(symbol)
 
     @staticmethod
-    def _style_flowpaths(layer: QgsVectorLayer, min_stream_order: int) -> None:
-        layer.setSubsetString(f'"stream_order" >= {min_stream_order}')
+    def _style_flowpaths(
+        layer: QgsVectorLayer,
+        min_stream_order: int,
+        stream_order_col: str = "stream_order",
+    ) -> None:
+        if min_stream_order > 1:
+            layer.setSubsetString(f'"{stream_order_col}" >= {min_stream_order}')
         symbol = QgsLineSymbol.createSimple({})
         symbol.deleteSymbolLayer(0)
         line = QgsSimpleLineSymbolLayer()
@@ -176,6 +182,9 @@ class NWMCoastalPlugin:
         gpkg_path = dlg.gpkg_path
         parquet_path = dlg.parquet_path
         min_order = dlg.min_stream_order
+        nwm_flowlines_path = dlg.nwm_flowlines_path
+        nwm_layer_name = dlg.nwm_layer_name
+        stream_order_col = dlg.stream_order_column
         project = QgsProject.instance()
         root = project.layerTreeRoot()
 
@@ -194,12 +203,22 @@ class NWMCoastalPlugin:
         self._add_gpkg_layer(gpkg_path, "divides", project, self._style_divides)
 
         # 3. flowpaths (linestring: blue, width 1, filtered)
-        self._add_gpkg_layer(
-            gpkg_path,
-            "flowpaths",
-            project,
-            lambda lyr: self._style_flowpaths(lyr, min_order),
-        )
+        # Use NWM flowlines gpkg if provided, otherwise fall back to NHF gpkg
+        if nwm_flowlines_path is not None:
+            self._add_gpkg_layer(
+                nwm_flowlines_path,
+                nwm_layer_name,
+                project,
+                lambda lyr: self._style_flowpaths(lyr, min_order, stream_order_col),
+                display_name="flowpaths",
+            )
+        else:
+            self._add_gpkg_layer(
+                gpkg_path,
+                "flowpaths",
+                project,
+                lambda lyr: self._style_flowpaths(lyr, min_order, stream_order_col),
+            )
 
         # 4. gages (point: red, size 3) — optional
         self._add_gpkg_layer(gpkg_path, "gages", project, self._style_gages, optional=True)
@@ -491,6 +510,78 @@ class NWMCoastalPlugin:
             self._log(f"Error saving polygon: {error_msg}", Qgis.MessageLevel.Critical, push=True)
 
     # ------------------------------------------------------------------
+    # Button 6: Export Selected Flowpaths
+    # ------------------------------------------------------------------
+
+    def _on_export_flowpaths(self) -> None:
+        """Export selected flowpath features to a GeoPackage file.
+
+        If no features are selected on the flowpaths layer, the layer is
+        made active and QGIS's selection tool is activated so the user can
+        pick features first.
+        """
+        project = QgsProject.instance()
+
+        fp_layers = project.mapLayersByName("flowpaths")
+        if not fp_layers:
+            self._log(
+                "No 'flowpaths' layer found. Load basemap first.",
+                Qgis.MessageLevel.Warning,
+                push=True,
+            )
+            return
+
+        fp_layer = fp_layers[0]
+
+        if fp_layer.selectedFeatureCount() == 0:
+            self.iface.setActiveLayer(fp_layer)
+            self.iface.actionSelect().trigger()
+            self._log(
+                "Select flowpath features on the map, then click this button again to export.",
+                push=True,
+            )
+            return
+
+        save_path, _ = QFileDialog.getSaveFileName(
+            self.iface.mainWindow(),
+            "Export Selected Flowpaths as GeoPackage",
+            "",
+            "GeoPackage (*.gpkg)",
+        )
+        if not save_path:
+            return
+        if not save_path.endswith(".gpkg"):
+            save_path += ".gpkg"
+
+        options = QgsVectorFileWriter.SaveVectorOptions()
+        options.driverName = "GPKG"
+        options.fileEncoding = "UTF-8"
+        options.onlySelectedFeatures = True
+
+        Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+
+        error_code, error_msg, *_ = QgsVectorFileWriter.writeAsVectorFormatV3(
+            fp_layer,
+            save_path,
+            project.transformContext(),
+            options,
+        )
+
+        if error_code == QgsVectorFileWriter.NoError:
+            n = fp_layer.selectedFeatureCount()
+            self._log(
+                f"Exported {n} flowpath(s) to {save_path}",
+                Qgis.MessageLevel.Success,
+                push=True,
+            )
+        else:
+            self._log(
+                f"Error exporting flowpaths: {error_msg}",
+                Qgis.MessageLevel.Critical,
+                push=True,
+            )
+
+    # ------------------------------------------------------------------
     # Plugin lifecycle
     # ------------------------------------------------------------------
 
@@ -501,13 +592,18 @@ class NWMCoastalPlugin:
 
         self._add_action("mActionAddOgrLayer.svg", "Add Basemap", self._on_add_basemap)
         self._add_action("mActionCapturePolygon.svg", "Draw Polygon", self._on_draw_polygon)
-        self._add_action("mActionNodeTool.svg", "Edit Polygon", self._on_edit_polygon)
+        self._add_action("mActionVertexToolActiveLayer.svg", "Edit Polygon", self._on_edit_polygon)
         self._add_action(
             "mActionMergeFeatures.svg",
             "Union with NHF Divides",
             self._on_union_divides,
         )
         self._add_action("mActionFileSaveAs.svg", "Save Polygon", self._on_save_polygon)
+        self._add_action(
+            "mActionExport.svg",
+            "Export Selected Flowpaths",
+            self._on_export_flowpaths,
+        )
 
     def unload(self) -> None:
         """Clean up toolbar, actions, and any active edits."""
