@@ -81,9 +81,11 @@ def _depth_from_index(
     idx_block = idx_src.read(1, window=window)
     nodata_mask = idx_block == idx_nodata
     safe_idx = idx_block.copy()
-    safe_idx[nodata_mask] = 0
+    oob_mask = (safe_idx < 0) | (safe_idx >= len(zs_flat))
+    invalid_mask = nodata_mask | oob_mask
+    safe_idx[invalid_mask] = 0
     h = zs_flat[safe_idx] - dep_block
-    h[nodata_mask] = np.nan
+    h[invalid_mask] = np.nan
     return h
 
 
@@ -152,62 +154,63 @@ def _write_floodmap_cog(
             idx_src = rasterio.open(index_path)
             idx_nodata = int(idx_src.nodata or 2147483647)
 
-        profile = {
-            "driver": "GTiff",
-            "width": m1,
-            "height": n1,
-            "count": 1,
-            "dtype": "float32",
-            "crs": dem_crs,
-            "transform": dem_transform,
-            "tiled": True,
-            "blockxsize": 256,
-            "blockysize": 256,
-            "compress": "deflate",
-            "predictor": 2,
-            "nodata": float("nan"),
-            "BIGTIFF": "YES",
-        }
+        try:
+            profile = {
+                "driver": "GTiff",
+                "width": m1,
+                "height": n1,
+                "count": 1,
+                "dtype": "float32",
+                "crs": dem_crs,
+                "transform": dem_transform,
+                "tiled": True,
+                "blockxsize": 256,
+                "blockysize": 256,
+                "compress": "deflate",
+                "predictor": 2,
+                "nodata": float("nan"),
+                "BIGTIFF": "YES",
+            }
 
-        with rasterio.open(output_path, "w", **profile) as dst:
-            nrcb = nrmax
-            nrbn = int(np.ceil(n1 / nrcb))
-            nrbm = int(np.ceil(m1 / nrcb))
+            with rasterio.open(output_path, "w", **profile) as dst:
+                nrcb = nrmax
+                nrbn = int(np.ceil(n1 / nrcb))
+                nrbm = int(np.ceil(m1 / nrcb))
 
-            for jj in range(nrbn):
-                bn0 = jj * nrcb
-                bn1 = min(bn0 + nrcb, n1)
-                for ii in range(nrbm):
-                    bm0 = ii * nrcb
-                    bm1 = min(bm0 + nrcb, m1)
+                for jj in range(nrbn):
+                    bn0 = jj * nrcb
+                    bn1 = min(bn0 + nrcb, n1)
+                    for ii in range(nrbm):
+                        bm0 = ii * nrcb
+                        bm1 = min(bm0 + nrcb, m1)
 
-                    window = Window(bm0, bn0, bm1 - bm0, bn1 - bn0)  # type: ignore[too-many-positional-arguments]
-                    dep_block = src.read(1, window=window).astype("float32")
+                        window = Window(bm0, bn0, bm1 - bm0, bn1 - bn0)  # type: ignore[too-many-positional-arguments]
+                        dep_block = src.read(1, window=window).astype("float32")
 
-                    if np.all(np.isnan(dep_block)):
-                        continue
+                        if np.all(np.isnan(dep_block)):
+                            continue
 
-                    if idx_src is not None:
-                        h = _depth_from_index(idx_src, zs_flat, dep_block, window, idx_nodata)
-                    else:
-                        h = _depth_from_rasterize(
-                            zsmax,
-                            dep_block,
-                            dem_crs,
-                            dem_transform,
-                            bm0,
-                            bm1,
-                            bn0,
-                            bn1,
-                            reproj_method,
-                        )
+                        if idx_src is not None:
+                            h = _depth_from_index(idx_src, zs_flat, dep_block, window, idx_nodata)
+                        else:
+                            h = _depth_from_rasterize(
+                                zsmax,
+                                dep_block,
+                                dem_crs,
+                                dem_transform,
+                                bm0,
+                                bm1,
+                                bn0,
+                                bn1,
+                                reproj_method,
+                            )
 
-                    h[~np.isfinite(h)] = np.nan
-                    h[h <= hmin] = np.nan
-                    dst.write(h[np.newaxis, :, :], window=window)
-
-        if idx_src is not None:
-            idx_src.close()
+                        h[~np.isfinite(h)] = np.nan
+                        h[h <= hmin] = np.nan
+                        dst.write(h[np.newaxis, :, :], window=window)
+        finally:
+            if idx_src is not None:
+                idx_src.close()
 
 
 def create_flood_depth_map(

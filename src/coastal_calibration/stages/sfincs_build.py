@@ -1407,6 +1407,13 @@ class SfincsDischargeStage(_SfincsStageBase):
 
             return da_sel.to_pandas()
         except Exception:
+            import logging
+
+            logging.getLogger(__name__).debug(
+                "Failed to load discharge from '%s' via xarray fallback",
+                source_name,
+                exc_info=True,
+            )
             return None
 
     def _assign_discharge_timeseries(self, model: Any) -> None:

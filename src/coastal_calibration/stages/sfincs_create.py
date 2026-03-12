@@ -770,7 +770,7 @@ class CreateDischargeStage(_CreateStageBase):
         self._log(f"Wrote {len(snapped)} discharge source location(s) to {src_path.name}")
         return {
             "status": "completed",
-            "points_added": len(discharge_points),
+            "points_added": len(snapped),
             "src_file": str(src_path),
         }
 
