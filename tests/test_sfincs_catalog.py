@@ -24,6 +24,8 @@ from coastal_calibration.stages.sfincs import (
     CatalogMetadata,
     DataAdapter,
     DataCatalog,
+    _build_coastal_stofs_entry,
+    _stofs_uri,
     create_nc_symlinks,
     generate_data_catalog,
     remove_nc_symlinks,
@@ -385,3 +387,155 @@ class TestSfincsDataCatalogStage:
         stage = SfincsDataCatalogStage(sample_config)
         errors = stage.validate()
         assert len(errors) == 0
+
+
+class TestStofsUri:
+    """Tests for ``_stofs_uri`` — URI builder for STOFS catalog entries.
+
+    Regression tests for a bug where the STOFS data catalog entry used a
+    recursive glob (``stofs/**/*.fields.cwl.nc``) that matched all cached
+    files.  When the shared download cache contained STOFS files from
+    different mesh versions (pre/post v2.1, mid-January 2024), xarray
+    could not concatenate them because the ``nbou`` / ``node`` / ``nvel``
+    dimensions differed in size.  The fix replaced the glob with an exact
+    path computed by ``_stofs_uri``.
+    """
+
+    def test_new_naming_convention(self):
+        """Dates after 2023-01-08 should use ``stofs_2d_glo`` naming."""
+        sim = SimulationConfig(
+            start_date=datetime(2024, 1, 9),
+            duration_hours=60,
+            coastal_domain="atlgulf",
+            meteo_source="nwm_ana",
+        )
+        uri = _stofs_uri(sim)
+        assert uri == "coastal/stofs/stofs_2d_glo.20240109/stofs_2d_glo.t00z.fields.cwl.nc"
+
+    def test_old_naming_convention(self):
+        """Dates before 2023-01-08 should use ``estofs`` naming."""
+        sim = SimulationConfig(
+            start_date=datetime(2022, 6, 1),
+            duration_hours=3,
+            coastal_domain="atlgulf",
+            meteo_source="nwm_retro",
+        )
+        uri = _stofs_uri(sim)
+        assert uri == "coastal/stofs/estofs.20220601/estofs.t00z.fields.cwl.nc"
+
+    def test_cycle_hour_rounding(self):
+        """Non-cycle hours should round down to the nearest 6-hour cycle."""
+        sim = SimulationConfig(
+            start_date=datetime(2024, 9, 1, 14),
+            duration_hours=3,
+            coastal_domain="atlgulf",
+            meteo_source="nwm_ana",
+        )
+        uri = _stofs_uri(sim)
+        assert "t12z" in uri
+
+    def test_uri_matches_downloader_path(self):
+        """URI must match the layout produced by ``get_stofs_path``."""
+        from pathlib import Path
+
+        from coastal_calibration.downloader import get_stofs_path
+
+        for start_date in [
+            datetime(2022, 3, 15),
+            datetime(2024, 1, 9),
+            datetime(2025, 6, 1, 6),
+        ]:
+            sim = SimulationConfig(
+                start_date=start_date,
+                duration_hours=3,
+                coastal_domain="atlgulf",
+                meteo_source="nwm_ana",
+            )
+            uri = _stofs_uri(sim)
+            expected = str(get_stofs_path(start_date, Path()))
+            assert uri == expected, f"URI mismatch for {start_date}: {uri!r} != {expected!r}"
+
+    def test_uri_is_not_a_glob(self):
+        """Regression: URI must not contain wildcard characters."""
+        sim = SimulationConfig(
+            start_date=datetime(2024, 1, 9),
+            duration_hours=60,
+            coastal_domain="atlgulf",
+            meteo_source="nwm_ana",
+        )
+        uri = _stofs_uri(sim)
+        assert "*" not in uri
+        assert "?" not in uri
+
+
+class TestStofsEntryDropVariables:
+    """Verify the STOFS catalog entry drops all mesh-topology variables.
+
+    Regression tests for a bug where ADCIRC mesh topology variables
+    (``nvell``, ``ibtype``, ``nbvv``, ``max_nvell``) were not dropped,
+    causing xarray to fail when files from different STOFS mesh versions
+    were loaded together.  Even with a specific URI (no glob), dropping
+    these unused variables reduces memory for the ~12-million-node mesh.
+    """
+
+    def _get_stofs_entry(self, start_date=None):
+        sim = SimulationConfig(
+            start_date=start_date or datetime(2024, 1, 9),
+            duration_hours=60,
+            coastal_domain="atlgulf",
+            meteo_source="nwm_ana",
+        )
+        return _build_coastal_stofs_entry(sim)
+
+    def test_drops_mesh_topology_variables(self):
+        """All ADCIRC mesh topology variables must be dropped."""
+        entry = self._get_stofs_entry()
+        drop = entry.driver["options"]["drop_variables"]
+        for var in ("adcirc_mesh", "element", "mesh"):
+            assert var in drop, f"{var!r} must be dropped"
+
+    def test_drops_nbou_dimension_variables(self):
+        """Variables on the ``nbou`` dimension must be dropped.
+
+        The ``nbou`` dimension (number of flow boundary segments) changed
+        from 2530 to 262 when STOFS-2D-Global updated its mesh (v2.1,
+        mid-January 2024).
+        """
+        entry = self._get_stofs_entry()
+        drop = entry.driver["options"]["drop_variables"]
+        for var in ("nvell", "ibtype"):
+            assert var in drop, f"{var!r} (nbou dim) must be dropped"
+
+    def test_drops_nvel_dimension_variables(self):
+        """Variables on the ``nvel`` dimension must be dropped.
+
+        ``nvel`` is used as both a scalar variable and a dimension in
+        STOFS files — the scalar is dropped to avoid the clash, and
+        ``nbvv`` / ``max_nvell`` are dropped because they ride on the
+        ``nvel``/``nbou`` dimensions.
+        """
+        entry = self._get_stofs_entry()
+        drop = entry.driver["options"]["drop_variables"]
+        for var in ("nvel", "nbvv", "max_nvell"):
+            assert var in drop, f"{var!r} (nvel dim) must be dropped"
+
+    def test_drops_depth_variable(self):
+        """Bathymetry ``depth`` is unused and inflates memory."""
+        entry = self._get_stofs_entry()
+        drop = entry.driver["options"]["drop_variables"]
+        assert "depth" in drop
+
+    def test_entry_uses_specific_uri(self):
+        """Regression: the entry URI must be a specific path, not a glob."""
+        entry = self._get_stofs_entry()
+        assert "*" not in entry.uri
+        assert "**" not in entry.uri
+        assert entry.uri.endswith(".fields.cwl.nc")
+
+    def test_catalog_stofs_entry_uri_varies_by_date(self):
+        """Different simulation dates must produce different URIs."""
+        entry_a = self._get_stofs_entry(datetime(2024, 1, 9))
+        entry_b = self._get_stofs_entry(datetime(2024, 9, 1))
+        assert entry_a.uri != entry_b.uri
+        assert "20240109" in entry_a.uri
+        assert "20240901" in entry_b.uri

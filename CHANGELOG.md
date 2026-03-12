@@ -9,118 +9,39 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 
-- `clip_and_reproject()` utility in `utils/raster.py` for memory-safe raster clipping
-    and reprojection. Clips in the **source** CRS first, then reprojects with a
-    constrained output grid, preventing `rasterio.warp.calculate_default_transform` from
-    inflating the grid to the full source extent (e.g. CONUS-scale for NWM LCC → UTM).
-- SFINCS compilation guide (`docs/sfincs_compilation.md`) with platform-specific build
-    instructions for Ubuntu and macOS.
-- Pixi activation script (`scripts/ensure-sfincs.sh`) that automatically compiles SFINCS
-    from the Git submodule on first environment activation.
-- Build dependencies (compilers, autotools, NetCDF-Fortran) in the `sfincs` pixi feature
-    for native SFINCS compilation.
-- `SfincsFloodMapStage` that downscales SFINCS `zsmax` (maximum water surface elevation)
-    onto a high-resolution DEM to produce a Cloud Optimized GeoTIFF of maximum flood
-    depth via `hydromt_sfincs.utils.downscale_floodmap`.
-- `create_flood_depth_map()` utility in `utils/floodmap.py` with automatic index COG
-    creation, DEM overview building, and configurable depth threshold (`hmin`).
-- `floodmap_dem`, `floodmap_hmin`, and `floodmap_enabled` configuration fields on
-    `SfincsModelConfig`.
-- Hydromt-sfincs compatibility patch for `make_index_cog` fixing CRS reprojection,
-    closed-dataset access, and grid component names.
-- `hydromt_sfincs_issues.md` document tracking upstream hydromt-sfincs bugs and
-    workarounds.
-- NWM Coastal QGIS plugin with toolbar for basemap loading (NHF GeoPackage + CO-OPS
-    stations), polygon sketching and vertex editing, union with NHF divides, and GeoJSON
-    export.
-- Human-readable `__str__` methods on `WorkflowResult`, `DownloadResult`,
-    `DownloadResults`, and `StageProgress` so that `print(result)` produces clean,
-    indented output with friendly time formatting.
-- `from_dict` public class method on `SfincsCreateConfig` and `CoastalCalibConfig` for
-    constructing configs from plain dictionaries in notebooks and scripts.
-- Examples gallery in the documentation with two Lavaca Bay tutorial notebooks (CLI and
-    Python API) rendered via `mkdocs-jupyter`, a gallery index page with Material grid
-    cards, and restructured example configs under `docs/examples/`.
-- `create` CLI command for building SFINCS quadtree models from an AOI polygon. The
-    workflow supports grid generation with quadtree refinement, automatic NOAA DEM
-    discovery and download, elevation/bathymetry, active cell mask, boundary cells,
-    optional NWM discharge source points, and subgrid table generation.
-- `prepare-topobathy` CLI command for downloading NWS 30 m topobathymetric DEMs from
-    `icechunk` (S3) clipped to an AOI bounding box, with HydroMT data catalog output.
-- `update-dem-index` CLI command for rebuilding the NOAA DEM spatial index from S3 STAC
-    metadata.
-- `SfincsCreateConfig` configuration schema for the `create` workflow, with sections for
-    grid, elevation, mask, subgrid, and optional NWM discharge.
-- `SfincsCreator` runner with resumable execution (tracks completion in
-    `.create_status.json`) and `--start-from`/`--stop-after` support.
-- NOAA DEM auto-discovery utility (`noaa_dem.py`) that selects the best-matching coastal
-    DEM based on AOI overlap, resolution, and year.
-- NWS topobathy fetch utility (`topobathy.py`) for domain-specific DEM downloads via
-    `icechunk`.
+- `_KNOWN_INP_PARAMS` allowlist on `SfincsModelConfig` that validates `inp_overrides`
+    keys against all ~170 recognised `sfincs.inp` parameters, catching typos early
+    (SFINCS silently ignores unknown parameters).
+- `SfincsDischargeStage` now assigns real NWM CHRTOUT discharge timeseries to source
+    points via `_assign_discharge_timeseries`, with support for both HydroMT GeoDataset
+    and raw xarray `open_mfdataset` loading strategies.
+- `tests/test_floodmap.py` with unit tests for `_write_floodmap_cog`,
+    `_ensure_overviews`, and an integration test for `create_flood_depth_map`.
 
 ### Changed
 
-- Replace `_clip_meteo_to_domain()` + upstream `component.create()` with
-    `_create_meteo_forcing()` that fetches meteo data with a small buffer (30 cells
-    instead of the upstream default of 5 000), clips in the source CRS via
-    `clip_and_reproject()`, and constrains the output grid to model domain bounds. This
-    prevents the LCC → UTM reprojection from allocating a CONUS-scale grid (the root
-    cause of intermittent OOM kernel crashes in `sfincs_wind`). All three meteo stages
-    (precipitation, wind, pressure) use `try`/`finally` to guarantee `component.clear()`
-    runs even on failure.
-- Conditionally set matplotlib `Agg` backend only outside Jupyter kernels in
-    `SchismPlotStage` and `SfincsPlotStage`, enabling inline plotting in notebooks.
-- Update Lavaca Bay tutorial notebooks (API and CLI) to cover the flood map generation
-    phase.
-- Bump pre-commit hooks: `ruff-pre-commit` v0.15.4 → v0.15.5, `codespell` v2.4.1 →
-    v2.4.2.
-- Rewrite NOAA station matching in `SfincsPlotStage` to use spatial KDTree
-    nearest-neighbor lookup instead of file-based `obs_station_map.json` / regex
-    fallback. Observation points are reprojected to WGS 84 and matched against the full
-    NOAA CO-OPS station catalog, making the run workflow work with any SFINCS model.
-- Move stdout suppression for `hydromt-sfincs` from the CLI into a `_suppress_stdout()`
-    context manager in `SfincsCreator` that redirects both `fd 1` and `sys.stdout`,
-    fixing noisy print output in Jupyter notebooks.
-- Remove the `submit` execution path and `SlurmConfig` entirely. The `run` command is
-    now the sole entry point — use it inside user-written `sbatch` scripts instead. Old
-    YAML configs with a `slurm:` key are silently ignored for backward compatibility.
-    The `${slurm.user}` path-template alias continues to work, resolving from the
-    `$USER` environment variable.
-- Replace `assert isinstance(...)` with `typing.cast()` for `SchismModelConfig` type
-    narrowing in all stage modules (`boundary`, `forcing`, `schism`), since `assert`
-    statements are stripped by `python -O`.
-- Replace Singularity container execution with native binary execution for the SFINCS
-    workflow. The `sfincs_run` stage now resolves the SFINCS binary from `PATH` (or an
-    explicit `sfincs_exe` config path) instead of pulling and running a Singularity
-    image.
-- Update `sfincs_exe` field description from "bypasses container" to "overrides PATH
-    lookup".
-- Switch type checker from `pyright` to `ty`.
-- Switch documentation theme from `mkdocs-material` to `mkdocs-materialx`.
+- Rewrite `create_flood_depth_map` to read the DEM and index COG at full resolution and
+    write a flood-depth Cloud Optimized GeoTIFF block-by-block, bypassing an upstream
+    `hydromt_sfincs` bug where `downscale_floodmap` opened rasters with
+    `overview_level=0` and silently halved the output resolution.
+- Separate discharge concerns between `create` and `run` stages: the create stage now
+    only writes the `.src` file with snapped locations, while the run stage
+    (`SfincsDischargeStage`) adds points to the model and attaches real NWM streamflow
+    data.
+- Bump `pyproject-fmt` pre-commit hook from v2.16.2 to v2.18.1.
 
 ### Fixed
 
-- Update `_TEXAS_ZIP` path in test fixtures to match relocated archive at
-    `docs/examples/slurm/texas.zip`, restoring 18 previously-skipped SFINCS integration
-    tests.
-- Correct mock NOAA station IDs and coordinates in `test_sfincs_workflow` to fall within
-    the 0.1-degree spatial match radius of the pre-built model observation points.
-- Resolve all `ty` type-checker diagnostics across the codebase: invalid-assignment in
-    `coops_api.get_datums`, stale `type: ignore` comments in `_hydromt_compat`,
-    `download`, and `runner`, a possible `None` dereference in `logging` file-handler
-    stream reconfiguration, and dead `_work_dir` code path in `WorkflowMonitor`.
-
-### Removed
-
-- Singularity container support for SFINCS: `resolve_sif_path`,
-    `_pull_singularity_image`, `_run_singularity`, and `SFINCS_DOCKER_IMAGE`.
-- `container_tag` and `container_image` fields from `SfincsModelConfig`.
-- `docker_tag` → `container_tag` and `sif_path` → `container_image` field migration
-    aliases.
-- `pyright` configuration section in `pyproject.toml` (superseded by `ty`).
-- `SlurmConfig`, `SlurmManager`, `JobState`, and the `submit` CLI command.
-- `utils/slurm.py` module.
-- All submit/slurm-related tests and fixtures.
+- STOFS data catalog entry previously used a recursive glob (`stofs/**/*.fields.cwl.nc`)
+    that matched all cached STOFS files. When the cache held files from different STOFS
+    mesh versions with incompatible dimensions, xarray concatenation failed. A new
+    `_stofs_uri()` helper now builds an exact file path for the simulation's date and
+    cycle hour, avoiding multi-file collision.
+- Expand the STOFS `drop_variables` list to also drop `nvell`, `ibtype`, `nbvv`,
+    `max_nvell`, and `depth`, reducing memory for the ~12-million-node STOFS mesh.
+- `_downstream_endpoint` now compares both endpoints of NWM hydrofabric flowpath
+    linestrings and returns whichever is closest to the AOI boundary, fixing incorrect
+    discharge point placement when flowpath direction is reversed.
 
 ## [3.1.1.0.0] - 2026-02-19
 

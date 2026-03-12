@@ -44,7 +44,11 @@ class TestClipAndReproject:
         dst_res = 1_000.0
 
         result = clip_and_reproject(
-            src, dst_bounds, dst_crs, dst_res, buffer=buffer,
+            src,
+            dst_bounds,
+            dst_crs,
+            dst_res,
+            buffer=buffer,
         )
         out_bounds = result.raster.bounds
         xmin, ymin, xmax, ymax = out_bounds
@@ -62,11 +66,15 @@ class TestClipAndReproject:
         buffer = 5_000.0
 
         result = clip_and_reproject(
-            src, dst_bounds, "EPSG:32615", dst_res, buffer=buffer,
+            src,
+            dst_bounds,
+            "EPSG:32615",
+            dst_res,
+            buffer=buffer,
         )
         expected_w = int(np.ceil((100_000 + 2 * buffer) / dst_res))
         expected_h = int(np.ceil((100_000 + 2 * buffer) / dst_res))
-        _, y_dim, x_dim = result.dims if len(result.dims) == 3 else (None, *result.dims)
+        __, y_dim, x_dim = result.dims if len(result.dims) == 3 else (None, *result.dims)
         assert result.sizes[x_dim] == expected_w
         assert result.sizes[y_dim] == expected_h
 
@@ -79,7 +87,11 @@ class TestClipAndReproject:
         )
         dst_bounds = (200_000.0, 3_200_000.0, 250_000.0, 3_250_000.0)
         result = clip_and_reproject(
-            src, dst_bounds, "EPSG:32615", 1_000.0, buffer=5_000.0,
+            src,
+            dst_bounds,
+            "EPSG:32615",
+            1_000.0,
+            buffer=5_000.0,
         )
         assert result.sizes[result.raster.dims[0]] > 0
         assert result.sizes[result.raster.dims[1]] > 0
@@ -93,7 +105,11 @@ class TestClipAndReproject:
         )
         dst_bounds = (200_000.0, 3_200_000.0, 300_000.0, 3_300_000.0)
         result = clip_and_reproject(
-            src, dst_bounds, "EPSG:32615", 1_000.0, buffer=5_000.0,
+            src,
+            dst_bounds,
+            "EPSG:32615",
+            1_000.0,
+            buffer=5_000.0,
         )
         assert result.sizes[result.raster.dims[0]] > 0
         assert result.sizes[result.raster.dims[1]] > 0
@@ -103,11 +119,17 @@ class TestClipAndReproject:
         src = _make_raster()
         with pytest.raises(ValueError, match="dst_res must be positive"):
             clip_and_reproject(
-                src, (0, 0, 1, 1), "EPSG:32615", dst_res=0,
+                src,
+                (0, 0, 1, 1),
+                "EPSG:32615",
+                dst_res=0,
             )
         with pytest.raises(ValueError, match="dst_res must be positive"):
             clip_and_reproject(
-                src, (0, 0, 1, 1), "EPSG:32615", dst_res=-100,
+                src,
+                (0, 0, 1, 1),
+                "EPSG:32615",
+                dst_res=-100,
             )
 
     def test_inverted_bounds_raises(self) -> None:
@@ -115,13 +137,17 @@ class TestClipAndReproject:
         src = _make_raster()
         with pytest.raises(ValueError, match="Invalid dst_bounds"):
             clip_and_reproject(
-                src, (300_000, 3_200_000, 200_000, 3_300_000),
-                "EPSG:32615", 1_000.0,
+                src,
+                (300_000, 3_200_000, 200_000, 3_300_000),
+                "EPSG:32615",
+                1_000.0,
             )
         with pytest.raises(ValueError, match="Invalid dst_bounds"):
             clip_and_reproject(
-                src, (200_000, 3_300_000, 300_000, 3_200_000),
-                "EPSG:32615", 1_000.0,
+                src,
+                (200_000, 3_300_000, 300_000, 3_200_000),
+                "EPSG:32615",
+                1_000.0,
             )
 
     def test_dataset_input(self) -> None:
@@ -130,7 +156,11 @@ class TestClipAndReproject:
         ds = da.to_dataset(name="var")
         dst_bounds = (200_000.0, 3_200_000.0, 250_000.0, 3_250_000.0)
         result = clip_and_reproject(
-            ds, dst_bounds, "EPSG:32615", 1_000.0, buffer=5_000.0,
+            ds,
+            dst_bounds,
+            "EPSG:32615",
+            1_000.0,
+            buffer=5_000.0,
         )
         assert isinstance(result, xr.Dataset)
         assert "var" in result.data_vars

@@ -661,17 +661,28 @@ class CreateDischargeStage(_CreateStageBase):
         return snapped
 
     @staticmethod
-    def _downstream_endpoint(geom: Any) -> tuple[float, float] | None:
-        """Extract the downstream (last) coordinate of a flowpath geometry."""
-        from shapely.geometry import MultiLineString
+    def _downstream_endpoint(geom: Any, aoi_boundary: Any) -> tuple[float, float] | None:
+        """Return the flowpath endpoint closest to the AOI boundary.
+
+        NWM hydrofabric flowpath linestrings have no guaranteed
+        direction, so we compare both the first and last coordinates
+        and pick whichever is nearest to the AOI boundary.  In
+        practice the outlet should sit on (or very near) the boundary.
+        """
+        from shapely.geometry import MultiLineString, Point
 
         if geom is None or geom.is_empty:
             return None
         if isinstance(geom, MultiLineString):
-            last_line = list(geom.geoms)[-1]
-            return last_line.coords[-1][:2]
-        # LineString
-        return geom.coords[-1][:2]
+            first_coord = next(iter(geom.geoms)).coords[0][:2]
+            last_coord = list(geom.geoms)[-1].coords[-1][:2]
+        else:
+            first_coord = geom.coords[0][:2]
+            last_coord = geom.coords[-1][:2]
+
+        d_first = aoi_boundary.distance(Point(first_coord))
+        d_last = aoi_boundary.distance(Point(last_coord))
+        return first_coord if d_first < d_last else last_coord
 
     def run(self) -> dict[str, Any]:
         """Extract flowpath outlets from hydrofabric and add as discharge points."""
@@ -709,17 +720,22 @@ class CreateDischargeStage(_CreateStageBase):
         grid_ds = model.quadtree_grid.data
         model_crs = grid_ds.ugrid.grid.crs
 
-        # Reproject to model CRS
+        # Reproject flowpaths and AOI to model CRS
         if flowpaths_gdf.crs is not None and flowpaths_gdf.crs != model_crs:
             flowpaths_gdf = flowpaths_gdf.to_crs(model_crs)
 
-        # Extract downstream endpoint of each flowpath as the discharge location
+        aoi_gdf = gpd.read_file(str(cfg.aoi))
+        if aoi_gdf.crs is not None and aoi_gdf.crs != model_crs:
+            aoi_gdf = aoi_gdf.to_crs(model_crs)
+        aoi_boundary = aoi_gdf.union_all().boundary
+
+        # Pick the flowpath endpoint closest to the AOI boundary
         self._update_substep("Extracting flowpath outlet points")
         discharge_points: list[tuple[float, float, str]] = []
         for _, row in flowpaths_gdf.iterrows():
             raw_id = row[id_col]
             feature_id = str(int(raw_id)) if isinstance(raw_id, float) else str(raw_id)
-            endpoint = self._downstream_endpoint(row.geometry)
+            endpoint = self._downstream_endpoint(row.geometry, aoi_boundary)
             if endpoint is None:
                 self._log(f"Flowpath {feature_id} has empty geometry, skipping")
                 continue
@@ -741,18 +757,17 @@ class CreateDischargeStage(_CreateStageBase):
             )
             return {"status": "completed", "points_added": 0}
 
-        # Add snapped discharge points to the model
-        self._update_substep("Adding discharge source points")
-        for x, y, name in snapped:
-            model.discharge_points.add_point(x=x, y=y, name=name)
-
-        # Write a reference .src file
+        # Write a standalone .src file with the snapped locations.
+        # The points are NOT added to the model here — the run stage
+        # reads this file, adds the points, and assigns real discharge
+        # timeseries from the NWM CHRTOUT data catalog.
+        self._update_substep("Writing discharge source locations")
         src_path = cfg.output_dir / "sfincs_nwm.src"
         with src_path.open("w") as f:
             for x, y, name in snapped:
                 f.write(f'{x:.2f} {y:.2f} "{name}"\n')
 
-        self._log(f"Added {len(snapped)} discharge source point(s), wrote {src_path.name}")
+        self._log(f"Wrote {len(snapped)} discharge source location(s) to {src_path.name}")
         return {
             "status": "completed",
             "points_added": len(discharge_points),
