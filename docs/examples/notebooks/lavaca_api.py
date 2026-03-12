@@ -39,7 +39,7 @@ import os
 from pathlib import Path
 
 notebook_dir = Path.cwd()  # assumes notebook is run from docs/examples/notebooks/
-os.chdir(notebook_dir.parent / "texas-lavaca")
+os.chdir(notebook_dir.parent / "lavaca-tx")
 
 # %% [markdown]
 # ## 1. Create the SFINCS model

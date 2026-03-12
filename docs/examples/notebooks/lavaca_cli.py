@@ -33,7 +33,7 @@
 # %% [markdown]
 # ## Setup
 #
-# Change to the `texas-lavaca/` directory so that relative paths in
+# Change to the `lavaca-tx/` directory so that relative paths in
 # the YAML configs resolve correctly.
 
 # %%
@@ -41,7 +41,7 @@ import os
 from pathlib import Path
 
 notebook_dir = Path.cwd()  # assumes notebook is run from docs/examples/notebooks/
-os.chdir(notebook_dir.parent / "texas-lavaca")
+os.chdir(notebook_dir.parent / "lavaca-tx")
 print("Working directory:", Path.cwd())
 
 # %% [markdown]

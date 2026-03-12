@@ -27,6 +27,9 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
+- Rename example directory `texas-lavaca/` to `lavaca-tx/` and update notebook paths
+    accordingly.
+- Re-execute `lavaca_api` and `lavaca_cli` example notebooks with latest outputs.
 - Rewrite `create_flood_depth_map` to read the DEM and index COG at full resolution and
     write a flood-depth Cloud Optimized GeoTIFF block-by-block, bypassing an upstream
     `hydromt_sfincs` bug where `downscale_floodmap` opened rasters with
