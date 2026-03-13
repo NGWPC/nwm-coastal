@@ -67,7 +67,10 @@ def _reduce_zsmax(zsmax: Any) -> Any:
     if isinstance(zsmax, xu.UgridDataArray):
         zs_flat = zsmax.to_numpy().astype("float32")
     else:
-        zs_flat = zsmax.values.flatten().astype("float32")
+        # Regular grid: flatten in Fortran (column-major) order so that
+        # indices from ``SfincsGrid.get_indices_at_points`` (which computes
+        # ``col * nmax + row``) map to the correct values.
+        zs_flat = zsmax.values.flatten(order="F").astype("float32")
     zs_flat[~np.isfinite(zs_flat)] = np.nan
     return zsmax, zs_flat
 
@@ -277,11 +280,13 @@ def create_flood_depth_map(
     """
     # ── Ensure patches are applied before any hydromt-sfincs call ──
     from coastal_calibration.stages._hydromt_compat import apply_all_patches
+    from coastal_calibration.utils.logging import suppress_hydromt_output
 
     apply_all_patches()
 
     # Import *after* patches so local references pick up the fixed versions.
-    from hydromt_sfincs.workflows.downscaling import make_index_cog
+    with suppress_hydromt_output():
+        from hydromt_sfincs.workflows.downscaling import make_index_cog
 
     model_root = Path(model_root)
     dem_path = Path(dem_path)
@@ -304,12 +309,13 @@ def create_flood_depth_map(
 
     # ── Load model and read output ──────────────────────────────
     if model is None:
-        from hydromt_sfincs import SfincsModel as _Sfincs
+        with suppress_hydromt_output():
+            from hydromt_sfincs import SfincsModel as _Sfincs
 
-        # Use "r+" (same as the pipeline) so all components are writable
-        # and the quadtree grid loads correctly.
-        model = _Sfincs(root=str(model_root), mode="r+")
-        model.read()
+            # Use "r+" (same as the pipeline) so all components are writable
+            # and the quadtree grid loads correctly.
+            model = _Sfincs(root=str(model_root), mode="r+")
+            model.read()
 
     model.output.read()
 

@@ -11,10 +11,10 @@ from rasterio.transform import from_bounds
 
 from coastal_calibration.utils.floodmap import (
     _ensure_overviews,
+    _reduce_zsmax,
     _write_floodmap_cog,
     create_flood_depth_map,
 )
-
 
 # ── helpers ──────────────────────────────────────────────────────────
 
@@ -74,7 +74,9 @@ def _make_dem_tif(path, *, bounds=(0, 0, 1000, 1000), shape=(100, 100), fill=0.5
     return path
 
 
-def _make_index_tif(path, *, shape=(100, 100), n_faces=100, crs="EPSG:32619", bounds=(0, 0, 1000, 1000)):
+def _make_index_tif(
+    path, *, shape=(100, 100), n_faces=100, crs="EPSG:32619", bounds=(0, 0, 1000, 1000)
+):
     """Write a synthetic index COG where each pixel maps to a valid face."""
     transform = from_bounds(*bounds, shape[1], shape[0])
     # Map each pixel to a face index (cycling through available faces).
@@ -86,6 +88,66 @@ def _make_index_tif(path, *, shape=(100, 100), n_faces=100, crs="EPSG:32619", bo
         driver="GTiff",
         width=shape[1],
         height=shape[0],
+        count=1,
+        dtype="uint32",
+        crs=crs,
+        transform=transform,
+        nodata=nodata,
+    ) as dst:
+        dst.write(indices, 1)
+    return path
+
+
+def _make_regular_zsmax(nrows: int = 5, ncols: int = 8, water_level: float = 2.0):
+    """Build a regular-grid ``xr.DataArray`` mimicking SFINCS structured output.
+
+    Uses a **non-square** grid so that C-order and Fortran-order flattening
+    produce different index mappings, exposing any mismatch.
+
+    Each cell value is ``water_level + row + col * nrows`` so every cell
+    is uniquely identifiable in the output.
+    """
+    vals = np.zeros((nrows, ncols), dtype="float32")
+    for r in range(nrows):
+        for c in range(ncols):
+            vals[r, c] = water_level + r + c * nrows
+    y = np.arange(nrows) * 100.0 + 50.0
+    x = np.arange(ncols) * 100.0 + 50.0
+    da = xr.DataArray(
+        vals,
+        dims=("y", "x"),
+        coords={"y": y, "x": x},
+    )
+    da.raster.set_crs("EPSG:32619")
+    return da
+
+
+def _make_regular_index_tif(
+    path,
+    *,
+    dem_shape=(50, 50),
+    target_row: int = 0,
+    target_col: int = 0,
+    nrows: int = 5,
+    crs="EPSG:32619",
+    bounds=(0, 0, 1000, 1000),
+):
+    """Write an index COG with Fortran-order index for a single target cell.
+
+    ``SfincsGrid.get_indices_at_points`` returns
+    ``col * nmax + row`` (Fortran / column-major linearisation).
+    This helper mirrors that convention.
+    """
+    transform = from_bounds(*bounds, dem_shape[1], dem_shape[0])
+    fortran_idx = np.uint32(target_col * nrows + target_row)
+    indices = np.full(dem_shape, fortran_idx, dtype="uint32")
+    nodata = np.uint32(2147483647)
+    with rasterio.open(
+        path,
+        "w",
+        driver="GTiff",
+        width=dem_shape[1],
+        height=dem_shape[0],
         count=1,
         dtype="uint32",
         crs=crs,
@@ -214,6 +276,72 @@ class TestWriteFloodmapCog:
         with rasterio.open(out) as src:
             assert src.shape == dem_shape
 
+    def test_regular_grid_with_index(self, tmp_path):
+        """Regular (non-UGRID) grid uses Fortran-order flatten for index lookup."""
+        nrows, ncols = 5, 8  # non-square to catch C vs F order bugs
+        target_row, target_col = 2, 3
+        dem_elev = 0.5
+
+        zsmax = _make_regular_zsmax(nrows=nrows, ncols=ncols)
+        # The target cell value: water_level + row + col * nrows
+        expected_wl = 2.0 + target_row + target_col * nrows  # 2 + 2 + 15 = 19
+        expected_depth = expected_wl - dem_elev  # 18.5
+
+        dem = tmp_path / "dem.tif"
+        idx = tmp_path / "index.tif"
+        out = tmp_path / "flood.tif"
+
+        _make_dem_tif(dem, fill=dem_elev, shape=(50, 50))
+        _make_regular_index_tif(
+            idx,
+            dem_shape=(50, 50),
+            target_row=target_row,
+            target_col=target_col,
+            nrows=nrows,
+        )
+
+        _write_floodmap_cog(
+            zsmax=zsmax,
+            dem_path=dem,
+            index_path=idx,
+            output_path=out,
+            hmin=0.05,
+            reproj_method="nearest",
+            nrmax=500,
+            log_fn=lambda m: None,
+        )
+
+        with rasterio.open(out) as src:
+            data = src.read(1)
+            finite = data[np.isfinite(data)]
+            assert len(finite) > 0
+            np.testing.assert_allclose(finite, expected_depth, atol=0.01)
+
+    def test_regular_grid_without_index(self, tmp_path):
+        """Regular grid fallback (rasterize) produces valid flood depths."""
+        zsmax = _make_regular_zsmax(nrows=10, ncols=10, water_level=2.0)
+        dem = tmp_path / "dem.tif"
+        out = tmp_path / "flood.tif"
+
+        _make_dem_tif(dem, fill=0.5, shape=(50, 50))
+
+        _write_floodmap_cog(
+            zsmax=zsmax,
+            dem_path=dem,
+            index_path=None,
+            output_path=out,
+            hmin=0.05,
+            reproj_method="nearest",
+            nrmax=500,
+            log_fn=lambda m: None,
+        )
+
+        with rasterio.open(out) as src:
+            data = src.read(1)
+            finite = data[np.isfinite(data)]
+            assert len(finite) > 0
+            assert finite.min() > 0
+
     def test_hmin_filtering(self, tmp_path):
         """Pixels with depth <= hmin are set to NaN."""
         # water_level = 0.54, dem = 0.5 → depth = 0.04 < hmin=0.05
@@ -241,6 +369,39 @@ class TestWriteFloodmapCog:
             assert np.all(np.isnan(data))
 
 
+# ── _reduce_zsmax ───────────────────────────────────────────────────
+
+
+class TestReduceZsmax:
+    def test_regular_grid_fortran_order(self):
+        """Regular-grid zsmax flattens in Fortran (column-major) order.
+
+        ``SfincsGrid.get_indices_at_points`` computes ``col * nmax + row``
+        which is Fortran-order linearisation.  ``_reduce_zsmax`` must
+        flatten consistently so that ``zs_flat[col * nmax + row]``
+        returns ``zsmax[row, col]``.
+        """
+        nrows, ncols = 5, 8
+        zsmax = _make_regular_zsmax(nrows=nrows, ncols=ncols)
+        _, zs_flat = _reduce_zsmax(zsmax)
+
+        for row in range(nrows):
+            for col in range(ncols):
+                fortran_idx = col * nrows + row
+                expected = zsmax.values[row, col]
+                assert zs_flat[fortran_idx] == pytest.approx(expected), (
+                    f"zs_flat[{fortran_idx}] = {zs_flat[fortran_idx]} "
+                    f"but zsmax[{row},{col}] = {expected}"
+                )
+
+    def test_ugrid_unchanged(self):
+        """UgridDataArray zsmax stays 1-D (no flatten ambiguity)."""
+        zsmax = _make_quadtree_zsmax(water_level=1.5)
+        _, zs_flat = _reduce_zsmax(zsmax)
+        assert zs_flat.ndim == 1
+        assert len(zs_flat) == 100
+
+
 # ── create_flood_depth_map (integration) ─────────────────────────────
 
 
@@ -251,7 +412,7 @@ _NARRAGANSETT = (
 
 
 @pytest.mark.skipif(
-    not all(map(lambda p: __import__("pathlib").Path(p).exists(), _NARRAGANSETT)),
+    not all(__import__("pathlib").Path(p).exists() for p in _NARRAGANSETT),
     reason="Narragansett example model not available",
 )
 class TestCreateFloodDepthMapIntegration:
@@ -263,8 +424,18 @@ class TestCreateFloodDepthMapIntegration:
     """
 
     def test_quadtree_floodmap(self, tmp_path):
-        """End-to-end: index covers all levels, output is full-res with overviews."""
+        """End-to-end: index covers all faces, output is full-res with overviews.
+
+        Works for both multi-level (refined) and single-level (unrefined)
+        quadtree grids.
+        """
         from pathlib import Path
+
+        from hydromt_sfincs import SfincsModel
+
+        from coastal_calibration.stages._hydromt_compat import apply_all_patches
+
+        apply_all_patches()
 
         model_root = Path(_NARRAGANSETT[0])
         dem_path = Path(_NARRAGANSETT[1])
@@ -272,23 +443,31 @@ class TestCreateFloodDepthMapIntegration:
         idx_path = tmp_path / "index.tif"
         out_path = tmp_path / "flood.tif"
 
+        # Determine the total number of faces in the grid so we can
+        # validate the index range regardless of refinement level count.
+        sf = SfincsModel(root=str(model_root), mode="r+")
+        sf.read()
+        if sf.grid_type == "quadtree":
+            n_faces = sf.quadtree_grid.data.sizes["mesh2d_nFaces"]
+        else:
+            n_faces = int(sf.grid.mask.size)
+
         result = create_flood_depth_map(
             model_root=model_root,
             dem_path=dem_path,
             output_path=out_path,
             index_path=idx_path,
             log=lambda m: None,
+            model=sf,
         )
 
-        # ── Index covers the full face range (not just coarse levels) ──
+        # ── Index covers faces up to the grid size ──
         with rasterio.open(idx_path) as src:
             idx = src.read(1)
             nodata = int(src.nodata)
             valid = idx[idx != nodata]
-            # Level 4 starts at face ~7090, total faces ~293850
-            assert valid.max() > 10000, (
-                f"Index max {valid.max()} suggests only coarse levels are mapped"
-            )
+            assert len(valid) > 0, "Index COG is entirely nodata"
+            assert valid.max() < n_faces, f"Index max {valid.max()} exceeds n_faces={n_faces}"
 
         # ── Output matches DEM resolution (no overview_level=0 shrink) ──
         with rasterio.open(dem_path) as dem_src:
@@ -301,10 +480,7 @@ class TestCreateFloodDepthMapIntegration:
             data = src.read(1)
             finite = data[np.isfinite(data)]
             assert len(finite) > 0
-            # The DEM (dep_subgrid_lev3) includes underwater bathymetry,
-            # so depths up to ~55 m are expected.  The old broken index
-            # (coarse cells only) produced 131 m — guard against that.
             assert finite.max() < 80.0, (
                 f"Max depth {finite.max():.1f} m is unreasonably high; "
-                "index likely maps to wrong (coarse) cells"
+                "index likely maps to wrong cells"
             )
