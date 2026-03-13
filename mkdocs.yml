@@ -61,6 +61,9 @@ theme:
   - toc.follow
   - toc.integrate
 
+exclude_docs: |
+  examples/downloads/
+
 hooks:
 - docs/hooks.py
 
@@ -69,6 +72,7 @@ plugins:
 - mkdocs-jupyter:
     include: ['*.ipynb']
     include_source: true
+    execute: false
 - mike:
     alias_type: symlink
     canonical_version: stable

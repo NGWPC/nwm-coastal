@@ -37,7 +37,7 @@ subgrid:
   manning_land: 0.04
   manning_sea: 0.02
 
-nwm_discharge:
+river_discharge:
   flowlines: ./discharge_nwm.geojson # GeoJSON of selected NWM flowpaths
   nwm_id_column: flowpath_id         # column with NWM feature IDs
 

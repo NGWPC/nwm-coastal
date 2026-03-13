@@ -458,7 +458,7 @@ class CreateBoundaryStage(_CreateStageBase):
 
 
 class CreateDischargeStage(_CreateStageBase):
-    """Add NWM discharge source points derived from flowpath linestrings.
+    """Add river discharge source points derived from flowpath linestrings.
 
     Flowpath linestrings are read from a GeoJSON file (e.g., exported
     from the QGIS plugin), intersected with the AOI boundary, and the
@@ -467,24 +467,24 @@ class CreateDischargeStage(_CreateStageBase):
     """
 
     name = "create_discharge"
-    description = "Add NWM discharge source points"
+    description = "Add river discharge source points"
 
     def validate(self) -> list[str]:
         """Validate flowlines GeoJSON and NWM ID column."""
         cfg = self.config
-        if cfg.nwm_discharge is None:
+        if cfg.river_discharge is None:
             return []
 
-        nd = cfg.nwm_discharge
+        nd = cfg.river_discharge
         errors: list[str] = []
 
         if not nd.flowlines.exists():
-            errors.append(f"nwm_discharge.flowlines not found: {nd.flowlines}")
+            errors.append(f"river_discharge.flowlines not found: {nd.flowlines}")
             return errors
 
         if nd.flowlines.suffix.lower() != ".geojson":
             errors.append(
-                f"nwm_discharge.flowlines must be a .geojson file, got: {nd.flowlines.name}"
+                f"river_discharge.flowlines must be a .geojson file, got: {nd.flowlines.name}"
             )
             return errors
 
@@ -515,18 +515,40 @@ class CreateDischargeStage(_CreateStageBase):
 
         return errors
 
+    @staticmethod
+    def _crs_unit_to_meter(model_crs: Any) -> float:
+        """Return the conversion factor from CRS linear units to meters.
+
+        Raises ``ValueError`` for geographic (degree-based) CRS because
+        Euclidean KDTree distances in degrees are not meaningful for
+        metric comparisons.
+        """
+        from pyproj import CRS
+
+        crs = CRS(model_crs)
+        if crs.is_geographic:
+            raise ValueError(
+                f"Model CRS {crs.to_epsg() or crs} is geographic (degree-based). "
+                "Discharge snapping requires a projected CRS so that distances "
+                "are in linear units (meters or feet)."
+            )
+        # axis_info[0].unit_conversion_factor converts CRS units → meters
+        # (e.g. 1.0 for meters, ~0.3048 for US survey feet).
+        return float(crs.axis_info[0].unit_conversion_factor)
+
     def _snap_to_active_cells(
         self,
         points: list[tuple[float, float, str]],
         model: Any,
+        max_snap_distance_m: float,
     ) -> list[tuple[float, float, str]]:
         """Snap discharge points to the nearest active grid cell.
 
-        For each point, if it already sits on an active cell (``mask == 1``)
-        it is kept as-is.  Otherwise the nearest active cell is found via
-        a KDTree search and the point is relocated to that cell's face
-        center.  Points with no active cell within the search radius are
-        dropped with a warning.
+        Each point is relocated to the face center of the nearest active
+        cell.  The KDTree distance (in CRS units) is converted to meters
+        before comparing with *max_snap_distance_m*.  Points whose
+        nearest active cell is farther than the threshold are dropped
+        with a warning.
 
         Returns the list of (x, y, name) tuples on active cells.
         """
@@ -537,10 +559,8 @@ class CreateDischargeStage(_CreateStageBase):
         ugrid = grid_ds.ugrid.grid
         face_xy = np.column_stack([ugrid.face_x, ugrid.face_y])
         mask = grid_ds["mask"].to_numpy()
+        unit_to_m = self._crs_unit_to_meter(ugrid.crs)
 
-        # Build a KDTree of *all* face centers for initial lookup,
-        # and a separate tree of *active-only* centers for snapping.
-        tree_all = KDTree(face_xy)
         active_idx = np.where(mask == 1)[0]
         if len(active_idx) == 0:
             self._log("No active cells in grid, cannot place discharge points", level="warning")
@@ -549,18 +569,20 @@ class CreateDischargeStage(_CreateStageBase):
 
         snapped: list[tuple[float, float, str]] = []
         for x, y, name in points:
-            _, cell_idx = tree_all.query([x, y])
-            if mask[cell_idx] == 1:
-                # Already on an active cell — keep as-is
-                snapped.append((x, y, name))
+            dist_crs, active_pos = tree_active.query([x, y])
+            dist_m = dist_crs * unit_to_m
+            if dist_m > max_snap_distance_m:
+                self._log(
+                    f"  {name}: DROPPED — nearest active cell is {dist_m:.0f} m away "
+                    f"(exceeds max_snap_distance_m={max_snap_distance_m:.0f})",
+                    level="warning",
+                )
                 continue
-
-            # Snap to nearest active cell
-            dist, active_pos = tree_active.query([x, y])
             real_idx = active_idx[active_pos]
-            nx, ny = float(face_xy[real_idx, 0]), float(face_xy[real_idx, 1])
-            snapped.append((nx, ny, name))
-            self._log(f"  {name}: snapped to active cell ({dist:.0f} m away)")
+            cx, cy = float(face_xy[real_idx, 0]), float(face_xy[real_idx, 1])
+            if dist_m > 0:
+                self._log(f"  {name}: snapped to active cell ({dist_m:.0f} m away)")
+            snapped.append((cx, cy, name))
 
         return snapped
 
@@ -591,13 +613,13 @@ class CreateDischargeStage(_CreateStageBase):
     def run(self) -> dict[str, Any]:
         """Extract flowpath outlets from GeoJSON and add as discharge points."""
         cfg = self.config
-        if cfg.nwm_discharge is None:
-            self._log("No NWM discharge configuration, skipping")
+        if cfg.river_discharge is None:
+            self._log("No river discharge configuration, skipping")
             return {"status": "skipped"}
 
         import geopandas as gpd
 
-        nd = cfg.nwm_discharge
+        nd = cfg.river_discharge
         model = self.sfincs
 
         self._update_substep("Reading flowpath geometries from GeoJSON")
@@ -650,7 +672,7 @@ class CreateDischargeStage(_CreateStageBase):
         # Intersection points land on the AOI boundary which often
         # falls on inactive cells; snapping moves them inward.
         self._update_substep("Snapping discharge points to active cells")
-        snapped = self._snap_to_active_cells(discharge_points, model)
+        snapped = self._snap_to_active_cells(discharge_points, model, nd.max_snap_distance_m)
         if not snapped:
             self._log(
                 "No discharge points could be placed on active cells",

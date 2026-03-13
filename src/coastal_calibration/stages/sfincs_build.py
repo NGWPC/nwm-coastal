@@ -2197,12 +2197,18 @@ class SfincsSymlinksStage(WorkflowStage):
         download_dir = self.config.paths.download_dir
         if not download_dir.exists():
             self._log(f"Download dir {download_dir} does not exist — skipping symlinks")
-            return {"meteo_symlinks": 0, "streamflow_symlinks": 0, "status": "skipped"}
+            return {
+                "meteo_symlinks": 0,
+                "streamflow_symlinks": 0,
+                "meteo_existing": 0,
+                "streamflow_existing": 0,
+                "status": "skipped",
+            }
 
         self._update_substep("Creating .nc symlinks")
         meteo_source = self.config.simulation.meteo_source
 
-        created = create_nc_symlinks(
+        created, existing = create_nc_symlinks(
             download_dir,
             meteo_source=meteo_source,
             include_meteo=True,
@@ -2211,11 +2217,22 @@ class SfincsSymlinksStage(WorkflowStage):
 
         n_meteo = len(created["meteo"])
         n_stream = len(created["streamflow"])
-        self._log(f"Created {n_meteo} meteo + {n_stream} streamflow symlinks in {download_dir}")
+        n_meteo_existing = existing["meteo"]
+        n_stream_existing = existing["streamflow"]
+
+        if n_meteo + n_stream > 0:
+            self._log(f"Created {n_meteo} meteo + {n_stream} streamflow symlinks in {download_dir}")
+        if n_meteo_existing + n_stream_existing > 0:
+            self._log(
+                f"Skipped {n_meteo_existing} meteo + {n_stream_existing} streamflow"
+                " symlinks (already exist)"
+            )
 
         return {
             "meteo_symlinks": n_meteo,
             "streamflow_symlinks": n_stream,
+            "meteo_existing": n_meteo_existing,
+            "streamflow_existing": n_stream_existing,
             "status": "completed",
         }
 

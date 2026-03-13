@@ -10,6 +10,7 @@ import yaml
 
 from coastal_calibration.config.schema import MeteoSource, PathConfig
 from coastal_calibration.stages._hydromt_compat import apply_all_patches
+from coastal_calibration.utils.logging import logger
 
 apply_all_patches()
 
@@ -675,13 +676,31 @@ def generate_data_catalog(
     return catalog
 
 
+def _symlink_dir(directory: Path, glob_pattern: str, nc_suffix: str) -> tuple[list[Path], int]:
+    """Create ``.nc`` symlinks in *directory* for files matching *glob_pattern*."""
+    created: list[Path] = []
+    n_existing = 0
+    if not directory.exists():
+        return created, n_existing
+    for src in directory.glob(glob_pattern):
+        dst = src.with_suffix(nc_suffix)
+        if dst.is_symlink():
+            n_existing += 1
+        elif dst.exists():
+            logger.warning("Non-symlink file exists at %s, skipping", dst)
+        else:
+            dst.symlink_to(src.name)
+            created.append(dst)
+    return created, n_existing
+
+
 def create_nc_symlinks(
     download_dir: Path | str,
     *,
     meteo_source: MeteoSource = "nwm_retro",
     include_meteo: bool = True,
     include_streamflow: bool = True,
-) -> dict[str, list[Path]]:
+) -> tuple[dict[str, list[Path]], dict[str, int]]:
     """Create .nc symlinks for NWM files to work around HydroMT extension check bug.
 
     HydroMT's raster_xarray driver has a bug where the `ext_override` option is not
@@ -701,9 +720,12 @@ def create_nc_symlinks(
 
     Returns
     -------
-    dict[str, list[Path]]
-        Dictionary with keys "meteo" and "streamflow" containing lists of created
-        symlink paths.
+    created : dict[str, list[Path]]
+        Dictionary with keys "meteo" and "streamflow" containing lists of newly
+        created symlink paths.
+    existing : dict[str, int]
+        Dictionary with keys "meteo" and "streamflow" containing counts of
+        symlinks that already existed.
 
     Examples
     --------
@@ -721,18 +743,16 @@ def create_nc_symlinks(
     """
     download_dir = Path(download_dir)
     created: dict[str, list[Path]] = {"meteo": [], "streamflow": []}
+    existing: dict[str, int] = {"meteo": 0, "streamflow": 0}
 
     if include_meteo:
         meteo_dir = download_dir / PathConfig.METEO_SUBDIR / meteo_source
         # Both nwm_retro and nwm_ana downloads use extension-less
         # YYYYMMDDHH.LDASIN_DOMAIN1 naming.  We create .nc symlinks to
         # work around a HydroMT ext_override bug.
-        if meteo_dir.exists():
-            for src in meteo_dir.glob("*.LDASIN_DOMAIN1"):
-                dst = src.with_suffix(".LDASIN_DOMAIN1.nc")
-                if not dst.exists():
-                    dst.symlink_to(src.name)
-                    created["meteo"].append(dst)
+        new, n_existing = _symlink_dir(meteo_dir, "*.LDASIN_DOMAIN1", ".LDASIN_DOMAIN1.nc")
+        created["meteo"] = new
+        existing["meteo"] = n_existing
 
     if include_streamflow:
         if meteo_source == "nwm_retro":
@@ -740,14 +760,11 @@ def create_nc_symlinks(
         else:
             streamflow_dir = download_dir / PathConfig.HYDRO_SUBDIR / "nwm"
 
-        if streamflow_dir.exists():
-            for src in streamflow_dir.glob("*.CHRTOUT_DOMAIN1"):
-                dst = src.with_suffix(".CHRTOUT_DOMAIN1.nc")
-                if not dst.exists():
-                    dst.symlink_to(src.name)
-                    created["streamflow"].append(dst)
+        new, n_existing = _symlink_dir(streamflow_dir, "*.CHRTOUT_DOMAIN1", ".CHRTOUT_DOMAIN1.nc")
+        created["streamflow"] = new
+        existing["streamflow"] = n_existing
 
-    return created
+    return created, existing
 
 
 def remove_nc_symlinks(

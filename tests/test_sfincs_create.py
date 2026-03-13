@@ -10,7 +10,6 @@ Run with::
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -24,8 +23,8 @@ from coastal_calibration.config.create_schema import (
     ElevationConfig,
     ElevationDataset,
     GridConfig,
-    NWMDischargeConfig,
     RefinementLevel,
+    RiverDischargeConfig,
     SfincsCreateConfig,
     SubgridConfig,
 )
@@ -54,30 +53,14 @@ from coastal_calibration.stages.sfincs_create import (
 
 @pytest.fixture
 def aoi_file(tmp_path: Path) -> Path:
-    """Create a minimal GeoJSON AOI polygon."""
-    geojson = {
-        "type": "FeatureCollection",
-        "features": [
-            {
-                "type": "Feature",
-                "geometry": {
-                    "type": "Polygon",
-                    "coordinates": [
-                        [
-                            [-95.5, 29.0],
-                            [-95.0, 29.0],
-                            [-95.0, 29.5],
-                            [-95.5, 29.5],
-                            [-95.5, 29.0],
-                        ]
-                    ],
-                },
-                "properties": {},
-            }
-        ],
-    }
+    """Create a minimal GeoJSON AOI polygon in EPSG:4326."""
+    import geopandas as gpd
+    from shapely import box
+
+    # Bounding box around Lavaca Bay area (lon/lat)
+    gdf = gpd.GeoDataFrame(geometry=[box(-95.5, 29.0, -95.0, 29.5)], crs="EPSG:4326")
     path = tmp_path / "aoi.geojson"
-    path.write_text(json.dumps(geojson))
+    gdf.to_file(path, driver="GeoJSON")
     return path
 
 
@@ -856,11 +839,12 @@ def flowlines_geojson(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def nwm_discharge_config(flowlines_geojson: Path) -> NWMDischargeConfig:
-    """Return an NWMDischargeConfig with valid test values."""
-    return NWMDischargeConfig(
+def river_discharge_config(flowlines_geojson: Path) -> RiverDischargeConfig:
+    """Return a RiverDischargeConfig with valid test values."""
+    return RiverDischargeConfig(
         flowlines=flowlines_geojson,
         nwm_id_column="id",
+        max_snap_distance_m=100_000.0,
     )
 
 
@@ -868,20 +852,20 @@ def nwm_discharge_config(flowlines_geojson: Path) -> NWMDischargeConfig:
 def discharge_create_config(
     aoi_file: Path,
     output_dir: Path,
-    nwm_discharge_config: NWMDischargeConfig,
+    river_discharge_config: RiverDischargeConfig,
 ) -> SfincsCreateConfig:
-    """Return a SfincsCreateConfig with nwm_discharge configured."""
+    """Return a SfincsCreateConfig with river_discharge configured."""
     return SfincsCreateConfig(
         aoi=aoi_file,
         output_dir=output_dir,
-        nwm_discharge=nwm_discharge_config,
+        river_discharge=river_discharge_config,
     )
 
 
-class TestNWMDischargeConfig:
-    """Test NWMDischargeConfig loading and validation."""
+class TestRiverDischargeConfig:
+    """Test RiverDischargeConfig loading and validation."""
 
-    def test_config_loads_with_nwm_discharge(
+    def test_config_loads_with_river_discharge(
         self,
         tmp_path: Path,
         aoi_file: Path,
@@ -891,7 +875,7 @@ class TestNWMDischargeConfig:
         cfg_data = {
             "aoi": str(aoi_file),
             "output_dir": str(output_dir),
-            "nwm_discharge": {
+            "river_discharge": {
                 "flowlines": str(flowlines_geojson),
                 "nwm_id_column": "id",
             },
@@ -899,8 +883,8 @@ class TestNWMDischargeConfig:
         cfg_path = tmp_path / "with_discharge.yaml"
         cfg_path.write_text(yaml.dump(cfg_data))
         cfg = SfincsCreateConfig.from_yaml(cfg_path)
-        assert cfg.nwm_discharge is not None
-        assert cfg.nwm_discharge.nwm_id_column == "id"
+        assert cfg.river_discharge is not None
+        assert cfg.river_discharge.nwm_id_column == "id"
 
     def test_relative_flowlines_path_resolved(
         self, tmp_path: Path, aoi_file: Path, flowlines_geojson: Path
@@ -916,7 +900,7 @@ class TestNWMDischargeConfig:
         cfg_data = {
             "aoi": str(aoi_file),
             "output_dir": str(sub / "out"),
-            "nwm_discharge": {
+            "river_discharge": {
                 "flowlines": "flowlines.geojson",
                 "nwm_id_column": "id",
             },
@@ -924,14 +908,14 @@ class TestNWMDischargeConfig:
         cfg_path = sub / "rel.yaml"
         cfg_path.write_text(yaml.dump(cfg_data))
         cfg = SfincsCreateConfig.from_yaml(cfg_path)
-        assert cfg.nwm_discharge is not None
-        assert cfg.nwm_discharge.flowlines == local_geojson.resolve()
+        assert cfg.river_discharge is not None
+        assert cfg.river_discharge.flowlines == local_geojson.resolve()
 
     def test_validate_missing_flowlines(self, aoi_file: Path, output_dir: Path) -> None:
         cfg = SfincsCreateConfig(
             aoi=aoi_file,
             output_dir=output_dir,
-            nwm_discharge=NWMDischargeConfig(
+            river_discharge=RiverDischargeConfig(
                 flowlines=Path("/nonexistent/flowlines.geojson"),
                 nwm_id_column="id",
             ),
@@ -950,17 +934,17 @@ class TestNWMDischargeConfig:
     def test_stage_order_excludes_discharge_when_none(
         self, minimal_create_config: SfincsCreateConfig
     ) -> None:
-        assert minimal_create_config.nwm_discharge is None
+        assert minimal_create_config.river_discharge is None
         assert "create_discharge" not in minimal_create_config.stage_order
 
     def test_to_dict_with_discharge(self, discharge_create_config: SfincsCreateConfig) -> None:
         d = discharge_create_config.to_dict()
-        assert d["nwm_discharge"] is not None
-        assert d["nwm_discharge"]["nwm_id_column"] == "id"
+        assert d["river_discharge"] is not None
+        assert d["river_discharge"]["nwm_id_column"] == "id"
 
     def test_to_dict_without_discharge(self, minimal_create_config: SfincsCreateConfig) -> None:
         d = minimal_create_config.to_dict()
-        assert d["nwm_discharge"] is None
+        assert d["river_discharge"] is None
 
 
 # ===================================================================
@@ -984,7 +968,7 @@ class TestDischargeStageValidation:
         cfg = SfincsCreateConfig(
             aoi=aoi_file,
             output_dir=output_dir,
-            nwm_discharge=NWMDischargeConfig(
+            river_discharge=RiverDischargeConfig(
                 flowlines=Path("/nonexistent/flowlines.geojson"),
                 nwm_id_column="id",
             ),
@@ -1004,7 +988,7 @@ class TestDischargeStageValidation:
         cfg = SfincsCreateConfig(
             aoi=aoi_file,
             output_dir=output_dir,
-            nwm_discharge=NWMDischargeConfig(
+            river_discharge=RiverDischargeConfig(
                 flowlines=bad_file,
                 nwm_id_column="id",
             ),
@@ -1022,7 +1006,7 @@ class TestDischargeStageValidation:
         cfg = SfincsCreateConfig(
             aoi=aoi_file,
             output_dir=output_dir,
-            nwm_discharge=NWMDischargeConfig(
+            river_discharge=RiverDischargeConfig(
                 flowlines=flowlines_geojson,
                 nwm_id_column="nonexistent_col",
             ),
@@ -1040,7 +1024,7 @@ class TestDischargeStageValidation:
         cfg = SfincsCreateConfig(
             aoi=aoi_file,
             output_dir=output_dir,
-            nwm_discharge=NWMDischargeConfig(
+            river_discharge=RiverDischargeConfig(
                 flowlines=flowlines_geojson,
                 nwm_id_column="id",
             ),
@@ -1076,12 +1060,12 @@ class TestDischargeStageRun:
     ) -> None:
         import numpy as np
 
-        # Set up mock model with a CRS that matches the AOI
-        mock_sfincs_model.quadtree_grid.data.ugrid.grid.crs = "EPSG:4326"
-        # Provide face centres and mask for snapping.  A small grid of
-        # active cells inside the AOI ([-95.5,29.0] to [-95.0,29.5]).
-        face_x = np.array([-95.45, -95.35, -95.25, -95.15])
-        face_y = np.array([29.15, 29.25, 29.35, 29.45])
+        # Mock grid in UTM zone 15N — the run() method reprojects
+        # EPSG:4326 GeoJSON data to this CRS automatically.
+        mock_sfincs_model.quadtree_grid.data.ugrid.grid.crs = "EPSG:32615"
+        # Face centers inside the AOI (UTM equivalents of the 4326 AOI).
+        face_x = np.array([261677.0, 271629.0, 281563.0, 291478.0])
+        face_y = np.array([3227087.0, 3237973.0, 3248867.0, 3259768.0])
         mock_sfincs_model.quadtree_grid.data.ugrid.grid.face_x = face_x
         mock_sfincs_model.quadtree_grid.data.ugrid.grid.face_y = face_y
         mask_mock = MagicMock()
@@ -1122,12 +1106,12 @@ class TestDischargeStageRun:
         cfg = SfincsCreateConfig(
             aoi=aoi_file,
             output_dir=output_dir,
-            nwm_discharge=NWMDischargeConfig(
+            river_discharge=RiverDischargeConfig(
                 flowlines=empty_geojson,
                 nwm_id_column="id",
             ),
         )
-        mock_sfincs_model.quadtree_grid.data.ugrid.grid.crs = "EPSG:4326"
+        mock_sfincs_model.quadtree_grid.data.ugrid.grid.crs = "EPSG:32615"
         _set_model(cfg, mock_sfincs_model)
         stage = CreateDischargeStage(cfg)
         result = stage.run()
@@ -1143,34 +1127,12 @@ class TestDischargeStageRun:
         """Flowpath inside AOI uses downstream endpoint as discharge point."""
         import geopandas as gpd
         import numpy as np
-        from shapely import LineString
+        from shapely import LineString, box
 
-        # AOI with a specific boundary
+        # AOI in EPSG:4326 (will be reprojected to model CRS by run())
         aoi = tmp_path / "aoi.geojson"
-        aoi.write_text(
-            json.dumps(
-                {
-                    "type": "FeatureCollection",
-                    "features": [
-                        {
-                            "type": "Feature",
-                            "geometry": {
-                                "type": "Polygon",
-                                "coordinates": [
-                                    [
-                                        [-95.5, 29.0],
-                                        [-95.0, 29.0],
-                                        [-95.0, 29.5],
-                                        [-95.5, 29.5],
-                                        [-95.5, 29.0],
-                                    ]
-                                ],
-                            },
-                            "properties": {},
-                        }
-                    ],
-                }
-            )
+        gpd.GeoDataFrame(geometry=[box(-95.5, 29.0, -95.0, 29.5)], crs="EPSG:4326").to_file(
+            aoi, driver="GeoJSON"
         )
 
         # Flowpath entirely inside the AOI — endpoint at (-95.2, 29.3)
@@ -1185,14 +1147,16 @@ class TestDischargeStageRun:
         cfg = SfincsCreateConfig(
             aoi=aoi,
             output_dir=output_dir,
-            nwm_discharge=NWMDischargeConfig(
+            river_discharge=RiverDischargeConfig(
                 flowlines=geojson,
                 nwm_id_column="id",
+                max_snap_distance_m=100_000.0,
             ),
         )
-        mock_sfincs_model.quadtree_grid.data.ugrid.grid.crs = "EPSG:4326"
-        face_x = np.array([-95.25, -95.15])
-        face_y = np.array([29.25, 29.35])
+        # UTM equivalents of (-95.25, 29.25) and (-95.15, 29.35)
+        mock_sfincs_model.quadtree_grid.data.ugrid.grid.crs = "EPSG:32615"
+        face_x = np.array([281563.0, 291478.0])
+        face_y = np.array([3248867.0, 3259768.0])
         mock_sfincs_model.quadtree_grid.data.ugrid.grid.face_x = face_x
         mock_sfincs_model.quadtree_grid.data.ugrid.grid.face_y = face_y
         mask_mock = MagicMock()
@@ -1219,33 +1183,11 @@ class TestDischargeStageRun:
         """MultiLineString geometries are merged into LineStrings."""
         import geopandas as gpd
         import numpy as np
-        from shapely import MultiLineString
+        from shapely import MultiLineString, box
 
         aoi = tmp_path / "aoi.geojson"
-        aoi.write_text(
-            json.dumps(
-                {
-                    "type": "FeatureCollection",
-                    "features": [
-                        {
-                            "type": "Feature",
-                            "geometry": {
-                                "type": "Polygon",
-                                "coordinates": [
-                                    [
-                                        [-95.5, 29.0],
-                                        [-95.0, 29.0],
-                                        [-95.0, 29.5],
-                                        [-95.5, 29.5],
-                                        [-95.5, 29.0],
-                                    ]
-                                ],
-                            },
-                            "properties": {},
-                        }
-                    ],
-                }
-            )
+        gpd.GeoDataFrame(geometry=[box(-95.5, 29.0, -95.0, 29.5)], crs="EPSG:4326").to_file(
+            aoi, driver="GeoJSON"
         )
 
         # MultiLineString that should be merged into a single LineString
@@ -1262,14 +1204,15 @@ class TestDischargeStageRun:
         cfg = SfincsCreateConfig(
             aoi=aoi,
             output_dir=output_dir,
-            nwm_discharge=NWMDischargeConfig(
+            river_discharge=RiverDischargeConfig(
                 flowlines=geojson,
                 nwm_id_column="id",
+                max_snap_distance_m=100_000.0,
             ),
         )
-        mock_sfincs_model.quadtree_grid.data.ugrid.grid.crs = "EPSG:4326"
-        face_x = np.array([-95.25, -95.15])
-        face_y = np.array([29.25, 29.35])
+        mock_sfincs_model.quadtree_grid.data.ugrid.grid.crs = "EPSG:32615"
+        face_x = np.array([281563.0, 291478.0])
+        face_y = np.array([3248867.0, 3259768.0])
         mock_sfincs_model.quadtree_grid.data.ugrid.grid.face_x = face_x
         mock_sfincs_model.quadtree_grid.data.ugrid.grid.face_y = face_y
         mask_mock = MagicMock()
@@ -1281,6 +1224,150 @@ class TestDischargeStageRun:
         stage = CreateDischargeStage(cfg)
         result = stage.run()
         assert result["points_added"] == 1
+        _clear_model(cfg)
+
+    def _make_outside_domain_cfg(
+        self,
+        output_dir: Path,
+        tmp_path: Path,
+        mock_sfincs_model: MagicMock,
+        *,
+        max_snap_distance_m: float = 2000.0,
+    ) -> SfincsCreateConfig:
+        """Create config with a flowpath far outside the AOI."""
+        import geopandas as gpd
+        import numpy as np
+        from shapely import LineString, box
+
+        # AOI in EPSG:4326 (will be reprojected to model CRS)
+        aoi = tmp_path / "aoi.geojson"
+        gpd.GeoDataFrame(geometry=[box(-95.5, 29.0, -95.0, 29.5)], crs="EPSG:4326").to_file(
+            aoi, driver="GeoJSON"
+        )
+
+        # Flowpath entirely outside the AOI (endpoint at -96.0, 29.25)
+        geojson = tmp_path / "outside.geojson"
+        gdf = gpd.GeoDataFrame(
+            {"id": [9001]},
+            geometry=[LineString([(-96.5, 29.25), (-96.0, 29.25)])],
+            crs="EPSG:4326",
+        )
+        gdf.to_file(geojson, driver="GeoJSON")
+
+        cfg = SfincsCreateConfig(
+            aoi=aoi,
+            output_dir=output_dir,
+            river_discharge=RiverDischargeConfig(
+                flowlines=geojson,
+                nwm_id_column="id",
+                max_snap_distance_m=max_snap_distance_m,
+            ),
+        )
+
+        # Grid in UTM 15N — face centers inside the AOI.
+        # The outside flowpath endpoint (-96.0, 29.25) projects to
+        # ~(208436, 3239416) in UTM, which is ~54,650 m from the
+        # nearest face center at (261677, 3227087).
+        mock_sfincs_model.quadtree_grid.data.ugrid.grid.crs = "EPSG:32615"
+        face_x = np.array([261677.0, 271629.0, 281563.0, 291478.0])
+        face_y = np.array([3227087.0, 3237973.0, 3248867.0, 3259768.0])
+        mock_sfincs_model.quadtree_grid.data.ugrid.grid.face_x = face_x
+        mock_sfincs_model.quadtree_grid.data.ugrid.grid.face_y = face_y
+        mask_mock = MagicMock()
+        mask_mock.to_numpy.return_value = np.array([1, 1, 1, 1])
+        mock_sfincs_model.quadtree_grid.data.__getitem__ = lambda self, k: (
+            mask_mock if k == "mask" else MagicMock()
+        )
+        _set_model(cfg, mock_sfincs_model)
+        return cfg
+
+    def test_run_outside_domain_dropped_exceeds_max_snap_distance(
+        self,
+        output_dir: Path,
+        tmp_path: Path,
+        mock_sfincs_model: MagicMock,
+    ) -> None:
+        """Discharge point beyond max_snap_distance_m is dropped with a warning."""
+        # Outside point is ~54,650 m from nearest face center — exceeds 2000 m.
+        cfg = self._make_outside_domain_cfg(
+            output_dir, tmp_path, mock_sfincs_model, max_snap_distance_m=2000.0
+        )
+        stage = CreateDischargeStage(cfg)
+        result = stage.run()
+
+        assert result["status"] == "completed"
+        assert result["points_added"] == 0
+        _clear_model(cfg)
+
+    def test_run_outside_domain_snaps_within_max_distance(
+        self,
+        output_dir: Path,
+        tmp_path: Path,
+        mock_sfincs_model: MagicMock,
+    ) -> None:
+        """Discharge point outside domain snaps when max_snap_distance_m is large enough."""
+        # Outside point is ~54,650 m from nearest face — 100 km threshold allows it.
+        cfg = self._make_outside_domain_cfg(
+            output_dir, tmp_path, mock_sfincs_model, max_snap_distance_m=100_000.0
+        )
+        stage = CreateDischargeStage(cfg)
+        result = stage.run()
+
+        assert result["status"] == "completed"
+        assert result["points_added"] == 1
+
+        # Verify snapped coordinates are on the grid (UTM), not at
+        # the original outside-domain location (~208436 easting).
+        src_file = cfg.output_dir / "sfincs_nwm.src"
+        assert src_file.exists()
+        src_line = src_file.read_text().strip()
+        x_written, y_written = (float(v) for v in src_line.split()[:2])
+        assert 256000 <= x_written <= 292000, f"Snapped x={x_written} should be inside the grid"
+        assert 3_210_000 <= y_written <= 3_266_000, (
+            f"Snapped y={y_written} should be inside the grid"
+        )
+        _clear_model(cfg)
+
+    def test_run_geographic_crs_raises(
+        self,
+        aoi_file: Path,
+        output_dir: Path,
+        tmp_path: Path,
+        mock_sfincs_model: MagicMock,
+    ) -> None:
+        """A geographic CRS (degree-based) raises ValueError."""
+        import geopandas as gpd
+        import numpy as np
+        from shapely import LineString
+
+        geojson = tmp_path / "flow.geojson"
+        gpd.GeoDataFrame(
+            {"id": [1001]},
+            geometry=[LineString([(-96.0, 29.25), (-95.4, 29.25)])],
+            crs="EPSG:4326",
+        ).to_file(geojson, driver="GeoJSON")
+
+        cfg = SfincsCreateConfig(
+            aoi=aoi_file,
+            output_dir=output_dir,
+            river_discharge=RiverDischargeConfig(flowlines=geojson, nwm_id_column="id"),
+        )
+
+        mock_sfincs_model.quadtree_grid.data.ugrid.grid.crs = "EPSG:4326"
+        face_x = np.array([-95.25])
+        face_y = np.array([29.25])
+        mock_sfincs_model.quadtree_grid.data.ugrid.grid.face_x = face_x
+        mock_sfincs_model.quadtree_grid.data.ugrid.grid.face_y = face_y
+        mask_mock = MagicMock()
+        mask_mock.to_numpy.return_value = np.array([1])
+        mock_sfincs_model.quadtree_grid.data.__getitem__ = lambda self, k: (
+            mask_mock if k == "mask" else MagicMock()
+        )
+        _set_model(cfg, mock_sfincs_model)
+
+        stage = CreateDischargeStage(cfg)
+        with pytest.raises(ValueError, match="geographic"):
+            stage.run()
         _clear_model(cfg)
 
     def test_create_stages_includes_discharge(

@@ -80,9 +80,9 @@ This page provides detailed documentation for the NWM Coastal Python API.
 
 ::: coastal_calibration.config.create_schema.SubgridConfig
 
-### NWMDischargeConfig
+### RiverDischargeConfig
 
-::: coastal_calibration.config.create_schema.NWMDischargeConfig
+::: coastal_calibration.config.create_schema.RiverDischargeConfig
 
 ## Workflow Runners
 
