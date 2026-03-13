@@ -81,7 +81,7 @@ create_config = SfincsCreateConfig.from_dict(
             "manning_land": 0.04,
             "manning_sea": 0.02,
         },
-        "nwm_discharge": {
+        "river_discharge": {
             "flowlines": "./discharge_nwm.geojson",
             "nwm_id_column": "flowpath_id",
         },
@@ -189,7 +189,7 @@ print(result)
 # %% [markdown]
 # ## 3. View results
 #
-# The pipeline generates station comparison plots (modelled vs. observed
+# The pipeline generates station comparison plots (modeled vs. observed
 # water levels at NOAA CO-OPS tide gauges).
 
 # %%
