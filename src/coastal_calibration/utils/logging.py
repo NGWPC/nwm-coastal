@@ -33,6 +33,7 @@ __all__ = [
     "get_log_file_path",
     "logger",
     "silence_third_party_loggers",
+    "suppress_hydromt_output",
 ]
 
 # Module-level logger
@@ -42,6 +43,7 @@ logger.propagate = False
 
 _file_handler: logging.FileHandler | None = None
 _console_handler: logging.Handler | None = None
+_user_console_level: int | None = None  # set by configure_logger(); None = not yet configured
 
 if not logger.handlers:
     _console_handler = RichHandler(
@@ -200,15 +202,17 @@ def configure_logger(
     >>> # Disable file logging
     >>> configure_logger(file=None)
     """
-    global _file_handler  # noqa: PLW0603
+    global _file_handler, _user_console_level  # noqa: PLW0603
 
     if level is not None:
         level_int = _validate_level(level)
+        _user_console_level = level_int
         if _console_handler is not None:
             _console_handler.setLevel(level_int)
     elif verbose is not None:
+        _user_console_level = logging.DEBUG if verbose else logging.WARNING
         if _console_handler is not None:
-            _console_handler.setLevel(logging.DEBUG if verbose else logging.WARNING)
+            _console_handler.setLevel(_user_console_level)
 
     if file is not None:
         if _file_handler is not None:
@@ -314,6 +318,40 @@ def silence_third_party_loggers(*, file_level: int = logging.DEBUG) -> None:
         root.setLevel(file_level)
 
 
+@contextmanager
+def suppress_hydromt_output() -> Iterator[None]:
+    """Silence all hydromt / hydromt-sfincs console noise.
+
+    Combines two layers:
+
+    * **Logging** — :func:`silence_third_party_loggers` removes the
+      ``StreamHandler`` that HydroMT attaches to its loggers.
+    * **stdout redirect** — catches raw ``print()`` calls that
+      hydromt-sfincs emits during model reads (both at the fd level
+      and at the Python ``sys.stdout`` level for Jupyter compatibility).
+    """
+    import os
+
+    silence_third_party_loggers()
+
+    # fd-level redirect
+    devnull_fd = os.open(os.devnull, os.O_WRONLY)
+    saved_fd = os.dup(1)
+    os.dup2(devnull_fd, 1)
+    os.close(devnull_fd)
+
+    # Python-level redirect
+    saved_stdout = sys.stdout
+    sys.stdout = Path(os.devnull).open("w")  # noqa: SIM115
+    try:
+        yield
+    finally:
+        sys.stdout.close()
+        sys.stdout = saved_stdout
+        os.dup2(saved_fd, 1)
+        os.close(saved_fd)
+
+
 class StageStatus(StrEnum):
     """Workflow stage status."""
 
@@ -371,8 +409,10 @@ class WorkflowMonitor:
     def _setup_logger(self) -> logging.Logger:
         """Configure logging based on monitoring config.
 
-        * The console handler is kept at WARNING so only problems
-          are shown on screen.
+        * If the user has already called :func:`configure_logger` with
+          a custom console level, that level is preserved.  Otherwise
+          the console handler defaults to WARNING so only problems are
+          shown on screen.
         * A log file is always created (either the one specified in
           ``config.log_file`` or an auto-generated one under
           ``config.work_dir``).  All DEBUG-level messages from both
@@ -380,8 +420,12 @@ class WorkflowMonitor:
         * Third-party loggers (HydroMT, xarray, ...) are silenced
           on the console but still write to the log file.
         """
-        # Console: only warnings and errors
-        if _console_handler is not None and _console_handler in logger.handlers:
+        # Console: respect user-configured level, otherwise default to WARNING.
+        if (
+            _console_handler is not None
+            and _console_handler in logger.handlers
+            and _user_console_level is None
+        ):
             _console_handler.setLevel(logging.WARNING)
 
         # File: full detail
