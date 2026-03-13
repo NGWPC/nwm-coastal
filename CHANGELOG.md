@@ -9,11 +9,11 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 
-- `coastal_calibration.plotting` module with reusable visualisation utilities:
+- `coastal_calibration.plotting` module with reusable visualization utilities:
     - `SfincsGridInfo` dataclass with `from_model_root()` factory for loading and
-        summarising SFINCS grid metadata (quadtree and regular grids).
-    - `plot_mesh()` for visualising the SFINCS mesh coloured by refinement level with
-        optional satellite basemap via contextily.
+        summarizing SFINCS grid metadata (quadtree and regular grids).
+    - `plot_mesh()` for visualizing the SFINCS mesh colored by refinement level with
+        optional satellite basemap via `contextily`.
     - `plot_floodmap()` for reading and plotting flood-depth Cloud Optimized GeoTIFFs with
         automatic overview-level selection and basemap overlay.
     - `plot_station_comparison()` for generating 2×2 simulated vs observed water-level
@@ -22,11 +22,11 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     - `plotable_stations()` helper for filtering stations that have both simulated and
         observed data.
 - `_KNOWN_INP_PARAMS` allowlist on `SfincsModelConfig` that validates `inp_overrides`
-    keys against all ~170 recognised `sfincs.inp` parameters, catching typos early
+    keys against all ~170 recognized `sfincs.inp` parameters, catching typos early
     (SFINCS silently ignores unknown parameters).
 - `SfincsDischargeStage` now assigns real NWM CHRTOUT discharge timeseries to source
     points via `_assign_discharge_timeseries`, with support for both HydroMT GeoDataset
-    and raw xarray `open_mfdataset` loading strategies.
+    and raw `xarray` `open_mfdataset` loading strategies.
 - `tests/test_floodmap.py` with unit tests for `_write_floodmap_cog`,
     `_ensure_overviews`, and an integration test for `create_flood_depth_map`.
 - QGIS plugin: optional NWM Flowlines Override in the basemap dialog, allowing users to
@@ -43,11 +43,11 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
-- Centralise station comparison plotting into `coastal_calibration.plotting.stations`,
+- Centralize station comparison plotting into `coastal_calibration.plotting.stations`,
     removing duplicate `_plotable_stations` and `_plot_figures` code from
     `SfincsPlotStage` and `SchismPlotStage`.
 - Refactor Lavaca and Narragansett example notebooks to use the new `plotting` module
-    (`SfincsGridInfo`, `plot_mesh`, `plot_floodmap`) instead of inline visualisation
+    (`SfincsGridInfo`, `plot_mesh`, `plot_floodmap`) instead of inline visualization
     code.
 - **Breaking:** Simplify `nwm_discharge` config from 5 fields (`hydrofabric_gpkg`,
     `flowpaths_layer`, `flowpath_id_column`, `flowpath_ids`, `coastal_domain`) to 2
@@ -68,7 +68,7 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     only writes the `.src` file with snapped locations, while the run stage
     (`SfincsDischargeStage`) adds points to the model and attaches real NWM streamflow
     data.
-- Consolidate stdout/logging suppression for hydromt-sfincs into a shared
+- Consolidate stdout/logging suppression for `hydromt-sfincs` into a shared
     `suppress_hydromt_output()` context manager in `utils.logging`, replacing duplicated
     `_suppress_stdout` helpers in `creator.py` and `sfincs_create.py`.
 - `SfincsGridInfo.from_model_root()` no longer accepts a `base_resolution` parameter;
@@ -79,7 +79,7 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 - Flood depth map generation for regular (non-quadtree) SFINCS grids: the `zsmax` index
     lookup in `_reduce_zsmax` used C-order (row-major) flattening but
-    `SfincsGrid.get_indices_at_points` returns Fortran-order (column-major) linearised
+    `SfincsGrid.get_indices_at_points` returns Fortran-order (column-major) linearized
     indices. Changed to Fortran-order to match, fixing incorrect flood depth values on
     regular grids.
 - `sfincs_floodmap` stage now reads `zsmax` via `SfincsModel` with `apply_all_patches()`
@@ -87,7 +87,7 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     levels (where the output lacks UGRID topology).
 - STOFS data catalog entry previously used a recursive glob (`stofs/**/*.fields.cwl.nc`)
     that matched all cached STOFS files. When the cache held files from different STOFS
-    mesh versions with incompatible dimensions, xarray concatenation failed. A new
+    mesh versions with incompatible dimensions, `xarray` concatenation failed. A new
     `_stofs_uri()` helper now builds an exact file path for the simulation's date and
     cycle hour, avoiding multi-file collision.
 - Expand the STOFS `drop_variables` list to also drop `nvell`, `ibtype`, `nbvv`,
@@ -95,9 +95,9 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - `_downstream_endpoint` now compares both endpoints of NWM hydrofabric flowpath
     linestrings and returns whichever is closest to the AOI boundary, fixing incorrect
     discharge point placement when flowpath direction is reversed.
-- Quadtree mesh plotting (`SfincsGridInfo`) now masks fill values (-1) in
-    face-node connectivity before computing cell widths, fixing bogus level counts
-    and distorted mesh visualisations.
+- Quadtree mesh plotting (`SfincsGridInfo`) now masks fill values (-1) in face-node
+    connectivity before computing cell widths, fixing bogus level counts and distorted
+    mesh visualizations.
 - QGIS plugin: use `mActionVertexToolActiveLayer.svg` icon for the Edit Polygon toolbar
     button (previously used the removed `mActionNodeTool.svg`).
 
