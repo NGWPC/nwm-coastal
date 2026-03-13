@@ -168,8 +168,8 @@ class DataCatalogConfig:
 
 
 @dataclass
-class NWMDischargeConfig:
-    """NWM discharge source point configuration.
+class RiverDischargeConfig:
+    """River discharge source point configuration.
 
     Derives discharge source points from user-provided flowline
     geometries (e.g. exported from the QGIS plugin).  Each flowline's
@@ -183,6 +183,11 @@ class NWMDischargeConfig:
     #: Column in the GeoJSON whose values correspond to NWM
     #: ``feature_id`` values in CHRTOUT files.
     nwm_id_column: str
+
+    #: Maximum distance (meters) a discharge point may be snapped to
+    #: reach an active grid cell.  Points that must move farther than
+    #: this threshold are dropped with a warning.
+    max_snap_distance_m: float = 2000.0
 
     def __post_init__(self) -> None:
         self.flowlines = Path(self.flowlines).expanduser().resolve()
@@ -212,7 +217,7 @@ class SfincsCreateConfig:
     subgrid: SubgridConfig = field(default_factory=SubgridConfig)
     data_catalog: DataCatalogConfig = field(default_factory=DataCatalogConfig)
     monitoring: MonitoringConfig = field(default_factory=MonitoringConfig)
-    nwm_discharge: NWMDischargeConfig | None = None
+    river_discharge: RiverDischargeConfig | None = None
 
     #: When True, automatically query NOAA CO-OPS for water level
     #: stations within the model domain and add them as observation
@@ -264,7 +269,7 @@ class SfincsCreateConfig:
 
         Roughness is embedded in the quadtree subgrid tables, so there
         is no separate roughness stage.  The ``create_discharge`` stage
-        is included only when :attr:`nwm_discharge` is configured.
+        is included only when :attr:`river_discharge` is configured.
         """
         stages = ["create_grid"]
         has_elev_source = any(d.source is not None for d in self.elevation.datasets)
@@ -278,7 +283,7 @@ class SfincsCreateConfig:
                 "create_boundary",
             ]
         )
-        if self.nwm_discharge is not None:
+        if self.river_discharge is not None:
             stages.append("create_discharge")
         stages.append("create_subgrid")
         has_obs = (
@@ -344,11 +349,11 @@ class SfincsCreateConfig:
             monitoring_data["log_file"] = Path(monitoring_data["log_file"])
         monitoring = MonitoringConfig(**monitoring_data)
 
-        nwm_discharge: NWMDischargeConfig | None = None
-        nwm_data = data.get("nwm_discharge")
+        river_discharge: RiverDischargeConfig | None = None
+        nwm_data = data.get("river_discharge")
         if nwm_data is not None:
             nwm_data["flowlines"] = Path(nwm_data["flowlines"])
-            nwm_discharge = NWMDischargeConfig(**nwm_data)
+            river_discharge = RiverDischargeConfig(**nwm_data)
 
         download_dir_raw = data.get("download_dir")
         download_dir = Path(download_dir_raw) if download_dir_raw else None
@@ -369,7 +374,7 @@ class SfincsCreateConfig:
             subgrid=subgrid_cfg,
             data_catalog=data_catalog,
             monitoring=monitoring,
-            nwm_discharge=nwm_discharge,
+            river_discharge=river_discharge,
             add_noaa_gages=add_noaa_gages,
             observation_points=observation_points,
             observation_locations_file=observation_locations_file,
@@ -393,11 +398,11 @@ class SfincsCreateConfig:
             if poly and not Path(poly).is_absolute():
                 ref_entry["polygon"] = str(yaml_dir / poly)
 
-        nwm_data = data.get("nwm_discharge") or {}
+        nwm_data = data.get("river_discharge") or {}
         flowlines = nwm_data.get("flowlines")
         if flowlines and not Path(flowlines).is_absolute():
             nwm_data["flowlines"] = str(yaml_dir / flowlines)
-            data["nwm_discharge"] = nwm_data
+            data["river_discharge"] = nwm_data
 
         catalog_data = data.get("data_catalog") or {}
         libs = catalog_data.get("data_libs") or []
@@ -521,10 +526,10 @@ class SfincsCreateConfig:
             if ref.level < 1:
                 errors.append(f"refinement level must be >= 1, got {ref.level}")
 
-        if self.nwm_discharge is not None:
-            nd = self.nwm_discharge
+        if self.river_discharge is not None:
+            nd = self.river_discharge
             if not nd.flowlines.exists():
-                errors.append(f"nwm_discharge.flowlines not found: {nd.flowlines}")
+                errors.append(f"river_discharge.flowlines not found: {nd.flowlines}")
 
         return errors
 
@@ -588,12 +593,13 @@ class SfincsCreateConfig:
                 "enable_progress_tracking": self.monitoring.enable_progress_tracking,
                 "enable_timing": self.monitoring.enable_timing,
             },
-            "nwm_discharge": (
+            "river_discharge": (
                 {
-                    "flowlines": str(self.nwm_discharge.flowlines),
-                    "nwm_id_column": self.nwm_discharge.nwm_id_column,
+                    "flowlines": str(self.river_discharge.flowlines),
+                    "nwm_id_column": self.river_discharge.nwm_id_column,
+                    "max_snap_distance_m": self.river_discharge.max_snap_distance_m,
                 }
-                if self.nwm_discharge is not None
+                if self.river_discharge is not None
                 else None
             ),
             "add_noaa_gages": self.add_noaa_gages,
