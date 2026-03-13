@@ -49,7 +49,11 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Refactor Lavaca and Narragansett example notebooks to use the new `plotting` module
     (`SfincsGridInfo`, `plot_mesh`, `plot_floodmap`) instead of inline visualization
     code.
-- **Breaking:** Simplify `nwm_discharge` config from 5 fields (`hydrofabric_gpkg`,
+- **Breaking:** Rename `nwm_discharge` config section to `river_discharge` and add
+    `max_snap_distance_m` field (default 2000 m). Discharge points that must move
+    farther than this threshold to reach an active grid cell are dropped with a warning.
+    Previously these points could be silently written with out-of-bounds coordinates.
+- **Breaking:** Simplify `river_discharge` config from 5 fields (`hydrofabric_gpkg`,
     `flowpaths_layer`, `flowpath_id_column`, `flowpath_ids`, `coastal_domain`) to 2
     fields (`flowlines`, `nwm_id_column`). Users now provide a GeoJSON file of selected
     flowpaths (e.g., exported from the QGIS plugin) instead of a full NWM hydrofabric
@@ -74,6 +78,17 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - `SfincsGridInfo.from_model_root()` no longer accepts a `base_resolution` parameter;
     the coarsest cell size is now derived automatically from the quadtree grid data.
 - Bump `pyproject-fmt` pre-commit hook from v2.16.2 to v2.18.1.
+- `sfincs_symlinks` stage now reports when symlinks already exist instead of silently
+    showing "Created 0 … symlinks".
+- Add `jupytext` pre-commit hook (`--sync`) to keep `.ipynb` and `.py` notebook pairs in
+    sync automatically.
+- Configure `ty` type-checker to resolve third-party imports from the pixi `typecheck`
+    environment via `extra-paths`.
+- Exclude `docs/examples/downloads/` from mkdocs static file copying to prevent
+    `No space left on device` errors from large NWM data files.
+- Discharge snapping now always snaps to the nearest active cell (previously kept points
+    as-is when they happened to land on an active cell) and converts KDTree distances
+    from CRS units to meters before comparing with `max_snap_distance_m`.
 
 ### Fixed
 
