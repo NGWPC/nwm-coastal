@@ -77,11 +77,6 @@ def plot_floodmap(
     with rasterio.open(floodmap_path) as src:
         bounds = src.bounds
         raster_crs = src.crs
-        res_unit = raster_crs.linear_units if raster_crs.is_projected else "deg"
-        print(f"  CRS:          {raster_crs}")
-        print(f"  Size:         {src.width} x {src.height}")
-        print(f"  Resolution:   {abs(src.res[0]):.6g} x {abs(src.res[1]):.6g} {res_unit}")
-        print(f"  File size:    {floodmap_path.stat().st_size / 1e6:.1f} MB")
 
         overviews = src.overviews(1)
         ovr_idx = next(
@@ -96,22 +91,20 @@ def plot_floodmap(
     # ── Read at overview level ───────────────────────────────────
     with rasterio.open(floodmap_path, overview_level=ovr_idx) as src:
         hmax = src.read(1)
-        print(f"  Display size: {src.width} x {src.height} (overview {overviews[ovr_idx]}x)")
 
     hmax_masked = np.where(np.isfinite(hmax) & (hmax > 0), hmax, np.nan)
     valid = np.isfinite(hmax_masked)
-    print(f"  Valid pixels: {valid.sum():,} / {hmax.size:,} ({valid.sum() / hmax.size:.1%})")
     if valid.any():
-        print(
-            f"  Depth range:  {np.nanmin(hmax_masked):.2f} – {np.nanmax(hmax_masked):.2f} m"
-        )
+        pass
 
     # ── Plot ─────────────────────────────────────────────────────
     if ax is None:
         fig, ax = plt.subplots(figsize=figsize)
     else:
         fig = ax.get_figure()
-        assert fig is not None
+        if fig is None:  # pragma: no cover
+            msg = "ax must be attached to a Figure"
+            raise ValueError(msg)
 
     extent = (bounds.left, bounds.right, bounds.bottom, bounds.top)
     cmap = plt.colormaps["viridis"].copy()

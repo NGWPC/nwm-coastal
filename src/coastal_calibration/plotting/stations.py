@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 __all__ = ["plot_station_comparison", "plotable_stations"]
 
-#: Maximum number of stations per figure (2×2 layout).
+#: Maximum number of stations per figure (2x2 layout).
 _STATIONS_PER_FIGURE = 4
 
 
@@ -60,7 +60,7 @@ def plot_station_comparison(
 ) -> list[Path]:
     """Create comparison figures of simulated vs observed water levels.
 
-    Stations that lack *both* valid observations and valid simulated
+    Stations that lack *either* valid observations or valid simulated
     data are skipped so that empty panels do not appear.
 
     Parameters

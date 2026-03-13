@@ -8,12 +8,13 @@ mesh with an optional satellite basemap.
 from __future__ import annotations
 
 import dataclasses
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple
 
 import numpy as np
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
     from pyproj import CRS
@@ -62,46 +63,6 @@ class SfincsGridInfo:
     _grid_extent: tuple[float, float, float, float] | None = dataclasses.field(
         default=None, repr=False
     )
-
-    # ── factory ──────────────────────────────────────────────────
-
-    @classmethod
-    def from_model_root(
-        cls,
-        model_root: Path | str,
-    ) -> SfincsGridInfo:
-        """Load grid metadata from a SFINCS model directory.
-
-        Parameters
-        ----------
-        model_root:
-            Path to the SFINCS model directory (must contain ``sfincs.inp``
-            and, for quadtree models, ``sfincs.nc``).
-        """
-        from coastal_calibration.stages._hydromt_compat import apply_all_patches
-        from coastal_calibration.utils.logging import suppress_hydromt_output
-
-        apply_all_patches()
-
-        with suppress_hydromt_output():
-            from hydromt_sfincs import SfincsModel
-
-            sf = SfincsModel(root=str(model_root), mode="r+")
-            sf.read()
-        return cls._from_loaded_model(sf)
-
-    @classmethod
-    def _from_loaded_model(
-        cls,
-        model: Any,
-    ) -> SfincsGridInfo:
-        """Build from an already-loaded ``SfincsModel``."""
-        crs = model.crs
-        is_quadtree = model.grid_type == "quadtree"
-
-        if is_quadtree:
-            return cls._build_quadtree(model, crs)
-        return cls._build_regular(model, crs)
 
     # ── quadtree builder ─────────────────────────────────────────
 
@@ -184,9 +145,49 @@ class SfincsGridInfo:
             _grid_extent=extent,
         )
 
+    @classmethod
+    def _from_loaded_model(
+        cls,
+        model: Any,
+    ) -> SfincsGridInfo:
+        """Build from an already-loaded ``SfincsModel``."""
+        crs = model.crs
+        is_quadtree = model.grid_type == "quadtree"
+
+        if is_quadtree:
+            return cls._build_quadtree(model, crs)
+        return cls._build_regular(model, crs)
+
+    # ── factory ──────────────────────────────────────────────────
+
+    @classmethod
+    def from_model_root(
+        cls,
+        model_root: Path | str,
+    ) -> SfincsGridInfo:
+        """Load grid metadata from a SFINCS model directory.
+
+        Parameters
+        ----------
+        model_root:
+            Path to the SFINCS model directory (must contain ``sfincs.inp``
+            and, for quadtree models, ``sfincs.nc``).
+        """
+        from coastal_calibration.stages._hydromt_compat import apply_all_patches
+        from coastal_calibration.utils.logging import suppress_hydromt_output
+
+        apply_all_patches()
+
+        with suppress_hydromt_output():
+            from hydromt_sfincs import SfincsModel
+
+            sf = SfincsModel(root=str(model_root), mode="r+")
+            sf.read()
+        return cls._from_loaded_model(sf)
+
     # ── display ──────────────────────────────────────────────────
 
-    def __str__(self) -> str:  # noqa: D105
+    def __str__(self) -> str:
         epsg = self.crs.to_epsg() if self.crs is not None else "?"
         lines = [f"SfincsGridInfo({self.grid_type}, EPSG:{epsg})"]
 
@@ -194,18 +195,15 @@ class SfincsGridInfo:
             lines.append(f"  Faces:     {self.n_faces:>10,}")
             lines.append(f"  Edges:     {self.n_edges:>10,}")
             for lv, info in sorted(self.levels.items()):
-                lines.append(
-                    f"  Level {lv}:   {info.count:>10,} cells ({info.resolution:.0f} m)"
-                )
-        else:
-            assert self.shape is not None
+                lines.append(f"  Level {lv}:   {info.count:>10,} cells ({info.resolution:.0f} m)")
+        elif self.shape is not None:
             lines.append(f"  Shape:      {self.shape[0]} x {self.shape[1]}")
             res = next(iter(self.levels.values())).resolution
             lines.append(f"  Resolution: {res:.0f} m")
 
         return "\n".join(lines)
 
-    def __repr__(self) -> str:  # noqa: D105
+    def __repr__(self) -> str:
         return self.__str__()
 
 
@@ -213,6 +211,71 @@ class SfincsGridInfo:
 
 
 _LEVEL_COLORS = ["#4575b4", "#91bfdb", "#fee090", "#d73027"]
+
+
+def _plot_quadtree(info: SfincsGridInfo, ax: Axes) -> None:
+    from matplotlib.collections import PolyCollection
+    from matplotlib.colors import BoundaryNorm, ListedColormap
+    from matplotlib.patches import Patch
+
+    if info._verts is None or info._level_per_face is None:  # pragma: no cover
+        msg = "SfincsGridInfo must be built with quadtree data"
+        raise ValueError(msg)
+
+    sorted_levels = sorted(info.levels)
+    n_levels = len(sorted_levels)
+    colors = _LEVEL_COLORS[:n_levels]
+    cmap = ListedColormap(colors)
+    bounds = [lv - 0.5 for lv in sorted_levels] + [sorted_levels[-1] + 0.5]
+    norm = BoundaryNorm(bounds, ncolors=n_levels)
+
+    pc = PolyCollection(list(info._verts), edgecolors="black", linewidths=0.1, alpha=0.4)
+    pc.set_array(info._level_per_face.astype(float))
+    pc.set_cmap(cmap)
+    pc.set_norm(norm)
+    ax.add_collection(pc)
+    ax.autoscale_view()
+
+    legend_handles = [
+        Patch(
+            facecolor=cmap(norm(lv)),
+            edgecolor="black",
+            linewidth=0.5,
+            alpha=0.5,
+            label=f"Level {lv} ({info.levels[lv].resolution:.0f} m)",
+        )
+        for lv in sorted_levels
+    ]
+    ax.legend(handles=legend_handles, loc="lower right", title="Refinement level")
+
+
+def _plot_regular(info: SfincsGridInfo, ax: Axes) -> None:
+    if info._mask is None or info._grid_extent is None:  # pragma: no cover
+        msg = "SfincsGridInfo must be built with regular grid data"
+        raise ValueError(msg)
+    x0, x1, y0, y1 = info._grid_extent
+    extent = (x0, x1, y0, y1)
+    ax.imshow(
+        np.where(info._mask > 0, info._mask, np.nan),
+        extent=extent,
+        origin="lower",
+        alpha=0.4,
+        cmap="Blues",
+        interpolation="nearest",
+    )
+
+
+def _add_basemap(
+    ax: Axes,
+    crs: CRS,
+    source: Any | None,
+    zoom: int,
+) -> None:
+    import contextily as cx
+
+    if source is None:
+        source = cx.providers.Esri.WorldImagery  # type: ignore[attr-defined]
+    cx.add_basemap(ax, crs=crs, source=source, zoom=zoom)
 
 
 def plot_mesh(
@@ -255,7 +318,9 @@ def plot_mesh(
         fig, ax = plt.subplots(figsize=figsize)
     else:
         fig = ax.get_figure()
-        assert fig is not None
+        if fig is None:  # pragma: no cover
+            msg = "ax must be attached to a Figure"
+            raise ValueError(msg)
 
     if info.grid_type == "quadtree":
         _plot_quadtree(info, ax)
@@ -270,66 +335,3 @@ def plot_mesh(
         _add_basemap(ax, info.crs, basemap_source, basemap_zoom)
 
     return fig, ax  # type: ignore[return-value]
-
-
-def _plot_quadtree(info: SfincsGridInfo, ax: Axes) -> None:
-    from matplotlib.collections import PolyCollection
-    from matplotlib.colors import BoundaryNorm, ListedColormap
-    from matplotlib.patches import Patch
-
-    assert info._verts is not None
-    assert info._level_per_face is not None
-
-    sorted_levels = sorted(info.levels)
-    n_levels = len(sorted_levels)
-    colors = _LEVEL_COLORS[:n_levels]
-    cmap = ListedColormap(colors)
-    bounds = [lv - 0.5 for lv in sorted_levels] + [sorted_levels[-1] + 0.5]
-    norm = BoundaryNorm(bounds, ncolors=n_levels)
-
-    pc = PolyCollection(list(info._verts), edgecolors="black", linewidths=0.1, alpha=0.4)
-    pc.set_array(info._level_per_face.astype(float))
-    pc.set_cmap(cmap)
-    pc.set_norm(norm)
-    ax.add_collection(pc)
-    ax.autoscale_view()
-
-    legend_handles = [
-        Patch(
-            facecolor=cmap(norm(lv)),
-            edgecolor="black",
-            linewidth=0.5,
-            alpha=0.5,
-            label=f"Level {lv} ({info.levels[lv].resolution:.0f} m)",
-        )
-        for lv in sorted_levels
-    ]
-    ax.legend(handles=legend_handles, loc="lower right", title="Refinement level")
-
-
-def _plot_regular(info: SfincsGridInfo, ax: Axes) -> None:
-    assert info._mask is not None
-    assert info._grid_extent is not None
-    x0, x1, y0, y1 = info._grid_extent
-    extent = (x0, x1, y0, y1)
-    ax.imshow(
-        np.where(info._mask > 0, info._mask, np.nan),
-        extent=extent,
-        origin="lower",
-        alpha=0.4,
-        cmap="Blues",
-        interpolation="nearest",
-    )
-
-
-def _add_basemap(
-    ax: Axes,
-    crs: CRS,
-    source: Any | None,
-    zoom: int,
-) -> None:
-    import contextily as cx
-
-    if source is None:
-        source = cx.providers.Esri.WorldImagery  # type: ignore[attr-defined]
-    cx.add_basemap(ax, crs=crs, source=source, zoom=zoom)

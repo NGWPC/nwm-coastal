@@ -322,25 +322,31 @@ def silence_third_party_loggers(*, file_level: int = logging.DEBUG) -> None:
 def suppress_hydromt_output() -> Iterator[None]:
     """Silence all hydromt / hydromt-sfincs console noise.
 
-    Combines two layers:
+    Applies two layers:
 
-    * **Logging** — :func:`silence_third_party_loggers` removes the
-      ``StreamHandler`` that HydroMT attaches to its loggers.
-    * **stdout redirect** — catches raw ``print()`` calls that
-      hydromt-sfincs emits during model reads (both at the fd level
-      and at the Python ``sys.stdout`` level for Jupyter compatibility).
+    * **Logging** (permanent) — :func:`silence_third_party_loggers`
+      removes the ``StreamHandler`` that HydroMT attaches to its
+      loggers.  This mutation is intentionally **not** reverted: once
+      silenced, the third-party loggers stay silenced for the process
+      lifetime.
+    * **stdout redirect** (temporary) — catches raw ``print()`` calls
+      that hydromt-sfincs emits during model reads (both at the fd
+      level and at the Python ``sys.stdout`` level for Jupyter
+      compatibility).  This redirect is restored when the context
+      manager exits.
     """
     import os
 
+    # One-time, permanent mutation — safe to call repeatedly.
     silence_third_party_loggers()
 
-    # fd-level redirect
+    # fd-level redirect (temporary)
     devnull_fd = os.open(os.devnull, os.O_WRONLY)
     saved_fd = os.dup(1)
     os.dup2(devnull_fd, 1)
     os.close(devnull_fd)
 
-    # Python-level redirect
+    # Python-level redirect (temporary)
     saved_stdout = sys.stdout
     sys.stdout = Path(os.devnull).open("w")  # noqa: SIM115
     try:

@@ -317,7 +317,8 @@ def create_flood_depth_map(
             model = _Sfincs(root=str(model_root), mode="r+")
             model.read()
 
-    model.output.read()
+    with suppress_hydromt_output():
+        model.output.read()
 
     if "zsmax" not in model.output.data:
         raise KeyError(
@@ -334,12 +335,13 @@ def create_flood_depth_map(
         _info(f"Creating index COG: {index_path}")
         index_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        make_index_cog(
-            model=model,
-            indices_fn=str(index_path),
-            topobathy_fn=str(dem_path),
-            nrmax=nrmax,
-        )
+        with suppress_hydromt_output():
+            make_index_cog(
+                model=model,
+                indices_fn=str(index_path),
+                topobathy_fn=str(dem_path),
+                nrmax=nrmax,
+            )
         _ensure_overviews(index_path, _info)
         _info(f"Index COG created ({index_path.stat().st_size / 1e6:.1f} MB)")
 
