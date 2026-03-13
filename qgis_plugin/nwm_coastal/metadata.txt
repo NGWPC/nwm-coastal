@@ -16,9 +16,8 @@ tracker=https://github.com/NGWPC/nwm-coastal/issues
 deprecated=False
 experimental=True
 plugin_dependencies=
-qgisMinimumVersion=3.34
+qgisMinimumVersion=3.28
 qgisMaximumVersion=3.99
 supportsQt6=True
-
 version=0.1.0
 changelog=

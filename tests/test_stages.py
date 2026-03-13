@@ -15,6 +15,12 @@ from coastal_calibration.config.schema import (
     SchismModelConfig,
     SimulationConfig,
 )
+from coastal_calibration.plotting.stations import (
+    plot_station_comparison,
+)
+from coastal_calibration.plotting.stations import (
+    plotable_stations as _plotable_stations,
+)
 from coastal_calibration.stages.base import WorkflowStage
 from coastal_calibration.stages.boundary import (
     BoundaryConditionStage,
@@ -30,16 +36,8 @@ from coastal_calibration.stages.forcing import (
 from coastal_calibration.stages.schism import (
     PostSCHISMStage,
     PreSCHISMStage,
-    SchismPlotStage,
     SCHISMRunStage,
     _patch_param_nml,
-    _plotable_stations,
-)
-from coastal_calibration.stages.sfincs_build import (
-    SfincsPlotStage,
-)
-from coastal_calibration.stages.sfincs_build import (
-    _plotable_stations as _sfincs_plotable_stations,
 )
 from coastal_calibration.utils.logging import WorkflowMonitor
 
@@ -470,7 +468,7 @@ class TestPlotableStations:
 
 
 class TestPlotFigures:
-    """Tests for SchismPlotStage._plot_figures."""
+    """Tests for plot_station_comparison."""
 
     @staticmethod
     def _make_obs_ds(station_ids, n_times=10, fill_value=0.0):
@@ -500,7 +498,7 @@ class TestPlotFigures:
         obs.water_level.loc[{"station": "B"}] = np.nan
 
         figs_dir = tmp_path / "figs"
-        paths = SchismPlotStage._plot_figures(sim_times, sim, ["A", "B"], obs, figs_dir)
+        paths = plot_station_comparison(sim_times, sim, ["A", "B"], obs, figs_dir)
         assert len(paths) == 1
         assert paths[0].exists()
 
@@ -515,7 +513,7 @@ class TestPlotFigures:
         obs = self._make_obs_ds(["A", "B"], n_times=n_times, fill_value=np.nan)
 
         figs_dir = tmp_path / "figs"
-        paths = SchismPlotStage._plot_figures(sim_times, sim, ["A", "B"], obs, figs_dir)
+        paths = plot_station_comparison(sim_times, sim, ["A", "B"], obs, figs_dir)
         assert paths == []
 
     def test_produces_multiple_figures(self, tmp_path):
@@ -531,7 +529,7 @@ class TestPlotFigures:
         obs = self._make_obs_ds(ids, n_times=n_times, fill_value=1.0)
 
         figs_dir = tmp_path / "figs"
-        paths = SchismPlotStage._plot_figures(sim_times, sim, ids, obs, figs_dir)
+        paths = plot_station_comparison(sim_times, sim, ids, obs, figs_dir)
         assert len(paths) == 2
         assert all(p.exists() for p in paths)
 
@@ -546,7 +544,7 @@ class TestPlotFigures:
         obs = self._make_obs_ds(["A"], n_times=n_times, fill_value=1.0)
 
         figs_dir = tmp_path / "figs"
-        paths = SchismPlotStage._plot_figures(sim_times, sim, ["A"], obs, figs_dir)
+        paths = plot_station_comparison(sim_times, sim, ["A"], obs, figs_dir)
         assert len(paths) == 1
         assert paths[0].exists()
 
@@ -577,7 +575,7 @@ class TestSfincsPlotableStations:
 
         sim = np.ones((5, 3))
         obs = self._make_obs_ds(["A", "B", "C"])
-        result = _sfincs_plotable_stations(["A", "B", "C"], sim, obs)
+        result = _plotable_stations(["A", "B", "C"], sim, obs)
         assert len(result) == 3
 
     def test_sim_only_excluded(self):
@@ -585,7 +583,7 @@ class TestSfincsPlotableStations:
 
         sim = np.ones((5, 2))
         obs = self._make_obs_ds(["A"], fill_value=np.nan)
-        result = _sfincs_plotable_stations(["A", "B"], sim, obs)
+        result = _plotable_stations(["A", "B"], sim, obs)
         assert len(result) == 0
 
     def test_obs_only_excluded(self):
@@ -593,7 +591,7 @@ class TestSfincsPlotableStations:
 
         sim = np.full((5, 1), np.nan)
         obs = self._make_obs_ds(["A"], fill_value=1.0)
-        result = _sfincs_plotable_stations(["A"], sim, obs)
+        result = _plotable_stations(["A"], sim, obs)
         assert len(result) == 0
 
     def test_mixed_keeps_both_only(self):
@@ -603,12 +601,12 @@ class TestSfincsPlotableStations:
         sim[:, 2] = 2.0
         obs = self._make_obs_ds(["A", "B", "C"], fill_value=np.nan)
         obs.water_level.loc[{"station": "C"}] = 3.0
-        result = _sfincs_plotable_stations(["A", "B", "C"], sim, obs)
+        result = _plotable_stations(["A", "B", "C"], sim, obs)
         assert [sid for sid, _ in result] == ["C"]
 
 
 class TestSfincsPlotFigures:
-    """Tests for SfincsPlotStage._plot_figures (identical to SCHISM)."""
+    """Tests for plot_station_comparison (identical to SCHISM)."""
 
     @staticmethod
     def _make_obs_ds(station_ids, n_times=10, fill_value=0.0):
@@ -635,7 +633,7 @@ class TestSfincsPlotFigures:
         obs.water_level.loc[{"station": "B"}] = np.nan
 
         figs_dir = tmp_path / "figs"
-        paths = SfincsPlotStage._plot_figures(sim_times, sim, ["A", "B"], obs, figs_dir)
+        paths = plot_station_comparison(sim_times, sim, ["A", "B"], obs, figs_dir)
         assert len(paths) == 1
         assert paths[0].exists()
 
@@ -649,7 +647,7 @@ class TestSfincsPlotFigures:
         obs = self._make_obs_ds(["A", "B"], n_times=n_times, fill_value=np.nan)
 
         figs_dir = tmp_path / "figs"
-        paths = SfincsPlotStage._plot_figures(sim_times, sim, ["A", "B"], obs, figs_dir)
+        paths = plot_station_comparison(sim_times, sim, ["A", "B"], obs, figs_dir)
         assert paths == []
 
     def test_produces_multiple_figures(self, tmp_path):
@@ -664,7 +662,7 @@ class TestSfincsPlotFigures:
         obs = self._make_obs_ds(ids, n_times=n_times, fill_value=1.0)
 
         figs_dir = tmp_path / "figs"
-        paths = SfincsPlotStage._plot_figures(sim_times, sim, ids, obs, figs_dir)
+        paths = plot_station_comparison(sim_times, sim, ids, obs, figs_dir)
         assert len(paths) == 2
         assert all(p.exists() for p in paths)
 
@@ -678,6 +676,6 @@ class TestSfincsPlotFigures:
         obs = self._make_obs_ds(["A"], n_times=n_times, fill_value=1.0)
 
         figs_dir = tmp_path / "figs"
-        paths = SfincsPlotStage._plot_figures(sim_times, sim, ["A"], obs, figs_dir)
+        paths = plot_station_comparison(sim_times, sim, ["A"], obs, figs_dir)
         assert len(paths) == 1
         assert paths[0].exists()

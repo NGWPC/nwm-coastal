@@ -161,8 +161,8 @@ nav:
   - Workflow Stages: user-guide/workflow-stages.md
 - Examples:
   - Overview: examples/index.md
-  - CLI Tutorial: examples/notebooks/lavaca_cli.ipynb
-  - Python API Tutorial: examples/notebooks/lavaca_api.ipynb
+  - Lavaca Bay: examples/notebooks/lavaca.ipynb
+  - Narragansett Bay: examples/notebooks/narragansett.ipynb
 - Design: DESIGN.md
 - Reference:
   - API Reference: reference/api.md

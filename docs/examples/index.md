@@ -1,10 +1,10 @@
 # Examples
 
-These tutorial notebooks walk through the full Lavaca Bay (Texas) SFINCS workflow — from
-building the model grid to running the simulation and comparing results against NOAA
-tide-gauge observations.
+These tutorial notebooks walk through the full SFINCS coastal flood modeling workflow —
+from building the model grid to running the simulation and comparing results against
+NOAA tide-gauge observations.
 
-Both notebooks cover the same three-phase workflow:
+Each notebook covers the same three-phase workflow:
 
 1. **Create** — build a SFINCS model from an Area of Interest polygon (grid, elevation,
     subgrid tables, boundary conditions, observation points).
@@ -21,10 +21,10 @@ Both notebooks cover the same three-phase workflow:
 
 <div class="grid cards" markdown>
 
-- [![CLI Tutorial](images/lavaca_cli_thumb.png){ loading=lazy }](notebooks/lavaca_cli.ipynb "CLI Tutorial")
-    **CLI Tutorial**
+- [![Lavaca Bay](images/lavaca_thumb.png){ loading=lazy }](notebooks/lavaca.ipynb "Lavaca Bay, TX")
+    **Lavaca Bay, TX**
 
-- [![Python API Tutorial](images/lavaca_api_thumb.png){ loading=lazy }](notebooks/lavaca_api.ipynb "Python API Tutorial")
-    **Python API Tutorial**
+- [![Narragansett Bay](images/narragansett_thumb.png){ loading=lazy }](notebooks/narragansett.ipynb "Narragansett Bay, RI")
+    **Narragansett Bay, RI**
 
 </div>

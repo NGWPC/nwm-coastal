@@ -15,13 +15,17 @@ from qgis.core import (
     QgsLineSymbol,
     QgsMarkerSymbol,
     QgsMessageLog,
+    QgsPalLayerSettings,
     QgsProject,
     QgsRasterLayer,
     QgsSimpleFillSymbolLayer,
     QgsSimpleLineSymbolLayer,
     QgsSimpleMarkerSymbolLayer,
+    QgsTextBufferSettings,
+    QgsTextFormat,
     QgsVectorFileWriter,
     QgsVectorLayer,
+    QgsVectorLayerSimpleLabeling,
 )
 from qgis.PyQt.QtGui import QColor
 from qgis.PyQt.QtWidgets import QAction, QFileDialog
@@ -97,6 +101,25 @@ class NWMCoastalPlugin:
         style_fn(layer)
         project.addMapLayer(layer)
 
+    # -- Layer labeling helper --
+
+    @staticmethod
+    def _enable_labels(layer: QgsVectorLayer, field_name: str) -> None:
+        """Enable single labels for a layer with a text buffer."""
+        text_format = QgsTextFormat()
+        text_format.setSize(15)
+
+        buffer_settings = QgsTextBufferSettings()
+        buffer_settings.setEnabled(True)
+        text_format.setBuffer(buffer_settings)
+
+        label_settings = QgsPalLayerSettings()
+        label_settings.fieldName = field_name
+        label_settings.setFormat(text_format)
+
+        layer.setLabeling(QgsVectorLayerSimpleLabeling(label_settings))
+        layer.setLabelsEnabled(True)
+
     def _add_coops_layer(self, parquet_path: Path, project: QgsProject) -> None:
         layer = QgsVectorLayer(str(parquet_path), "coops", "ogr")
         if not layer.isValid():
@@ -114,6 +137,7 @@ class NWMCoastalPlugin:
         marker.setSize(7.0)
         symbol.appendSymbolLayer(marker)
         layer.renderer().setSymbol(symbol)
+        self._enable_labels(layer, "station_id")
 
         project.addMapLayer(layer)
 
@@ -155,6 +179,7 @@ class NWMCoastalPlugin:
         marker.setSize(3.0)
         symbol.appendSymbolLayer(marker)
         layer.renderer().setSymbol(symbol)
+        NWMCoastalPlugin._enable_labels(layer, "site_no")
 
     @staticmethod
     def _style_nexus(layer: QgsVectorLayer) -> None:
@@ -514,7 +539,7 @@ class NWMCoastalPlugin:
     # ------------------------------------------------------------------
 
     def _on_export_flowpaths(self) -> None:
-        """Export selected flowpath features to a GeoPackage file.
+        """Export selected flowpath features to a GeoJSON file.
 
         If no features are selected on the flowpaths layer, the layer is
         made active and QGIS's selection tool is activated so the user can
@@ -544,17 +569,17 @@ class NWMCoastalPlugin:
 
         save_path, _ = QFileDialog.getSaveFileName(
             self.iface.mainWindow(),
-            "Export Selected Flowpaths as GeoPackage",
+            "Export Selected Flowpaths as GeoJSON",
             "",
-            "GeoPackage (*.gpkg)",
+            "GeoJSON (*.geojson)",
         )
         if not save_path:
             return
-        if not save_path.endswith(".gpkg"):
-            save_path += ".gpkg"
+        if not save_path.endswith(".geojson"):
+            save_path += ".geojson"
 
         options = QgsVectorFileWriter.SaveVectorOptions()
-        options.driverName = "GPKG"
+        options.driverName = "GeoJSON"
         options.fileEncoding = "UTF-8"
         options.onlySelectedFeatures = True
 

@@ -24,6 +24,9 @@ hindcast and operational forecast runs.
 - **Boundary Conditions**: TPXO tidal model and STOFS water level support
 - **NOAA Observation Stations**: Automatic discovery of CO-OPS water level stations
     within the model domain, with post-run comparison plots (simulated vs observed)
+- **Plotting Utilities**: Reusable `plotting` module for SFINCS grid inspection
+    (`SfincsGridInfo`, `plot_mesh`), flood depth visualization (`plot_floodmap`), and
+    simulated vs observed station comparison (`plot_station_comparison`)
 - **Flood Depth Map**: Downscale SFINCS water surface elevations onto a high-resolution
     DEM to produce a Cloud Optimized GeoTIFF of maximum flood depth
 - **SFINCS Model Creation**: Build SFINCS quadtree models from an AOI polygon with

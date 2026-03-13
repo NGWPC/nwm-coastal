@@ -473,7 +473,7 @@ class TestCreateStages:
                 return_value=mock_sfincs_model,
             ),
             patch(
-                "coastal_calibration.stages.sfincs_create._suppress_stdout",
+                "coastal_calibration.stages.sfincs_create.suppress_hydromt_output",
                 return_value=MagicMock(
                     __enter__=MagicMock(), __exit__=MagicMock(return_value=False)
                 ),
@@ -831,10 +831,10 @@ class TestCLI:
 
 
 @pytest.fixture
-def hydrofabric_gpkg(tmp_path: Path) -> Path:
-    """Create a minimal GeoPackage with a flowpaths layer."""
+def flowlines_geojson(tmp_path: Path) -> Path:
+    """Create a minimal GeoJSON with flowpath linestrings."""
     import geopandas as gpd
-    from shapely.geometry import LineString
+    from shapely import LineString
 
     # Create flowpath linestrings that cross the AOI boundary
     # AOI is [-95.5, 29.0] to [-95.0, 29.5]
@@ -850,20 +850,17 @@ def hydrofabric_gpkg(tmp_path: Path) -> Path:
         ],
         crs="EPSG:4326",
     )
-    path = tmp_path / "hydrofabric.gpkg"
-    gdf.to_file(path, layer="flowpaths", driver="GPKG")
+    path = tmp_path / "flowlines.geojson"
+    gdf.to_file(path, driver="GeoJSON")
     return path
 
 
 @pytest.fixture
-def nwm_discharge_config(hydrofabric_gpkg: Path) -> NWMDischargeConfig:
+def nwm_discharge_config(flowlines_geojson: Path) -> NWMDischargeConfig:
     """Return an NWMDischargeConfig with valid test values."""
     return NWMDischargeConfig(
-        hydrofabric_gpkg=hydrofabric_gpkg,
-        flowpaths_layer="flowpaths",
-        flowpath_id_column="id",
-        flowpath_ids=[1001, 1002],
-        coastal_domain="conus",
+        flowlines=flowlines_geojson,
+        nwm_id_column="id",
     )
 
 
@@ -889,98 +886,58 @@ class TestNWMDischargeConfig:
         tmp_path: Path,
         aoi_file: Path,
         output_dir: Path,
-        hydrofabric_gpkg: Path,
+        flowlines_geojson: Path,
     ) -> None:
         cfg_data = {
             "aoi": str(aoi_file),
             "output_dir": str(output_dir),
             "nwm_discharge": {
-                "hydrofabric_gpkg": str(hydrofabric_gpkg),
-                "flowpaths_layer": "flowpaths",
-                "flowpath_id_column": "id",
-                "flowpath_ids": [1001, 1002],
-                "coastal_domain": "conus",
+                "flowlines": str(flowlines_geojson),
+                "nwm_id_column": "id",
             },
         }
         cfg_path = tmp_path / "with_discharge.yaml"
         cfg_path.write_text(yaml.dump(cfg_data))
         cfg = SfincsCreateConfig.from_yaml(cfg_path)
         assert cfg.nwm_discharge is not None
-        assert cfg.nwm_discharge.flowpath_ids == [1001, 1002]
-        assert cfg.nwm_discharge.flowpaths_layer == "flowpaths"
-        assert cfg.nwm_discharge.coastal_domain == "conus"
+        assert cfg.nwm_discharge.nwm_id_column == "id"
 
-    def test_relative_gpkg_path_resolved(
-        self, tmp_path: Path, aoi_file: Path, hydrofabric_gpkg: Path
+    def test_relative_flowlines_path_resolved(
+        self, tmp_path: Path, aoi_file: Path, flowlines_geojson: Path
     ) -> None:
-        """Relative hydrofabric_gpkg path resolves against YAML dir."""
+        """Relative flowlines path resolves against YAML dir."""
         import shutil
 
-        # Copy gpkg to tmp_path so relative path works
-        local_gpkg = tmp_path / "hf.gpkg"
-        shutil.copy(hydrofabric_gpkg, local_gpkg)
+        # Put the YAML in a subdirectory so the geojson copy isn't same-file.
+        sub = tmp_path / "sub"
+        sub.mkdir()
+        local_geojson = sub / "flowlines.geojson"
+        shutil.copy(flowlines_geojson, local_geojson)
         cfg_data = {
             "aoi": str(aoi_file),
-            "output_dir": str(tmp_path / "out"),
+            "output_dir": str(sub / "out"),
             "nwm_discharge": {
-                "hydrofabric_gpkg": "hf.gpkg",
-                "flowpaths_layer": "flowpaths",
-                "flowpath_id_column": "id",
-                "flowpath_ids": [1001],
+                "flowlines": "flowlines.geojson",
+                "nwm_id_column": "id",
             },
         }
-        cfg_path = tmp_path / "rel.yaml"
+        cfg_path = sub / "rel.yaml"
         cfg_path.write_text(yaml.dump(cfg_data))
         cfg = SfincsCreateConfig.from_yaml(cfg_path)
         assert cfg.nwm_discharge is not None
-        assert cfg.nwm_discharge.hydrofabric_gpkg == local_gpkg.resolve()
+        assert cfg.nwm_discharge.flowlines == local_geojson.resolve()
 
-    def test_validate_missing_gpkg(self, aoi_file: Path, output_dir: Path) -> None:
+    def test_validate_missing_flowlines(self, aoi_file: Path, output_dir: Path) -> None:
         cfg = SfincsCreateConfig(
             aoi=aoi_file,
             output_dir=output_dir,
             nwm_discharge=NWMDischargeConfig(
-                hydrofabric_gpkg=Path("/nonexistent/hf.gpkg"),
-                flowpaths_layer="flowpaths",
-                flowpath_id_column="id",
-                flowpath_ids=[1001],
+                flowlines=Path("/nonexistent/flowlines.geojson"),
+                nwm_id_column="id",
             ),
         )
         errors = cfg.validate()
-        assert any("hydrofabric_gpkg not found" in e for e in errors)
-
-    def test_validate_empty_flowpath_ids(
-        self, aoi_file: Path, output_dir: Path, hydrofabric_gpkg: Path
-    ) -> None:
-        cfg = SfincsCreateConfig(
-            aoi=aoi_file,
-            output_dir=output_dir,
-            nwm_discharge=NWMDischargeConfig(
-                hydrofabric_gpkg=hydrofabric_gpkg,
-                flowpaths_layer="flowpaths",
-                flowpath_id_column="id",
-                flowpath_ids=[],
-            ),
-        )
-        errors = cfg.validate()
-        assert any("at least one ID" in e for e in errors)
-
-    def test_validate_invalid_domain(
-        self, aoi_file: Path, output_dir: Path, hydrofabric_gpkg: Path
-    ) -> None:
-        cfg = SfincsCreateConfig(
-            aoi=aoi_file,
-            output_dir=output_dir,
-            nwm_discharge=NWMDischargeConfig(
-                hydrofabric_gpkg=hydrofabric_gpkg,
-                flowpaths_layer="flowpaths",
-                flowpath_id_column="id",
-                flowpath_ids=[1001],
-                coastal_domain="mars",
-            ),
-        )
-        errors = cfg.validate()
-        assert any("coastal_domain must be one of" in e for e in errors)
+        assert any("flowlines not found" in e for e in errors)
 
     def test_stage_order_includes_discharge(
         self, discharge_create_config: SfincsCreateConfig
@@ -999,8 +956,7 @@ class TestNWMDischargeConfig:
     def test_to_dict_with_discharge(self, discharge_create_config: SfincsCreateConfig) -> None:
         d = discharge_create_config.to_dict()
         assert d["nwm_discharge"] is not None
-        assert d["nwm_discharge"]["flowpath_ids"] == [1001, 1002]
-        assert d["nwm_discharge"]["flowpaths_layer"] == "flowpaths"
+        assert d["nwm_discharge"]["nwm_id_column"] == "id"
 
     def test_to_dict_without_discharge(self, minimal_create_config: SfincsCreateConfig) -> None:
         d = minimal_create_config.to_dict()
@@ -1013,126 +969,84 @@ class TestNWMDischargeConfig:
 
 
 class TestDischargeStageValidation:
-    """Test CreateDischargeStage.validate() with pyogrio checks."""
+    """Test CreateDischargeStage.validate() with GeoJSON checks."""
 
     def test_validate_skips_when_no_config(self, minimal_create_config: SfincsCreateConfig) -> None:
         stage = CreateDischargeStage(minimal_create_config)
         errors = stage.validate()
         assert errors == []
 
-    def test_validate_missing_layer(
+    def test_validate_missing_flowlines(
         self,
         aoi_file: Path,
         output_dir: Path,
-        hydrofabric_gpkg: Path,
     ) -> None:
         cfg = SfincsCreateConfig(
             aoi=aoi_file,
             output_dir=output_dir,
             nwm_discharge=NWMDischargeConfig(
-                hydrofabric_gpkg=hydrofabric_gpkg,
-                flowpaths_layer="nonexistent_layer",
-                flowpath_id_column="id",
-                flowpath_ids=[1001],
+                flowlines=Path("/nonexistent/flowlines.geojson"),
+                nwm_id_column="id",
             ),
         )
         stage = CreateDischargeStage(cfg)
         errors = stage.validate()
-        assert any("not found in" in e and "nonexistent_layer" in e for e in errors)
+        assert any("flowlines not found" in e for e in errors)
+
+    def test_validate_wrong_extension(
+        self,
+        aoi_file: Path,
+        output_dir: Path,
+        tmp_path: Path,
+    ) -> None:
+        bad_file = tmp_path / "flowlines.gpkg"
+        bad_file.touch()
+        cfg = SfincsCreateConfig(
+            aoi=aoi_file,
+            output_dir=output_dir,
+            nwm_discharge=NWMDischargeConfig(
+                flowlines=bad_file,
+                nwm_id_column="id",
+            ),
+        )
+        stage = CreateDischargeStage(cfg)
+        errors = stage.validate()
+        assert any(".geojson" in e for e in errors)
 
     def test_validate_missing_column(
         self,
         aoi_file: Path,
         output_dir: Path,
-        hydrofabric_gpkg: Path,
+        flowlines_geojson: Path,
     ) -> None:
         cfg = SfincsCreateConfig(
             aoi=aoi_file,
             output_dir=output_dir,
             nwm_discharge=NWMDischargeConfig(
-                hydrofabric_gpkg=hydrofabric_gpkg,
-                flowpaths_layer="flowpaths",
-                flowpath_id_column="nonexistent_col",
-                flowpath_ids=[1001],
+                flowlines=flowlines_geojson,
+                nwm_id_column="nonexistent_col",
             ),
         )
         stage = CreateDischargeStage(cfg)
         errors = stage.validate()
         assert any("nonexistent_col" in e and "not found" in e for e in errors)
 
-    def test_validate_nwm_ids_missing(
+    def test_validate_valid_geojson(
         self,
         aoi_file: Path,
         output_dir: Path,
-        hydrofabric_gpkg: Path,
+        flowlines_geojson: Path,
     ) -> None:
-        """Mock the NWM download to return a file with known feature_ids."""
-        import numpy as np
-        import xarray as xr
-
         cfg = SfincsCreateConfig(
             aoi=aoi_file,
             output_dir=output_dir,
             nwm_discharge=NWMDischargeConfig(
-                hydrofabric_gpkg=hydrofabric_gpkg,
-                flowpaths_layer="flowpaths",
-                flowpath_id_column="id",
-                flowpath_ids=[1001, 9999],  # 9999 doesn't exist
+                flowlines=flowlines_geojson,
+                nwm_id_column="id",
             ),
         )
-
-        # Create a fake NWM streamflow file with feature_id = [1001, 1002, 1003]
-        def mock_execute_download(urls, paths, source, timeout, raise_on_error):
-            from coastal_calibration.downloader import DownloadResult
-
-            ds = xr.Dataset({"feature_id": ("feature_id", np.array([1001, 1002, 1003]))})
-            paths[0].parent.mkdir(parents=True, exist_ok=True)
-            ds.to_netcdf(paths[0])
-            return DownloadResult(source=source, total_files=1, successful=1)
-
         stage = CreateDischargeStage(cfg)
-        with patch(
-            "coastal_calibration.downloader._execute_download",
-            side_effect=mock_execute_download,
-        ):
-            errors = stage.validate()
-        assert any("9999" in e and "not found" in e for e in errors)
-
-    def test_validate_nwm_ids_all_present(
-        self,
-        aoi_file: Path,
-        output_dir: Path,
-        hydrofabric_gpkg: Path,
-    ) -> None:
-        """All requested IDs are present in the NWM sample file."""
-        import numpy as np
-        import xarray as xr
-
-        cfg = SfincsCreateConfig(
-            aoi=aoi_file,
-            output_dir=output_dir,
-            nwm_discharge=NWMDischargeConfig(
-                hydrofabric_gpkg=hydrofabric_gpkg,
-                flowpaths_layer="flowpaths",
-                flowpath_id_column="id",
-                flowpath_ids=[1001, 1002],
-            ),
-        )
-
-        def mock_execute_download(urls, paths, source, timeout, raise_on_error):
-            from coastal_calibration.downloader import DownloadResult
-
-            ds = xr.Dataset({"feature_id": ("feature_id", np.array([1001, 1002, 1003]))})
-            paths[0].parent.mkdir(parents=True, exist_ok=True)
-            ds.to_netcdf(paths[0])
-            return DownloadResult(source=source, total_files=1, successful=1)
-
-        stage = CreateDischargeStage(cfg)
-        with patch(
-            "coastal_calibration.downloader._execute_download",
-            side_effect=mock_execute_download,
-        ):
-            errors = stage.validate()
+        errors = stage.validate()
         assert errors == []
 
 
@@ -1191,22 +1105,26 @@ class TestDischargeStageRun:
         assert len(src_lines) == result["points_added"]
         _clear_model(discharge_create_config)
 
-    def test_run_no_matching_flowpaths(
+    def test_run_empty_geojson(
         self,
         aoi_file: Path,
         output_dir: Path,
-        hydrofabric_gpkg: Path,
+        tmp_path: Path,
         mock_sfincs_model: MagicMock,
     ) -> None:
-        """Flowpath IDs that don't exist in the GPKG produce skipped status."""
+        """An empty GeoJSON produces skipped status."""
+        import geopandas as gpd
+
+        empty_geojson = tmp_path / "empty.geojson"
+        gpd.GeoDataFrame({"id": []}, geometry=[], crs="EPSG:4326").to_file(
+            empty_geojson, driver="GeoJSON"
+        )
         cfg = SfincsCreateConfig(
             aoi=aoi_file,
             output_dir=output_dir,
             nwm_discharge=NWMDischargeConfig(
-                hydrofabric_gpkg=hydrofabric_gpkg,
-                flowpaths_layer="flowpaths",
-                flowpath_id_column="id",
-                flowpath_ids=[99999],  # doesn't exist in the gpkg
+                flowlines=empty_geojson,
+                nwm_id_column="id",
             ),
         )
         mock_sfincs_model.quadtree_grid.data.ugrid.grid.crs = "EPSG:4326"
@@ -1225,7 +1143,7 @@ class TestDischargeStageRun:
         """Flowpath inside AOI uses downstream endpoint as discharge point."""
         import geopandas as gpd
         import numpy as np
-        from shapely.geometry import LineString
+        from shapely import LineString
 
         # AOI with a specific boundary
         aoi = tmp_path / "aoi.geojson"
@@ -1256,22 +1174,20 @@ class TestDischargeStageRun:
         )
 
         # Flowpath entirely inside the AOI — endpoint at (-95.2, 29.3)
-        gpkg = tmp_path / "inside.gpkg"
+        geojson = tmp_path / "inside.geojson"
         gdf = gpd.GeoDataFrame(
             {"id": [2001]},
             geometry=[LineString([(-95.3, 29.2), (-95.2, 29.3)])],
             crs="EPSG:4326",
         )
-        gdf.to_file(gpkg, layer="flowpaths", driver="GPKG")
+        gdf.to_file(geojson, driver="GeoJSON")
 
         cfg = SfincsCreateConfig(
             aoi=aoi,
             output_dir=output_dir,
             nwm_discharge=NWMDischargeConfig(
-                hydrofabric_gpkg=gpkg,
-                flowpaths_layer="flowpaths",
-                flowpath_id_column="id",
-                flowpath_ids=[2001],
+                flowlines=geojson,
+                nwm_id_column="id",
             ),
         )
         mock_sfincs_model.quadtree_grid.data.ugrid.grid.crs = "EPSG:4326"
@@ -1292,6 +1208,79 @@ class TestDischargeStageRun:
         src_file = cfg.output_dir / "sfincs_nwm.src"
         assert src_file.exists()
         assert len(src_file.read_text().strip().splitlines()) == 1
+        _clear_model(cfg)
+
+    def test_run_multilinestring_merged(
+        self,
+        output_dir: Path,
+        tmp_path: Path,
+        mock_sfincs_model: MagicMock,
+    ) -> None:
+        """MultiLineString geometries are merged into LineStrings."""
+        import geopandas as gpd
+        import numpy as np
+        from shapely import MultiLineString
+
+        aoi = tmp_path / "aoi.geojson"
+        aoi.write_text(
+            json.dumps(
+                {
+                    "type": "FeatureCollection",
+                    "features": [
+                        {
+                            "type": "Feature",
+                            "geometry": {
+                                "type": "Polygon",
+                                "coordinates": [
+                                    [
+                                        [-95.5, 29.0],
+                                        [-95.0, 29.0],
+                                        [-95.0, 29.5],
+                                        [-95.5, 29.5],
+                                        [-95.5, 29.0],
+                                    ]
+                                ],
+                            },
+                            "properties": {},
+                        }
+                    ],
+                }
+            )
+        )
+
+        # MultiLineString that should be merged into a single LineString
+        geojson = tmp_path / "multi.geojson"
+        gdf = gpd.GeoDataFrame(
+            {"id": [3001]},
+            geometry=[
+                MultiLineString([[(-95.4, 29.2), (-95.3, 29.25)], [(-95.3, 29.25), (-95.2, 29.3)]])
+            ],
+            crs="EPSG:4326",
+        )
+        gdf.to_file(geojson, driver="GeoJSON")
+
+        cfg = SfincsCreateConfig(
+            aoi=aoi,
+            output_dir=output_dir,
+            nwm_discharge=NWMDischargeConfig(
+                flowlines=geojson,
+                nwm_id_column="id",
+            ),
+        )
+        mock_sfincs_model.quadtree_grid.data.ugrid.grid.crs = "EPSG:4326"
+        face_x = np.array([-95.25, -95.15])
+        face_y = np.array([29.25, 29.35])
+        mock_sfincs_model.quadtree_grid.data.ugrid.grid.face_x = face_x
+        mock_sfincs_model.quadtree_grid.data.ugrid.grid.face_y = face_y
+        mask_mock = MagicMock()
+        mask_mock.to_numpy.return_value = np.array([1, 1])
+        mock_sfincs_model.quadtree_grid.data.__getitem__ = lambda self, k: (
+            mask_mock if k == "mask" else MagicMock()
+        )
+        _set_model(cfg, mock_sfincs_model)
+        stage = CreateDischargeStage(cfg)
+        result = stage.run()
+        assert result["points_added"] == 1
         _clear_model(cfg)
 
     def test_create_stages_includes_discharge(

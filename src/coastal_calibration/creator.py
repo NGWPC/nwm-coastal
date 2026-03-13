@@ -2,12 +2,8 @@
 
 from __future__ import annotations
 
-import contextlib
 import json
-import os
-import sys
 from datetime import datetime
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from coastal_calibration.runner import WorkflowResult
@@ -21,44 +17,13 @@ from coastal_calibration.utils.logging import (
     configure_logger,
     generate_log_path,
     silence_third_party_loggers,
+    suppress_hydromt_output,
 )
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from coastal_calibration.config.create_schema import SfincsCreateConfig
-
-
-@contextlib.contextmanager
-def _suppress_stdout():
-    """Redirect stdout to ``/dev/null`` to silence raw ``print()`` calls.
-
-    hydromt-sfincs's quadtree builders use raw ``print()`` that cannot
-    be silenced via the logging system.  All our own output goes to
-    stderr via :mod:`rich`, so nothing is lost.
-
-    Two layers of redirection are needed:
-
-    * **fd 1** — catches C extensions that write directly to file
-      descriptor 1.
-    * **sys.stdout** — catches Python-level ``print()`` in environments
-      where ``sys.stdout`` is *not* backed by fd 1 (e.g. Jupyter
-      notebooks use a ZMQ-backed stream).
-    """
-    # fd-level redirect
-    devnull_fd = os.open(os.devnull, os.O_WRONLY)
-    saved_fd = os.dup(1)
-    os.dup2(devnull_fd, 1)
-    os.close(devnull_fd)
-
-    # Python-level redirect
-    saved_stdout = sys.stdout
-    sys.stdout = Path(os.devnull).open("w")  # noqa: SIM115
-    try:
-        yield
-    finally:
-        sys.stdout.close()
-        sys.stdout = saved_stdout
-        os.dup2(saved_fd, 1)
-        os.close(saved_fd)
 
 
 class SfincsCreator:
@@ -264,7 +229,7 @@ class SfincsCreator:
 
         current_stage = ""
         try:
-            with _suppress_stdout():
+            with suppress_hydromt_output():
                 for current_stage in stages_to_run:
                     stage = self._stages[current_stage]
 

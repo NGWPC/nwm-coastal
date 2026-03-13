@@ -11,7 +11,6 @@ module-level registry keyed by config ``id``.
 
 from __future__ import annotations
 
-import math
 import os
 import shutil
 import subprocess
@@ -32,38 +31,6 @@ if TYPE_CHECKING:
 
     from coastal_calibration.config.schema import CoastalCalibConfig
     from coastal_calibration.utils.logging import WorkflowMonitor
-
-# Maximum number of stations per figure (2x2 layout).
-_STATIONS_PER_FIGURE = 4
-
-
-def _plotable_stations(
-    station_ids: list[str],
-    sim_elevation: NDArray[np.float64],
-    obs_ds: Any,
-) -> list[tuple[str, int]]:
-    """Return (station_id, column_index) pairs that have data to plot.
-
-    A station is plotable only when *both* its simulated and observed
-    time-series contain finite values — a comparison plot with only
-    one series is not useful.
-
-    The returned list is sorted by numeric station ID so that figures
-    are deterministic across runs.
-    """
-    result: list[tuple[str, int]] = []
-    for i, sid in enumerate(station_ids):
-        has_sim = bool(np.isfinite(sim_elevation[:, i]).any())
-        has_obs = False
-        if sid in obs_ds.station.values:
-            has_obs = bool(np.isfinite(obs_ds.water_level.sel(station=sid)).any())
-        if has_sim and has_obs:
-            result.append((sid, i))
-    try:
-        result.sort(key=lambda pair: int(pair[0]))
-    except ValueError:
-        result.sort(key=lambda pair: pair[0])
-    return result
 
 
 # ---------------------------------------------------------------------------
@@ -1001,7 +968,7 @@ class SfincsForcingStage(_SfincsStageBase):
 
         import geopandas as gpd
         from pyproj import Transformer
-        from shapely.geometry import Point
+        from shapely import Point
 
         model_root = get_model_root(self.config)
 
@@ -1185,7 +1152,7 @@ class SfincsForcingStage(_SfincsStageBase):
         4. Injects the result into HydroMT the same way the TPXO path does.
         """
         import geopandas as gpd
-        from shapely.geometry import Point
+        from shapely import Point
 
         # 1. Read boundary points (sfincs.bnd or quadtree mask fallback)
         bnd_points = self._get_boundary_points(model)
@@ -1922,139 +1889,6 @@ class SfincsPlotStage(_SfincsStageBase):
                 return str(dim_name)
         raise ValueError("Cannot determine station dimension in point_h")
 
-    @staticmethod
-    def _plot_figures(
-        sim_times: Any,
-        sim_elevation: NDArray[np.float64],
-        station_ids: list[str],
-        obs_ds: Any,
-        figs_dir: Path,
-    ) -> list[Path]:
-        """Create comparison figures and save them.
-
-        Stations that lack *both* valid observations and valid simulated
-        data are skipped so that empty panels do not appear.
-
-        Parameters
-        ----------
-        sim_times : array-like
-            Simulation datetimes.
-        sim_elevation : ndarray
-            Simulated elevation of shape (n_times, n_stations).
-        station_ids : list[str]
-            NOAA station IDs (one per column in ``sim_elevation``).
-        obs_ds : xr.Dataset
-            Observed water levels.
-        figs_dir : Path
-            Output directory for figures.
-
-        Returns
-        -------
-        list[Path]
-            Paths to the saved figures.
-        """
-        import sys
-
-        import matplotlib
-
-        # Force non-interactive backend except inside Jupyter kernels.
-        if "ipykernel" not in sys.modules:
-            matplotlib.use("Agg")
-
-        import matplotlib.dates as mdates
-        import matplotlib.pyplot as plt
-
-        # ── Pre-filter: keep only stations with both obs and sim ──
-        plotable = _plotable_stations(station_ids, sim_elevation, obs_ds)
-
-        if not plotable:
-            figs_dir.mkdir(parents=True, exist_ok=True)
-            return []
-
-        n_plotable = len(plotable)
-        n_figures = math.ceil(n_plotable / _STATIONS_PER_FIGURE)
-        figs_dir.mkdir(parents=True, exist_ok=True)
-
-        saved: list[Path] = []
-        for fig_idx in range(n_figures):
-            start = fig_idx * _STATIONS_PER_FIGURE
-            end = min(start + _STATIONS_PER_FIGURE, n_plotable)
-            batch = plotable[start:end]
-            batch_size = len(batch)
-
-            nrows = 2 if batch_size > 2 else 1
-            ncols = 2 if batch_size > 1 else 1
-
-            fig, axes = plt.subplots(
-                nrows,
-                ncols,
-                figsize=(16, 5 * nrows),
-                squeeze=False,
-            )
-            axes_flat = axes.ravel()
-
-            for i, (sid, col_idx) in enumerate(batch):
-                ax = axes_flat[i]
-
-                # Simulated
-                sim_ts = sim_elevation[:, col_idx]
-                has_sim = bool(np.isfinite(sim_ts).any())
-
-                # Observed
-                has_obs = False
-                if sid in obs_ds.station.values:
-                    obs_wl = obs_ds.water_level.sel(station=sid)
-                    has_obs = bool(np.isfinite(obs_wl).any())
-                    if has_obs:
-                        ax.plot(
-                            obs_wl.time.values,
-                            obs_wl.values,
-                            label="Observed",
-                            color="k",
-                            linewidth=1.0,
-                        )
-
-                if has_sim:
-                    ax.plot(
-                        sim_times,
-                        sim_ts,
-                        color="r",
-                        ls="--",
-                        alpha=0.5,
-                    )
-                    ax.scatter(
-                        sim_times,
-                        sim_ts,
-                        label="Simulated",
-                        color="r",
-                        marker="x",
-                        s=25,
-                    )
-
-                ax.set_title(f"NOAA {sid}", fontsize=14, fontweight="bold")
-                ax.set_ylabel("Water Level (m, MSL)", fontsize=12)
-                ax.tick_params(axis="both", labelsize=11)
-                ax.legend(fontsize=11, loc="best")
-
-                # Readable date formatting on x-axis
-                ax.xaxis.set_major_formatter(mdates.DateFormatter("%m-%d %H:%M"))
-                ax.xaxis.set_major_locator(mdates.AutoDateLocator(minticks=4, maxticks=8))
-                for label in ax.get_xticklabels():
-                    label.set_rotation(30)
-                    label.set_horizontalalignment("right")
-
-            # Remove unused axes
-            for j in range(batch_size, nrows * ncols):
-                axes_flat[j].remove()
-
-            fig.tight_layout()
-            fig_path = figs_dir / f"stations_comparison_{fig_idx + 1:03d}.png"
-            fig.savefig(fig_path, dpi=300, bbox_inches="tight")
-            plt.close(fig)
-            saved.append(fig_path)
-
-        return saved
-
     def _fetch_observations_msl(
         self,
         station_ids: list[str],
@@ -2325,8 +2159,12 @@ class SfincsPlotStage(_SfincsStageBase):
 
         # Generate comparison plots
         self._update_substep("Generating comparison plots")
+        from coastal_calibration.plotting import plot_station_comparison
+
         figs_dir = model_root / "figs"
-        fig_paths = self._plot_figures(sim_times, sim_elevation, noaa_station_ids, obs_ds, figs_dir)
+        fig_paths = plot_station_comparison(
+            sim_times, sim_elevation, noaa_station_ids, obs_ds, figs_dir
+        )
 
         self._log(f"Saved {len(fig_paths)} comparison figure(s) to {figs_dir}")
         return {

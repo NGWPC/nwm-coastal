@@ -167,40 +167,25 @@ class DataCatalogConfig:
     data_libs: list[str] = field(default_factory=list)
 
 
-#: Valid NWM domains for streamflow validation.
-_VALID_NWM_DOMAINS = frozenset({"conus", "atlgulf", "pacific", "hawaii", "prvi", "alaska"})
-
-
 @dataclass
 class NWMDischargeConfig:
     """NWM discharge source point configuration.
 
-    Derives discharge source points by intersecting NWM hydrofabric
-    flowpaths with the model AOI boundary.  The intersection points
-    are added as SFINCS discharge source locations.
+    Derives discharge source points from user-provided flowline
+    geometries (e.g. exported from the QGIS plugin).  Each flowline's
+    downstream endpoint (closest to the AOI boundary) is registered as
+    a SFINCS discharge source location.
     """
 
-    #: Path to an NWM hydrofabric GeoPackage file.
-    hydrofabric_gpkg: Path
+    #: Path to a GeoJSON file containing flowpath linestring geometries.
+    flowlines: Path
 
-    #: Layer name inside the GeoPackage containing flowpath linestring
-    #: geometries.
-    flowpaths_layer: str
-
-    #: Column in the flowpaths layer whose values identify each flowpath
-    #: and correspond to NWM ``feature_id`` values in CHRTOUT files.
-    flowpath_id_column: str
-
-    #: List of NWM feature IDs to extract from the hydrofabric.
-    flowpath_ids: list[int] = field(default_factory=list)
-
-    #: NWM coastal domain used for streamflow ID validation
-    #: (``conus``, ``atlgulf``, ``pacific``, ``hawaii``, ``prvi``, or
-    #: ``alaska``).
-    coastal_domain: str = "conus"
+    #: Column in the GeoJSON whose values correspond to NWM
+    #: ``feature_id`` values in CHRTOUT files.
+    nwm_id_column: str
 
     def __post_init__(self) -> None:
-        self.hydrofabric_gpkg = Path(self.hydrofabric_gpkg).expanduser().resolve()
+        self.flowlines = Path(self.flowlines).expanduser().resolve()
 
 
 @dataclass
@@ -362,7 +347,7 @@ class SfincsCreateConfig:
         nwm_discharge: NWMDischargeConfig | None = None
         nwm_data = data.get("nwm_discharge")
         if nwm_data is not None:
-            nwm_data["hydrofabric_gpkg"] = Path(nwm_data["hydrofabric_gpkg"])
+            nwm_data["flowlines"] = Path(nwm_data["flowlines"])
             nwm_discharge = NWMDischargeConfig(**nwm_data)
 
         download_dir_raw = data.get("download_dir")
@@ -409,9 +394,9 @@ class SfincsCreateConfig:
                 ref_entry["polygon"] = str(yaml_dir / poly)
 
         nwm_data = data.get("nwm_discharge") or {}
-        gpkg = nwm_data.get("hydrofabric_gpkg")
-        if gpkg and not Path(gpkg).is_absolute():
-            nwm_data["hydrofabric_gpkg"] = str(yaml_dir / gpkg)
+        flowlines = nwm_data.get("flowlines")
+        if flowlines and not Path(flowlines).is_absolute():
+            nwm_data["flowlines"] = str(yaml_dir / flowlines)
             data["nwm_discharge"] = nwm_data
 
         catalog_data = data.get("data_catalog") or {}
@@ -538,15 +523,8 @@ class SfincsCreateConfig:
 
         if self.nwm_discharge is not None:
             nd = self.nwm_discharge
-            if not nd.hydrofabric_gpkg.exists():
-                errors.append(f"nwm_discharge.hydrofabric_gpkg not found: {nd.hydrofabric_gpkg}")
-            if not nd.flowpath_ids:
-                errors.append("nwm_discharge.flowpath_ids must contain at least one ID")
-            if nd.coastal_domain not in _VALID_NWM_DOMAINS:
-                errors.append(
-                    f"nwm_discharge.coastal_domain must be one of "
-                    f"{sorted(_VALID_NWM_DOMAINS)}, got '{nd.coastal_domain}'"
-                )
+            if not nd.flowlines.exists():
+                errors.append(f"nwm_discharge.flowlines not found: {nd.flowlines}")
 
         return errors
 
@@ -612,11 +590,8 @@ class SfincsCreateConfig:
             },
             "nwm_discharge": (
                 {
-                    "hydrofabric_gpkg": str(self.nwm_discharge.hydrofabric_gpkg),
-                    "flowpaths_layer": self.nwm_discharge.flowpaths_layer,
-                    "flowpath_id_column": self.nwm_discharge.flowpath_id_column,
-                    "flowpath_ids": self.nwm_discharge.flowpath_ids,
-                    "coastal_domain": self.nwm_discharge.coastal_domain,
+                    "flowlines": str(self.nwm_discharge.flowlines),
+                    "nwm_id_column": self.nwm_discharge.nwm_id_column,
                 }
                 if self.nwm_discharge is not None
                 else None
