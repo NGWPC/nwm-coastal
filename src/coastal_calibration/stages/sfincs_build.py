@@ -2197,7 +2197,13 @@ class SfincsSymlinksStage(WorkflowStage):
         download_dir = self.config.paths.download_dir
         if not download_dir.exists():
             self._log(f"Download dir {download_dir} does not exist — skipping symlinks")
-            return {"meteo_symlinks": 0, "streamflow_symlinks": 0, "status": "skipped"}
+            return {
+                "meteo_symlinks": 0,
+                "streamflow_symlinks": 0,
+                "meteo_existing": 0,
+                "streamflow_existing": 0,
+                "status": "skipped",
+            }
 
         self._update_substep("Creating .nc symlinks")
         meteo_source = self.config.simulation.meteo_source

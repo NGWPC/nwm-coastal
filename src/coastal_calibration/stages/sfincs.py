@@ -10,6 +10,7 @@ import yaml
 
 from coastal_calibration.config.schema import MeteoSource, PathConfig
 from coastal_calibration.stages._hydromt_compat import apply_all_patches
+from coastal_calibration.utils.logging import logger
 
 apply_all_patches()
 
@@ -675,6 +676,24 @@ def generate_data_catalog(
     return catalog
 
 
+def _symlink_dir(directory: Path, glob_pattern: str, nc_suffix: str) -> tuple[list[Path], int]:
+    """Create ``.nc`` symlinks in *directory* for files matching *glob_pattern*."""
+    created: list[Path] = []
+    n_existing = 0
+    if not directory.exists():
+        return created, n_existing
+    for src in directory.glob(glob_pattern):
+        dst = src.with_suffix(nc_suffix)
+        if dst.is_symlink():
+            n_existing += 1
+        elif dst.exists():
+            logger.warning("Non-symlink file exists at %s, skipping", dst)
+        else:
+            dst.symlink_to(src.name)
+            created.append(dst)
+    return created, n_existing
+
+
 def create_nc_symlinks(
     download_dir: Path | str,
     *,
@@ -731,14 +750,9 @@ def create_nc_symlinks(
         # Both nwm_retro and nwm_ana downloads use extension-less
         # YYYYMMDDHH.LDASIN_DOMAIN1 naming.  We create .nc symlinks to
         # work around a HydroMT ext_override bug.
-        if meteo_dir.exists():
-            for src in meteo_dir.glob("*.LDASIN_DOMAIN1"):
-                dst = src.with_suffix(".LDASIN_DOMAIN1.nc")
-                if dst.exists():
-                    existing["meteo"] += 1
-                else:
-                    dst.symlink_to(src.name)
-                    created["meteo"].append(dst)
+        new, n_existing = _symlink_dir(meteo_dir, "*.LDASIN_DOMAIN1", ".LDASIN_DOMAIN1.nc")
+        created["meteo"] = new
+        existing["meteo"] = n_existing
 
     if include_streamflow:
         if meteo_source == "nwm_retro":
@@ -746,14 +760,9 @@ def create_nc_symlinks(
         else:
             streamflow_dir = download_dir / PathConfig.HYDRO_SUBDIR / "nwm"
 
-        if streamflow_dir.exists():
-            for src in streamflow_dir.glob("*.CHRTOUT_DOMAIN1"):
-                dst = src.with_suffix(".CHRTOUT_DOMAIN1.nc")
-                if dst.exists():
-                    existing["streamflow"] += 1
-                else:
-                    dst.symlink_to(src.name)
-                    created["streamflow"].append(dst)
+        new, n_existing = _symlink_dir(streamflow_dir, "*.CHRTOUT_DOMAIN1", ".CHRTOUT_DOMAIN1.nc")
+        created["streamflow"] = new
+        existing["streamflow"] = n_existing
 
     return created, existing
 
