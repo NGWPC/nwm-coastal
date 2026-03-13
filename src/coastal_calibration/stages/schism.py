@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 import re
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any, cast
@@ -21,8 +20,6 @@ if TYPE_CHECKING:
 
 # Buffer size for reading large hgrid.gr3 files (8 MB).
 _HGRID_BUFFER_SIZE = 8 * 1024 * 1024
-# Maximum number of stations per figure (2x2 layout).
-_STATIONS_PER_FIGURE = 4
 
 
 # ---------------------------------------------------------------------------
@@ -105,28 +102,6 @@ def _read_station_noaa_ids(base_dir: Path) -> list[str]:
     """Read station NOAA IDs from the companion file."""
     path = base_dir / "station_noaa_ids.txt"
     return [line.strip() for line in path.read_text().splitlines() if line.strip()]
-
-
-def _plotable_stations(
-    station_ids: list[str],
-    sim_elevation: NDArray[np.float64],
-    obs_ds: Any,
-) -> list[tuple[str, int]]:
-    """Return (station_id, column_index) pairs that have data to plot.
-
-    A station is plotable only when *both* its simulated and observed
-    time-series contain finite values — a comparison plot with only
-    one series is not useful.
-    """
-    result: list[tuple[str, int]] = []
-    for i, sid in enumerate(station_ids):
-        has_sim = bool(np.isfinite(sim_elevation[:, i]).any())
-        has_obs = False
-        if sid in obs_ds.station.values:
-            has_obs = bool(np.isfinite(obs_ds.water_level.sel(station=sid)).any())
-        if has_sim and has_obs:
-            result.append((sid, i))
-    return result
 
 
 def _read_staout(staout_path: Path) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
@@ -582,133 +557,6 @@ class SchismPlotStage(WorkflowStage):
         obs_ds.attrs["datum"] = "MSL"
         return obs_ds
 
-    @staticmethod
-    def _plot_figures(
-        sim_times: Any,
-        sim_elevation: NDArray[np.float64],
-        station_ids: list[str],
-        obs_ds: Any,
-        figs_dir: Path,
-    ) -> list[Path]:
-        """Create 2x2 comparison figures and save them.
-
-        Stations that have *neither* valid observations nor valid
-        simulated data are skipped entirely so that empty panels do
-        not appear in the output.
-
-        Parameters
-        ----------
-        sim_times : array-like
-            Simulation datetimes.
-        sim_elevation : ndarray
-            Simulated elevation of shape (n_times, n_stations).
-        station_ids : list[str]
-            NOAA station IDs (one per column in ``sim_elevation``).
-        obs_ds : xr.Dataset
-            Observed water levels.
-        figs_dir : Path
-            Output directory for figures.
-
-        Returns
-        -------
-        list[Path]
-            Paths to the saved figures.
-        """
-        import sys
-
-        import matplotlib
-
-        # Force non-interactive backend except inside Jupyter kernels.
-        if "ipykernel" not in sys.modules:
-            matplotlib.use("Agg")
-
-        import matplotlib.dates as mdates
-        import matplotlib.pyplot as plt
-
-        # ── Pre-filter: keep only stations with at least obs or sim ──
-        plotable = _plotable_stations(station_ids, sim_elevation, obs_ds)
-
-        if not plotable:
-            figs_dir.mkdir(parents=True, exist_ok=True)
-            return []
-
-        n_plotable = len(plotable)
-        n_figures = math.ceil(n_plotable / _STATIONS_PER_FIGURE)
-        figs_dir.mkdir(parents=True, exist_ok=True)
-
-        saved: list[Path] = []
-        for fig_idx in range(n_figures):
-            start = fig_idx * _STATIONS_PER_FIGURE
-            end = min(start + _STATIONS_PER_FIGURE, n_plotable)
-            batch = plotable[start:end]
-            batch_size = len(batch)
-
-            nrows = 2 if batch_size > 2 else 1
-            ncols = 2 if batch_size > 1 else 1
-
-            fig, axes = plt.subplots(
-                nrows,
-                ncols,
-                figsize=(16, 5 * nrows),
-                squeeze=False,
-            )
-            axes_flat = axes.ravel()
-
-            for i, (sid, col_idx) in enumerate(batch):
-                ax = axes_flat[i]
-
-                # _plotable_stations guarantees both sim & obs have
-                # finite values, so we can plot unconditionally.
-                sim_ts = sim_elevation[:, col_idx]
-                obs_wl = obs_ds.water_level.sel(station=sid)
-
-                ax.plot(
-                    obs_wl.time.values,
-                    obs_wl.values,
-                    label="Observed",
-                    color="k",
-                    linewidth=1.0,
-                )
-                ax.plot(
-                    sim_times,
-                    sim_ts,
-                    color="r",
-                    ls="--",
-                    alpha=0.5,
-                )
-                ax.scatter(
-                    sim_times,
-                    sim_ts,
-                    label="Simulated",
-                    color="r",
-                    marker="x",
-                    s=25,
-                )
-
-                ax.set_title(f"NOAA {sid}", fontsize=14, fontweight="bold")
-                ax.set_ylabel("Water Level (m, MSL)", fontsize=12)
-                ax.tick_params(axis="both", labelsize=11)
-                ax.legend(fontsize=11, loc="best")
-
-                # Readable date formatting on x-axis
-                ax.xaxis.set_major_formatter(mdates.DateFormatter("%m-%d %H:%M"))
-                ax.xaxis.set_major_locator(mdates.AutoDateLocator(minticks=4, maxticks=8))
-                for label in ax.get_xticklabels():
-                    label.set_rotation(30)
-                    label.set_horizontalalignment("right")
-
-            # Remove unused axes
-            for j in range(batch_size, nrows * ncols):
-                axes_flat[j].remove()
-
-            fig.tight_layout()
-            fig_path = figs_dir / f"stations_comparison_{fig_idx + 1:03d}.png"
-            fig.savefig(fig_path, dpi=300, bbox_inches="tight")
-            plt.close(fig)
-            saved.append(fig_path)
-
-        return saved
-
     def run(self) -> dict[str, Any]:
         """Read SCHISM output, fetch NOAA observations, and plot comparison."""
         if not self.model.include_noaa_gages:
@@ -766,8 +614,10 @@ class SchismPlotStage(WorkflowStage):
 
         # Generate comparison plots (2x2 per figure)
         self._update_substep("Generating comparison plots")
+        from coastal_calibration.plotting import plot_station_comparison
+
         figs_dir = work_dir / "figs"
-        fig_paths = self._plot_figures(sim_times, elevation, station_ids, obs_ds, figs_dir)
+        fig_paths = plot_station_comparison(sim_times, elevation, station_ids, obs_ds, figs_dir)
 
         self._log(f"Saved {len(fig_paths)} comparison figure(s) to {figs_dir}")
 
