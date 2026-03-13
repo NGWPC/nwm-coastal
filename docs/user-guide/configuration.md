@@ -476,21 +476,23 @@ Each dataset entry:
 | ----------- | ---- | ------- | ------------------------------------------ |
 | `data_libs` | list | `[]`    | Additional HydroMT data catalog YAML paths |
 
-#### NWM Discharge (`nwm_discharge`) — Optional
+#### River Discharge (`river_discharge`) — Optional
 
-When configured, adds NWM streamflow discharge source points to the model by
-intersecting hydrofabric flowpaths with the AOI boundary.
+When configured, adds river discharge source points to the model by intersecting
+hydrofabric flowpaths with the AOI boundary.
 
 ```yaml
-nwm_discharge:
+river_discharge:
   flowlines: ./selected_flowpaths.geojson
   nwm_id_column: feature_id
+  max_snap_distance_m: 2000
 ```
 
-| Parameter       | Type | Default  | Description                                                      |
-| --------------- | ---- | -------- | ---------------------------------------------------------------- |
-| `flowlines`     | path | required | GeoJSON file with flowpath linestrings (e.g. exported from QGIS) |
-| `nwm_id_column` | str  | required | Column whose values correspond to NWM `feature_id` in CHRTOUT    |
+| Parameter             | Type  | Default  | Description                                                                    |
+| --------------------- | ----- | -------- | ------------------------------------------------------------------------------ |
+| `flowlines`           | path  | required | GeoJSON file with flowpath linestrings (e.g. exported from QGIS)               |
+| `nwm_id_column`       | str   | required | Column whose values correspond to NWM `feature_id` in CHRTOUT                  |
+| `max_snap_distance_m` | float | `2000`   | Max distance (m) to snap a point to an active cell; farther points are dropped |
 
 ## Validation
 

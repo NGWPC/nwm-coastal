@@ -694,7 +694,7 @@ y_coords = transform[5] + (np.arange(bn0, bn1) + 0.5) * src.transform[4]  # <-- 
 
 The `xx`, `yy` meshgrid coordinates are in the DEM's CRS (e.g. EPSG:4269, NAD83
 geographic, degrees), but `get_indices_at_points` expects coordinates in the model's CRS
-(e.g. EPSG:32614, UTM, metres). Without reprojection, every point falls outside the grid
+(e.g. EPSG:32614, UTM, meters). Without reprojection, every point falls outside the grid
 and the entire index COG is filled with nodata.
 
 **Suggested fix**:

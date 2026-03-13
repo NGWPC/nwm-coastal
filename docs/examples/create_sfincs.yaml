@@ -58,19 +58,14 @@ subgrid:
   manning_land: 0.04
   manning_sea: 0.02
 
-# NWM discharge source points from hydrofabric (optional)
+# River discharge source points from flowpath geometries (optional)
 # Derives discharge locations by intersecting flowpath linestrings
 # with the AOI boundary.  Feature IDs are validated against NWM
 # streamflow data before model creation.
-# nwm_discharge:
-#   hydrofabric_gpkg: /path/to/hydrofabric.gpkg
-#   flowpaths_layer: flowpaths
-#   flowpath_id_column: id
-#   flowpath_ids:
-#     - 1614588
-#     - 1614624
-#     - 1614632
-#   coastal_domain: conus    # conus, atlgulf, pacific, hawaii, prvi, alaska
+# river_discharge:
+#   flowlines: /path/to/flowlines.geojson
+#   nwm_id_column: flowpath_id
+#   max_snap_distance_m: 2000  # drop points that must move farther than this
 
 # Observation points (optional)
 # Discovers NOAA CO-OPS water level stations within the model domain

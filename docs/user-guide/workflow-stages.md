@@ -618,10 +618,10 @@ Skipped when all datasets are user-provided (no auto-fetch configured).
 
 ### 6. create_discharge _(optional)_
 
-**Purpose:** Add NWM discharge source points to the model.
+**Purpose:** Add river discharge source points to the model.
 
-**Enabled by:** Configuring a `nwm_discharge` section in the creation config. Skipped
-when `nwm_discharge` is not present.
+**Enabled by:** Configuring a `river_discharge` section in the creation config. Skipped
+when `river_discharge` is not present.
 
 **Tasks:**
 
