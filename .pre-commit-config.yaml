@@ -39,7 +39,7 @@ repos:
     exclude: ^docs/examples/notebooks/.*\.py$
 
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.15.5
+  rev: v0.15.6
   hooks:
   - id: ruff
     name: Linting with Ruff

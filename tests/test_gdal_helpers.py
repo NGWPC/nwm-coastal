@@ -16,8 +16,8 @@ import geopandas as gpd
 import numpy as np
 import pytest
 import rasterio
+import shapely
 from rasterio.transform import from_bounds
-from shapely.geometry import box
 
 from coastal_calibration.utils._gdal import compute_aoi_coverage
 
@@ -56,7 +56,7 @@ def _write_zone(
     path: Path, bounds: tuple[float, float, float, float], crs: str = "EPSG:4326"
 ) -> Path:
     """Write a GeoJSON zone polygon via GeoPandas (produces a FeatureCollection)."""
-    gdf = gpd.GeoDataFrame(geometry=[box(*bounds)], crs=crs)
+    gdf = gpd.GeoDataFrame(geometry=[shapely.box(*bounds)], crs=crs)
     gdf.to_file(path, driver="GeoJSON")
     return path
 

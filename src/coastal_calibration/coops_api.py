@@ -22,8 +22,8 @@ from coastal_calibration.utils.logging import logger
 if TYPE_CHECKING:
     import geopandas as gpd
     import pandas as pd
-    import shapely
     import xarray as xr
+    from shapely.geometry.base import BaseGeometry
 
 
 def _check_plot_deps() -> None:
@@ -849,7 +849,7 @@ def query_coops_byids(
 
 
 def query_coops_bygeometry(
-    geometry: shapely.geometry.base.BaseGeometry,
+    geometry: BaseGeometry,
     begin_date: str,
     end_date: str,
     *,
