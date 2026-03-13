@@ -681,7 +681,7 @@ def create_nc_symlinks(
     meteo_source: MeteoSource = "nwm_retro",
     include_meteo: bool = True,
     include_streamflow: bool = True,
-) -> dict[str, list[Path]]:
+) -> tuple[dict[str, list[Path]], dict[str, int]]:
     """Create .nc symlinks for NWM files to work around HydroMT extension check bug.
 
     HydroMT's raster_xarray driver has a bug where the `ext_override` option is not
@@ -701,9 +701,12 @@ def create_nc_symlinks(
 
     Returns
     -------
-    dict[str, list[Path]]
-        Dictionary with keys "meteo" and "streamflow" containing lists of created
-        symlink paths.
+    created : dict[str, list[Path]]
+        Dictionary with keys "meteo" and "streamflow" containing lists of newly
+        created symlink paths.
+    existing : dict[str, int]
+        Dictionary with keys "meteo" and "streamflow" containing counts of
+        symlinks that already existed.
 
     Examples
     --------
@@ -721,6 +724,7 @@ def create_nc_symlinks(
     """
     download_dir = Path(download_dir)
     created: dict[str, list[Path]] = {"meteo": [], "streamflow": []}
+    existing: dict[str, int] = {"meteo": 0, "streamflow": 0}
 
     if include_meteo:
         meteo_dir = download_dir / PathConfig.METEO_SUBDIR / meteo_source
@@ -730,7 +734,9 @@ def create_nc_symlinks(
         if meteo_dir.exists():
             for src in meteo_dir.glob("*.LDASIN_DOMAIN1"):
                 dst = src.with_suffix(".LDASIN_DOMAIN1.nc")
-                if not dst.exists():
+                if dst.exists():
+                    existing["meteo"] += 1
+                else:
                     dst.symlink_to(src.name)
                     created["meteo"].append(dst)
 
@@ -743,11 +749,13 @@ def create_nc_symlinks(
         if streamflow_dir.exists():
             for src in streamflow_dir.glob("*.CHRTOUT_DOMAIN1"):
                 dst = src.with_suffix(".CHRTOUT_DOMAIN1.nc")
-                if not dst.exists():
+                if dst.exists():
+                    existing["streamflow"] += 1
+                else:
                     dst.symlink_to(src.name)
                     created["streamflow"].append(dst)
 
-    return created
+    return created, existing
 
 
 def remove_nc_symlinks(
