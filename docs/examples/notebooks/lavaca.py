@@ -13,7 +13,7 @@
 # ---
 
 # %% [markdown]
-# # Lavaca Bay SFINCS Tutorial — Python API
+# # Lavaca Bay SFINCS Tutorial
 #
 # This notebook demonstrates how to build and run a
 # [SFINCS](https://sfincs.readthedocs.io) coastal flood model for
@@ -50,7 +50,9 @@ os.chdir(notebook_dir.parent / "lavaca-tx")
 # structure as the YAML file.
 
 # %%
-from coastal_calibration import SfincsCreateConfig, SfincsCreator
+from coastal_calibration import SfincsCreateConfig, SfincsCreator, configure_logger
+
+configure_logger(level="INFO")
 
 create_config = SfincsCreateConfig.from_dict(
     {
@@ -78,6 +80,10 @@ create_config = SfincsCreateConfig.from_dict(
             "lulc_dataset": "esa_worldcover",
             "manning_land": 0.04,
             "manning_sea": 0.02,
+        },
+        "nwm_discharge": {
+            "flowlines": "./discharge_nwm.geojson",
+            "nwm_id_column": "flowpath_id",
         },
         "add_noaa_gages": True,
     }
@@ -125,7 +131,7 @@ run_config = CoastalCalibConfig.from_dict(
         "model": "sfincs",
         "simulation": {
             "start_date": "2025-06-01",
-            "duration_hours": 10,
+            "duration_hours": 100,
             "coastal_domain": "atlgulf",
             "meteo_source": "nwm_ana",
         },
@@ -138,8 +144,8 @@ run_config = CoastalCalibConfig.from_dict(
         "model_config": {
             "prebuilt_dir": "./output",
             "merge_discharge": True,
-            "forcing_to_mesh_offset_m": 0.0,
-            "vdatum_mesh_to_msl_m": 0.30,
+            "forcing_to_mesh_offset_m": 0.0, # STOFS already in NAVD88
+            "vdatum_mesh_to_msl_m": 0.17,    # NAVD88 mesh -> MSL
             "include_precip": True,
             "include_wind": True,
             "include_pressure": True,
@@ -196,86 +202,20 @@ for png in sorted(figs_dir.glob("stations_comparison_*.png")):
     display(Image(filename=str(png), width=800))
 
 # %% [markdown]
-# ## 4. Quadtree mesh
+# ## 4. SFINCS mesh
 #
 # The SFINCS model uses a quadtree grid with local refinement.  Coarser
 # cells (512 m) cover the offshore domain while regions near the coastline
 # and inside the bay are refined to smaller cell sizes (down to 64 m).
-# The map output file (`sfincs_map.nc`) stores the mesh as standard UGRID
-# quadrilaterals — opening it in QGIS with *native mesh rendering*
-# immediately shows the refinement structure.
 
 # %%
-import matplotlib.pyplot as plt
-import numpy as np
-import xugrid as xu
-from matplotlib.collections import PolyCollection
-from matplotlib.colors import BoundaryNorm, ListedColormap
-from matplotlib.patches import Patch
-from pyproj import CRS
+from coastal_calibration.plotting import SfincsGridInfo, plot_floodmap, plot_mesh
 
-map_file = Path("run/sfincs_model/sfincs_map.nc")
-assert map_file.exists(), (
-    f"Map output not found: {map_file.resolve()} — run the pipeline first."
-)
-
-ds = xu.open_dataset(map_file)
-grid = ds.ugrid.grid
-grid_crs = CRS.from_epsg(int(ds["inp"].attrs["epsg"]))
-
-# Derive refinement level from cell size (the grid is in UTM metres).
-fnc = grid.face_node_connectivity  # (n_face, 4) — all quads
-node_x, node_y = grid.node_x, grid.node_y
-cell_width = node_x[fnc].max(axis=1) - node_x[fnc].min(axis=1)
-base_res = 512
-level = np.round(np.log2(base_res / cell_width) + 1).astype(int)
-
-# Print grid summary
-levels, counts = np.unique(level, return_counts=True)
-print(f"  Grid CRS:  EPSG:{grid_crs.to_epsg()}")
-print(f"  Faces:     {grid.n_face:,}")
-print(f"  Edges:     {grid.n_edge:,}")
-for lv, cnt in zip(levels, counts, strict=True):
-    print(f"  Level {lv}:   {cnt:>6,} cells ({base_res / 2**(lv-1):.0f} m)")
+info = SfincsGridInfo.from_model_root("run/sfincs_model")
+print(info)
 
 # %%
-# Build vertex arrays for PolyCollection in the grid's native CRS (UTM).
-n_verts = fnc.shape[1]
-verts = np.zeros((grid.n_face, n_verts, 2))
-for j in range(n_verts):
-    verts[:, j, 0] = node_x[fnc[:, j]]
-    verts[:, j, 1] = node_y[fnc[:, j]]
-
-fig, ax = plt.subplots(figsize=(11, 7))
-
-# Overlay mesh cells colored by refinement level
-colors = ["#4575b4", "#91bfdb", "#fee090", "#d73027"]
-cmap = ListedColormap(colors)
-norm = BoundaryNorm([0.5, 1.5, 2.5, 3.5, 4.5], ncolors=4)
-
-pc = PolyCollection(verts, edgecolors="black", linewidths=0.1, alpha=0.4)
-pc.set_array(level.astype(float))
-pc.set_cmap(cmap)
-pc.set_norm(norm)
-ax.add_collection(pc)
-ax.autoscale_view()
-
-# Satellite basemap via contextily (tiles are reprojected to match the data CRS).
-import contextily as cx
-
-cx.add_basemap(ax, crs=grid_crs, source=cx.providers.Esri.WorldImagery, zoom=11)
-
-# Legend
-legend_handles = [
-    Patch(
-        facecolor=cmap(norm(lv)), edgecolor="black", linewidth=0.5,
-        alpha=0.5, label=f"Level {lv} ({base_res / 2**(lv-1):.0f} m)",
-    )
-    for lv in levels
-]
-ax.legend(handles=legend_handles, loc="lower right", title="Refinement level")
-ax.set_title("Lavaca Bay SFINCS quadtree mesh")
-plt.show()
+fig, ax = plot_mesh(info, title="Lavaca Bay SFINCS mesh")
 
 # %% [markdown]
 # ## 5. Flood depth map
@@ -287,73 +227,11 @@ plt.show()
 # writes a Cloud Optimized GeoTIFF of flood depth at the DEM resolution.
 
 # %%
-import matplotlib.pyplot as plt
-import numpy as np
-import rasterio
-
-floodmap = Path("run/sfincs_model/floodmap_hmax.tif")
-assert floodmap.exists(), (
-    f"Flood map not found: {floodmap.resolve()} — "
-    "ensure floodmap_dem is set and sfincs_map.nc contains zsmax."
+fig, ax = plot_floodmap(
+    "run/sfincs_model/floodmap_hmax.tif",
+    title="Lavaca Bay flood depth (hmax) from SFINCS simulation",
 )
-
-# Print metadata at full resolution, then read at a coarser overview
-# for display — the full raster can be too large to render.
-with rasterio.open(floodmap) as src:
-    bounds = src.bounds
-    raster_crs = src.crs
-    print(f"  CRS:          {raster_crs}")
-    print(f"  Size:         {src.width} x {src.height}")
-    res_unit = raster_crs.linear_units if raster_crs.is_projected else "deg"
-    print(f"  Resolution:   {abs(src.res[0]):.6g} x {abs(src.res[1]):.6g} {res_unit}")
-    print(f"  File size:    {floodmap.stat().st_size / 1e6:.1f} MB")
-    overviews = src.overviews(1)
-    # Pick an overview that gives roughly 2000 px on the longest axis.
-    ovr_idx = next(
-        (i for i, f in enumerate(overviews) if max(src.height, src.width) / f <= 2000),
-        len(overviews) - 1,
-    )
-
-with rasterio.open(floodmap, overview_level=ovr_idx) as src:
-    hmax = src.read(1)
-    print(f"  Display size: {src.width} x {src.height} (overview {overviews[ovr_idx]}x)")
-
-# Mask dry / NaN pixels.  The floodmap already contains NaN outside the
-# SFINCS domain and where depth < hmin, so no extra DEM masking is needed.
-hmax_masked = np.where(np.isfinite(hmax) & (hmax > 0), hmax, np.nan)
-valid = np.isfinite(hmax_masked)
-print(f"  Valid pixels: {valid.sum():,} / {hmax.size:,} ({valid.sum() / hmax.size:.1%})")
-if valid.any():
-    print(f"  Depth range:  {np.nanmin(hmax_masked):.2f} - {np.nanmax(hmax_masked):.2f} m")
-
-# %%
-# Plot flood depth with satellite basemap using contextily.
-import contextily as cx
-
-extent = [bounds.left, bounds.right, bounds.bottom, bounds.top]
-
-fig, ax = plt.subplots(figsize=(11, 7))
-
-cmap = plt.cm.viridis.copy()
-cmap.set_bad(alpha=0)
-hmax_plot = np.ma.masked_invalid(hmax_masked)
-
-im = ax.imshow(
-    hmax_plot,
-    extent=extent,
-    origin="upper",
-    cmap=cmap,
-    vmin=0,
-    vmax=np.nanpercentile(hmax_masked, 98),
-    interpolation="nearest",
-    zorder=2,
-)
-
-cx.add_basemap(ax, crs=raster_crs, source=cx.providers.Esri.WorldImagery, zoom=12)
-
-fig.colorbar(im, ax=ax, label="Flood depth (m)", shrink=0.6, pad=0.02, extend="both")
-ax.set_title("Lavaca Bay flood depth (hmax) from SFINCS simulation")
-plt.show()
+fig.savefig("../images/lavaca_thumb.png", dpi=150, bbox_inches="tight")
 
 # %% [markdown]
 # The flood depth COG can be opened in QGIS or any GIS viewer.
