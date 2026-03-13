@@ -1437,14 +1437,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/notebooks/lavaca_cli/" class="md-nav__link">
+      <a href="../../examples/notebooks/lavaca/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Lavaca Bay SFINCS Tutorial — CLI Workflow
+    Lavaca Bay SFINCS Tutorial
   
 
     
@@ -1465,14 +1465,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/notebooks/lavaca_api/" class="md-nav__link">
+      <a href="../../examples/notebooks/narragansett/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Lavaca Bay SFINCS Tutorial — Python API
+    Narragansett Bay SFINCS Tutorial
   
 
     
@@ -2102,10 +2102,10 @@ set this to <code>0.0</code>. The offset can be obtained from the
 <p><strong>Tasks:</strong></p>
 <ul>
 <li>Read <code>zsmax</code> (maximum water surface elevation) from the SFINCS map output
-    (<code>sfincs_map.nc</code>)</li>
+    (<code>sfincs_map.nc</code>) via <code>SfincsModel</code> (handles both quadtree and regular grids)</li>
 <li>Create an index COG that maps high-resolution DEM pixels to SFINCS grid cells</li>
-<li>Call <code>hydromt_sfincs.utils.downscale_floodmap</code> to produce a Cloud Optimized GeoTIFF of
-    flood depth (<code>floodmap_hmax.tif</code>)</li>
+<li>Compute flood depth (water surface minus DEM elevation) block-by-block and write a
+    Cloud Optimized GeoTIFF (<code>floodmap_hmax.tif</code>)</li>
 </ul>
 <p><strong>Enabled by:</strong> <code>model_config.floodmap_dem</code> pointing to a high-resolution DEM. The stage
 is skipped when <code>floodmap_dem</code> is not configured, <code>floodmap_enabled</code> is false,

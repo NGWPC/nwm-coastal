@@ -1,0 +1,43 @@
+# Narragansett Bay, Rhode Island — SFINCS run pipeline configuration
+#
+# Uses the model created via:
+#   coastal-calibration create create.yaml
+#
+# Quadtree mesh, EPSG:32619 (UTM zone 19N), 512 m base resolution
+#
+# Usage:
+#   coastal-calibration run run.yaml
+#   coastal-calibration run run.yaml --stop-after sfincs_write
+#   coastal-calibration run run.yaml --start-from sfincs_run
+
+model: sfincs
+
+simulation:
+  start_date: 2024-01-09
+  duration_hours: 60
+  coastal_domain: atlgulf
+  meteo_source: nwm_ana
+
+boundary:
+  source: stofs
+
+paths:
+  work_dir: ./run
+  raw_download_dir: ../downloads    # shared download cache
+
+download:
+  enabled: true
+
+model_config:
+  prebuilt_dir: ./output            # created by: coastal-calibration create create.yaml
+  discharge_locations_file: ./output/sfincs_nwm.src
+  merge_discharge: true
+  forcing_to_mesh_offset_m: 0.0    # STOFS already in NAVD88
+  vdatum_mesh_to_msl_m: 0.1        # NAVD88 mesh -> MSL
+  include_precip: true
+  include_wind: true
+  include_pressure: true
+  # Flood depth map — reuse the NWS 30 m DEM fetched during model creation.
+  floodmap_dem: ../downloads/narragansett_grid/nws_30m.tif
+  inp_overrides:
+    tspinup: 10800            # 3 h spin-up

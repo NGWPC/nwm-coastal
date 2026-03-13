@@ -868,14 +868,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../examples/notebooks/lavaca_cli/" class="md-nav__link">
+      <a href="../examples/notebooks/lavaca/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Lavaca Bay SFINCS Tutorial — CLI Workflow
+    Lavaca Bay SFINCS Tutorial
   
 
     
@@ -896,14 +896,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../examples/notebooks/lavaca_api/" class="md-nav__link">
+      <a href="../examples/notebooks/narragansett/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Lavaca Bay SFINCS Tutorial — Python API
+    Narragansett Bay SFINCS Tutorial
   
 
     
@@ -1324,24 +1324,59 @@ this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic V
 <h2 id="unreleased"><a href="https://github.com/NGWPC/nwm-coastal/compare/3.1.1.0.0...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">#</a></h3>
 <ul>
+<li><code>coastal_calibration.plotting</code> module with reusable visualization utilities:<ul>
+<li><code>SfincsGridInfo</code> dataclass with <code>from_model_root()</code> factory for loading and
+    summarizing SFINCS grid metadata (quadtree and regular grids).</li>
+<li><code>plot_mesh()</code> for visualizing the SFINCS mesh colored by refinement level with
+    optional satellite basemap via <code>contextily</code>.</li>
+<li><code>plot_floodmap()</code> for reading and plotting flood-depth Cloud Optimized GeoTIFFs with
+    automatic overview-level selection and basemap overlay.</li>
+<li><code>plot_station_comparison()</code> for generating 2×2 simulated vs observed water-level
+    comparison plots, consolidated from the former <code>sfincs_plot</code> and <code>schism_plot</code>
+    stage internals.</li>
+<li><code>plotable_stations()</code> helper for filtering stations that have both simulated and
+    observed data.</li>
+</ul>
+</li>
 <li><code>_KNOWN_INP_PARAMS</code> allowlist on <code>SfincsModelConfig</code> that validates <code>inp_overrides</code>
-    keys against all ~170 recognised <code>sfincs.inp</code> parameters, catching typos early
+    keys against all ~170 recognized <code>sfincs.inp</code> parameters, catching typos early
     (SFINCS silently ignores unknown parameters).</li>
 <li><code>SfincsDischargeStage</code> now assigns real NWM CHRTOUT discharge timeseries to source
     points via <code>_assign_discharge_timeseries</code>, with support for both HydroMT GeoDataset
-    and raw xarray <code>open_mfdataset</code> loading strategies.</li>
+    and raw <code>xarray</code> <code>open_mfdataset</code> loading strategies.</li>
 <li><code>tests/test_floodmap.py</code> with unit tests for <code>_write_floodmap_cog</code>,
     <code>_ensure_overviews</code>, and an integration test for <code>create_flood_depth_map</code>.</li>
 <li>QGIS plugin: optional NWM Flowlines Override in the basemap dialog, allowing users to
     load flowpaths from a separate NWM GeoPackage with configurable layer name and
     stream order column.</li>
 <li>QGIS plugin: "Export Selected Flowpaths" toolbar button that saves the current
-    selection on the flowpaths layer to a GeoPackage file.</li>
+    selection on the flowpaths layer to a GeoJSON file.</li>
 <li>QGIS plugin: stream order validation against the actual min/max range in the data,
     with a clear error when the user-specified value is out of range.</li>
+<li>QGIS plugin: auto-enable labels for gages (<code>site_no</code>) and CO-OPS (<code>station_id</code>) layers
+    with font size 15 and text buffer.</li>
+<li>Narragansett Bay, RI example notebook showing compound forcing (ocean + river
+    discharge + meteo) with NWM streamflow.</li>
 </ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">#</a></h3>
 <ul>
+<li>Centralize station comparison plotting into <code>coastal_calibration.plotting.stations</code>,
+    removing duplicate <code>_plotable_stations</code> and <code>_plot_figures</code> code from
+    <code>SfincsPlotStage</code> and <code>SchismPlotStage</code>.</li>
+<li>Refactor Lavaca and Narragansett example notebooks to use the new <code>plotting</code> module
+    (<code>SfincsGridInfo</code>, <code>plot_mesh</code>, <code>plot_floodmap</code>) instead of inline visualization
+    code.</li>
+<li><strong>Breaking:</strong> Simplify <code>nwm_discharge</code> config from 5 fields (<code>hydrofabric_gpkg</code>,
+    <code>flowpaths_layer</code>, <code>flowpath_id_column</code>, <code>flowpath_ids</code>, <code>coastal_domain</code>) to 2
+    fields (<code>flowlines</code>, <code>nwm_id_column</code>). Users now provide a GeoJSON file of selected
+    flowpaths (e.g., exported from the QGIS plugin) instead of a full NWM hydrofabric
+    GeoPackage with explicit IDs.</li>
+<li>QGIS plugin: "Export Selected Flowpaths" now writes GeoJSON (<code>.geojson</code>) instead of
+    GeoPackage (<code>.gpkg</code>).</li>
+<li>Rename example directory <code>texas-lavaca/</code> to <code>lavaca-tx/</code> and update notebook paths
+    accordingly.</li>
+<li>Consolidate example notebooks: remove CLI variants and <code>_api</code>/<code>_cli</code> suffixes, keeping
+    one notebook per region (<code>lavaca.ipynb</code>, <code>narragansett.ipynb</code>).</li>
 <li>Rewrite <code>create_flood_depth_map</code> to read the DEM and index COG at full resolution and
     write a flood-depth Cloud Optimized GeoTIFF block-by-block, bypassing an upstream
     <code>hydromt_sfincs</code> bug where <code>downscale_floodmap</code> opened rasters with
@@ -1350,13 +1385,26 @@ this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic V
     only writes the <code>.src</code> file with snapped locations, while the run stage
     (<code>SfincsDischargeStage</code>) adds points to the model and attaches real NWM streamflow
     data.</li>
+<li>Consolidate stdout/logging suppression for <code>hydromt-sfincs</code> into a shared
+    <code>suppress_hydromt_output()</code> context manager in <code>utils.logging</code>, replacing duplicated
+    <code>_suppress_stdout</code> helpers in <code>creator.py</code> and <code>sfincs_create.py</code>.</li>
+<li><code>SfincsGridInfo.from_model_root()</code> no longer accepts a <code>base_resolution</code> parameter;
+    the coarsest cell size is now derived automatically from the quadtree grid data.</li>
 <li>Bump <code>pyproject-fmt</code> pre-commit hook from v2.16.2 to v2.18.1.</li>
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">#</a></h3>
 <ul>
+<li>Flood depth map generation for regular (non-quadtree) SFINCS grids: the <code>zsmax</code> index
+    lookup in <code>_reduce_zsmax</code> used C-order (row-major) flattening but
+    <code>SfincsGrid.get_indices_at_points</code> returns Fortran-order (column-major) linearized
+    indices. Changed to Fortran-order to match, fixing incorrect flood depth values on
+    regular grids.</li>
+<li><code>sfincs_floodmap</code> stage now reads <code>zsmax</code> via <code>SfincsModel</code> with <code>apply_all_patches()</code>
+    instead of <code>xu.open_dataset</code>, fixing a crash on quadtree models without refinement
+    levels (where the output lacks UGRID topology).</li>
 <li>STOFS data catalog entry previously used a recursive glob (<code>stofs/**/*.fields.cwl.nc</code>)
     that matched all cached STOFS files. When the cache held files from different STOFS
-    mesh versions with incompatible dimensions, xarray concatenation failed. A new
+    mesh versions with incompatible dimensions, <code>xarray</code> concatenation failed. A new
     <code>_stofs_uri()</code> helper now builds an exact file path for the simulation's date and
     cycle hour, avoiding multi-file collision.</li>
 <li>Expand the STOFS <code>drop_variables</code> list to also drop <code>nvell</code>, <code>ibtype</code>, <code>nbvv</code>,
@@ -1364,6 +1412,9 @@ this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic V
 <li><code>_downstream_endpoint</code> now compares both endpoints of NWM hydrofabric flowpath
     linestrings and returns whichever is closest to the AOI boundary, fixing incorrect
     discharge point placement when flowpath direction is reversed.</li>
+<li>Quadtree mesh plotting (<code>SfincsGridInfo</code>) now masks fill values (-1) in face-node
+    connectivity before computing cell widths, fixing bogus level counts and distorted
+    mesh visualizations.</li>
 <li>QGIS plugin: use <code>mActionVertexToolActiveLayer.svg</code> icon for the Edit Polygon toolbar
     button (previously used the removed <code>mActionNodeTool.svg</code>).</li>
 </ul>

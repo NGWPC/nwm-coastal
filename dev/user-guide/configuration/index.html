@@ -1140,14 +1140,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/notebooks/lavaca_cli/" class="md-nav__link">
+      <a href="../../examples/notebooks/lavaca/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Lavaca Bay SFINCS Tutorial — CLI Workflow
+    Lavaca Bay SFINCS Tutorial
   
 
     
@@ -1168,14 +1168,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/notebooks/lavaca_api/" class="md-nav__link">
+      <a href="../../examples/notebooks/narragansett/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Lavaca Bay SFINCS Tutorial — Python API
+    Narragansett Bay SFINCS Tutorial
   
 
     
@@ -2399,11 +2399,8 @@ run/simulation config above.</p>
 <p>When configured, adds NWM streamflow discharge source points to the model by
 intersecting hydrofabric flowpaths with the AOI boundary.</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="nt">nwm_discharge</span><span class="p">:</span>
-</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="w">  </span><span class="nt">hydrofabric_gpkg</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./nwm_hydrofabric.gpkg</span>
-</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="w">  </span><span class="nt">flowpaths_layer</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">flowpaths</span>
-</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="w">  </span><span class="nt">flowpath_id_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">feature_id</span>
-</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="w">  </span><span class="nt">flowpath_ids</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">12345</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">67890</span><span class="p p-Indicator">]</span>
-</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="w">  </span><span class="nt">coastal_domain</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">atlgulf</span>
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="w">  </span><span class="nt">flowlines</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./selected_flowpaths.geojson</span>
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="w">  </span><span class="nt">nwm_id_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">feature_id</span>
 </span></code></pre></div>
 <table>
 <thead>
@@ -2416,34 +2413,16 @@ intersecting hydrofabric flowpaths with the AOI boundary.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>hydrofabric_gpkg</code></td>
+<td><code>flowlines</code></td>
 <td>path</td>
 <td>required</td>
-<td>Path to NWM hydrofabric GeoPackage</td>
+<td>GeoJSON file with flowpath linestrings (e.g. exported from QGIS)</td>
 </tr>
 <tr>
-<td><code>flowpaths_layer</code></td>
+<td><code>nwm_id_column</code></td>
 <td>str</td>
 <td>required</td>
-<td>Layer name with flowpath linestrings</td>
-</tr>
-<tr>
-<td><code>flowpath_id_column</code></td>
-<td>str</td>
-<td>required</td>
-<td>Column matching NWM <code>feature_id</code> values</td>
-</tr>
-<tr>
-<td><code>flowpath_ids</code></td>
-<td>list</td>
-<td>required</td>
-<td>NWM feature IDs to extract</td>
-</tr>
-<tr>
-<td><code>coastal_domain</code></td>
-<td>str</td>
-<td><code>conus</code></td>
-<td>NWM coastal domain for ID validation</td>
+<td>Column whose values correspond to NWM <code>feature_id</code> in CHRTOUT</td>
 </tr>
 </tbody>
 </table>
