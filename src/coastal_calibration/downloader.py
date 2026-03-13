@@ -297,7 +297,7 @@ class DownloadResults:
 
     def __str__(self) -> str:
         status = "ERRORS" if self.has_errors else "OK"
-        lines = [f"DownloadResults: {status}"]
+        lines: list[str] = [f"DownloadResults: {status}"]
         lines.extend(str(result) for result in self)
         return "\n".join(lines)
 
