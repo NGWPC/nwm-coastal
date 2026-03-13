@@ -1,4 +1,4 @@
-"""Plotting utilities for coastal model visualisation."""
+"""Plotting utilities for coastal model visualization."""
 
 from __future__ import annotations
 

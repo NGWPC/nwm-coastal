@@ -1,6 +1,6 @@
 # Examples
 
-These tutorial notebooks walk through the full SFINCS coastal flood modelling workflow —
+These tutorial notebooks walk through the full SFINCS coastal flood modeling workflow —
 from building the model grid to running the simulation and comparing results against
 NOAA tide-gauge observations.
 

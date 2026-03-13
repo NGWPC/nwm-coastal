@@ -1,4 +1,4 @@
-"""Flood depth map visualisation.
+"""Flood depth map visualization.
 
 Provides :func:`plot_floodmap` which reads a flood-depth COG (produced
 by :func:`~coastal_calibration.utils.floodmap.create_flood_depth_map`),
@@ -35,7 +35,7 @@ def plot_floodmap(
 
     Reads at an overview level that keeps the longest axis under
     *max_display_px* pixels, masks dry / NaN pixels, and renders
-    with a viridis colour map.
+    with a viridis color map.
 
     Parameters
     ----------
@@ -55,7 +55,7 @@ def plot_floodmap(
         Target maximum dimension (in pixels) for the rendered raster.
         Controls which overview level is read.
     vmax_percentile:
-        Upper percentile for the colour-map range.
+        Upper percentile for the color-map range.
     figsize:
         Figure size when *ax* is *None*.
 

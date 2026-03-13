@@ -1,7 +1,7 @@
 """SFINCS grid inspection and mesh plotting.
 
-Provides :class:`SfincsGridInfo` for loading and summarising a SFINCS
-grid (quadtree or regular) and :func:`plot_mesh` for visualising the
+Provides :class:`SfincsGridInfo` for loading and summarizing a SFINCS
+grid (quadtree or regular) and :func:`plot_mesh` for visualizing the
 mesh with an optional satellite basemap.
 """
 
@@ -288,7 +288,7 @@ def plot_mesh(
     basemap_zoom: int = 11,
     figsize: tuple[float, float] = (11, 7),
 ) -> tuple[Figure, Axes]:
-    """Plot the SFINCS mesh coloured by refinement level.
+    """Plot the SFINCS mesh colored by refinement level.
 
     Parameters
     ----------

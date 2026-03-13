@@ -277,7 +277,7 @@ creator.run(start_from="create_elevation")
 
 ## Plotting Utilities
 
-The `coastal_calibration.plotting` module provides reusable functions for visualising
+The `coastal_calibration.plotting` module provides reusable functions for visualizing
 SFINCS grids, flood depth maps, and simulated vs observed water-level comparisons.
 
 ### Grid Inspection
@@ -295,7 +295,7 @@ print(info)
 #   Level 2:   14,180 cells (256 m)
 #   ...
 
-# Plot the mesh coloured by refinement level with satellite basemap
+# Plot the mesh colored by refinement level with satellite basemap
 fig, ax = plot_mesh(info)
 ```
 
