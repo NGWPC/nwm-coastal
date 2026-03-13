@@ -427,10 +427,10 @@ STOFS water level data.
 **Tasks:**
 
 - Read `zsmax` (maximum water surface elevation) from the SFINCS map output
-    (`sfincs_map.nc`)
+    (`sfincs_map.nc`) via `SfincsModel` (handles both quadtree and regular grids)
 - Create an index COG that maps high-resolution DEM pixels to SFINCS grid cells
-- Call `hydromt_sfincs.utils.downscale_floodmap` to produce a Cloud Optimized GeoTIFF of
-    flood depth (`floodmap_hmax.tif`)
+- Compute flood depth (water surface minus DEM elevation) block-by-block and write a
+    Cloud Optimized GeoTIFF (`floodmap_hmax.tif`)
 
 **Enabled by:** `model_config.floodmap_dem` pointing to a high-resolution DEM. The stage
 is skipped when `floodmap_dem` is not configured, `floodmap_enabled` is false,

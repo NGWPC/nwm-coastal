@@ -483,20 +483,14 @@ intersecting hydrofabric flowpaths with the AOI boundary.
 
 ```yaml
 nwm_discharge:
-  hydrofabric_gpkg: ./nwm_hydrofabric.gpkg
-  flowpaths_layer: flowpaths
-  flowpath_id_column: feature_id
-  flowpath_ids: [12345, 67890]
-  coastal_domain: atlgulf
+  flowlines: ./selected_flowpaths.geojson
+  nwm_id_column: feature_id
 ```
 
-| Parameter            | Type | Default  | Description                             |
-| -------------------- | ---- | -------- | --------------------------------------- |
-| `hydrofabric_gpkg`   | path | required | Path to NWM hydrofabric GeoPackage      |
-| `flowpaths_layer`    | str  | required | Layer name with flowpath linestrings    |
-| `flowpath_id_column` | str  | required | Column matching NWM `feature_id` values |
-| `flowpath_ids`       | list | required | NWM feature IDs to extract              |
-| `coastal_domain`     | str  | `conus`  | NWM coastal domain for ID validation    |
+| Parameter       | Type | Default  | Description                                                      |
+| --------------- | ---- | -------- | ---------------------------------------------------------------- |
+| `flowlines`     | path | required | GeoJSON file with flowpath linestrings (e.g. exported from QGIS) |
+| `nwm_id_column` | str  | required | Column whose values correspond to NWM `feature_id` in CHRTOUT    |
 
 ## Validation
 

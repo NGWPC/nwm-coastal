@@ -275,6 +275,53 @@ creator.run()
 creator.run(start_from="create_elevation")
 ```
 
+## Plotting Utilities
+
+The `coastal_calibration.plotting` module provides reusable functions for visualising
+SFINCS grids, flood depth maps, and simulated vs observed water-level comparisons.
+
+### Grid Inspection
+
+```python
+from coastal_calibration import SfincsGridInfo, plot_mesh
+
+# Load grid metadata from a SFINCS model directory
+info = SfincsGridInfo.from_model_root("run/sfincs_model")
+print(info)
+# SfincsGridInfo(quadtree, EPSG:32619)
+#   Faces:     293,850
+#   Edges:     596,123
+#   Level 1:    7,090 cells (512 m)
+#   Level 2:   14,180 cells (256 m)
+#   ...
+
+# Plot the mesh coloured by refinement level with satellite basemap
+fig, ax = plot_mesh(info)
+```
+
+### Flood Depth Map
+
+```python
+from coastal_calibration import plot_floodmap
+
+# Plot the flood-depth COG with automatic overview selection
+fig, ax = plot_floodmap("run/sfincs_model/floodmap_hmax.tif")
+```
+
+### Station Comparison Plots
+
+```python
+from coastal_calibration import plot_station_comparison, plotable_stations
+
+# Filter stations that have both simulated and observed data
+pairs = plotable_stations(station_ids, sim_elevation, obs_ds)
+
+# Generate 2×2 comparison figures and save to disk
+fig_paths = plot_station_comparison(
+    sim_times, sim_elevation, station_ids, obs_ds, "run/sfincs_model/figs"
+)
+```
+
 ## Data Sources
 
 ### Check Available Date Ranges

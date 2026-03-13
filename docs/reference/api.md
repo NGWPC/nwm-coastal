@@ -107,6 +107,32 @@ This page provides detailed documentation for the NWM Coastal Python API.
 
 ::: coastal_calibration.runner.WorkflowResult
 
+## Plotting
+
+### SfincsGridInfo
+
+::: coastal_calibration.plotting.grid.SfincsGridInfo
+    options:
+      show_source: true
+      members:
+        - from_model_root
+
+### plot_mesh
+
+::: coastal_calibration.plotting.grid.plot_mesh
+
+### plot_floodmap
+
+::: coastal_calibration.plotting.floodmap.plot_floodmap
+
+### plot_station_comparison
+
+::: coastal_calibration.plotting.stations.plot_station_comparison
+
+### plotable_stations
+
+::: coastal_calibration.plotting.stations.plotable_stations
+
 ## Flood Depth Map
 
 ### create_flood_depth_map
