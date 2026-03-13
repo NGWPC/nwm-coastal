@@ -14,46 +14,23 @@ from __future__ import annotations
 import contextlib
 import json
 import math
-import os
 from abc import ABC, abstractmethod
-from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any
+
+import shapely
 
 from coastal_calibration.stages._hydromt_compat import apply_all_patches
+from coastal_calibration.utils.logging import suppress_hydromt_output
 
 apply_all_patches()
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
     from pathlib import Path
 
     from hydromt_sfincs import SfincsModel
 
     from coastal_calibration.config.create_schema import SfincsCreateConfig
     from coastal_calibration.utils.logging import WorkflowMonitor
-
-
-# ---------------------------------------------------------------------------
-# stdout suppression
-# ---------------------------------------------------------------------------
-
-
-@contextmanager
-def _suppress_stdout() -> Iterator[None]:
-    """Redirect stdout to ``/dev/null``.
-
-    HydroMT-SFINCS's quadtree builders use raw ``print()`` calls
-    that cannot be silenced through Python's logging system.
-    """
-    devnull = os.open(os.devnull, os.O_WRONLY)
-    saved_fd = os.dup(1)
-    os.dup2(devnull, 1)
-    os.close(devnull)
-    try:
-        yield
-    finally:
-        os.dup2(saved_fd, 1)
-        os.close(saved_fd)
 
 
 # ---------------------------------------------------------------------------
@@ -259,7 +236,7 @@ class CreateGridStage(CreateStage):
                     "warning",
                 )
 
-        with _suppress_stdout():
+        with suppress_hydromt_output():
             sf.quadtree_grid.create_from_region(
                 region=region,
                 res=cfg.grid.resolution,
@@ -481,96 +458,19 @@ class CreateBoundaryStage(_CreateStageBase):
 
 
 class CreateDischargeStage(_CreateStageBase):
-    """Add NWM discharge source points derived from hydrofabric flowpaths.
+    """Add NWM discharge source points derived from flowpath linestrings.
 
-    Flowpath linestrings are read from an NWM hydrofabric GeoPackage,
-    intersected with the AOI boundary, and the resulting points are
-    registered as discharge source locations in the SFINCS model.
+    Flowpath linestrings are read from a GeoJSON file (e.g., exported
+    from the QGIS plugin), intersected with the AOI boundary, and the
+    resulting points are registered as discharge source locations in the
+    SFINCS model.
     """
 
     name = "create_discharge"
     description = "Add NWM discharge source points"
 
-    # Known-good sample dates per domain for NWM retro streamflow validation.
-    _SAMPLE_DATES: ClassVar[dict[str, tuple[str, str]]] = {
-        "conus": ("2020-01-01", "2020-01-01T01:00:00"),
-        "atlgulf": ("2020-01-01", "2020-01-01T01:00:00"),
-        "pacific": ("2020-01-01", "2020-01-01T01:00:00"),
-        "hawaii": ("2010-01-01", "2010-01-01T01:00:00"),
-        "prvi": ("2010-01-01", "2010-01-01T01:00:00"),
-        "alaska": ("2018-01-01", "2018-01-01T01:00:00"),
-    }
-
-    def _validate_nwm_feature_ids(
-        self,
-        nd: Any,
-    ) -> list[str]:
-        """Download a sample NWM streamflow file and check feature IDs."""
-        import tempfile
-        from datetime import datetime
-
-        import xarray as xr
-
-        from coastal_calibration.downloader import (
-            _build_nwm_retro_streamflow_urls,
-            _execute_download,
-        )
-
-        errors: list[str] = []
-        domain = nd.coastal_domain
-        sample = self._SAMPLE_DATES.get(domain)
-        if sample is None:
-            errors.append(f"No sample date configured for domain '{domain}'")
-            return errors
-
-        start = datetime.fromisoformat(sample[0])
-        end = datetime.fromisoformat(sample[1])
-
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            from pathlib import Path
-
-            tmp_path = Path(tmp_dir)
-            urls, paths = _build_nwm_retro_streamflow_urls(start, end, tmp_path, domain)
-            if not urls:
-                errors.append("Could not build NWM streamflow URL for validation")
-                return errors
-
-            # Download only the first file
-            result = _execute_download(
-                urls[:1], paths[:1], "nwm_validation", timeout=120, raise_on_error=False
-            )
-            if result.errors or not paths[0].exists():
-                self._log(
-                    "Could not download NWM streamflow sample for ID validation; "
-                    "skipping feature_id check",
-                    level="warning",
-                )
-                return errors
-
-            try:
-                ds = xr.open_dataset(paths[0])
-                try:
-                    nwm_ids = set(ds["feature_id"].to_numpy().tolist())
-                finally:
-                    ds.close()
-            except Exception as exc:
-                self._log(
-                    f"Could not read NWM streamflow sample: {exc}; skipping feature_id check",
-                    level="warning",
-                )
-                return errors
-
-            missing = [fid for fid in nd.flowpath_ids if fid not in nwm_ids]
-            if missing:
-                errors.append(
-                    f"NWM feature_id(s) not found in streamflow data for "
-                    f"domain '{domain}': {missing}"
-                )
-
-        return errors
-
     def validate(self) -> list[str]:
-        """Validate hydrofabric GPKG structure and NWM feature IDs."""
+        """Validate flowlines GeoJSON and NWM ID column."""
         cfg = self.config
         if cfg.nwm_discharge is None:
             return []
@@ -578,36 +478,40 @@ class CreateDischargeStage(_CreateStageBase):
         nd = cfg.nwm_discharge
         errors: list[str] = []
 
-        if not nd.hydrofabric_gpkg.exists():
-            errors.append(f"nwm_discharge.hydrofabric_gpkg not found: {nd.hydrofabric_gpkg}")
+        if not nd.flowlines.exists():
+            errors.append(f"nwm_discharge.flowlines not found: {nd.flowlines}")
             return errors
 
-        # --- pyogrio layer validation ---
-        import pyogrio
-
-        layers = pyogrio.list_layers(nd.hydrofabric_gpkg)
-        layer_names = [name for name, _ in layers]
-        if nd.flowpaths_layer not in layer_names:
+        if nd.flowlines.suffix.lower() != ".geojson":
             errors.append(
-                f"Layer '{nd.flowpaths_layer}' not found in "
-                f"{nd.hydrofabric_gpkg.name}. "
-                f"Available layers: {layer_names}"
+                f"nwm_discharge.flowlines must be a .geojson file, got: {nd.flowlines.name}"
             )
             return errors
 
-        # --- pyogrio column validation ---
-        info = pyogrio.read_info(nd.hydrofabric_gpkg, layer=nd.flowpaths_layer)
-        columns: list[str] = list(info["fields"])
-        if nd.flowpath_id_column not in columns:
+        # Validate that the file is readable and contains the ID column.
+        import geopandas as gpd
+
+        try:
+            gdf = gpd.read_file(nd.flowlines, force_2d=True)
+        except Exception as exc:
+            errors.append(f"Cannot read flowlines GeoJSON: {exc}")
+            return errors
+
+        if nd.nwm_id_column not in gdf.columns:
             errors.append(
-                f"Column '{nd.flowpath_id_column}' not found in layer "
-                f"'{nd.flowpaths_layer}'. Available columns: {columns}"
+                f"Column '{nd.nwm_id_column}' not found in "
+                f"{nd.flowlines.name}. Available columns: {list(gdf.columns)}"
             )
             return errors
 
-        # --- NWM streamflow feature_id validation ---
-        nwm_errors = self._validate_nwm_feature_ids(nd)
-        errors.extend(nwm_errors)
+        # NWM feature IDs must be integers.
+        try:
+            gdf[nd.nwm_id_column] = gdf[nd.nwm_id_column].astype(int)
+        except (ValueError, TypeError):
+            errors.append(
+                f"Column '{nd.nwm_id_column}' in {nd.flowlines.name} "
+                f"cannot be converted to integer (NWM feature IDs must be integers)"
+            )
 
         return errors
 
@@ -669,7 +573,7 @@ class CreateDischargeStage(_CreateStageBase):
         and pick whichever is nearest to the AOI boundary.  In
         practice the outlet should sit on (or very near) the boundary.
         """
-        from shapely.geometry import MultiLineString, Point
+        from shapely import MultiLineString, Point
 
         if geom is None or geom.is_empty:
             return None
@@ -685,7 +589,7 @@ class CreateDischargeStage(_CreateStageBase):
         return first_coord if d_first < d_last else last_coord
 
     def run(self) -> dict[str, Any]:
-        """Extract flowpath outlets from hydrofabric and add as discharge points."""
+        """Extract flowpath outlets from GeoJSON and add as discharge points."""
         cfg = self.config
         if cfg.nwm_discharge is None:
             self._log("No NWM discharge configuration, skipping")
@@ -696,25 +600,22 @@ class CreateDischargeStage(_CreateStageBase):
         nd = cfg.nwm_discharge
         model = self.sfincs
 
-        self._update_substep("Reading flowpath geometries from hydrofabric")
-        id_col = nd.flowpath_id_column
-        ids_str = ", ".join(str(i) for i in nd.flowpath_ids)
-        flowpaths_gdf = gpd.read_file(
-            nd.hydrofabric_gpkg,
-            layer=nd.flowpaths_layer,
-            where=f'"{id_col}" IN ({ids_str})',
-        )
-        self._log(
-            f"Read {len(flowpaths_gdf)} flowpath(s) from "
-            f"{nd.hydrofabric_gpkg.name}:{nd.flowpaths_layer}"
-        )
+        self._update_substep("Reading flowpath geometries from GeoJSON")
+        id_col = nd.nwm_id_column
+        flowpaths_gdf = gpd.read_file(nd.flowlines, force_2d=True)
+        self._log(f"Read {len(flowpaths_gdf)} flowpath(s) from {nd.flowlines.name}")
 
         if flowpaths_gdf.empty:
             self._log(
-                "No flowpaths matched the specified IDs, skipping discharge",
+                "No flowpaths found in GeoJSON, skipping discharge",
                 level="warning",
             )
-            return {"status": "skipped", "reason": "no matching flowpaths"}
+            return {"status": "skipped", "reason": "no flowpaths in file"}
+
+        # NWM feature IDs must be integers.
+        flowpaths_gdf[id_col] = flowpaths_gdf[id_col].astype(int)
+        # Merge MultiLineStrings into LineStrings for clean endpoint selection.
+        flowpaths_gdf["geometry"] = shapely.line_merge(flowpaths_gdf.geometry)
 
         # Determine model CRS from the SfincsModel grid
         grid_ds = model.quadtree_grid.data
@@ -732,14 +633,14 @@ class CreateDischargeStage(_CreateStageBase):
         # Pick the flowpath endpoint closest to the AOI boundary
         self._update_substep("Extracting flowpath outlet points")
         discharge_points: list[tuple[float, float, str]] = []
-        for _, row in flowpaths_gdf.iterrows():
-            raw_id = row[id_col]
-            feature_id = str(int(raw_id)) if isinstance(raw_id, float) else str(raw_id)
-            endpoint = self._downstream_endpoint(row.geometry, aoi_boundary)
+        for feature_id, geom in flowpaths_gdf[[id_col, "geometry"]].itertuples(
+            name=None, index=False
+        ):
+            endpoint = self._downstream_endpoint(geom, aoi_boundary)
             if endpoint is None:
                 self._log(f"Flowpath {feature_id} has empty geometry, skipping")
                 continue
-            discharge_points.append((endpoint[0], endpoint[1], feature_id))
+            discharge_points.append((endpoint[0], endpoint[1], str(feature_id)))
 
         if not discharge_points:
             self._log("No discharge points extracted from flowpaths")
@@ -881,7 +782,7 @@ class CreateObservationPointsStage(_CreateStageBase):
         """
         import numpy as np
         from scipy.spatial import KDTree
-        from shapely.geometry import Point
+        from shapely import Point
 
         depth_threshold = self._SNAP_DEPTH_THRESHOLD
         search_radius = self._SNAP_SEARCH_RADIUS_M

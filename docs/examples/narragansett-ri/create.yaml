@@ -38,9 +38,7 @@ subgrid:
   manning_sea: 0.02
 
 nwm_discharge:
-  coastal_domain: atlgulf
+  flowlines: ./discharge_nwm.geojson # GeoJSON of selected NWM flowpaths
+  nwm_id_column: flowpath_id         # column with NWM feature IDs
 
 add_noaa_gages: true           # discover NOAA CO-OPS stations in domain
-
-monitoring:
-  log_level: INFO
