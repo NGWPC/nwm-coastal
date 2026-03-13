@@ -35,6 +35,13 @@ from coastal_calibration.downloader import (
     get_default_sources,
     get_overlapping_range,
 )
+from coastal_calibration.plotting import (
+    SfincsGridInfo,
+    plot_floodmap,
+    plot_mesh,
+    plot_station_comparison,
+    plotable_stations,
+)
 from coastal_calibration.runner import (
     CoastalCalibRunner,
     WorkflowResult,
@@ -49,6 +56,7 @@ from coastal_calibration.stages.sfincs import (
     generate_data_catalog,
     remove_nc_symlinks,
 )
+from coastal_calibration.utils.logging import configure_logger
 from coastal_calibration.utils.workflow import (
     nwm_coastal_merge_source_sink,
     post_nwm_coastal,
@@ -91,10 +99,13 @@ __all__ = [
     # SFINCS creation
     "SfincsCreateConfig",
     "SfincsCreator",
+    # Plotting
+    "SfincsGridInfo",
     "SfincsModelConfig",
     "SimulationConfig",
     "WorkflowResult",
     "__version__",
+    "configure_logger",
     # Data Catalog (SFINCS)
     "create_nc_symlinks",
     # Downloader
@@ -105,6 +116,10 @@ __all__ = [
     "get_overlapping_range",
     # Workflow utilities (Python implementations of bash scripts)
     "nwm_coastal_merge_source_sink",
+    "plot_floodmap",
+    "plot_mesh",
+    "plot_station_comparison",
+    "plotable_stations",
     "post_nwm_coastal",
     "post_nwm_forcing_coastal",
     "pre_nwm_forcing_coastal",
