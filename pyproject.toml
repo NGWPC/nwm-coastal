@@ -316,8 +316,6 @@ sfincs = { features = [ "sfincs", "plot", "py314" ] }
 typecheck = { features = [ "typecheck", "sfincs", "plot", "py314" ] }
 lint = { features = [ "lint", "py314" ], no-default-feature = true }
 docs = { features = [ "docs", "py314" ] }
-[tool.pixi.feature.dev.activation]
-scripts = [ "scripts/ensure-sfincs.sh" ]
 [tool.pixi.feature.dev.dependencies]
 s3fs = ">=2026.2.0,<2027"
 [tool.pixi.feature.docs.tasks]

@@ -18,7 +18,7 @@ echo "SFINCS binary not found in this environment — building …"
     _needs_configure=0
     if [ ! -f Makefile ]; then
         _needs_configure=1
-    elif ! grep -q "^prefix = $CONDA_PREFIX\$" Makefile; then
+    elif ! grep -Fxq "prefix = $CONDA_PREFIX" Makefile; then
         echo "Stale Makefile (wrong prefix) — reconfiguring …"
         make distclean 2>/dev/null || true
         _needs_configure=1

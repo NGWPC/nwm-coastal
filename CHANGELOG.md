@@ -82,8 +82,6 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     showing "Created 0 … symlinks".
 - Add `jupytext` pre-commit hook (`--sync`) to keep `.ipynb` and `.py` notebook pairs in
     sync automatically.
-- Add SFINCS activation script to the `dev` pixi environment so it also compiles SFINCS
-    on first activation.
 - Configure `ty` type-checker to resolve third-party imports from the pixi `typecheck`
     environment via `python` path instead of `extra-paths`.
 - Exclude `docs/examples/downloads/` from mkdocs static file copying to prevent
