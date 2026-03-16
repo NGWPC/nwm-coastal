@@ -296,7 +296,7 @@ source_pkgs = [
 
 [tool.ty.environment]
 python-version = "3.11"
-extra-paths = [ ".pixi/envs/typecheck/lib/python3.14/site-packages" ]
+python = ".pixi/envs/typecheck"
 [tool.ty.rules]
 all = "error"
 [tool.ty.src]
