@@ -82,8 +82,10 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     showing "Created 0 … symlinks".
 - Add `jupytext` pre-commit hook (`--sync`) to keep `.ipynb` and `.py` notebook pairs in
     sync automatically.
+- Add SFINCS activation script to the `dev` pixi environment so it also compiles SFINCS
+    on first activation.
 - Configure `ty` type-checker to resolve third-party imports from the pixi `typecheck`
-    environment via `extra-paths`.
+    environment via `python` path instead of `extra-paths`.
 - Exclude `docs/examples/downloads/` from mkdocs static file copying to prevent
     `No space left on device` errors from large NWM data files.
 - Discharge snapping now always snaps to the nearest active cell (previously kept points
@@ -92,6 +94,9 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- SFINCS activation script now detects stale `Makefile` configured for a different
+    environment prefix and reconfigures automatically, fixing `sfincs` binary not found
+    when switching between pixi environments.
 - Flood depth map generation for regular (non-quadtree) SFINCS grids: the `zsmax` index
     lookup in `_reduce_zsmax` used C-order (row-major) flattening but
     `SfincsGrid.get_indices_at_points` returns Fortran-order (column-major) linearized
