@@ -34,9 +34,6 @@ pre_nwm_coastal() {
 
    #create offline partition
    create_offline_partition $NPROCS "${NSCRIBES}"
-   #cpfs ${EXECnwm}/pschism_wcoss2_NO_PARMETIS_TVD-VL .
-   #cpfs ${EXECnwm}/pschism_mistral_NOPM_VL .
-   cp ${EXECnwm}/pschism_wcoss2_NO_PARMETIS_TVD-VL.openmpi .
 
 }
 
@@ -48,9 +45,7 @@ function create_offline_partition() {
   local num_procs=$1
   local scribes=$2
 
-  cp ${EXECnwm}/metis_prep ./
-  cp ${EXECnwm}/gpmetis ./
-  ./metis_prep ./hgrid.gr3 ./vgrid.in
-  ./gpmetis ./graphinfo $((${num_procs} - ${scribes})) -ufactor=1.01 -seed=15
+  metis_prep ./hgrid.gr3 ./vgrid.in
+  gpmetis ./graphinfo $((${num_procs} - ${scribes})) -ufactor=1.01 -seed=15
   awk '{print NR,$0}' graphinfo.part.$((${num_procs} - ${scribes})) > partition.prop
 }
