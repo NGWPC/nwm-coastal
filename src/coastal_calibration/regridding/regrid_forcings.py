@@ -291,7 +291,7 @@ class CoastalForcingRegridder:
         time_coord.calendar = "standard"
         time_coord.standard_name = "time"
 
-    def _regrid_to_latlon(self, input_file: Path, apply_slp: bool = True):  # noqa: PLR0912
+    def _regrid_to_latlon(self, input_file: Path, apply_slp: bool = True):  # noqa: PLR0912, PLR0915
         """Regrid atmospheric variables to a regular lat-lon grid."""
         input_ds = Dataset(input_file)
         nlons, nlats = self.out_grid.max_index
