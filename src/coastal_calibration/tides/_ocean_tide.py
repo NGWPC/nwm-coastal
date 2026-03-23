@@ -47,7 +47,9 @@ def _generate_tidal_levels(  # noqa: PLR0915
         for _ in range(num_open_boundaries):
             num_boundary_nodes = int(f.readline().split()[0])
             bnodes.extend(int(f.readline()) for _ in range(num_boundary_nodes))
-    assert len(bnodes) == total_open_boundary_nodes  # noqa: S101
+    if len(bnodes) != total_open_boundary_nodes:
+        msg = f"Parsed {len(bnodes)} boundary nodes but header declares {total_open_boundary_nodes}"
+        raise ValueError(msg)
 
     lo = [lon[b - 1] for b in bnodes]
     la = [lat[b - 1] for b in bnodes]
@@ -78,6 +80,9 @@ def _generate_tidal_levels(  # noqa: PLR0915
         p = p[i]
 
         mask = ~a.mask if hasattr(a, "mask") else np.ones(a.shape, dtype=bool)
+        if x is None or y is None:
+            msg = "Constituent coordinate arrays were not initialized"
+            raise RuntimeError(msg)
         xI = x[mask]  # noqa: N806
         yI = y[mask]  # noqa: N806
         p = p[mask]
@@ -88,6 +93,9 @@ def _generate_tidal_levels(  # noqa: PLR0915
         data.close()
 
     pred_times = Tide._times(start_time, total_hours)
+    if not isinstance(pred_times, list):
+        msg = "Expected list of prediction times"
+        raise TypeError(msg)
 
     wl = np.zeros((len(pred_times), amp.shape[0]))
     cons = [c for c in con.noaa if c != con._Z0]

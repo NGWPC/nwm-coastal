@@ -348,8 +348,9 @@ def _run_and_log(
         text=True,
     ) as proc:
         with log_path.open("w") as f:
-            assert proc.stdout is not None  # noqa: S101
-            assert proc.stderr is not None  # noqa: S101
+            if proc.stdout is None or proc.stderr is None:
+                msg = "Popen streams not available (stdout/stderr must use PIPE)"
+                raise RuntimeError(msg)
             for line in proc.stdout:
                 stdout_lines.append(line)
                 f.write(line)
@@ -398,7 +399,9 @@ class _SfincsStageBase(WorkflowStage):
         monitor: WorkflowMonitor | None = None,
     ) -> None:
         super().__init__(config, monitor)
-        assert isinstance(config.model_config, SfincsModelConfig)  # noqa: S101
+        if not isinstance(config.model_config, SfincsModelConfig):
+            msg = f"Expected SfincsModelConfig, got {type(config.model_config).__name__}"
+            raise TypeError(msg)
         self.sfincs: SfincsModelConfig = config.model_config
 
 
@@ -998,7 +1001,7 @@ class SfincsForcingStage(_SfincsStageBase):
         xx, yy, names = zip(*bnd_points, strict=True)
 
         # 2. Build GeoDataFrame for boundary locations
-        gdf_bnd = gpd.GeoDataFrame(
+        gdf_bnd = gpd.GeoDataFrame(  # type: ignore[no-matching-overload]
             {"name": list(names)},
             geometry=gpd.points_from_xy(list(xx), list(yy), crs=model.crs),
         )
@@ -1104,7 +1107,7 @@ class SfincsForcingStage(_SfincsStageBase):
         tstart, tstop = model.get_model_time()
 
         xx, yy, _ = zip(*bnd_points, strict=False)
-        bbox_gdf = gpd.GeoDataFrame(
+        bbox_gdf = gpd.GeoDataFrame(  # type: ignore[no-matching-overload]
             geometry=gpd.points_from_xy(list(xx), list(yy), crs=model.crs),
         ).to_crs(4326)
 
@@ -1184,7 +1187,7 @@ class SfincsForcingStage(_SfincsStageBase):
 
         # 4. Build GeoDataFrame for boundary locations (model CRS)
         xx, yy, names = zip(*bnd_points, strict=True)
-        gdf_bnd = gpd.GeoDataFrame(
+        gdf_bnd = gpd.GeoDataFrame(  # type: ignore[no-matching-overload]
             {"name": list(names)},
             geometry=gpd.points_from_xy(list(xx), list(yy), crs=model.crs),
         )

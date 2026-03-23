@@ -332,7 +332,9 @@ class CoastalForcingRegridder:
 
             # Create output variable on root
             if self.root:
-                assert output_ds is not None
+                if output_ds is None:
+                    msg = "output_ds is None on root rank"
+                    raise RuntimeError(msg)
                 new_var = output_ds.createVariable(
                     varname=var_name, datatype="f4", dimensions=("time", "lat", "lon")
                 )
@@ -370,8 +372,9 @@ class CoastalForcingRegridder:
             final_output = gather_reduce(global_output, global_shape=(nlons, nlats))
 
             if self.root:
-                assert output_ds is not None
-                assert final_output is not None
+                if output_ds is None or final_output is None:
+                    msg = "output_ds or final_output is None on root rank"
+                    raise RuntimeError(msg)
                 output_ds.variables[var_name][0, :] = final_output.T
 
             in_field.destroy()
@@ -379,7 +382,9 @@ class CoastalForcingRegridder:
 
         # Write coordinates and close
         if self.root:
-            assert output_ds is not None
+            if output_ds is None:
+                msg = "output_ds is None on root rank"
+                raise RuntimeError(msg)
             output_ds.variables["lat"][:] = self.lats
             output_ds.variables["lon"][:] = self.lons
             output_ds.variables["time"][:] = input_ds.variables[_pick_time_var(input_ds)][:]

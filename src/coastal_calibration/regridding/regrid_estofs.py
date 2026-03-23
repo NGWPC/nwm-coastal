@@ -183,14 +183,14 @@ def regrid_estofs(
         field_out = ESMF.Field(locstream_out, name="OpenBoundary")
 
         # Global index range for slicing data arrays
-        i_lo = locstream_in._global_lower
-        i_hi = locstream_in._global_upper
-        o_lo = locstream_out._global_lower
-        o_hi = locstream_out._global_upper
+        i_lo = locstream_in._global_lower  # type: ignore[attr-defined]
+        i_hi = locstream_in._global_upper  # type: ignore[attr-defined]
+        o_lo = locstream_out._global_lower  # type: ignore[attr-defined]
+        o_hi = locstream_out._global_upper  # type: ignore[attr-defined]
 
         regridder = MaskedRegridder(
-            method=ESMF.RegridMethod.NEAREST_STOD,
-            unmapped_action=ESMF.UnmappedAction.IGNORE,
+            method=ESMF.RegridMethod.NEAREST_STOD,  # type: ignore[invalid-argument-type]
+            unmapped_action=ESMF.UnmappedAction.IGNORE,  # type: ignore[invalid-argument-type]
             src_mask_values=[1],
         )
 
@@ -216,6 +216,9 @@ def regrid_estofs(
 
     # Write output on root rank
     if local_pet == 0:
+        if output is None:
+            msg = "gather_reduce returned None on root rank"
+            raise RuntimeError(msg)
         _write_schism_output(nc_out, output, times, time_atts, len(bnd_coords))
 
 
