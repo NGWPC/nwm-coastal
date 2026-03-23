@@ -168,7 +168,7 @@ class COOPSAPIClient:
             logger.info("  Retrieved metadata for %d stations", len(stations))
             logger.info("  Saved station metadata to cache: %s", cache_file)
 
-        return gpd.GeoDataFrame(  # type: ignore[no-matching-overload]
+        return gpd.GeoDataFrame(  # ty: ignore[no-matching-overload]
             [
                 {
                     "station_id": station_info.get("id", ""),

@@ -168,8 +168,8 @@ def build_locstream(lon: np.ndarray, lat: np.ndarray) -> ESMF.LocStream:
     locstream["ESMF:Lat"] = lat[local_start : local_start + local_count].astype(np.float64)
 
     # Store the global index range so callers can slice data arrays
-    locstream._global_lower = local_start  # type: ignore[attr-defined]
-    locstream._global_upper = local_start + local_count  # type: ignore[attr-defined]
+    locstream._global_lower = local_start  # ty: ignore[unresolved-attribute]
+    locstream._global_upper = local_start + local_count  # ty: ignore[unresolved-attribute]
     return locstream
 
 
@@ -205,8 +205,8 @@ class Regridder:
         self,
         src_field: ESMF.Field,
         dst_field: ESMF.Field,
-        method: ESMF.RegridMethod = ESMF.RegridMethod.BILINEAR,  # type: ignore[invalid-parameter-default]
-        unmapped_action: ESMF.UnmappedAction = ESMF.UnmappedAction.IGNORE,  # type: ignore[invalid-parameter-default]
+        method: ESMF.RegridMethod = ESMF.RegridMethod.BILINEAR,  # ty: ignore[invalid-parameter-default]
+        unmapped_action: ESMF.UnmappedAction = ESMF.UnmappedAction.IGNORE,  # ty: ignore[invalid-parameter-default]
         src_mask_values: list[int] | None = None,
         extrap_method: ESMF.ExtrapMethod | None = None,
     ):
@@ -217,7 +217,7 @@ class Regridder:
             "unmapped_action": unmapped_action,
         }
         if src_mask_values is not None:
-            kwargs["src_mask_values"] = src_mask_values  # type: ignore[invalid-assignment]
+            kwargs["src_mask_values"] = src_mask_values  # ty: ignore[invalid-assignment]
         if extrap_method is not None:
             kwargs["extrap_method"] = extrap_method
 
@@ -260,8 +260,8 @@ class MaskedRegridder:
 
     def __init__(
         self,
-        method: ESMF.RegridMethod = ESMF.RegridMethod.NEAREST_STOD,  # type: ignore[invalid-parameter-default]
-        unmapped_action: ESMF.UnmappedAction = ESMF.UnmappedAction.IGNORE,  # type: ignore[invalid-parameter-default]
+        method: ESMF.RegridMethod = ESMF.RegridMethod.NEAREST_STOD,  # ty: ignore[invalid-parameter-default]
+        unmapped_action: ESMF.UnmappedAction = ESMF.UnmappedAction.IGNORE,  # ty: ignore[invalid-parameter-default]
         src_mask_values: list[int] | None = None,
     ):
         self.method = method
@@ -344,7 +344,7 @@ def gatherv_1d(
     all_counts = np.empty(comm.Get_size(), dtype="i") if comm.Get_rank() == root else None
     comm.Gather(count_arr, all_counts, root=root)
 
-    result = np.zeros(int(all_counts.sum())) if comm.Get_rank() == root else None  # type: ignore[union-attr]
+    result = np.zeros(int(all_counts.sum())) if comm.Get_rank() == root else None  # ty: ignore[unresolved-attribute]
 
     comm.Gatherv(sendbuf=local_data, recvbuf=(result, all_counts), root=root)
     return result

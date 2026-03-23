@@ -89,7 +89,7 @@ def patch_serialize_crs() -> None:
         return crs.to_wkt()
 
     _original.__code__ = _safe_serialize_crs.__code__
-    _original._patched = True  # type: ignore[attr-defined]
+    _original._patched = True  # ty: ignore[unresolved-attribute]
     _log.info("Patched hydromt _serialize_crs to handle CRS without an authority.")
 
 
@@ -124,8 +124,8 @@ def patch_boundary_conditions_index_dim() -> None:
             gdf.index.name = "index"
         return gdf
 
-    SfincsBoundaryBase._validate_and_prepare_gdf = _validate_and_normalize  # type: ignore[reportPrivateUsage]
-    SfincsBoundaryBase._validate_and_prepare_gdf._patched = True  # type: ignore[reportPrivateUsage, attr-defined]
+    SfincsBoundaryBase._validate_and_prepare_gdf = _validate_and_normalize  # ty: ignore[invalid-assignment]
+    SfincsBoundaryBase._validate_and_prepare_gdf._patched = True  # ty: ignore[unresolved-attribute]
     _log.info("Patched hydromt-sfincs _validate_and_prepare_gdf to normalize index name.")
 
 
@@ -217,8 +217,8 @@ def patch_meteo_write_gridded() -> None:
         finally:
             nc.close()
 
-    SfincsMeteo.write_gridded = _write_gridded_lazy  # type: ignore[assignment]
-    SfincsMeteo.write_gridded._patched = True  # type: ignore[attr-defined]
+    SfincsMeteo.write_gridded = _write_gridded_lazy  # ty: ignore[invalid-assignment]
+    SfincsMeteo.write_gridded._patched = True  # ty: ignore[unresolved-attribute]
     _log.info("Patched hydromt-sfincs write_gridded to stream time-steps lazily.")
 
 
@@ -295,8 +295,8 @@ def patch_parse_river_list_geoms() -> None:
             if _injected:
                 self.__dict__.pop("geoms", None)
 
-    SfincsModel._parse_river_list = _parse_river_list_safe  # type: ignore[assignment]
-    SfincsModel._parse_river_list._patched = True  # type: ignore[attr-defined]
+    SfincsModel._parse_river_list = _parse_river_list_safe  # ty: ignore[invalid-assignment]
+    SfincsModel._parse_river_list._patched = True  # ty: ignore[unresolved-attribute]
     _log.info("Patched SfincsModel._parse_river_list to handle missing 'geoms' component.")
 
 
@@ -406,8 +406,8 @@ def patch_quadtree_output_read() -> None:
 
         self.set(uds, split_dataset=True)
 
-    SfincsOutput.read_map_file = _read_map_file_safe  # type: ignore[assignment]
-    SfincsOutput.read_map_file._patched = True  # type: ignore[attr-defined]
+    SfincsOutput.read_map_file = _read_map_file_safe  # ty: ignore[invalid-assignment]
+    SfincsOutput.read_map_file._patched = True  # ty: ignore[unresolved-attribute]
     _log.info("Patched SfincsOutput.read_map_file to re-grid quadtree map output to UGRID.")
 
 
@@ -525,8 +525,8 @@ def patch_quadtree_get_indices_at_points() -> None:  # noqa: PLR0915
 
         return result
 
-    SfincsQuadtreeGrid.get_indices_at_points = _get_indices_at_points_fixed  # type: ignore[assignment]
-    SfincsQuadtreeGrid.get_indices_at_points._patched = True  # type: ignore[attr-defined]
+    SfincsQuadtreeGrid.get_indices_at_points = _get_indices_at_points_fixed  # ty: ignore[invalid-assignment]
+    SfincsQuadtreeGrid.get_indices_at_points._patched = True  # ty: ignore[unresolved-attribute]
     _log.info(
         "Patched SfincsQuadtreeGrid.get_indices_at_points to fix broken ifirst line-continuation."
     )
@@ -635,7 +635,7 @@ def patch_make_index_cog() -> None:  # noqa: PLR0915
                 if merge_last_row and block_row == (nrbn - 1):
                     bn1 += 1
 
-                window = Window(bm0, bn0, bm1 - bm0, bn1 - bn0)  # type: ignore[too-many-positional-arguments]
+                window = Window(bm0, bn0, bm1 - bm0, bn1 - bn0)  # ty: ignore[too-many-positional-arguments]
 
                 # FIX: use saved ``transform`` instead of closed ``src.transform``
                 x_coords = transform[2] + (np.arange(bm0, bm1) + 0.5) * transform[0]
@@ -656,8 +656,8 @@ def patch_make_index_cog() -> None:  # noqa: PLR0915
 
         build_overviews(fn=indices_fn, resample_method="nearest")
 
-    _ds_mod.make_index_cog = _make_index_cog_fixed  # type: ignore[assignment]
-    _ds_mod.make_index_cog._patched = True  # type: ignore[attr-defined]
+    _ds_mod.make_index_cog = _make_index_cog_fixed  # ty: ignore[invalid-assignment]
+    _ds_mod.make_index_cog._patched = True  # ty: ignore[unresolved-attribute]
     _log.info(
         "Patched make_index_cog to fix component names, CRS reprojection,"
         " and closed-dataset access."

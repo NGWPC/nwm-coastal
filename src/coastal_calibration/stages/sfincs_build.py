@@ -1001,7 +1001,7 @@ class SfincsForcingStage(_SfincsStageBase):
         xx, yy, names = zip(*bnd_points, strict=True)
 
         # 2. Build GeoDataFrame for boundary locations
-        gdf_bnd = gpd.GeoDataFrame(  # type: ignore[no-matching-overload]
+        gdf_bnd = gpd.GeoDataFrame(  # ty: ignore[no-matching-overload]
             {"name": list(names)},
             geometry=gpd.points_from_xy(list(xx), list(yy), crs=model.crs),
         )
@@ -1107,7 +1107,7 @@ class SfincsForcingStage(_SfincsStageBase):
         tstart, tstop = model.get_model_time()
 
         xx, yy, _ = zip(*bnd_points, strict=False)
-        bbox_gdf = gpd.GeoDataFrame(  # type: ignore[no-matching-overload]
+        bbox_gdf = gpd.GeoDataFrame(  # ty: ignore[no-matching-overload]
             geometry=gpd.points_from_xy(list(xx), list(yy), crs=model.crs),
         ).to_crs(4326)
 
@@ -1187,7 +1187,7 @@ class SfincsForcingStage(_SfincsStageBase):
 
         # 4. Build GeoDataFrame for boundary locations (model CRS)
         xx, yy, names = zip(*bnd_points, strict=True)
-        gdf_bnd = gpd.GeoDataFrame(  # type: ignore[no-matching-overload]
+        gdf_bnd = gpd.GeoDataFrame(  # ty: ignore[no-matching-overload]
             {"name": list(names)},
             geometry=gpd.points_from_xy(list(xx), list(yy), crs=model.crs),
         )

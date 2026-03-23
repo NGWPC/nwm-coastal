@@ -183,14 +183,14 @@ def regrid_estofs(
         field_out = ESMF.Field(locstream_out, name="OpenBoundary")
 
         # Global index range for slicing data arrays
-        i_lo = locstream_in._global_lower  # type: ignore[attr-defined]
-        i_hi = locstream_in._global_upper  # type: ignore[attr-defined]
-        o_lo = locstream_out._global_lower  # type: ignore[attr-defined]
-        o_hi = locstream_out._global_upper  # type: ignore[attr-defined]
+        i_lo = locstream_in._global_lower  # ty: ignore[unresolved-attribute]
+        i_hi = locstream_in._global_upper  # ty: ignore[unresolved-attribute]
+        o_lo = locstream_out._global_lower  # ty: ignore[unresolved-attribute]
+        o_hi = locstream_out._global_upper  # ty: ignore[unresolved-attribute]
 
         regridder = MaskedRegridder(
-            method=ESMF.RegridMethod.NEAREST_STOD,  # type: ignore[invalid-argument-type]
-            unmapped_action=ESMF.UnmappedAction.IGNORE,  # type: ignore[invalid-argument-type]
+            method=ESMF.RegridMethod.NEAREST_STOD,  # ty: ignore[invalid-argument-type]
+            unmapped_action=ESMF.UnmappedAction.IGNORE,  # ty: ignore[invalid-argument-type]
             src_mask_values=[1],
         )
 

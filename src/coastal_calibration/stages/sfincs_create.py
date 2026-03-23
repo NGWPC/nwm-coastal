@@ -817,8 +817,8 @@ class CreateObservationPointsStage(_CreateStageBase):
         ugrid = grid_ds.ugrid.grid
         fx = np.asarray(ugrid.face_x)
         fy = np.asarray(ugrid.face_y)
-        z_elev = grid_ds["z"].to_numpy()  # type: ignore[index]
-        mask_arr = grid_ds["mask"].to_numpy()  # type: ignore[index]
+        z_elev = grid_ds["z"].to_numpy()  # ty: ignore[not-subscriptable]
+        mask_arr = grid_ds["mask"].to_numpy()  # ty: ignore[not-subscriptable]
 
         # Build a KDTree of active wet face centers only.
         wet_active = (z_elev < depth_threshold) & (mask_arr > 0)

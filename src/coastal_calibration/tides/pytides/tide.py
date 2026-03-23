@@ -154,7 +154,7 @@ class Tide:
     ) -> list[datetime] | datetime:
         """Convert hourly offsets from *t0* to datetimes (or vice-versa)."""
         if not isinstance(hours, Iterable):
-            result = Tide._times(t0, [hours])  # type: ignore[invalid-argument-type]
+            result = Tide._times(t0, [hours])  # ty: ignore[invalid-argument-type]
             if not isinstance(result, list):
                 msg = "Expected list from _times"
                 raise TypeError(msg)

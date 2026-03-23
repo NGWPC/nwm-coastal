@@ -216,9 +216,9 @@ class CoastalForcingRegridder:
             self._schism_regridder = Regridder(
                 in_field,
                 out_field,
-                method=ESMF.RegridMethod.BILINEAR,  # type: ignore[invalid-argument-type]
-                unmapped_action=ESMF.UnmappedAction.IGNORE,  # type: ignore[invalid-argument-type]
-                extrap_method=ESMF.ExtrapMethod.NONE,  # type: ignore[invalid-argument-type]
+                method=ESMF.RegridMethod.BILINEAR,  # ty: ignore[invalid-argument-type]
+                unmapped_action=ESMF.UnmappedAction.IGNORE,  # ty: ignore[invalid-argument-type]
+                extrap_method=ESMF.ExtrapMethod.NONE,  # ty: ignore[invalid-argument-type]
             )
 
         out_field = self._schism_regridder(in_field, out_field)
@@ -250,7 +250,7 @@ class CoastalForcingRegridder:
         # Write on root rank
         if self.root and vsource_ds is not None:
             step_time = self._read_start_time(input_ds)
-            output_ts = int(step_time - self.schism_first_timestep)  # type: ignore[unsupported-operator]
+            output_ts = int(step_time - self.schism_first_timestep)  # ty: ignore[unsupported-operator]
             output_idx = output_ts // 3600
             vsource_ds["time_vsource"][output_idx] = output_ts
             vsource_ds["vsource"][output_idx, :] = all_elements
@@ -354,14 +354,14 @@ class CoastalForcingRegridder:
                 self._latlon_regridder = Regridder(
                     in_field,
                     out_field,
-                    method=ESMF.RegridMethod.BILINEAR,  # type: ignore[invalid-argument-type]
-                    unmapped_action=ESMF.UnmappedAction.IGNORE,  # type: ignore[invalid-argument-type]
+                    method=ESMF.RegridMethod.BILINEAR,  # ty: ignore[invalid-argument-type]
+                    unmapped_action=ESMF.UnmappedAction.IGNORE,  # ty: ignore[invalid-argument-type]
                 )
             else:
                 self._latlon_regridder(
                     in_field,
                     out_field,
-                    zero_region=ESMF.constants.Region.SELECT,  # type: ignore[invalid-argument-type]
+                    zero_region=ESMF.constants.Region.SELECT,  # ty: ignore[invalid-argument-type]
                 )
 
             # Assemble global output from all partitions

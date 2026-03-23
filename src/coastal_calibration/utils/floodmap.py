@@ -186,7 +186,7 @@ def _write_floodmap_cog(
                         bm0 = ii * nrcb
                         bm1 = min(bm0 + nrcb, m1)
 
-                        window = Window(bm0, bn0, bm1 - bm0, bn1 - bn0)  # type: ignore[too-many-positional-arguments]
+                        window = Window(bm0, bn0, bm1 - bm0, bn1 - bn0)  # ty: ignore[too-many-positional-arguments]
                         dep_block = src.read(1, window=window).astype("float32")
 
                         if np.all(np.isnan(dep_block)):
