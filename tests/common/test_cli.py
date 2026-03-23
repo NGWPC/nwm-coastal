@@ -20,7 +20,7 @@ class TestCLIStages:
         # Both SCHISM and SFINCS stages shown by default
         assert "download" in result.output
         assert "schism_run" in result.output
-        assert "boundary_conditions" in result.output
+        assert "schism_boundary" in result.output
         assert "sfincs_run" in result.output
 
     def test_stages_schism_only(self, runner):

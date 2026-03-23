@@ -208,17 +208,19 @@ def fake_download_dir(tmp_path: Path) -> Path:
     meteo_dir.mkdir(parents=True)
     # Create two LDASIN files covering 0h and 1h
     for hour in range(2):
-        stem = f"2025060{1:02d}{hour:02d}.LDASIN_DOMAIN1"
+        dt = datetime(2025, 6, 1, hour)
+        stem = f"{dt:%Y%m%d%H%M}.LDASIN_DOMAIN1"
         nc_path = meteo_dir / f"{stem}.nc"
-        _create_fake_meteo_nc(nc_path, datetime(2025, 6, 1, hour))
+        _create_fake_meteo_nc(nc_path, dt)
 
     # --- Streamflow ---
     hydro_dir = dl_dir / "hydro" / "nwm"
     hydro_dir.mkdir(parents=True)
     for hour in range(2):
-        stem = f"2025060{1:02d}{hour:02d}.CHRTOUT_DOMAIN1"
+        dt = datetime(2025, 6, 1, hour)
+        stem = f"{dt:%Y%m%d%H%M}.CHRTOUT_DOMAIN1"
         nc_path = hydro_dir / f"{stem}.nc"
-        _create_fake_streamflow_nc(nc_path, datetime(2025, 6, 1, hour))
+        _create_fake_streamflow_nc(nc_path, dt)
 
     # --- Coastal (STOFS) ---
     stofs_dir = dl_dir / "coastal" / "stofs" / "stofs_2d_glo.20250601"

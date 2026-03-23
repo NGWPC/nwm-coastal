@@ -116,9 +116,13 @@ class TestPathConfig:
         cfg = PathConfig(work_dir=tmp_work_dir, raw_download_dir=tmp_download_dir)
         assert cfg.download_dir == tmp_download_dir
 
-    def test_otps_dir(self, tmp_work_dir):
+    def test_otps_dir_default_none(self, tmp_work_dir):
         cfg = PathConfig(work_dir=tmp_work_dir)
-        assert "OTPSnc" in str(cfg.otps_dir)
+        assert cfg.otps_dir is None
+
+    def test_otps_dir_explicit(self, tmp_work_dir, tmp_path):
+        cfg = PathConfig(work_dir=tmp_work_dir, otps_dir=tmp_path / "OTPSnc")
+        assert cfg.otps_dir == (tmp_path / "OTPSnc").resolve()
 
     def test_meteo_dir(self, tmp_work_dir, tmp_download_dir):
         cfg = PathConfig(work_dir=tmp_work_dir, raw_download_dir=tmp_download_dir)
@@ -136,14 +140,17 @@ class TestPathConfig:
         cfg = PathConfig(work_dir=tmp_work_dir, raw_download_dir=tmp_download_dir)
         assert cfg.coastal_dir("stofs") == tmp_download_dir / "coastal" / "stofs"
 
-    def test_derived_paths(self, tmp_work_dir):
+    def test_parm_nwm_requires_parm_dir(self, tmp_work_dir):
         cfg = PathConfig(work_dir=tmp_work_dir)
-        assert cfg.ush_nwm == cfg.nwm_dir / "ush"
-        assert cfg.exec_nwm == cfg.nwm_dir / "exec"
+        with pytest.raises(ValueError, match="parm_dir"):
+            _ = cfg.parm_nwm
+
+    def test_parm_nwm_with_parm_dir(self, tmp_work_dir, tmp_path):
+        cfg = PathConfig(work_dir=tmp_work_dir, parm_dir=tmp_path / "parm")
         assert "parm" in str(cfg.parm_nwm)
 
-    def test_geogrid_file(self, tmp_work_dir, sample_simulation_config):
-        cfg = PathConfig(work_dir=tmp_work_dir)
+    def test_geogrid_file(self, tmp_work_dir, tmp_path, sample_simulation_config):
+        cfg = PathConfig(work_dir=tmp_work_dir, parm_dir=tmp_path / "parm")
         geogrid = cfg.geogrid_file(sample_simulation_config)
         assert "geo_em_CONUS.nc" in str(geogrid)
 
@@ -160,20 +167,20 @@ class TestPathConfig:
         cfg = PathConfig(
             work_dir="/tmp/work",
             parm_dir="./parm",
-            nfs_mount="./nfs",
             nwm_dir="./nwm",
+            otps_dir="./otps",
             hot_start_file="./hotstart.nc",
         )
         assert cfg.parm_dir.is_absolute()
-        assert cfg.nfs_mount.is_absolute()
         assert cfg.nwm_dir.is_absolute()
+        assert cfg.otps_dir.is_absolute()
         assert cfg.hot_start_file.is_absolute()
 
 
 class TestSchismModelConfig:
     def test_defaults(self):
         cfg = SchismModelConfig()
-        assert cfg.singularity_image.is_absolute()
+        assert cfg.binary == "pschism"
         assert cfg.nodes == 2
         assert cfg.ntasks_per_node == 18
         assert cfg.exclusive is True
@@ -181,10 +188,6 @@ class TestSchismModelConfig:
         assert cfg.omp_num_threads == 2
         assert cfg.oversubscribe is False
         assert cfg.include_noaa_gages is False
-
-    def test_relative_singularity_image_resolved(self):
-        cfg = SchismModelConfig(singularity_image="./images/coastal.sif")
-        assert cfg.singularity_image.is_absolute()
 
     def test_total_tasks(self):
         cfg = SchismModelConfig(nodes=3, ntasks_per_node=10)
@@ -198,25 +201,33 @@ class TestSchismModelConfig:
         cfg = SchismModelConfig()
         expected = [
             "download",
-            "pre_forcing",
-            "nwm_forcing",
-            "post_forcing",
-            "update_params",
+            "schism_forcing_prep",
+            "schism_forcing",
+            "schism_sflux",
+            "schism_params",
             "schism_obs",
-            "boundary_conditions",
-            "pre_schism",
+            "schism_boundary",
+            "schism_prep",
             "schism_run",
-            "post_schism",
+            "schism_postprocess",
             "schism_plot",
         ]
         assert cfg.stage_order == expected
 
-    def test_schism_mesh(self, sample_simulation_config, tmp_work_dir):
-        cfg = SchismModelConfig()
-        paths = PathConfig(work_dir=tmp_work_dir)
-        mesh = cfg.schism_mesh(sample_simulation_config, paths)
+    def test_schism_mesh(self, tmp_path):
+        prebuilt = tmp_path / "prebuilt"
+        prebuilt.mkdir()
+        cfg = SchismModelConfig(prebuilt_dir=prebuilt)
+        mesh = cfg.schism_mesh
         assert "hgrid.nc" in str(mesh)
-        assert "pacific" in str(mesh)
+        assert str(prebuilt) in str(mesh)
+
+    def test_geogrid_file_resolved(self, tmp_path):
+        geogrid = tmp_path / "geo_em_HI.nc"
+        geogrid.touch()
+        cfg = SchismModelConfig(geogrid_file=geogrid)
+        assert cfg.geogrid_file == geogrid.resolve()
+        assert cfg.geogrid_file.is_absolute()
 
     def test_to_dict(self):
         cfg = SchismModelConfig()
@@ -491,11 +502,6 @@ class TestCoastalCalibConfig:
         sample_config.model_config.nscribes = sample_config.model_config.total_tasks
         errors = sample_config.validate()
         assert any("nscribes" in e for e in errors)
-
-    def test_validate_raw_download_dir_required(self, sample_config):
-        sample_config.paths.raw_download_dir = None
-        errors = sample_config.validate()
-        assert any("raw_download_dir" in e for e in errors)
 
     def test_to_dict_boundary_stofs_file(self, sample_config):
         sample_config.boundary.stofs_file = Path("/tmp/stofs.nc")
