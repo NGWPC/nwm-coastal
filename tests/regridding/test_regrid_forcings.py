@@ -294,11 +294,7 @@ class TestSeaLevelPressure:
 def _run_synthetic_vsource(
     tmp_path, synthetic_ldasin_dir, synthetic_geo_em_nc, synthetic_esmfmesh_nc
 ):
-    """Run CoastalForcingRegridder on synthetic data, skipping on ESMF regrid failures.
-
-    ESMF BILINEAR regridding on small synthetic grids can fail with rc=509
-    on certain platforms (e.g., Ubuntu CI) while working on others (macOS).
-    """
+    """Run CoastalForcingRegridder on synthetic data and return the output directory."""
     from coastal_calibration.regridding.regrid_forcings import (
         CoastalForcingRegridder,
     )
@@ -312,12 +308,7 @@ def _run_synthetic_vsource(
         geo_em_path=synthetic_geo_em_nc,
         schism_mesh_path=synthetic_esmfmesh_nc,
     )
-    try:
-        app.run(file_filter="**/*LDASIN_DOMAIN*", skip_latlon=True)
-    except ValueError as e:
-        if "ESMC_FieldRegridStore" in str(e):
-            pytest.skip(f"ESMF regridding failed on this platform: {e}")
-        raise
+    app.run(file_filter="**/*LDASIN_DOMAIN*", skip_latlon=True)
     return output_dir
 
 
