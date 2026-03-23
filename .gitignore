@@ -8,6 +8,7 @@
 
 # Logs
 *.log
+*.ESMF_LogFile
 # Temporary files
 *.tmp
 *~
