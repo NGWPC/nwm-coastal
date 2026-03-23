@@ -211,14 +211,15 @@ class CoastalForcingRegridder:
         # Initialise to 0 so unmapped elements (IGNORE action) are left at 0.
         out_field.data[...] = 0.0
 
-        # Build regridder once, reuse for subsequent files
+        # Build regridder once, reuse for subsequent files.
+        # CONSERVE is required for Grid -> Mesh(ELEMENT) regridding;
+        # BILINEAR only supports Mesh(NODE) destinations.
         if self._schism_regridder is None:
             self._schism_regridder = Regridder(
                 in_field,
                 out_field,
-                method=ESMF.RegridMethod.BILINEAR,  # ty: ignore[invalid-argument-type]
+                method=ESMF.RegridMethod.CONSERVE,  # ty: ignore[invalid-argument-type]
                 unmapped_action=ESMF.UnmappedAction.IGNORE,  # ty: ignore[invalid-argument-type]
-                extrap_method=ESMF.ExtrapMethod.NONE,  # ty: ignore[invalid-argument-type]
             )
 
         out_field = self._schism_regridder(in_field, out_field)
