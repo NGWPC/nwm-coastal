@@ -3,11 +3,29 @@
 # in this environment. Runs automatically on pixi env activation.
 # Subsequent activations skip instantly (just a file-existence check).
 
-if [ -x "$CONDA_PREFIX/bin/sfincs" ]; then
+# Fingerprint of the key compiled-against libraries: if any of these
+# packages are updated, the binary must be rebuilt against the new versions.
+_dep_fingerprint() {
+    local files
+    files=$(ls "$CONDA_PREFIX/conda-meta/"libnetcdf-*.json \
+               "$CONDA_PREFIX/conda-meta/"hdf5-*.json \
+               "$CONDA_PREFIX/conda-meta/"libgfortran-*.json 2>/dev/null | sort)
+    if command -v sha256sum >/dev/null 2>&1; then
+        printf '%s' "$files" | sha256sum | cut -d' ' -f1
+    else
+        printf '%s' "$files" | shasum -a 256 | cut -d' ' -f1
+    fi
+}
+
+FINGERPRINT_FILE="$CONDA_PREFIX/.sfincs_build_fingerprint"
+CURRENT_FP=$(_dep_fingerprint)
+
+if [ -x "$CONDA_PREFIX/bin/sfincs" ] \
+    && [ "$(cat "$FINGERPRINT_FILE" 2>/dev/null)" = "$CURRENT_FP" ]; then
     return 0 2>/dev/null || exit 0
 fi
 
-echo "SFINCS binary not found in this environment — building …"
+echo "SFINCS binary not found or dependencies changed — building …"
 (
     set -e
     cd "$PIXI_PROJECT_ROOT"
@@ -39,4 +57,5 @@ if [ $? -ne 0 ]; then
     echo "ERROR: SFINCS build failed — check the output above."
     return 1 2>/dev/null || exit 1
 fi
+echo "$CURRENT_FP" > "$FINGERPRINT_FILE"
 echo "SFINCS build complete — binary installed to $CONDA_PREFIX/bin/sfincs"

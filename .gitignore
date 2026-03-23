@@ -193,7 +193,7 @@ site/
 data/
 
 ### Test Reports ###
-junit.xml
+junit*.xml
 .htmlcov/
 
 ### Temp

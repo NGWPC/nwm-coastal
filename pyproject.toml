@@ -19,6 +19,7 @@ keywords = [
   "slurm",
 ]
 license = { file = "LICENSE" }
+authors = [ { name = "Taher Chegini", email = "tchegini@dewberry.com" } ]
 requires-python = ">=3.11"
 classifiers = [
   "Development Status :: 3 - Alpha",
@@ -36,19 +37,21 @@ dynamic = [
   "version",
 ]
 dependencies = [
+  "fsspec",
+  "geopandas>=1",
+  "netcdf4",
+  "numpy>=2",
+  "pandas>=2.2",
+  "pyproj>=3",
   "pyyaml>=6",
   "rich-click",
+  "rioxarray>=0.17",
+  "s3fs",
+  "shapely>=2",
   "tiny-retriever<0.2",
+  "xarray>=2024.1",
 ]
-[[project.authors]]
-name = "Taher Chegini"
-email = "tchegini@dewberry.com"
-[project.optional-dependencies]
-dev = [
-  "ipykernel",
-  "ipywidgets",
-]
-docs = [
+optional-dependencies.docs = [
   "mike>=2",
   "mkdocs>=1.6",
   "mkdocs-jupyter",
@@ -56,11 +59,15 @@ docs = [
   "mkdocstrings[python]>=0.27",
   "ruff",
 ]
-lint = [
+optional-dependencies.lint = [
   "codespell",
   "pre-commit",
 ]
-plot = [
+optional-dependencies.notebook = [
+  "ipykernel",
+  "ipywidgets",
+]
+optional-dependencies.plot = [
   "contextily>=1.6",
   "geopandas>=1",
   "matplotlib>=3.9",
@@ -69,52 +76,41 @@ plot = [
   "shapely>=2",
   "xarray>=2024.1",
 ]
-schism = [
-  "netcdf4",
-  "numpy",
-  "pandas",
-  "xarray",
-]
-sfincs = [
+optional-dependencies.sfincs = [
   "dotenv",
   "hydromt>=1.3",
   "icechunk>=1.0.2",
   # "hydromt-sfincs>=2.0.0rc1",
-  "rioxarray>=0.17",
 ]
-test = [
+optional-dependencies.test = [
   "coverage[toml]",
   "pytest-cov",
   "pytest-sugar",
 ]
-typecheck = [
+optional-dependencies.typecheck = [
+  "pandas-stubs",
   "ty",
   "types-pyyaml",
 ]
-[project.scripts]
-coastal-calibration = "coastal_calibration.cli:main"
-[project.urls]
-Documentation = "https://ngwpc.github.io/nwm-coastal"
-Source = "https://github.com/NGWPC/nwm-coastal"
+urls.Documentation = "https://ngwpc.github.io/nwm-coastal"
+urls.Source = "https://github.com/NGWPC/nwm-coastal"
+scripts.coastal-calibration = "coastal_calibration.cli:main"
 
-[tool.hatch.build.targets.sdist]
-exclude = [
+[tool.hatch]
+build.targets.sdist.exclude = [
   "*.tar.gz",
 ]
-[tool.hatch.build.targets.wheel]
-packages = [
+build.targets.wheel.packages = [
   "src/coastal_calibration",
 ]
-[tool.hatch.version]
-source = "vcs"
+version.source = "vcs"
 
 [tool.ruff]
 target-version = "py311"
 line-length = 100
 include = [ "src/coastal_calibration/**/*.py", "src/coastal_calibration/*.py" ]
-exclude = [ "docs/examples/notebooks/*.py", "src/coastal_calibration/scripts/**" ]
-[tool.ruff.lint]
-select = [
+exclude = [ "docs/examples/notebooks/*.py" ]
+lint.select = [
   # flake8-bugbear
   "B",
   # flake8-comprehensions
@@ -179,9 +175,11 @@ select = [
   # flake8-2020
   "YTT",
 ]
-ignore = [
+lint.ignore = [
   "D103",
   "D105",
+  # module level imports
+  "E402",
   "E501",
   # conflict with ruff-formatter
   "ISC001",
@@ -200,7 +198,15 @@ ignore = [
   # custom exception
   "TRY003",
 ]
-per-file-ignores."tests/*.py" = [
+lint.per-file-ignores."docs/examples/notebooks/*.{ipynb,py}" = [
+  # missing module docstring
+  "D100",
+  # use of "assert"
+  "S101",
+  # print statements
+  "T20",
+]
+lint.per-file-ignores."tests/**/*.py" = [
   "D100",
   "D101",
   "D102",
@@ -216,19 +222,7 @@ per-file-ignores."tests/*.py" = [
   # insecure use of path
   "S108",
 ]
-per-file-ignores."docs/examples/notebooks/*.{ipynb,py}" = [
-  # missing module docstring
-  "D100",
-  # module level import not at top
-  "E402",
-  # use of "assert"
-  "S101",
-  # print statements
-  "T20",
-]
-extend-safe-fixes = [
-  # module level imports
-  "E402",
+lint.extend-safe-fixes = [
   # break down assert
   "PT018",
   # Move imports
@@ -236,28 +230,28 @@ extend-safe-fixes = [
   # absolute imports
   "TID252",
 ]
-isort.known-first-party = [
+lint.isort.known-first-party = [
   "coastal_calibration",
 ]
-isort.required-imports = [ "from __future__ import annotations" ]
-pydocstyle.convention = "numpy"
+lint.isort.required-imports = [ "from __future__ import annotations" ]
+lint.pydocstyle.convention = "numpy"
 
 [tool.codespell]
 skip = "__pycache__,_build,.git,./htmlcov,pixi.lock,./site,./cache,*.ipynb"
 ignore-words-list = "gages,parm,oce,gage,nd"
 
 [tool.pyproject-fmt]
-table_format = "long"
+expand_tables = [ "tool.pixi" ]
 
-[tool.pytest.ini_options]
-addopts = [
+[tool.pytest]
+ini_options.addopts = [
   "--import-mode=importlib",
   "--doctest-modules",
   "-v",
   "--durations=5",
 ]
-doctest_optionflags = "NORMALIZE_WHITESPACE IGNORE_EXCEPTION_DETAIL NUMBER"
-filterwarnings = [
+ini_options.doctest_optionflags = "NORMALIZE_WHITESPACE IGNORE_EXCEPTION_DETAIL NUMBER"
+ini_options.filterwarnings = [
   "ignore:.*distutils.*",
   "ignore:.*--rsyncdir command line argument.*",
   "ignore:.*numpy.ndarray size changed.*",
@@ -265,121 +259,197 @@ filterwarnings = [
   "ignore:.*Ensure you extract a single element.*",
   "ignore:.*Deprecated in Pydantic V2.0.*",
 ]
-markers = [
+ini_options.markers = [
+  "schism: SCHISM compilation and workflow tests (require pixi schism env)",
   "sfincs: SFINCS workflow integration tests (require HydroMT-SFINCS + plot deps)",
 ]
-testpaths = [
-  "tests",
+ini_options.testpaths = [
+  "tests/common",
+  "tests/schism",
+  "tests/sfincs",
 ]
 
-[tool.coverage.paths]
-source = [ "src", "*/site-packages" ]
-[tool.coverage.report]
-exclude_lines = [
-  "raise ServiceUnavailableError",
-  "if TYPE_CHECKING:",
+[tool.coverage]
+run.branch = true
+run.omit = [
+  "*/legacy_scripts/*",
 ]
-ignore_errors = true
-omit = [
-  "**/__init__.py",
-  "*/scripts/*",
-]
-[tool.coverage.run]
-branch = true
-parallel = true
-omit = [
-  "*/scripts/*",
-]
-source_pkgs = [
+run.parallel = true
+run.source_pkgs = [
   "coastal_calibration",
 ]
+paths.source = [ "src", "*/site-packages" ]
+report.exclude_lines = [
+  "if TYPE_CHECKING:",
+  "raise ServiceUnavailableError",
+]
+report.ignore_errors = true
+report.omit = [
+  "**/__init__.py",
+  "*/legacy_scripts/*",
+]
 
-[tool.ty.environment]
-python-version = "3.11"
-python = ".pixi/envs/typecheck"
-[tool.ty.rules]
-all = "error"
-[tool.ty.src]
-include = [ "src/coastal_calibration" ]
-exclude = [
+[tool.ty]
+environment.python-version = "3.11"
+environment.python = ".pixi/envs/typecheck"
+rules.all = "error"
+src.include = [ "src/coastal_calibration" ]
+src.exclude = [
   "**/__pycache__",
   "**/__init__.py",
-  "src/coastal_calibration/scripts/**",
 ]
 
 [tool.pixi.environments]
-test311 = { features = [ "test", "sfincs", "plot", "py311" ] }
-test314 = { features = [ "test", "sfincs", "plot", "py314" ] }
-dev = { features = [ "dev", "sfincs", "plot", "test", "py314" ] }
-schism = { features = [ "schism", "py314" ] }
-sfincs = { features = [ "sfincs", "plot", "py314" ] }
-typecheck = { features = [ "typecheck", "sfincs", "plot", "py314" ] }
-lint = { features = [ "lint", "py314" ], no-default-feature = true }
-docs = { features = [ "docs", "py314" ] }
-[tool.pixi.feature.dev.dependencies]
-s3fs = ">=2026.2.0,<2027"
+test311-common = { features = [ "test", "test-common", "py311" ] }
+test311-sfincs = { features = [ "test", "test-sfincs", "sfincs", "plot", "py311" ] }
+test311-schism = { features = [ "test", "test-schism", "schism", "plot", "py311" ] }
+test313-common = { features = [ "test", "test-common", "py313" ] }
+test313-sfincs = { features = [ "test", "test-sfincs", "sfincs", "plot", "py313" ] }
+test313-schism = { features = [ "test", "test-schism", "schism", "plot", "py313" ] }
+test311 = { features = [ "test", "test311", "schism", "sfincs", "plot", "py311" ] }
+test313 = { features = [ "test", "test313", "schism", "sfincs", "plot", "py313" ] }
+dev = { features = [ "notebook", "schism", "sfincs", "plot", "test", "py313" ] }
+schism = { features = [ "notebook", "schism", "plot", "py313" ] }
+sfincs = { features = [ "notebook", "sfincs", "plot", "py313" ] }
+typecheck = { features = [ "typecheck", "schism", "sfincs", "plot", "test", "py313" ] }
+lint = { features = [ "lint", "py313" ], no-default-feature = true }
+docs = { features = [ "docs", "py313" ] }
+
 [tool.pixi.feature.docs.tasks]
 docs-build = "mkdocs build --strict"
 docs-serve = "mkdocs serve"
 docs-deploy = "mike deploy --push --update-aliases dev latest"
 docs-release = "mike deploy --push --update-aliases $(git describe --tags --abbrev=0) stable"
+
 [tool.pixi.feature.lint.tasks]
 lint = "pre-commit run --all-files"
 pcupdate = "pre-commit autoupdate"
 spell = "codespell -w"
+
 [tool.pixi.feature.plot.dependencies]
 proj = "*"
 libgdal-core = "*"
 hdf5 = "*"
 libnetcdf = "*"
+
 [tool.pixi.feature.py311.dependencies]
 python = "~=3.11.0"
-[tool.pixi.feature.py314.dependencies]
-python = "~=3.14.0"
-[tool.pixi.feature.schism.dependencies]
 proj = "*"
 libgdal-core = "*"
-hdf5 = "*"
+hdf5 = { version = "*", build = "mpi_openmpi_*" }
 libnetcdf = "*"
-esmpy = "*"
-mpi4py = "*"
-openmpi = "*"
-[tool.pixi.feature.sfincs.activation]
-scripts = [ "scripts/ensure-sfincs.sh" ]
-[tool.pixi.feature.sfincs.dependencies]
-proj = "*"
-libgdal-core = "*"
-hdf5 = "*"
-libnetcdf = "*"
-netcdf-fortran = "*"
+netcdf4 = { version = "*", build = "mpi_openmpi_*" }
+netcdf-fortran = { version = "*", build = "mpi_openmpi_*" }
 c-compiler = "*"
 fortran-compiler = "*"
+make = "*"
+pkg-config = "*"
+
+[tool.pixi.feature.py313.dependencies]
+python = "~=3.13.0"
+proj = "*"
+libgdal-core = "*"
+hdf5 = { version = "*", build = "mpi_openmpi_*" }
+libnetcdf = "*"
+netcdf4 = { version = "*", build = "mpi_openmpi_*" }
+netcdf-fortran = { version = "*", build = "mpi_openmpi_*" }
+c-compiler = "*"
+fortran-compiler = "*"
+make = "*"
+pkg-config = "*"
+
+[tool.pixi.feature.schism.activation]
+scripts = [ "scripts/ensure-schism.sh" ]
+
+[tool.pixi.feature.schism.dependencies]
+# Force MPI (OpenMPI) build variants so ESMF/esmpy runs with parallel support.
+# Without the build constraint, conda-forge resolves the nompi variants.
+mpi = { version = "*", build = "openmpi" }
+openmpi = "*"
+esmf = { version = "*", build = "mpi_openmpi_*" }
+esmpy = "*"
+mpi4py = "*"
+cxx-compiler = "*"
+cmake = ">=3.12,<4"
+
+[tool.pixi.feature.sfincs.activation]
+scripts = [ "scripts/ensure-sfincs.sh" ]
+
+[tool.pixi.feature.sfincs.dependencies]
 autoconf = "*"
 automake = "*"
 libtool = "*"
 m4 = "*"
-make = "*"
-pkg-config = "*"
+
 [tool.pixi.feature.sfincs.pypi-dependencies]
 hydromt-sfincs = { git = "https://github.com/Deltares/hydromt_sfincs", rev = "41aac0a3980fc2714ec28eafb0463d40abfc979a" }
-[tool.pixi.feature.test.tasks]
-test = { cmd = [
+
+[tool.pixi.feature.test-common.tasks]
+test-common = { cmd = [
   "pytest",
+  "tests/common",
   "--cov",
-  "--cov-append",
   "--cov-branch",
   "--cov-report=xml",
+  "--junitxml=junit-common.xml",
+  "--durations=5",
+] }
+report = { cmd = [ "coverage", "report" ], depends-on = [ "test-common" ] }
+html = { cmd = [ "coverage", "html" ], depends-on = [ "report" ] }
+
+[tool.pixi.feature.test-schism.tasks]
+test-schism = { cmd = [
+  "pytest",
+  "tests/schism",
+  "--no-cov",
+  "--junitxml=junit-schism.xml",
+  "--durations=5",
+] }
+
+[tool.pixi.feature.test-sfincs.tasks]
+test-sfincs = { cmd = [
+  "pytest",
+  "tests/sfincs",
+  "--cov",
+  "--cov-branch",
+  "--cov-report=xml",
+  "--junitxml=junit-sfincs.xml",
+  "--durations=5",
+] }
+
+[tool.pixi.feature.test311.tasks]
+test = { cmd = [
+  "pytest",
+  "tests/",
+  "--ignore=tests/legacy_scripts",
+  "--no-cov",
   "--junitxml=junit.xml",
   "--durations=5",
 ] }
 report = { cmd = [ "coverage", "report" ], depends-on = [ "test" ] }
 html = { cmd = [ "coverage", "html" ], depends-on = [ "report" ] }
+
+[tool.pixi.feature.test313.tasks]
+test = { cmd = [
+  "pytest",
+  "tests/",
+  "--ignore=tests/legacy_scripts",
+  "--no-cov",
+  "--junitxml=junit.xml",
+  "--durations=5",
+] }
+report = { cmd = [ "coverage", "report" ], depends-on = [ "test" ] }
+html = { cmd = [ "coverage", "html" ], depends-on = [ "report" ] }
+
 [tool.pixi.feature.typecheck.pypi-dependencies]
 hydromt-sfincs = { git = "https://github.com/Deltares/hydromt_sfincs", rev = "41aac0a3980fc2714ec28eafb0463d40abfc979a" }
+
 [tool.pixi.feature.typecheck.tasks]
 typecheck = "ty check"
+
 [tool.pixi.pypi-dependencies]
 coastal_calibration = { path = ".", editable = true }
+
 [tool.pixi.workspace]
 channels = [ "conda-forge" ]
 platforms = [ "linux-64", "osx-arm64" ]
