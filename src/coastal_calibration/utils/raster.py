@@ -122,10 +122,24 @@ def clip_and_reproject(
     dst_height = max(1, int(np.ceil((ymax - ymin) / dst_res)))
     dst_transform = Affine(dst_res, 0.0, xmin, 0.0, -dst_res, ymax)
 
-    return data.raster.reproject(
+    result = data.raster.reproject(
         dst_crs=dst_crs,
         dst_transform=dst_transform,
         dst_width=dst_width,
         dst_height=dst_height,
         method=reproject_method,
     ).fillna(fill_value)
+
+    # Ensure spatial coordinates are monotonic after reprojection.
+    # The ``nearest_index`` method (KDTree-based) can produce slightly
+    # non-monotonic coordinates from floating-point drift.
+    y_dim, x_dim = result.raster.dims
+    if result[x_dim].size > 1 and not result.indexes[x_dim].is_monotonic_increasing:
+        result = result.sortby(x_dim)
+    if result[y_dim].size > 1 and not (
+        result.indexes[y_dim].is_monotonic_increasing
+        or result.indexes[y_dim].is_monotonic_decreasing
+    ):
+        result = result.sortby(y_dim)
+
+    return result

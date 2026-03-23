@@ -6,16 +6,15 @@ DEM to produce a Cloud Optimized GeoTIFF (COG) of maximum flood depth.
 
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+from coastal_calibration.utils.logging import logger as _log
 
 if TYPE_CHECKING:
     from hydromt_sfincs import SfincsModel
 
 __all__ = ["create_flood_depth_map"]
-
-_log = logging.getLogger(__name__)
 
 
 def _ensure_overviews(tif_path: Path, log: Any) -> None:

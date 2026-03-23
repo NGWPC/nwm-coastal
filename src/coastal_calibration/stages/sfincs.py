@@ -302,7 +302,26 @@ def _build_meteo_entry(
     # Both nwm_retro and nwm_ana downloads use YYYYMMDDHH.LDASIN_DOMAIN1
     # naming (extension-less).  We create .nc symlinks to work around a
     # HydroMT ext_override bug.
-    uri = f"{PathConfig.METEO_SUBDIR}/{meteo_source}/*.LDASIN_DOMAIN1.nc"
+    #
+    # Scope the glob to the simulation year-month so that stale files
+    # from other runs/domains in the same directory are not loaded.
+    # NWM simulations rarely cross a month boundary (max ~30 days),
+    # but when they do, both months are covered by separate globs
+    # joined with a ``|`` separator — not supported by simple glob, so
+    # we instead use a ``?`` wildcard for the month digit when the
+    # simulation spans two months.
+    from datetime import timedelta
+
+    end = sim.start_date + timedelta(hours=sim.duration_hours)
+    start_prefix = sim.start_date.strftime("%Y%m")
+    end_prefix = end.strftime("%Y%m")
+    if start_prefix == end_prefix:
+        date_glob = f"{start_prefix}*.LDASIN_DOMAIN1.nc"
+    else:
+        # Different months — use the common year prefix with wildcard
+        common = start_prefix[:4]  # YYYY is always the same for ≤31d
+        date_glob = f"{common}*.LDASIN_DOMAIN1.nc"
+    uri = f"{PathConfig.METEO_SUBDIR}/{meteo_source}/{date_glob}"
 
     temporal_extent = _get_temporal_extent(sim)
 
@@ -386,14 +405,26 @@ def _build_streamflow_entry(
         Catalog entry for streamflow data.
     """
     # URI is relative to the root (download_dir)
-    # Use .nc symlinks to work around HydroMT ext_override bug
+    # Use .nc symlinks to work around HydroMT ext_override bug.
+    # Scope the glob to the simulation year-month (same logic as meteo).
+    from datetime import timedelta
+
+    end = sim.start_date + timedelta(hours=sim.duration_hours)
+    start_prefix = sim.start_date.strftime("%Y%m")
+    end_prefix = end.strftime("%Y%m")
+    if start_prefix == end_prefix:
+        date_glob = f"{start_prefix}*.CHRTOUT_DOMAIN1.nc"
+    else:
+        common = start_prefix[:4]
+        date_glob = f"{common}*.CHRTOUT_DOMAIN1.nc"
+
     if meteo_source == "nwm_retro":
-        uri = f"{PathConfig.STREAMFLOW_SUBDIR}/nwm_retro/*.CHRTOUT_DOMAIN1.nc"
+        uri = f"{PathConfig.STREAMFLOW_SUBDIR}/nwm_retro/{date_glob}"
         source_url = "https://noaa-nwm-retrospective-3-0-pds.s3.amazonaws.com"
         notes = "NWM Retrospective 3.0 CHRTOUT streamflow files"
         source_version = "3.0"
     else:
-        uri = f"{PathConfig.HYDRO_SUBDIR}/nwm/*.CHRTOUT_DOMAIN1.nc"
+        uri = f"{PathConfig.HYDRO_SUBDIR}/nwm/{date_glob}"
         source_url = "https://storage.googleapis.com/national-water-model"
         notes = "NWM Analysis channel_rt streamflow files"
         source_version = "operational"

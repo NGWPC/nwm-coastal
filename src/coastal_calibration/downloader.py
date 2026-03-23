@@ -753,10 +753,9 @@ def download_data(
             errors=["NGEN hydrology source not yet supported"],
         )
     elif meteo_source == "nwm_retro":
-        urls, paths = _build_nwm_retro_streamflow_urls(start, end, out_dir, domain)
-        hydro_result = _execute_download(
-            urls, paths, f"hydro/{hydro_source}", timeout, raise_on_error
-        )
+        # nwm_retro streamflow is read directly from the S3 Zarr store
+        # at runtime — no file download needed.
+        hydro_result = DownloadResult(source=f"hydro/{hydro_source}")
     else:
         urls, paths = _build_nwm_ana_streamflow_urls(start, end, out_dir, domain)
         hydro_result = _execute_download(
