@@ -20,9 +20,7 @@ def _isclose(a: float, b: float, rel_tol: float = 1e-09, abs_tol: float = 0.0) -
     if math.isinf(a) or math.isinf(b):
         return False
     diff = math.fabs(b - a)
-    return (diff <= math.fabs(rel_tol * b)) or (diff <= math.fabs(rel_tol * a)) or (
-        diff <= abs_tol
-    )
+    return (diff <= math.fabs(rel_tol * b)) or (diff <= math.fabs(rel_tol * a)) or (diff <= abs_tol)
 
 
 class TPXOOut:

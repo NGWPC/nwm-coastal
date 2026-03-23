@@ -39,6 +39,14 @@ class Tide:
 
     dtype = np.dtype([("constituent", object), ("amplitude", float), ("phase", float)])
 
+    def _normalize(self) -> None:
+        """Ensure positive amplitudes and phases in [0, 360)."""
+        for i, (_, amp, pha) in enumerate(self.model):
+            if amp < 0:
+                self.model["amplitude"][i] = -amp
+                self.model["phase"][i] = pha + 180.0
+            self.model["phase"][i] = np.mod(self.model["phase"][i], 360.0)
+
     def __init__(self, model: np.ndarray, radians: bool = False) -> None:
         if model.dtype != Tide.dtype:
             raise ValueError("model must be a numpy array with dtype == Tide.dtype")
@@ -47,52 +55,6 @@ class Tide:
             model["phase"] = _R2D * model["phase"]
         self.model = model[:]
         self._normalize()
-
-    # ------------------------------------------------------------------
-    # Prediction
-    # ------------------------------------------------------------------
-
-    def at(self, t: list[datetime]) -> np.ndarray:
-        """Return modelled tidal heights at given times.
-
-        Parameters
-        ----------
-        t : list[datetime]
-            Sequence of datetime objects.
-
-        Returns
-        -------
-        np.ndarray
-            Water level at each time.
-        """
-        if not isinstance(t, Iterable) or len(t) == 0:
-            raise ValueError("t must be a non-empty sequence of datetimes.")
-
-        t0 = t[0]
-        hours = self._hours(t0, t)
-
-        speed, u, f, V0 = self._prepare(self.model["constituent"], t0, radians=True)
-        H = self.model["amplitude"][:, np.newaxis]
-        p = _D2R * self.model["phase"][:, np.newaxis]
-
-        u_single = u[0] if isinstance(u, list) else u
-        f_single = f[0] if isinstance(f, list) else f
-        hours_arr = np.asarray(hours).reshape(1, -1)
-
-        return self._tidal_series(hours_arr, H, p, speed, u_single, f_single, V0)
-
-    # ------------------------------------------------------------------
-    # Time helpers
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def _times(t0: datetime, hours) -> list[datetime] | datetime:
-        """Convert hourly offsets from *t0* to datetimes (or vice-versa)."""
-        if not isinstance(hours, Iterable):
-            return Tide._times(t0, [hours])[0]
-        if not isinstance(hours[0], datetime):
-            return [t0 + timedelta(hours=float(h)) for h in hours]
-        return list(hours)
 
     @staticmethod
     def _hours(t0: datetime, t) -> np.ndarray:
@@ -144,14 +106,52 @@ class Tide:
         return speed, u, f, V0
 
     @staticmethod
-    def _tidal_series(t, amplitude, phase, speed, u, f, V0):
+    def _tidal_series(t, amplitude, phase, speed, u, f, V0):  # noqa: N803
         """Vectorised harmonic summation."""
         return np.sum(amplitude * f * np.cos(speed * t + V0 + u - phase), axis=0)
 
-    def _normalize(self) -> None:
-        """Ensure positive amplitudes and phases in [0, 360)."""
-        for i, (_, amp, pha) in enumerate(self.model):
-            if amp < 0:
-                self.model["amplitude"][i] = -amp
-                self.model["phase"][i] = pha + 180.0
-            self.model["phase"][i] = np.mod(self.model["phase"][i], 360.0)
+    # ------------------------------------------------------------------
+    # Prediction
+    # ------------------------------------------------------------------
+
+    def at(self, t: list[datetime]) -> np.ndarray:
+        """Return modelled tidal heights at given times.
+
+        Parameters
+        ----------
+        t : list[datetime]
+            Sequence of datetime objects.
+
+        Returns
+        -------
+        np.ndarray
+            Water level at each time.
+        """
+        if not isinstance(t, Iterable) or len(t) == 0:
+            raise ValueError("t must be a non-empty sequence of datetimes.")
+
+        t0 = t[0]
+        hours = self._hours(t0, t)
+
+        speed, u, f, V0 = self._prepare(self.model["constituent"], t0, radians=True)
+        H = self.model["amplitude"][:, np.newaxis]
+        p = _D2R * self.model["phase"][:, np.newaxis]
+
+        u_single = u[0] if isinstance(u, list) else u
+        f_single = f[0] if isinstance(f, list) else f
+        hours_arr = np.asarray(hours).reshape(1, -1)
+
+        return self._tidal_series(hours_arr, H, p, speed, u_single, f_single, V0)
+
+    # ------------------------------------------------------------------
+    # Time helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _times(t0: datetime, hours) -> list[datetime] | datetime:
+        """Convert hourly offsets from *t0* to datetimes (or vice-versa)."""
+        if not isinstance(hours, Iterable):
+            return Tide._times(t0, [hours])[0]
+        if not isinstance(hours[0], datetime):
+            return [t0 + timedelta(hours=float(h)) for h in hours]
+        return list(hours)

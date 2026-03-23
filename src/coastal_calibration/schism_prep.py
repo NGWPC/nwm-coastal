@@ -13,13 +13,19 @@ from __future__ import annotations
 
 import shutil
 import subprocess
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-import netCDF4 as nc
+import netCDF4 as nc  # noqa: N813
 import numpy as np
 
 from coastal_calibration.utils.logging import logger
+
+
+def _symlink(src: Path, dst: Path) -> None:
+    """Create a symlink, replacing an existing one."""
+    dst.unlink(missing_ok=True)
+    dst.symlink_to(src)
 
 
 # ---------------------------------------------------------------------------
@@ -81,10 +87,15 @@ def stage_chrtout_files(
     return nwm_output_dir, nwm_ana_dir
 
 
-def _symlink(src: Path, dst: Path) -> None:
-    """Create a symlink, replacing an existing one."""
-    dst.unlink(missing_ok=True)
-    dst.symlink_to(src)
+def _write_th_file(path: Path, data: np.ndarray, tstep: float) -> None:
+    """Write a SCHISM time-history (.th) file."""
+    t = 0.0
+    with path.open("w") as f:
+        for i in range(data.shape[0]):
+            parts = [str(t)]
+            parts.extend(str(data[i, j]) for j in range(data.shape[1]))
+            f.write("\t".join(parts) + "\n")
+            t += tstep
 
 
 # ---------------------------------------------------------------------------
@@ -92,7 +103,7 @@ def _symlink(src: Path, dst: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def make_discharge(
+def make_discharge(  # noqa: PLR0912, PLR0915
     *,
     work_dir: Path,
     nwm_output_dir: Path,
@@ -136,9 +147,7 @@ def make_discharge(
 
     if meteo_source == "nwm_retro":
         if start_date is None or end_date is None:
-            raise ValueError(
-                "start_date and end_date are required for nwm_retro"
-            )
+            raise ValueError("start_date and end_date are required for nwm_retro")
         df = read_streamflow(
             all_fids,
             start_date,
@@ -156,16 +165,12 @@ def make_discharge(
         chrtout_files.extend(sorted(nwm_output_dir.glob("*CHRTOUT*")))
 
         if not chrtout_files:
-            raise FileNotFoundError(
-                f"No CHRTOUT files found in {nwm_output_dir}"
-            )
+            raise FileNotFoundError(f"No CHRTOUT files found in {nwm_output_dir}")
 
         logger.info("    Processing %d CHRTOUT files", len(chrtout_files))
 
         if start_date is None or end_date is None:
-            raise ValueError(
-                "start_date and end_date are required for nwm_ana"
-            )
+            raise ValueError("start_date and end_date are required for nwm_ana")
         df = read_streamflow(
             all_fids,
             start_date,
@@ -209,23 +214,11 @@ def make_discharge(
             f.write(f"{e}\n")
 
     logger.info(
-        "    Wrote vsource.th (%d rows), vsink.th, source_sink.in "
-        "(%d sources, %d sinks)",
+        "    Wrote vsource.th (%d rows), vsink.th, source_sink.in (%d sources, %d sinks)",
         vsource.shape[0],
         len(soelems),
         len(sielems),
     )
-
-
-def _write_th_file(path: Path, data: np.ndarray, tstep: float) -> None:
-    """Write a SCHISM time-history (.th) file."""
-    t = 0.0
-    with path.open("w") as f:
-        for i in range(data.shape[0]):
-            parts = [str(t)]
-            parts.extend(str(data[i, j]) for j in range(data.shape[1]))
-            f.write("\t".join(parts) + "\n")
-            t += tstep
 
 
 # ---------------------------------------------------------------------------
@@ -245,8 +238,7 @@ def run_combine_sink_source(work_dir: Path) -> None:
     )
     if result.returncode != 0:
         raise RuntimeError(
-            f"combine_sink_source failed (exit {result.returncode}): "
-            f"{result.stderr[-2000:]}"
+            f"combine_sink_source failed (exit {result.returncode}): {result.stderr[-2000:]}"
         )
     logger.info("    combine_sink_source completed")
 
@@ -256,7 +248,7 @@ def run_combine_sink_source(work_dir: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def merge_source_sink(
+def merge_source_sink(  # noqa: PLR0915
     *,
     work_dir: Path,
     root_dir: Path,
@@ -284,12 +276,10 @@ def merge_source_sink(
         ss_path = work_dir / "source_sink.in.1"
     with ss_path.open() as f:
         nsoel1 = int(f.readline())
-        for _ in range(nsoel1):
-            soel1.append(int(f.readline()))
+        soel1.extend(int(f.readline()) for _ in range(nsoel1))
         next(f)
         nsiel = int(f.readline())
-        for _ in range(nsiel):
-            siel.append(int(f.readline()))
+        siel.extend(int(f.readline()) for _ in range(nsiel))
 
     # Read vsink.th.1
     vsink_lines = (work_dir / "vsink.th.1").read_text().splitlines()
@@ -349,13 +339,22 @@ def merge_source_sink(
     ncso = ncout.createVariable("source_elem", "i4", ("nsources",))
     ncsi = ncout.createVariable("sink_elem", "i4", ("nsinks",))
     ncvso = ncout.createVariable(
-        "vsource", "f8", ("time_vsource", "nsources"), zlib=True,
+        "vsource",
+        "f8",
+        ("time_vsource", "nsources"),
+        zlib=True,
     )
     ncvsi = ncout.createVariable(
-        "vsink", "f8", ("time_vsink", "nsinks"), zlib=True,
+        "vsink",
+        "f8",
+        ("time_vsink", "nsinks"),
+        zlib=True,
     )
     ncvmo = ncout.createVariable(
-        "msource", "i4", ("time_msource", "ntracers", "nsources"), zlib=True,
+        "msource",
+        "i4",
+        ("time_msource", "ntracers", "nsources"),
+        zlib=True,
     )
     nctso = ncout.createVariable("time_vsource", "f8", ("time_vsource",))
     nctsi = ncout.createVariable("time_vsink", "f8", ("time_vsink",))
@@ -419,9 +418,7 @@ def partition_mesh(
         check=False,
     )
     if result.returncode != 0:
-        raise RuntimeError(
-            f"metis_prep failed (exit {result.returncode}): {result.stderr[-2000:]}"
-        )
+        raise RuntimeError(f"metis_prep failed (exit {result.returncode}): {result.stderr[-2000:]}")
 
     # gpmetis: partition graphinfo into n_compute parts
     result = subprocess.run(
@@ -438,9 +435,7 @@ def partition_mesh(
         check=False,
     )
     if result.returncode != 0:
-        raise RuntimeError(
-            f"gpmetis failed (exit {result.returncode}): {result.stderr[-2000:]}"
-        )
+        raise RuntimeError(f"gpmetis failed (exit {result.returncode}): {result.stderr[-2000:]}")
 
     # Convert graphinfo.part.N → partition.prop  (awk '{print NR,$0}')
     part_file = work_dir / f"graphinfo.part.{n_compute}"
@@ -494,7 +489,7 @@ def stage_ldasin_files(
     coastal_forcing_output.mkdir(parents=True, exist_ok=True)
 
     length_hrs = int(duration_hours)
-    base_dt = start_date.replace(tzinfo=timezone.utc) if start_date.tzinfo is None else start_date
+    base_dt = start_date.replace(tzinfo=UTC) if start_date.tzinfo is None else start_date
 
     for i in range(abs(length_hrs) + 1):
         dt = base_dt + timedelta(hours=i)
@@ -589,7 +584,7 @@ def make_sflux(
 # ---------------------------------------------------------------------------
 
 
-def update_params(
+def update_params(  # noqa: PLR0915
     *,
     work_dir: Path,
     prebuilt_dir: Path,
@@ -620,10 +615,7 @@ def update_params(
     cyc = start_date.strftime("%H")
 
     length_hrs = int(duration_hours)
-    if length_hrs <= 0:
-        rnhours = -length_hrs
-    else:
-        rnhours = length_hrs
+    rnhours = -length_hrs if length_hrs <= 0 else length_hrs
 
     start_year = pdy[:4]
     start_month = pdy[4:6]
@@ -677,9 +669,16 @@ def update_params(
 
     # Symlink static mesh files
     static_files = [
-        "hgrid.gr3", "hgrid.ll", "manning.gr3", "vgrid.in",
-        "bctides.in", "windrot_geo2proj.gr3", "hgrid.utm",
-        "hgrid.cpp", "elev.ic", "element_areas.txt",
+        "hgrid.gr3",
+        "hgrid.ll",
+        "manning.gr3",
+        "vgrid.in",
+        "bctides.in",
+        "windrot_geo2proj.gr3",
+        "hgrid.utm",
+        "hgrid.cpp",
+        "elev.ic",
+        "element_areas.txt",
     ]
     for fname in static_files:
         src = coastal_parm / fname
@@ -725,7 +724,7 @@ def correct_elevation(elev_file: Path, correction_file: Path) -> None:
         CSV file with correction values in the 6th column (0-indexed: 5),
         one value per open-boundary node, with one header row to skip.
     """
-    import netCDF4 as nc
+    import netCDF4 as nc  # noqa: N813
     import numpy as np
 
     elev_correct = np.loadtxt(str(correction_file), delimiter=",", skiprows=1, usecols=5)
@@ -760,8 +759,8 @@ def make_tpxo_boundary(
     from coastal_calibration.tides import make_otps_input, otps_to_open_bnds
 
     coastal_parm = prebuilt_dir
-    pdy = start_date.strftime("%Y%m%d")
-    cyc = start_date.strftime("%H")
+    start_date.strftime("%Y%m%d")
+    start_date.strftime("%H")
 
     end_dt = start_date + timedelta(hours=abs(int(duration_hours)))
 
@@ -810,8 +809,7 @@ def make_tpxo_boundary(
     )
     if result.returncode != 0:
         raise RuntimeError(
-            f"predict_tide failed (exit {result.returncode}): "
-            f"{result.stderr[-2000:]}"
+            f"predict_tide failed (exit {result.returncode}): {result.stderr[-2000:]}"
         )
 
     # 4. Convert OTPS output to elev2D.th.nc
@@ -876,18 +874,26 @@ def make_stofs_boundary(
     length_hrs = abs(int(duration_hours)) + 1
 
     # Run regrid_estofs via MPI using the regridding module
-    import sys
 
     env = os.environ.copy()
     env.setdefault("HDF5_USE_FILE_LOCKING", "FALSE")
 
     cmd = [
-        "mpiexec", "-n", str(mpi_tasks),
-        sys.executable, "-m", "coastal_calibration.regridding.regrid_estofs",
-        str(estofs_data), str(hgrid_file), str(output_file),
-        "--cycle-date", pdy,
-        "--cycle-time", f"{cyc}00",
-        "--length-hrs", str(length_hrs),
+        "mpiexec",
+        "-n",
+        str(mpi_tasks),
+        sys.executable,
+        "-m",
+        "coastal_calibration.regridding.regrid_estofs",
+        str(estofs_data),
+        str(hgrid_file),
+        str(output_file),
+        "--cycle-date",
+        pdy,
+        "--cycle-time",
+        f"{cyc}00",
+        "--length-hrs",
+        str(length_hrs),
     ]
 
     result = subprocess.run(
@@ -900,8 +906,7 @@ def make_stofs_boundary(
     )
     if result.returncode != 0:
         raise RuntimeError(
-            f"regrid_estofs failed (exit {result.returncode}): "
-            f"{result.stderr[-2000:]}"
+            f"regrid_estofs failed (exit {result.returncode}): {result.stderr[-2000:]}"
         )
 
     # Post-process: tidal fill for medium-range runs (>180h)
@@ -909,9 +914,7 @@ def make_stofs_boundary(
     if raw_length > 180:
         from coastal_calibration.tides import generate_ocean_tide
 
-        tidal_constants_dir = Path(
-            os.environ.get("COASTAL_ROOT_DIR", "")
-        ) / "Tides" / "TidalConst"
+        tidal_constants_dir = Path(os.environ.get("COASTAL_ROOT_DIR", "")) / "Tides" / "TidalConst"
         try:
             generate_ocean_tide(
                 hgrid_gr3=coastal_parm / "hgrid.gr3",
@@ -954,7 +957,6 @@ def combine_hotstart(outputs_dir: Path) -> None:
     )
     if result.returncode != 0:
         raise RuntimeError(
-            f"combine_hotstart7 failed (exit {result.returncode}): "
-            f"{result.stderr[-2000:]}"
+            f"combine_hotstart7 failed (exit {result.returncode}): {result.stderr[-2000:]}"
         )
     logger.info("    combine_hotstart7 completed")

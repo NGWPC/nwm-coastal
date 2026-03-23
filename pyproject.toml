@@ -108,8 +108,15 @@ version.source = "vcs"
 [tool.ruff]
 target-version = "py311"
 line-length = 100
-include = [ "src/coastal_calibration/**/*.py", "src/coastal_calibration/*.py" ]
-exclude = [ "docs/examples/notebooks/*.py" ]
+include = [
+  "src/coastal_calibration/**/*.py",
+  "src/coastal_calibration/*.py",
+  "tests/**/*.py",
+]
+exclude = [
+  "docs/examples/notebooks/*.py",
+  "tests/legacy_scripts/**/*.py",
+]
 lint.select = [
   # flake8-bugbear
   "B",
@@ -205,6 +212,17 @@ lint.per-file-ignores."docs/examples/notebooks/*.{ipynb,py}" = [
   "S101",
   # print statements
   "T20",
+]
+lint.per-file-ignores."src/coastal_calibration/regridding/*.py" = [
+  # physics variable naming (Rd, Tv, H, LON, LAT)
+  "N806",
+  # ESMF convention: import esmpy as ESMF
+  "N812",
+]
+lint.per-file-ignores."src/coastal_calibration/tides/pytides/*.py" = [
+  # scientific naming conventions (tidal constituents: f_M2, u_K1, etc.)
+  "N802",
+  "N806",
 ]
 lint.per-file-ignores."tests/**/*.py" = [
   "D100",

@@ -45,9 +45,9 @@ def run_mpi(nprocs: int, cmd: list[str], env: dict[str, str]) -> None:
 
     Raises ``RuntimeError`` with captured stdout/stderr on non-zero exit.
     """
-    full_cmd = ["mpiexec", "-np", str(nprocs)] + cmd
+    full_cmd = ["mpiexec", "-np", str(nprocs), *cmd]
     full_env = {**os.environ, **env}
-    result = subprocess.run(full_cmd, env=full_env, capture_output=True, text=True)
+    result = subprocess.run(full_cmd, env=full_env, capture_output=True, text=True, check=False)
     if result.returncode != 0:
         raise RuntimeError(
             f"MPI job failed (rc={result.returncode}):\n"
@@ -64,16 +64,16 @@ def run_mpi(nprocs: int, cmd: list[str], env: dict[str, str]) -> None:
 def _esmf_available() -> bool:
     try:
         import ESMF  # noqa: F401
-
-        return True
     except ImportError:
         pass
+    else:
+        return True
     try:
         import esmpy  # noqa: F401
-
-        return True
     except ImportError:
         return False
+    else:
+        return True
 
 
 def _esmf_mesh_available(mesh_path: Path) -> bool:
@@ -101,10 +101,12 @@ print("ok")
             capture_output=True,
             text=True,
             timeout=60,
+            check=False,
         )
-        return result.returncode == 0 and "ok" in result.stdout
     except Exception:
         return False
+    else:
+        return result.returncode == 0 and "ok" in result.stdout
 
 
 def _esmf_mpi_available() -> bool:
@@ -124,12 +126,14 @@ def _esmf_mpi_available() -> bool:
             capture_output=True,
             text=True,
             timeout=30,
+            check=False,
         )
+    except Exception:
+        return False
+    else:
         if result.returncode == 0:
             last_line = result.stdout.strip().split("\n")[-1]
             return int(last_line) >= 2
-    except Exception:
-        pass
     return False
 
 
@@ -204,10 +208,10 @@ def stofs_cycle_env() -> dict[str, str]:
     import netCDF4
     from cftime import num2date
 
-    FORECAST_START = 5
+    forecast_start = 5
     with netCDF4.Dataset(STOFS_FILE) as f:
         tv = f["time"]
-        t = num2date(tv[FORECAST_START], units=tv.units)
+        t = num2date(tv[forecast_start], units=tv.units)
 
     if t.minute != 0:
         t = datetime(t.year, t.month, t.day, t.hour) + timedelta(hours=1)
@@ -223,7 +227,7 @@ def stofs_cycle_env() -> dict[str, str]:
 # Synthetic fixtures — always available, no external data required
 # ---------------------------------------------------------------------------
 
-from .synthetic import (  # noqa: E402
+from .synthetic import (
     make_esmfmesh_nc,
     make_geo_em_nc,
     make_hgrid_nc,
@@ -292,7 +296,7 @@ def synthetic_hgrid_nc(tmp_path_factory) -> Path:
 
 @pytest.fixture(scope="session")
 def synthetic_geo_em_nc(tmp_path_factory) -> Path:
-    """Minimal WRF geo_em NetCDF on a 6×5 grid."""
+    """Minimal WRF geo_em NetCDF on a 6x5 grid."""
     path = tmp_path_factory.mktemp("geo_em") / "synthetic_geo_em.nc"
     make_geo_em_nc(path)
     return path

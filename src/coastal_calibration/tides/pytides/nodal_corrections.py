@@ -98,7 +98,7 @@ def f_K1(a: dict) -> float:
 
 def f_L2(a: dict) -> float:
     """Schureman equations 215, 213, 204."""
-    P = _D2R * a["P"].value  # noqa: N806
+    P = _D2R * a["P"].value
     I = _D2R * a["I"].value  # noqa: E741
     tan_half_I = np.tan(0.5 * I)
     R_a_inv = (1 - 12 * tan_half_I**2 * np.cos(2 * P) + 36 * tan_half_I**4) ** 0.5
@@ -124,7 +124,7 @@ def f_K2(a: dict) -> float:
 
 def f_M1(a: dict) -> float:
     """Schureman equations 206, 207, 195."""
-    P = _D2R * a["P"].value  # noqa: N806
+    P = _D2R * a["P"].value
     I = _D2R * a["I"].value  # noqa: E741
     cos_I = np.cos(I)
     cos_half_I = np.cos(0.5 * I)
@@ -178,7 +178,7 @@ def u_K1(a: dict) -> float:
 def u_L2(a: dict) -> float:
     """Schureman 214."""
     I = _D2R * a["I"].value  # noqa: E741
-    P = _D2R * a["P"].value  # noqa: N806
+    P = _D2R * a["P"].value
     tan_half_I = np.tan(0.5 * I)
     if tan_half_I == 0:
         return 2.0 * a["xi"].value - 2.0 * a["nu"].value
@@ -193,7 +193,7 @@ def u_K2(a: dict) -> float:
 def u_M1(a: dict) -> float:
     """Schureman 202."""
     I = _D2R * a["I"].value  # noqa: E741
-    P = _D2R * a["P"].value  # noqa: N806
+    P = _D2R * a["P"].value
     cos_I = np.cos(I)
     if cos_I == 0:
         return a["xi"].value - a["nu"].value

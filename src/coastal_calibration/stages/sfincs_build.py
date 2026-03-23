@@ -1349,7 +1349,7 @@ class SfincsDischargeStage(_SfincsStageBase):
             if not files:
                 self._log(
                     f"No CHRTOUT files found in {streamflow_dir} "
-                    f"for {start_dt:%Y-%m-%d %H:%M}–{end_dt:%Y-%m-%d %H:%M}, "
+                    f"for {start_dt:%Y-%m-%d %H:%M}-{end_dt:%Y-%m-%d %H:%M}, "
                     "discharge points will use default (zero) values"
                 )
                 return

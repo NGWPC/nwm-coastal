@@ -10,13 +10,16 @@ from __future__ import annotations
 
 import math
 from datetime import datetime, timedelta
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import netCDF4
 import numpy as np
 
 from coastal_calibration.tides._tpxo_out import TPXOOut
 from coastal_calibration.utils.logging import logger
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 _SCHISM_COORD_NAME = "nodeCoords"
 _SCHISM_OPEN_BOUNDARY_NAME = "openBndNodes"
@@ -54,7 +57,7 @@ def make_otps_input(
         valid_indices = f_in[_SCHISM_OPEN_BOUNDARY_NAME][:]
         coords = [coords[i].tolist() for i in valid_indices]
 
-    with open(output_file, "w") as fout:
+    with output_file.open("w") as fout:
         for c in coords:
             current = start_dt
             while current <= end_dt:
@@ -116,9 +119,7 @@ def otps_to_open_bnds(
         time_var.units = (
             f"seconds since {start.strftime('%Y-%m-%d %H:%M:%S')}        ! NCDASE - BASE_DAT"
         )
-        time_var.base_date = (
-            f"{start.strftime('%Y-%m-%d %H:%M:%S')}        ! NCDASE - BASE_DATE"
-        )
+        time_var.base_date = f"{start.strftime('%Y-%m-%d %H:%M:%S')}        ! NCDASE - BASE_DATE"
         time_var.start_time = 0.0
 
         time_step_var[:] = np.array([_TIME_STEP_S])

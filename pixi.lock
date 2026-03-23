@@ -7877,8 +7877,8 @@ packages:
   timestamp: 1757877846468
 - pypi: ./
   name: coastal-calibration
-  version: 3.1.1.0.1.dev440+gf779f12eb.d20260319
-  sha256: b0fdeed9465fba51fd69e2a8ea6deb4c1c7609f89654590eea0f8b30775cb8d1
+  version: 3.1.1.0.1.dev448+ge27e7cfed.d20260323
+  sha256: 7da1767df4d34c14f176b8490dbe06097feea531d7f523600397722d9feb85ab
   requires_dist:
   - fsspec
   - geopandas>=1

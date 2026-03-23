@@ -31,7 +31,7 @@ _JULIAN_CENTURY: float = 36525.0
 class AstronomicalParameter:
     """Scalar value + speed pair for one astronomical quantity."""
 
-    __slots__ = ("value", "speed")
+    __slots__ = ("speed", "value")
 
     def __init__(self, value: float, speed: float) -> None:
         self.value = value
@@ -54,10 +54,10 @@ def _d_polynomial(coefficients: np.ndarray, argument: float) -> float:
     return float(np.polyval(deriv, argument))
 
 
-def _JD(t: datetime) -> float:  # noqa: N802
+def _JD(t: datetime) -> float:
     """Julian Day Number (Meeus formula 7.1)."""
-    Y, M = t.year, t.month  # noqa: N806
-    D = (  # noqa: N806
+    Y, M = t.year, t.month
+    D = (
         t.day
         + t.hour / _HOURS_PER_DAY
         + t.minute / _MINUTES_PER_DAY
@@ -65,11 +65,13 @@ def _JD(t: datetime) -> float:  # noqa: N802
         + t.microsecond / (_SECONDS_PER_DAY * 1e6)
     )
     if M <= 2:
-        Y -= 1  # noqa: N806
-        M += 12  # noqa: N806
-    A = np.floor(Y / 100.0)  # noqa: N806
-    B = 2 - A + np.floor(A / 4.0)  # noqa: N806
-    return float(np.floor(_DAYS_PER_YEAR * (Y + 4716)) + np.floor(30.6001 * (M + 1)) + D + B - 1524.5)
+        Y -= 1
+        M += 12
+    A = np.floor(Y / 100.0)
+    B = 2 - A + np.floor(A / 4.0)
+    return float(
+        np.floor(_DAYS_PER_YEAR * (Y + 4716)) + np.floor(30.6001 * (M + 1)) + D + B - 1524.5
+    )
 
 
 def _T(t: datetime) -> float:
@@ -128,31 +130,31 @@ _lunar_perigee = np.array(
 # ---------------------------------------------------------------------------
 
 
-def _I(N: float, i: float, omega: float) -> float:  # noqa: E741, N802
-    N, i, omega = _D2R * N, _D2R * i, _D2R * omega  # noqa: N806
+def _I(N: float, i: float, omega: float) -> float:  # noqa: N803
+    N, i, omega = _D2R * N, _D2R * i, _D2R * omega
     cosI = np.cos(i) * np.cos(omega) - np.sin(i) * np.sin(omega) * np.cos(N)
     return float(_R2D * np.arccos(np.clip(cosI, -1.0, 1.0)))
 
 
-def _xi(N: float, i: float, omega: float) -> float:
-    N, i, omega = _D2R * N, _D2R * i, _D2R * omega  # noqa: N806
+def _xi(N: float, i: float, omega: float) -> float:  # noqa: N803
+    N, i, omega = _D2R * N, _D2R * i, _D2R * omega
     e1 = np.cos(0.5 * (omega - i)) / np.cos(0.5 * (omega + i)) * np.tan(0.5 * N)
     e2 = np.sin(0.5 * (omega - i)) / np.sin(0.5 * (omega + i)) * np.tan(0.5 * N)
     return float(_R2D * 0.5 * (np.arctan(e1) + np.arctan(e2)))
 
 
-def _nu(N: float, i: float, omega: float) -> float:
-    N, i, omega = _D2R * N, _D2R * i, _D2R * omega  # noqa: N806
+def _nu(N: float, i: float, omega: float) -> float:  # noqa: N803
+    N, i, omega = _D2R * N, _D2R * i, _D2R * omega
     e1 = np.cos(0.5 * (omega - i)) / np.cos(0.5 * (omega + i)) * np.tan(0.5 * N)
     e2 = np.sin(0.5 * (omega - i)) / np.sin(0.5 * (omega + i)) * np.tan(0.5 * N)
     return float(_R2D * 0.5 * (np.arctan(e1) - np.arctan(e2)))
 
 
-def _nup(N: float, i: float, omega: float) -> float:
+def _nup(N: float, i: float, omega: float) -> float:  # noqa: N803
     return float(_R2D * np.arctan(np.sin(_D2R * omega) * np.tan(_D2R * N)))
 
 
-def _nupp(N: float, i: float, omega: float) -> float:
+def _nupp(N: float, i: float, omega: float) -> float:  # noqa: N803
     return float(_R2D * np.arctan(np.sin(_D2R * omega) * np.tan(2 * _D2R * N)))
 
 
@@ -188,12 +190,12 @@ def astro(t: datetime | Iterable[datetime]) -> dict[str, AstronomicalParameter]:
     s = _polynomial(_lunar_longitude, t_val) % 360.0
     h = _polynomial(_solar_longitude, t_val) % 360.0
     p = _polynomial(_lunar_perigee, t_val) % 360.0
-    N = _polynomial(_lunar_node, t_val) % 360.0  # noqa: N806
+    N = _polynomial(_lunar_node, t_val) % 360.0
     pp = _polynomial(_solar_perigee, t_val) % 360.0
     omega = _polynomial(_terrestrial_obliquity_adj, t_val)
     i = _polynomial(_lunar_inclination, t_val)
 
-    I_val = _I(N, i, omega)  # noqa: N806
+    I_val = _I(N, i, omega)
     xi_val = _xi(N, i, omega)
     nu_val = _nu(N, i, omega)
     nup_val = _nup(N, i, omega)
@@ -203,7 +205,7 @@ def astro(t: datetime | Iterable[datetime]) -> dict[str, AstronomicalParameter]:
     s_speed = _d_polynomial(_lunar_longitude, t_val) / (_JULIAN_CENTURY * 24.0)
     h_speed = _d_polynomial(_solar_longitude, t_val) / (_JULIAN_CENTURY * 24.0)
     p_speed = _d_polynomial(_lunar_perigee, t_val) / (_JULIAN_CENTURY * 24.0)
-    N_speed = _d_polynomial(_lunar_node, t_val) / (_JULIAN_CENTURY * 24.0)  # noqa: N806
+    N_speed = _d_polynomial(_lunar_node, t_val) / (_JULIAN_CENTURY * 24.0)
     pp_speed = _d_polynomial(_solar_perigee, t_val) / (_JULIAN_CENTURY * 24.0)
 
     t_plus_h_minus_s = ((jd_val - np.floor(jd_val)) * 360.0 + h - s) % 360.0

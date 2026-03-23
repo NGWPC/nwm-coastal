@@ -17,7 +17,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from tests.schism.schism_testkit import SCHISMRunError, generate_test_case, run_schism
+from tests.schism.schism_testkit import generate_test_case, run_schism
 
 pytestmark = pytest.mark.schism
 

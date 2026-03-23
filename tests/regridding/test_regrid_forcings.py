@@ -21,8 +21,8 @@ import os
 import sys
 import textwrap
 import types
-import unittest.mock as mock
 from pathlib import Path
+from unittest import mock
 
 import numpy as np
 import pytest
@@ -49,11 +49,7 @@ SCHISM_FORCING_MESH = Path("/Volumes/data/schism_models/hawaii/hgrid.nc")
 
 _GEO_EM_CANDIDATES = [
     Path("/Volumes/data/schism_models/geo_em_HI.nc"),
-    *(
-        [Path(os.environ["GEOGRID_FILE"])]
-        if "GEOGRID_FILE" in os.environ
-        else []
-    ),
+    *([Path(os.environ["GEOGRID_FILE"])] if "GEOGRID_FILE" in os.environ else []),
 ]
 GEO_EM_FILE = next((p for p in _GEO_EM_CANDIDATES if p.exists()), None)
 
@@ -178,18 +174,34 @@ def _import_slp():
     """Import sea_level_pressure, mocking ESMF/esmf_utils if not installed."""
     esmf_stub = types.ModuleType("ESMF")
     for attr in (
-        "Manager", "Grid", "Field", "Regrid", "Mesh", "LocStream",
-        "RegridMethod", "UnmappedAction", "ExtrapMethod", "MeshLoc",
-        "FileFormat", "CoordSys", "StaggerLoc", "local_pet", "pet_count",
+        "Manager",
+        "Grid",
+        "Field",
+        "Regrid",
+        "Mesh",
+        "LocStream",
+        "RegridMethod",
+        "UnmappedAction",
+        "ExtrapMethod",
+        "MeshLoc",
+        "FileFormat",
+        "CoordSys",
+        "StaggerLoc",
+        "local_pet",
+        "pet_count",
     ):
         setattr(esmf_stub, attr, mock.MagicMock())
 
-    esmf_utils_stub = types.ModuleType(
-        "coastal_calibration.regridding.esmf_utils"
-    )
+    esmf_utils_stub = types.ModuleType("coastal_calibration.regridding.esmf_utils")
     for name in (
-        "build_grid", "build_locstream", "Regridder", "MaskedRegridder",
-        "gather_reduce", "gatherv_1d", "allreduce_minmax", "GridBounds",
+        "build_grid",
+        "build_locstream",
+        "Regridder",
+        "MaskedRegridder",
+        "gather_reduce",
+        "gatherv_1d",
+        "allreduce_minmax",
+        "GridBounds",
     ):
         setattr(esmf_utils_stub, name, mock.MagicMock())
 
@@ -237,16 +249,16 @@ class TestSeaLevelPressure:
 
     def test_known_value(self):
         """Verify formula against a hand-computed value."""
-        g0, Rd, epsilon = 9.80665, 287.058, 0.622
+        g0, r_d, epsilon = 9.80665, 287.058, 0.622
 
         temp = np.array([288.0])
         mixing = np.array([0.01])
         height = np.array([500.0])
         press = np.array([95000.0])
 
-        Tv = temp * (1 + mixing / epsilon) / (1 + mixing)
-        H = Rd * Tv / g0
-        expected = press / np.exp(-height / H)
+        t_v = temp * (1 + mixing / epsilon) / (1 + mixing)
+        scale_height = r_d * t_v / g0
+        expected = press / np.exp(-height / scale_height)
 
         result = self._slp(temp, mixing, height, press)
         np.testing.assert_allclose(result, expected, rtol=1e-12)
@@ -391,7 +403,8 @@ def test_synthetic_source_elem_covers_all_mesh_elements(
     # Synthetic mesh has 4 elements; source_elem should be [1, 2, 3, 4]
     assert len(source_elem) == 4
     np.testing.assert_array_equal(
-        np.sort(source_elem), np.arange(1, 5),
+        np.sort(source_elem),
+        np.arange(1, 5),
         err_msg="source_elem should be 1-based indices covering all mesh elements",
     )
 

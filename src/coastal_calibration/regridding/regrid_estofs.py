@@ -1,4 +1,4 @@
-"""Regrid ESTOFS water level data to SCHISM open boundary nodes using ESMF.
+r"""Regrid ESTOFS water level data to SCHISM open boundary nodes using ESMF.
 
 This module regrids ESTOFS ``zeta`` (water surface elevation) from an
 unstructured node grid to SCHISM open boundary node locations using
@@ -26,7 +26,6 @@ import argparse
 from datetime import datetime, timedelta
 
 import esmpy as ESMF
-
 import netCDF4
 import numpy as np
 from cftime import num2date
@@ -40,8 +39,6 @@ local_pet = ESMF.local_pet()
 FORECAST_START = 5
 TIME_STEP = 3600
 MISSING = -9999.0
-
-
 
 
 def _determine_time_range(
@@ -202,7 +199,8 @@ def regrid_estofs(
             data = f_in[regrid_field][t][i_lo:i_hi]
             field_in.data[...] = data
             locstream_in["ESMF:Mask"] = (
-                data.mask.astype("i4") if hasattr(data, "mask") and np.ndim(data.mask) > 0
+                data.mask.astype("i4")
+                if hasattr(data, "mask") and np.ndim(data.mask) > 0
                 else np.zeros(len(data), dtype="i4")
             )
 
@@ -234,8 +232,11 @@ def main() -> None:
     args = parser.parse_args()
 
     regrid_estofs(
-        args.estofs_input, args.schism_grid, args.regrid_output,
-        cycle_date=args.cycle_date, cycle_time=args.cycle_time,
+        args.estofs_input,
+        args.schism_grid,
+        args.regrid_output,
+        cycle_date=args.cycle_date,
+        cycle_time=args.cycle_time,
         length_hrs=args.length_hrs,
     )
 

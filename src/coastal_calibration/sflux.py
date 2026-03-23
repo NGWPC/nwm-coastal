@@ -7,15 +7,17 @@ reading, no subprocess invocation.
 
 from __future__ import annotations
 
-import glob
 import math
-from datetime import datetime
-from pathlib import Path
+from typing import TYPE_CHECKING
 
-import netCDF4 as nc
+import netCDF4 as nc  # noqa: N813
 import numpy as np
 
 from coastal_calibration.utils.logging import logger
+
+if TYPE_CHECKING:
+    from datetime import datetime
+    from pathlib import Path
 
 
 def _round_down(n: float, decimals: int = 0) -> float:
@@ -48,15 +50,15 @@ def _slp(
         Sea-level pressure (Pa).
     """
     g0 = 9.80665
-    Rd = 287.058
+    Rd = 287.058  # noqa: N806
     epsilon = 0.622
 
-    Tv = temp * (1 + (mixing / epsilon)) / (1 + mixing)
-    H = Rd * Tv / g0
+    Tv = temp * (1 + (mixing / epsilon)) / (1 + mixing)  # noqa: N806
+    H = Rd * Tv / g0  # noqa: N806
     return press / np.exp(-height / H)
 
 
-def make_atmo_sflux(
+def make_atmo_sflux(  # noqa: PLR0915
     forcing_input_dir: Path,
     work_dir: Path,
     start_dt: datetime,
@@ -93,7 +95,7 @@ def make_atmo_sflux(
         lats = geo["XLAT_M"][0, :]
         lons = geo["XLONG_M"][0, :]
 
-    files = sorted(glob.glob(str(forcing_input_dir / "*LDASIN_DOMAIN1")))
+    files = sorted(str(p) for p in forcing_input_dir.glob("*LDASIN_DOMAIN1"))
     if not files:
         msg = f"No LDASIN_DOMAIN1 files found in {forcing_input_dir}"
         raise FileNotFoundError(msg)

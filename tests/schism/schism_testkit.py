@@ -52,7 +52,9 @@ def _validate_inputs(
     if dx <= 0 or dy <= 0:
         raise ValueError(f"Resolution must be positive, got dx={dx}, dy={dy}")
     if boundary_type not in {"shore", "ocean", "island"}:
-        raise ValueError(f"Boundary type must be 'shore', 'ocean', or 'island', got '{boundary_type}'")
+        raise ValueError(
+            f"Boundary type must be 'shore', 'ocean', or 'island', got '{boundary_type}'"
+        )
     if depth <= 0:
         raise ValueError(f"Depth must be positive, got {depth}")
     if run_days <= 0:
@@ -120,12 +122,9 @@ def _generate_central_island(nx: int, ny: int) -> tuple[list[list[int]], list[li
     i_start = i_center - 1
     j_start = j_center - 1
     land_boundary_nodes: list[int] = []
-    for i in range(3):
-        land_boundary_nodes.append(j_start * nx + (i_start + i) + 1)
-    for j in range(1, 3):
-        land_boundary_nodes.append((j_start + j) * nx + (i_start + 2) + 1)
-    for i in range(1, -1, -1):
-        land_boundary_nodes.append((j_start + 2) * nx + (i_start + i) + 1)
+    land_boundary_nodes.extend(j_start * nx + (i_start + i) + 1 for i in range(3))
+    land_boundary_nodes.extend((j_start + j) * nx + (i_start + 2) + 1 for j in range(1, 3))
+    land_boundary_nodes.extend((j_start + 2) * nx + (i_start + i) + 1 for i in range(1, -1, -1))
     land_boundary_nodes.append((j_start + 1) * nx + i_start + 1)
     return open_boundary_nodes_list, [land_boundary_nodes]
 
@@ -390,18 +389,18 @@ def _renumber_after_island_removal(
     for i, elem in enumerate(elements):
         for j in range(2, 5):
             elements[i, j] = old_to_new[int(elem[j])]
-    new_open_boundaries = []
-    for bnd in open_boundaries:
-        new_bnd = [old_to_new[node_id] for node_id in bnd if node_id != to_remove_id]
-        new_open_boundaries.append(new_bnd)
-    new_land_boundaries = []
-    for bnd in land_boundaries:
-        new_bnd = [old_to_new[node_id] for node_id in bnd if node_id != to_remove_id]
-        new_land_boundaries.append(new_bnd)
+    new_open_boundaries = [
+        [old_to_new[node_id] for node_id in bnd if node_id != to_remove_id]
+        for bnd in open_boundaries
+    ]
+    new_land_boundaries = [
+        [old_to_new[node_id] for node_id in bnd if node_id != to_remove_id]
+        for bnd in land_boundaries
+    ]
     return nodes, elements, new_open_boundaries, new_land_boundaries
 
 
-def generate_test_case(
+def generate_test_case(  # noqa: PLR0912, PLR0915
     grid_size: tuple[int, int],
     resolution: tuple[float, float],
     boundary_type: Literal["shore", "ocean", "island"],
@@ -416,8 +415,15 @@ def generate_test_case(
 ) -> None:
     """Create a minimal SCHISM test case with rectangular grid and tidal forcing."""
     _validate_inputs(
-        grid_size, resolution, boundary_type, depth, run_days, dt,
-        tidal_amplitude, tidal_period_hours, manning_coefficient,
+        grid_size,
+        resolution,
+        boundary_type,
+        depth,
+        run_days,
+        dt,
+        tidal_amplitude,
+        tidal_period_hours,
+        manning_coefficient,
     )
     base_dir = Path(base_dir)
     base_dir.mkdir(parents=True, exist_ok=True)
@@ -472,16 +478,32 @@ def generate_test_case(
         to_remove_id = ny // 2 * nx + nx // 2 + 1
         nodes_arr, elements_arr, open_boundary_nodes, land_boundary_nodes = (
             _renumber_after_island_removal(
-                to_remove_id, nx, ny, nodes_arr, elements_arr,
-                open_boundary_nodes, land_boundary_nodes,
+                to_remove_id,
+                nx,
+                ny,
+                nodes_arr,
+                elements_arr,
+                open_boundary_nodes,
+                land_boundary_nodes,
             )
         )
 
-    _write_hgrid(base_dir, nx, ny, nodes_arr, elements_arr, boundary_type, open_boundary_nodes, land_boundary_nodes)
+    _write_hgrid(
+        base_dir,
+        nx,
+        ny,
+        nodes_arr,
+        elements_arr,
+        boundary_type,
+        open_boundary_nodes,
+        land_boundary_nodes,
+    )
     _write_manning(base_dir, nodes_arr, elements_arr, manning_coefficient)
     _write_vgrid(base_dir)
     _write_bctides(base_dir, open_boundary_nodes)
-    _write_elev_th(base_dir, run_days, dt, tidal_amplitude, tidal_period_hours, len(open_boundary_nodes))
+    _write_elev_th(
+        base_dir, run_days, dt, tidal_amplitude, tidal_period_hours, len(open_boundary_nodes)
+    )
 
     if station_output:
         station_node = _get_station_node(nx, ny)
@@ -527,8 +549,13 @@ def _run_command(
     logger.debug("Running: %s", " ".join(cmd))
     try:
         result = subprocess.run(
-            cmd, cwd=cwd, check=False, env=env,
-            capture_output=True, text=True, timeout=timeout,
+            cmd,
+            cwd=cwd,
+            check=False,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
         )
         if result.stdout:
             logger.debug("STDOUT:\n%s", result.stdout)
@@ -537,10 +564,15 @@ def _run_command(
         if check_output:
             _check_schism_output(result, cwd)
         if result.returncode != 0:
-            logger.error("%s (rc=%d)\nSTDOUT:\n%s\nSTDERR:\n%s",
-                         error_msg, result.returncode, result.stdout, result.stderr)
-            raise SCHISMRunError(f"{error_msg} (return code: {result.returncode})")
-        return result
+            logger.error(
+                "%s (rc=%d)\nSTDOUT:\n%s\nSTDERR:\n%s",
+                error_msg,
+                result.returncode,
+                result.stdout,
+                result.stderr,
+            )
+            raise SCHISMRunError(f"{error_msg} (return code: {result.returncode})")  # noqa: TRY301
+        return result  # noqa: TRY300
     except subprocess.TimeoutExpired as e:
         raise SCHISMRunError(f"{error_msg} (timed out after {timeout}s)") from e
     except SCHISMRunError:
@@ -549,7 +581,7 @@ def _run_command(
         raise SCHISMRunError(f"{error_msg}: {e}") from e
 
 
-def run_schism(
+def run_schism(  # noqa: PLR0912, PLR0915
     project_dir: str | Path,
     exec_dir: str | Path,
     num_procs: int = 4,
@@ -579,7 +611,11 @@ def run_schism(
     gpmetis = exec_dir / "gpmetis"
     pschism = exec_dir / executable_name
 
-    missing = [n for n, p in [("metis_prep", metis_prep), ("gpmetis", gpmetis), (executable_name, pschism)] if not p.exists()]
+    missing = [
+        n
+        for n, p in [("metis_prep", metis_prep), ("gpmetis", gpmetis), (executable_name, pschism)]
+        if not p.exists()
+    ]
     if missing:
         raise FileNotFoundError(f"Missing executables in {exec_dir}: {', '.join(missing)}")
 
@@ -601,13 +637,17 @@ def run_schism(
         if not lib_path_resolved.exists():
             warnings.warn(f"Library path does not exist: {lib_path_resolved}", stacklevel=2)
         current = env.get("LD_LIBRARY_PATH", "")
-        env["LD_LIBRARY_PATH"] = f"{lib_path_resolved}:{current}" if current else str(lib_path_resolved)
+        env["LD_LIBRARY_PATH"] = (
+            f"{lib_path_resolved}:{current}" if current else str(lib_path_resolved)
+        )
 
     # Step 1: metis_prep
     logger.info("Running metis_prep ...")
     _run_command(
         cmd=[str(metis_prep.absolute()), "hgrid.gr3", "vgrid.in"],
-        cwd=project_dir, env=env, error_msg="metis_prep failed",
+        cwd=project_dir,
+        env=env,
+        error_msg="metis_prep failed",
     )
     if not (project_dir / "graphinfo").exists():
         raise SCHISMRunError("metis_prep failed to generate graphinfo")
@@ -615,9 +655,16 @@ def run_schism(
     # Step 2: gpmetis
     logger.info("Running gpmetis (%d partitions) ...", num_partitions)
     _run_command(
-        cmd=[str(gpmetis.absolute()), "graphinfo", str(num_partitions),
-             f"-ufactor={ufactor}", f"-seed={seed}"],
-        cwd=project_dir, env=env, error_msg="gpmetis failed",
+        cmd=[
+            str(gpmetis.absolute()),
+            "graphinfo",
+            str(num_partitions),
+            f"-ufactor={ufactor}",
+            f"-seed={seed}",
+        ],
+        cwd=project_dir,
+        env=env,
+        error_msg="gpmetis failed",
     )
     partition_input = project_dir / f"graphinfo.part.{num_partitions}"
     if not partition_input.exists():
@@ -625,7 +672,7 @@ def run_schism(
 
     # Create partition.prop
     lines = partition_input.read_text().splitlines(keepends=True)
-    with open(project_dir / "partition.prop", "w") as f:
+    with (project_dir / "partition.prop").open("w") as f:
         f.writelines(f"{i} {line}" for i, line in enumerate(lines, start=1))
 
     # Step 3: Run SCHISM
@@ -641,9 +688,12 @@ def run_schism(
 
     logger.info("Running SCHISM: %s", " ".join(cmd))
     _run_command(
-        cmd=cmd, cwd=project_dir, env=env,
+        cmd=cmd,
+        cwd=project_dir,
+        env=env,
         error_msg="SCHISM simulation failed",
-        timeout=timeout, check_output=True,
+        timeout=timeout,
+        check_output=True,
     )
 
     # Step 4: Validate
@@ -653,7 +703,11 @@ def run_schism(
             raise SCHISMRunError("Expected output file not found: staout_1")
         if staout.stat().st_size == 0:
             raise SCHISMRunError("Output file staout_1 is empty")
-        data_lines = [l for l in staout.read_text().splitlines() if l and not l.strip().startswith("!")]
+        data_lines = [
+            line
+            for line in staout.read_text().splitlines()
+            if line and not line.strip().startswith("!")
+        ]
         if not data_lines:
             raise SCHISMRunError("Output file staout_1 contains no data")
     logger.info("SCHISM workflow complete")

@@ -22,15 +22,37 @@ import coastal_calibration.tides.pytides.nodal_corrections as nc
 class BaseConstituent:
     """A single harmonic tidal constituent."""
 
-    __slots__ = ("coefficients", "name", "u", "f")
+    __slots__ = ("coefficients", "f", "name", "u")
 
-    xdo_int: dict[str, int] = {
-        "A": 1, "B": 2, "C": 3, "D": 4, "E": 5, "F": 6, "G": 7, "H": 8, "I": 9,
-        "J": 10, "K": 11, "L": 12, "M": 13, "N": 14, "O": 15, "P": 16, "Q": 17,
-        "R": -8, "S": -7, "T": -6, "U": -5, "V": -4, "W": -3, "X": -2, "Y": -1,
+    xdo_int: dict[str, int] = {  # noqa: RUF012
+        "A": 1,
+        "B": 2,
+        "C": 3,
+        "D": 4,
+        "E": 5,
+        "F": 6,
+        "G": 7,
+        "H": 8,
+        "I": 9,
+        "J": 10,
+        "K": 11,
+        "L": 12,
+        "M": 13,
+        "N": 14,
+        "O": 15,
+        "P": 16,
+        "Q": 17,
+        "R": -8,
+        "S": -7,
+        "T": -6,
+        "U": -5,
+        "V": -4,
+        "W": -3,
+        "X": -2,
+        "Y": -1,
         "Z": 0,
     }
-    int_xdo: dict[int, str] = {v: k for k, v in xdo_int.items()}
+    int_xdo: dict[int, str] = {v: k for k, v in xdo_int.items()}  # noqa: RUF012
 
     def __init__(
         self,
@@ -58,7 +80,7 @@ class BaseConstituent:
     def _astro_xdo(self, a: dict) -> list:
         return [a["T+h-s"], a["s"], a["h"], a["p"], a["N"], a["pp"], a["90"]]
 
-    def V(self, a: dict) -> float:  # noqa: N802
+    def V(self, a: dict) -> float:
         """Equilibrium argument (degrees)."""
         vals = np.asarray([x.value for x in self._astro_xdo(a)], dtype=np.float64)
         return float(np.mod(self.coefficients @ vals, 360.0))
@@ -92,15 +114,19 @@ class CompoundConstituent(BaseConstituent):
         self.coefficients = reduce(op.add, [c.coefficients * n for c, n in members])
 
     def speed(self, a: dict) -> float:
+        """Compound constituent speed (degrees per hour)."""
         return float(reduce(op.add, [n * c.speed(a) for c, n in self.members]))
 
-    def V(self, a: dict) -> float:  # noqa: N802
+    def V(self, a: dict) -> float:
+        """Compound equilibrium argument (degrees)."""
         return float(reduce(op.add, [n * c.V(a) for c, n in self.members]))
 
     def u(self, a: dict) -> float:
+        """Compound nodal correction for phase (degrees)."""
         return float(reduce(op.add, [n * c.u(a) for c, n in self.members]))
 
     def f(self, a: dict) -> float:
+        """Compound nodal correction for amplitude."""
         return float(reduce(op.mul, [c.f(a) ** abs(n) for c, n in self.members]))
 
 
@@ -139,8 +165,10 @@ _K2 = BaseConstituent(name="K2", xdo="B BZZ ZZZ", u=nc.u_K2, f=nc.f_K2)
 
 # Third-diurnal
 _M3 = BaseConstituent(
-    name="M3", xdo="C ZZZ ZZZ",
-    u=lambda a: nc.u_Modd(a, 3), f=lambda a: nc.f_Modd(a, 3),
+    name="M3",
+    xdo="C ZZZ ZZZ",
+    u=lambda a: nc.u_Modd(a, 3),
+    f=lambda a: nc.f_Modd(a, 3),
 )
 
 # Compound constituents
@@ -161,8 +189,41 @@ _M8 = CompoundConstituent(name="M8", members=[(_M2, 4)])
 
 # The 37 NOAA standard constituents
 noaa: list[BaseConstituent] = [
-    _M2, _S2, _N2, _K1, _M4, _O1, _M6, _MK3, _S4, _MN4, _nu2, _S6, _mu2,
-    _2N2, _OO1, _lambda2, _S1, _M1, _J1, _Mm, _Ssa, _Sa, _MSF, _Mf,
-    _rho1, _Q1, _T2, _R2, _2Q1, _P1, _2SM2, _M3, _L2, _2MK3, _K2,
-    _M8, _MS4,
+    _M2,
+    _S2,
+    _N2,
+    _K1,
+    _M4,
+    _O1,
+    _M6,
+    _MK3,
+    _S4,
+    _MN4,
+    _nu2,
+    _S6,
+    _mu2,
+    _2N2,
+    _OO1,
+    _lambda2,
+    _S1,
+    _M1,
+    _J1,
+    _Mm,
+    _Ssa,
+    _Sa,
+    _MSF,
+    _Mf,
+    _rho1,
+    _Q1,
+    _T2,
+    _R2,
+    _2Q1,
+    _P1,
+    _2SM2,
+    _M3,
+    _L2,
+    _2MK3,
+    _K2,
+    _M8,
+    _MS4,
 ]

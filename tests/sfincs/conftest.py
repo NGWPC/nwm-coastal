@@ -20,7 +20,9 @@ from coastal_calibration.config.schema import (
 )
 
 # Path to the pre-built SFINCS model archive
-_TEXAS_ZIP = Path(__file__).resolve().parent.parent.parent / "docs" / "examples" / "slurm" / "texas.zip"
+_TEXAS_ZIP = (
+    Path(__file__).resolve().parent.parent.parent / "docs" / "examples" / "slurm" / "texas.zip"
+)
 
 
 @pytest.fixture

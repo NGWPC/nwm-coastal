@@ -1,11 +1,10 @@
-"""Tests for regrid_estofs: output structure, physical plausibility, and
-optional comparison against the original implementation.
+"""Tests for regrid_estofs: output structure, physical plausibility, and comparison.
 
 Synthetic-data tests run whenever ESMF/ESMPy is importable; they use tiny
 in-memory grids and complete in a few seconds.
 
 Real-data comparison tests are guarded by ``have_stofs_data`` and
-``have_schism_hgrid`` — they are automatically skipped when the large on-disk
+``have_schism_hgrid`` -- they are automatically skipped when the large on-disk
 datasets are absent.
 
 Run with::
@@ -34,10 +33,7 @@ from .conftest import (
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
-ORIGINAL_SCRIPT = (
-    REPO_ROOT
-    / "tests/legacy_scripts/wrf_hydro_workflow_dev/coastal/regrid_estofs.py"
-)
+ORIGINAL_SCRIPT = REPO_ROOT / "tests/legacy_scripts/wrf_hydro_workflow_dev/coastal/regrid_estofs.py"
 
 NEW_MODULE = "coastal_calibration.regridding.regrid_estofs"
 
@@ -142,9 +138,7 @@ def test_synthetic_regrid_estofs_output_structure(
         assert ts.shape[3] == 1, "nComponents should be 1"
 
         expected_nt = int(synthetic_stofs_cycle_env["LENGTH_HRS"]) + 1
-        assert ts.shape[0] == expected_nt, (
-            f"Expected {expected_nt} timesteps, got {ts.shape[0]}"
-        )
+        assert ts.shape[0] == expected_nt, f"Expected {expected_nt} timesteps, got {ts.shape[0]}"
         assert ts.shape[1] > 0, "No boundary nodes in output"
 
         assert f["time_step"][0] == 3600.0

@@ -18,8 +18,6 @@ from typing import NamedTuple
 
 import esmpy as ESMF
 
-from coastal_calibration.utils.logging import logger
-
 # esmpy (>=8.4.0) requires Manager() before local_pet() returns the true MPI
 # rank.  Call it here so all modules that import esmf_utils get correct ranks.
 ESMF.Manager(debug=False)
@@ -212,18 +210,22 @@ class Regridder:
         src_mask_values: list[int] | None = None,
         extrap_method: ESMF.ExtrapMethod | None = None,
     ):
-        kwargs = dict(
-            srcfield=src_field,
-            dstfield=dst_field,
-            regrid_method=method,
-            unmapped_action=unmapped_action,
-        )
+        kwargs = {
+            "srcfield": src_field,
+            "dstfield": dst_field,
+            "regrid_method": method,
+            "unmapped_action": unmapped_action,
+        }
         if src_mask_values is not None:
             kwargs["src_mask_values"] = src_mask_values
         if extrap_method is not None:
             kwargs["extrap_method"] = extrap_method
 
         self._handle = ESMF.Regrid(**kwargs)
+
+    def destroy(self):
+        """Release ESMF resources held by the regrid handle."""
+        self._handle.destroy()
 
     def __call__(
         self,
@@ -232,14 +234,10 @@ class Regridder:
         zero_region: ESMF.Region | None = None,
     ) -> ESMF.Field:
         """Apply pre-computed regridding weights."""
-        kwargs = dict(srcfield=src_field, dstfield=dst_field)
+        kwargs = {"srcfield": src_field, "dstfield": dst_field}
         if zero_region is not None:
             kwargs["zero_region"] = zero_region
         return self._handle(**kwargs)
-
-    def destroy(self):
-        """Release ESMF resources held by the regrid handle."""
-        self._handle.destroy()
 
 
 class MaskedRegridder:
@@ -276,12 +274,12 @@ class MaskedRegridder:
         dst_field: ESMF.Field,
     ) -> ESMF.Field:
         """Build a fresh regridder with the current mask state and apply it."""
-        kwargs = dict(
-            srcfield=src_field,
-            dstfield=dst_field,
-            regrid_method=self.method,
-            unmapped_action=self.unmapped_action,
-        )
+        kwargs = {
+            "srcfield": src_field,
+            "dstfield": dst_field,
+            "regrid_method": self.method,
+            "unmapped_action": self.unmapped_action,
+        }
         if self.src_mask_values:
             kwargs["src_mask_values"] = self.src_mask_values
 
@@ -346,10 +344,7 @@ def gatherv_1d(
     all_counts = np.empty(comm.Get_size(), dtype="i") if comm.Get_rank() == root else None
     comm.Gather(count_arr, all_counts, root=root)
 
-    if comm.Get_rank() == root:
-        result = np.zeros(int(all_counts.sum()))
-    else:
-        result = None
+    result = np.zeros(int(all_counts.sum())) if comm.Get_rank() == root else None
 
     comm.Gatherv(sendbuf=local_data, recvbuf=(result, all_counts), root=root)
     return result

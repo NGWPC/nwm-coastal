@@ -167,8 +167,6 @@ class TestStageNames:
         assert stage.name == "schism_postprocess"
 
 
-
-
 class TestSchismRunCommandConstruction:
     """Seam-based tests for SCHISMRunStage._build_mpi_command."""
 

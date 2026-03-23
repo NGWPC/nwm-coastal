@@ -1,4 +1,4 @@
-"""Regrid WRF-Hydro forcing data to lat-lon grids and SCHISM mesh elements.
+r"""Regrid WRF-Hydro forcing data to lat-lon grids and SCHISM mesh elements.
 
 This module provides ``CoastalForcingRegridder``, which regrids NWM/WRF-Hydro
 LDASIN forcing files to:
@@ -28,7 +28,6 @@ import math
 from pathlib import Path
 
 import esmpy as ESMF
-
 import numpy as np
 from netCDF4 import Dataset
 
@@ -54,8 +53,7 @@ def _pick_time_var(ds: Dataset) -> str:
         if name in ds.variables:
             return name
     raise KeyError(
-        f"Expected 'time' or 'valid_time' in {ds.filepath()}, "
-        f"found: {list(ds.variables)}"
+        f"Expected 'time' or 'valid_time' in {ds.filepath()}, found: {list(ds.variables)}"
     )
 
 
@@ -181,60 +179,6 @@ class CoastalForcingRegridder:
             return ds["valid_time"][0]
         raise KeyError("Input file has neither 'time' nor 'valid_time' variable")
 
-    def run(
-        self,
-        file_filter: str = "**/*LDASIN_DOMAIN*",
-        skip_latlon: bool = False,
-        apply_slp: bool = True,
-    ):
-        """Process all forcing files: regrid to lat-lon and/or SCHISM mesh.
-
-        Parameters
-        ----------
-        file_filter
-            Glob pattern for input files within ``input_dir``.
-        skip_latlon
-            If True, skip the lat-lon regridding step.
-        apply_slp
-            If True, convert PSFC to sea-level pressure in lat-lon output.
-        """
-        input_files = sorted(self.input_dir.glob(file_filter))
-        if not input_files:
-            raise FileNotFoundError(f"No files match '{file_filter}' in {self.input_dir}")
-
-        # Job array partitioning for lat-lon regridding
-        if self.job_idx is not None and self.job_count is not None:
-            idx = self.job_idx
-            count = math.ceil(len(input_files) / self.job_count)
-            sub_input_files = input_files[idx * count : idx * count + count]
-        else:
-            idx = 0
-            sub_input_files = input_files
-
-        # Determine first timestep for SCHISM time offsets
-        if self.root:
-            with Dataset(input_files[0]) as ds0:
-                self.schism_first_timestep = self._read_start_time(ds0)
-
-        # Initialize SCHISM vsource output on idx=0
-        schism_vsource = None
-        if idx == 0 and self.root:
-            schism_vsource = Dataset(
-                self.output_dir / "precip_source.nc", "w", format="NETCDF4"
-            )
-            self._init_vsource_nc(schism_vsource, len(input_files))
-
-        # Process files
-        for file in input_files:
-            if not skip_latlon and file in sub_input_files:
-                self._regrid_to_latlon(file, apply_slp=apply_slp)
-            if idx == 0:
-                self._regrid_to_schism(file, schism_vsource)
-
-        if schism_vsource is not None:
-            schism_vsource.sync()
-            schism_vsource.close()
-
     def _init_vsource_nc(self, ds: Dataset, ntimes: int):
         """Create dimensions and variables for the SCHISM vsource file."""
         ds.createDimension("time_vsource", ntimes)
@@ -285,9 +229,7 @@ class CoastalForcingRegridder:
         R0_SCHISM = 6378206.4  # earth radius in meters used by SCHISM
         DENSITY_FACTOR = 1000
 
-        unit_areas = ESMF.Field(
-            self.schism_mesh, meshloc=ESMF.MeshLoc.ELEMENT, name="areafield"
-        )
+        unit_areas = ESMF.Field(self.schism_mesh, meshloc=ESMF.MeshLoc.ELEMENT, name="areafield")
         unit_areas.get_area()
         areas_m2 = unit_areas.data[...] * (R0_SCHISM * R0_SCHISM)
         out_field.data[...] *= areas_m2 / DENSITY_FACTOR
@@ -297,12 +239,13 @@ class CoastalForcingRegridder:
         local_count = self.schism_mesh.size[1]
         all_elements = gatherv_1d(out_field.data, local_count)
 
-        if all_elements is not None:
-            assert len(all_elements) == self.total_elements, (
+        if all_elements is not None and len(all_elements) != self.total_elements:
+            msg = (
                 f"Gathered element count {len(all_elements)} != "
-                f"mesh dimension {self.total_elements} — dimension mismatch would "
+                f"mesh dimension {self.total_elements} - dimension mismatch would "
                 "corrupt the vsource output file"
             )
+            raise ValueError(msg)
 
         # Write on root rank
         if self.root and vsource_ds is not None:
@@ -317,7 +260,38 @@ class CoastalForcingRegridder:
         out_field.destroy()
         input_ds.close()
 
-    def _regrid_to_latlon(self, input_file: Path, apply_slp: bool = True):
+    def _init_latlon_nc(self, output_ds: Dataset, nlats: int, nlons: int, input_ds: Dataset):
+        """Create dimensions, coordinates, and time variable for lat-lon output."""
+        output_ds.createDimension(dimname="lat", size=nlats)
+        output_ds.createDimension(dimname="lon", size=nlons)
+        output_ds.createDimension(dimname="time", size=0)
+
+        lat_coord = output_ds.createVariable(
+            varname="lat", dimensions=("lat",), datatype=self.lats.dtype
+        )
+        lat_coord.long_name = "latitude"
+        lat_coord.units = "degrees_north"
+        lat_coord.standard_name = "latitude"
+        lat_coord.axis = "Y"
+
+        lon_coord = output_ds.createVariable(
+            varname="lon", dimensions=("lon",), datatype=self.lons.dtype
+        )
+        lon_coord.long_name = "longitude"
+        lon_coord.units = "degrees_east"
+        lon_coord.standard_name = "longitude"
+        lon_coord.axis = "X"
+
+        in_time = input_ds.variables[_pick_time_var(input_ds)]
+        time_coord = output_ds.createVariable(
+            varname="time", dimensions=("time",), datatype=in_time.datatype
+        )
+        time_coord.long_name = "valid output time"
+        time_coord.units = in_time.units
+        time_coord.calendar = "standard"
+        time_coord.standard_name = "time"
+
+    def _regrid_to_latlon(self, input_file: Path, apply_slp: bool = True):  # noqa: PLR0912
         """Regrid atmospheric variables to a regular lat-lon grid."""
         input_ds = Dataset(input_file)
         nlons, nlats = self.out_grid.max_index
@@ -406,38 +380,57 @@ class CoastalForcingRegridder:
             output_ds.close()
         input_ds.close()
 
-    def _init_latlon_nc(
-        self, output_ds: Dataset, nlats: int, nlons: int, input_ds: Dataset
+    def run(
+        self,
+        file_filter: str = "**/*LDASIN_DOMAIN*",
+        skip_latlon: bool = False,
+        apply_slp: bool = True,
     ):
-        """Create dimensions, coordinates, and time variable for lat-lon output."""
-        output_ds.createDimension(dimname="lat", size=nlats)
-        output_ds.createDimension(dimname="lon", size=nlons)
-        output_ds.createDimension(dimname="time", size=0)
+        """Process all forcing files: regrid to lat-lon and/or SCHISM mesh.
 
-        lat_coord = output_ds.createVariable(
-            varname="lat", dimensions=("lat",), datatype=self.lats.dtype
-        )
-        lat_coord.long_name = "latitude"
-        lat_coord.units = "degrees_north"
-        lat_coord.standard_name = "latitude"
-        lat_coord.axis = "Y"
+        Parameters
+        ----------
+        file_filter
+            Glob pattern for input files within ``input_dir``.
+        skip_latlon
+            If True, skip the lat-lon regridding step.
+        apply_slp
+            If True, convert PSFC to sea-level pressure in lat-lon output.
+        """
+        input_files = sorted(self.input_dir.glob(file_filter))
+        if not input_files:
+            raise FileNotFoundError(f"No files match '{file_filter}' in {self.input_dir}")
 
-        lon_coord = output_ds.createVariable(
-            varname="lon", dimensions=("lon",), datatype=self.lons.dtype
-        )
-        lon_coord.long_name = "longitude"
-        lon_coord.units = "degrees_east"
-        lon_coord.standard_name = "longitude"
-        lon_coord.axis = "X"
+        # Job array partitioning for lat-lon regridding
+        if self.job_idx is not None and self.job_count is not None:
+            idx = self.job_idx
+            count = math.ceil(len(input_files) / self.job_count)
+            sub_input_files = input_files[idx * count : idx * count + count]
+        else:
+            idx = 0
+            sub_input_files = input_files
 
-        in_time = input_ds.variables[_pick_time_var(input_ds)]
-        time_coord = output_ds.createVariable(
-            varname="time", dimensions=("time",), datatype=in_time.datatype
-        )
-        time_coord.long_name = "valid output time"
-        time_coord.units = in_time.units
-        time_coord.calendar = "standard"
-        time_coord.standard_name = "time"
+        # Determine first timestep for SCHISM time offsets
+        if self.root:
+            with Dataset(input_files[0]) as ds0:
+                self.schism_first_timestep = self._read_start_time(ds0)
+
+        # Initialize SCHISM vsource output on idx=0
+        schism_vsource = None
+        if idx == 0 and self.root:
+            schism_vsource = Dataset(self.output_dir / "precip_source.nc", "w", format="NETCDF4")
+            self._init_vsource_nc(schism_vsource, len(input_files))
+
+        # Process files
+        for file in input_files:
+            if not skip_latlon and file in sub_input_files:
+                self._regrid_to_latlon(file, apply_slp=apply_slp)
+            if idx == 0:
+                self._regrid_to_schism(file, schism_vsource)
+
+        if schism_vsource is not None:
+            schism_vsource.sync()
+            schism_vsource.close()
 
 
 def main() -> None:
@@ -450,18 +443,21 @@ def main() -> None:
     parser.add_argument("--geogrid-file", required=True, help="WRF geogrid file path")
     parser.add_argument("--schism-mesh", required=True, help="SCHISM ESMF mesh file path")
     parser.add_argument("--length-hrs", type=int, required=True, help="Forecast length in hours")
-    parser.add_argument("--forcing-begin-date", default=None, help="Forcing begin date (YYYYMMDDHHmm)")
+    parser.add_argument(
+        "--forcing-begin-date", default=None, help="Forcing begin date (YYYYMMDDHHmm)"
+    )
     parser.add_argument("--forcing-end-date", default=None, help="Forcing end date (YYYYMMDDHHmm)")
-    parser.add_argument("--job-index", type=int, default=None, help="Job array index (for HPC parallelism)")
-    parser.add_argument("--job-count", type=int, default=None, help="Total job array size (for HPC parallelism)")
+    parser.add_argument(
+        "--job-index", type=int, default=None, help="Job array index (for HPC parallelism)"
+    )
+    parser.add_argument(
+        "--job-count", type=int, default=None, help="Total job array size (for HPC parallelism)"
+    )
     args = parser.parse_args()
 
     ESMF.Manager(debug=False)
 
-    if args.length_hrs < 0:  # AnA configuration
-        dir_date = args.forcing_end_date
-    else:
-        dir_date = args.forcing_begin_date
+    dir_date = args.forcing_end_date if args.length_hrs < 0 else args.forcing_begin_date
     if dir_date and len(dir_date) == 12:
         dir_date = dir_date[:-2]  # remove minutes
 

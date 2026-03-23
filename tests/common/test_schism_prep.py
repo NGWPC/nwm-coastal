@@ -6,8 +6,7 @@ that replaced the former bash scripts.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
 import numpy as np
@@ -15,15 +14,12 @@ import pytest
 
 from coastal_calibration.schism_prep import (
     _write_th_file,
-    make_discharge,
-    merge_source_sink,
     partition_mesh,
     run_combine_sink_source,
     stage_chrtout_files,
     stage_ldasin_files,
     update_params,
 )
-
 
 # ---------------------------------------------------------------------------
 # stage_chrtout_files
@@ -41,7 +37,7 @@ class TestStageChrtoutFiles:
         (prebuilt / "nwmReaches.csv").write_text("0\n\n0\n")
 
         # Create a dummy CHRTOUT file
-        dt = datetime(2021, 6, 11, tzinfo=timezone.utc)
+        dt = datetime(2021, 6, 11, tzinfo=UTC)
         fname = "202106110000.CHRTOUT_DOMAIN1"
         (streamflow / fname).write_text("dummy")
 
@@ -63,7 +59,7 @@ class TestStageChrtoutFiles:
         prebuilt.mkdir()
         (prebuilt / "nwmReaches.csv").write_text("test")
 
-        dt = datetime(2021, 6, 11, tzinfo=timezone.utc)
+        dt = datetime(2021, 6, 11, tzinfo=UTC)
         fname = "202106110000.CHRTOUT_DOMAIN1"
         (streamflow / fname).write_text("dummy")
 
@@ -84,7 +80,7 @@ class TestStageChrtoutFiles:
         prebuilt.mkdir()
         (prebuilt / "nwmReaches.csv").write_text("0\n\n0\n")
 
-        dt = datetime(2021, 6, 11, tzinfo=timezone.utc)
+        dt = datetime(2021, 6, 11, tzinfo=UTC)
         # Create sub-hourly CHRTOUT files
         for suffix in ["00", "15", "30", "45"]:
             fname = f"2021061100{suffix}.CHRTOUT_DOMAIN1"
@@ -145,7 +141,7 @@ class TestRunCombineSinkSource:
                 run_combine_sink_source(tmp_path)
 
     def test_passes_correct_stdin(self, tmp_path):
-        """Should pass '1\\n2\\n' as stdin to the binary."""
+        r"""Should pass '1\\n2\\n' as stdin to the binary."""
         with patch("coastal_calibration.schism_prep.subprocess.run") as mock_run:
             mock_run.return_value.returncode = 0
             run_combine_sink_source(tmp_path)
@@ -207,7 +203,7 @@ class TestStageLdasinFiles:
     def test_creates_forcing_dirs(self, tmp_path):
         nwm_dir = tmp_path / "meteo"
         nwm_dir.mkdir()
-        dt = datetime(2020, 8, 26, tzinfo=timezone.utc)
+        dt = datetime(2020, 8, 26, tzinfo=UTC)
         # Create dummy LDASIN files
         for h in range(3):
             t = dt + timedelta(hours=h)
@@ -231,7 +227,7 @@ class TestStageLdasinFiles:
         """Should log warning but not crash for missing LDASIN files."""
         nwm_dir = tmp_path / "meteo"
         nwm_dir.mkdir()
-        dt = datetime(2020, 8, 26, tzinfo=timezone.utc)
+        dt = datetime(2020, 8, 26, tzinfo=UTC)
 
         forcing_input, _ = stage_ldasin_files(
             work_dir=tmp_path,

@@ -8,10 +8,13 @@ seconds rather than minutes.
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import netCDF4
 import numpy as np
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # Domain constants — Hawaii-like region shared across all fixtures
@@ -34,8 +37,8 @@ def make_stofs_nc(path: Path, n_nodes: int = 50, n_times: int = 10) -> None:
     """Write a minimal ESTOFS-like NetCDF file.
 
     Time layout (seconds since 2024-01-09 00:00:00):
-        index 0–9  →  hours 0–9
-        index 5    →  05:00 UTC  ← cycle start used in ``synthetic_stofs_cycle_env``
+        index 0-9  ->  hours 0-9
+        index 5    ->  05:00 UTC  <- cycle start used in ``synthetic_stofs_cycle_env``
 
     The ``zeta`` variable has ~20 % of values masked, matching the wet/dry
     mask present in real ESTOFS output.
@@ -199,7 +202,7 @@ def make_ldasin_nc(
 
 
 def make_esmfmesh_nc(path: Path) -> None:
-    """Write a minimal ESMFMESH NetCDF file.
+    r"""Write a minimal ESMFMESH NetCDF file.
 
     Six nodes forming four triangular elements, covering the same Hawaii-like
     domain as the other fixtures.  Node indices in ``elementConn`` are
