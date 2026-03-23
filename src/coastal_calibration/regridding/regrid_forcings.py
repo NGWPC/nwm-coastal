@@ -216,9 +216,9 @@ class CoastalForcingRegridder:
             self._schism_regridder = Regridder(
                 in_field,
                 out_field,
-                method=ESMF.RegridMethod.BILINEAR,
-                unmapped_action=ESMF.UnmappedAction.IGNORE,
-                extrap_method=ESMF.ExtrapMethod.NONE,
+                method=ESMF.RegridMethod.BILINEAR,  # type: ignore[invalid-argument-type]
+                unmapped_action=ESMF.UnmappedAction.IGNORE,  # type: ignore[invalid-argument-type]
+                extrap_method=ESMF.ExtrapMethod.NONE,  # type: ignore[invalid-argument-type]
             )
 
         out_field = self._schism_regridder(in_field, out_field)
@@ -250,7 +250,7 @@ class CoastalForcingRegridder:
         # Write on root rank
         if self.root and vsource_ds is not None:
             step_time = self._read_start_time(input_ds)
-            output_ts = int(step_time - self.schism_first_timestep)
+            output_ts = int(step_time - self.schism_first_timestep)  # type: ignore[unsupported-operator]
             output_idx = output_ts // 3600
             vsource_ds["time_vsource"][output_idx] = output_ts
             vsource_ds["vsource"][output_idx, :] = all_elements
@@ -332,6 +332,7 @@ class CoastalForcingRegridder:
 
             # Create output variable on root
             if self.root:
+                assert output_ds is not None
                 new_var = output_ds.createVariable(
                     varname=var_name, datatype="f4", dimensions=("time", "lat", "lon")
                 )
@@ -351,12 +352,14 @@ class CoastalForcingRegridder:
                 self._latlon_regridder = Regridder(
                     in_field,
                     out_field,
-                    method=ESMF.RegridMethod.BILINEAR,
-                    unmapped_action=ESMF.UnmappedAction.IGNORE,
+                    method=ESMF.RegridMethod.BILINEAR,  # type: ignore[invalid-argument-type]
+                    unmapped_action=ESMF.UnmappedAction.IGNORE,  # type: ignore[invalid-argument-type]
                 )
             else:
                 self._latlon_regridder(
-                    in_field, out_field, zero_region=ESMF.constants.Region.SELECT
+                    in_field,
+                    out_field,
+                    zero_region=ESMF.constants.Region.SELECT,  # type: ignore[invalid-argument-type]
                 )
 
             # Assemble global output from all partitions
@@ -367,6 +370,8 @@ class CoastalForcingRegridder:
             final_output = gather_reduce(global_output, global_shape=(nlons, nlats))
 
             if self.root:
+                assert output_ds is not None
+                assert final_output is not None
                 output_ds.variables[var_name][0, :] = final_output.T
 
             in_field.destroy()
@@ -374,6 +379,7 @@ class CoastalForcingRegridder:
 
         # Write coordinates and close
         if self.root:
+            assert output_ds is not None
             output_ds.variables["lat"][:] = self.lats
             output_ds.variables["lon"][:] = self.lons
             output_ds.variables["time"][:] = input_ds.variables[_pick_time_var(input_ds)][:]

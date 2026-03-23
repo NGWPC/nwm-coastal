@@ -148,10 +148,16 @@ class Tide:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _times(t0: datetime, hours) -> list[datetime] | datetime:
+    def _times(
+        t0: datetime,
+        hours: Iterable[float] | Iterable[datetime] | float | datetime,
+    ) -> list[datetime] | datetime:
         """Convert hourly offsets from *t0* to datetimes (or vice-versa)."""
         if not isinstance(hours, Iterable):
-            return Tide._times(t0, [hours])[0]
-        if not isinstance(hours[0], datetime):
-            return [t0 + timedelta(hours=float(h)) for h in hours]
-        return list(hours)
+            result = Tide._times(t0, [hours])  # type: ignore[invalid-argument-type]
+            assert isinstance(result, list)  # noqa: S101
+            return result[0]
+        hours_list = list(hours)
+        if not isinstance(hours_list[0], datetime):
+            return [t0 + timedelta(hours=float(h)) for h in hours_list]
+        return [h for h in hours_list if isinstance(h, datetime)]
