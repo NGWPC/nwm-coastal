@@ -538,6 +538,9 @@ def make_sflux(
     forcing_subdir = forcing_input_dir / forcing_begin[:10]
     sflux_dir = work_dir / "sflux"
     sflux_dir.mkdir(parents=True, exist_ok=True)
+    # Remove stale sflux files from previous runs
+    for stale in sflux_dir.glob("sflux_air_*.nc"):
+        stale.unlink()
 
     sflux_out = sflux_dir / "sflux_air_1.0001.nc"
 
@@ -571,9 +574,9 @@ def make_sflux(
         if m and len(m.group(2)) > 1 and m.group(2).startswith("0"):
             new_name = f"{m.group(1)}.{int(m.group(2))}.nc"
             new_path = f.parent / new_name
-            if not new_path.exists():
-                f.rename(new_path)
-                logger.info("    Renamed %s → %s", f.name, new_name)
+            new_path.unlink(missing_ok=True)
+            f.rename(new_path)
+            logger.info("    Renamed %s → %s", f.name, new_name)
 
     logger.info("    Generated sflux in %s", sflux_dir)
     return sflux_dir

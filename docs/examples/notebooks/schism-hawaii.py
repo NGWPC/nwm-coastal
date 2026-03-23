@@ -66,11 +66,11 @@ run_config = CoastalCalibConfig.from_dict(
     {
         "model": "schism",
         "simulation": {
-            "start_date": "2024-01-09",
-            "duration_hours": 3,
+            "start_date": "2025-11-26",
+            "duration_hours": 50,
             "coastal_domain": "hawaii",
             "meteo_source": "nwm_ana",
-            "timestep_seconds": 200,
+            "timestep_seconds": 300,
         },
         "boundary": {"source": "stofs"},
         "paths": {
