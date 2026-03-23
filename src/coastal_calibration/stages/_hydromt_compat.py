@@ -7,13 +7,19 @@ when it is applied so problems are easy to trace.
 
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import TYPE_CHECKING, Any
+
+from pyproj import Transformer
 
 from coastal_calibration.utils.logging import logger as _log
 
 if TYPE_CHECKING:
     import geopandas as gpd
     import xarray as xr
+
+
+TransformerCRS = lru_cache(Transformer.from_crs)
 
 
 def register_round_coords_preprocessor() -> None:
@@ -666,6 +672,6 @@ def apply_all_patches() -> None:
     patch_meteo_write_gridded()
     patch_quadtree_subgrid_data_setter()
     patch_parse_river_list_geoms()
-    patch_quadtree_output_read()
+    # patch_quadtree_output_read()
     patch_quadtree_get_indices_at_points()
     patch_make_index_cog()

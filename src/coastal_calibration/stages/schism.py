@@ -221,7 +221,7 @@ class SchismObservationStage(WorkflowStage):
         if not hgrid_path.exists():
             raise FileNotFoundError(
                 f"hgrid.gr3 not found in {work_dir}. "
-                "The update_params stage must run before schism_obs "
+                "The schism_params stage must run before schism_obs "
                 "so that the mesh file is symlinked into the work directory."
             )
 
@@ -313,11 +313,16 @@ class SchismObservationStage(WorkflowStage):
 
 
 class PreSCHISMStage(WorkflowStage):
-    """Prepare input files for SCHISM execution."""
+    """Prepare input files for SCHISM execution.
 
-    name = "pre_schism"
+    Runs discharge generation, sink/source combining, source/sink
+    merging, and mesh partitioning.  All Fortran binaries
+    (``combine_sink_source``, ``metis_prep``, ``gpmetis``) are expected
+    on ``$PATH`` (pixi installs them to ``$CONDA_PREFIX/bin``).
+    """
+
+    name = "schism_prep"
     description = "Prepare SCHISM inputs (discharge, partitioning)"
-    requires_container = True
 
     def __init__(
         self,
@@ -329,29 +334,91 @@ class PreSCHISMStage(WorkflowStage):
 
     def run(self) -> dict[str, Any]:
         """Execute SCHISM pre-processing."""
-        self._update_substep("Building environment")
-        env = self.build_environment()
-
-        self._log("Running discharge, sink/source, and mesh partitioning")
-        self._update_substep("Running pre_schism")
-        script_path = self._get_scripts_dir() / "run_sing_coastal_workflow_pre_schism.bash"
-
-        self.run_singularity_command(
-            [str(script_path)],
-            sif_path=self.model.singularity_image,
-            env=env,
+        from coastal_calibration.schism_prep import (
+            make_discharge,
+            merge_source_sink,
+            partition_mesh,
+            run_combine_sink_source,
+            stage_chrtout_files,
         )
 
         work_dir = self.config.paths.work_dir
+        sim = self.config.simulation
+        paths = self.config.paths
+        prebuilt_dir = self.model.prebuilt_dir
+        (work_dir / "outputs").mkdir(parents=True, exist_ok=True)
 
-        # Verify critical files produced by earlier stages exist
+        # 1. Stage CHRTOUT files and create initial discharge
+        end_date = sim.start_date + timedelta(hours=int(sim.duration_hours))
+
+        if sim.meteo_source == "nwm_retro":
+            # nwm_retro reads directly from S3 Zarr — no local files needed
+            self._update_substep("Staging nwmReaches.csv")
+            self._log("Copying nwmReaches.csv from prebuilt directory")
+            import shutil
+
+            reaches_src = prebuilt_dir / "nwmReaches.csv"
+            if reaches_src.exists():
+                shutil.copy2(reaches_src, work_dir / "nwmReaches.csv")
+            nwm_output_dir = work_dir  # not used but needed for signature
+            nwm_ana_dir = None
+        else:
+            self._update_substep("Staging CHRTOUT files")
+            self._log("Symlinking NWM CHRTOUT files")
+            nwm_output_dir, nwm_ana_dir = stage_chrtout_files(
+                work_dir=work_dir,
+                start_date=sim.start_date,
+                duration_hours=int(sim.duration_hours),
+                coastal_domain=sim.coastal_domain,
+                streamflow_dir=paths.streamflow_dir(sim.meteo_source),
+                prebuilt_dir=prebuilt_dir,
+            )
+
+        self._update_substep("Generating discharge files")
+        self._log("Running make_discharge")
+        make_discharge(
+            work_dir=work_dir,
+            nwm_output_dir=nwm_output_dir,
+            nwm_ana_dir=nwm_ana_dir,
+            is_analysis="analysis" in sim.meteo_source,
+            meteo_source=sim.meteo_source,
+            domain=sim.coastal_domain,
+            start_date=sim.start_date,
+            end_date=end_date,
+        )
+
+        # 2. Combine sink/source (Fortran binary)
+        self._update_substep("Combining sink/source")
+        self._log("Running combine_sink_source")
+        run_combine_sink_source(work_dir)
+
+        # 3. Merge source/sink into precipitation data
+        self._update_substep("Merging source/sink")
+        self._log("Running merge_source_sink")
+        merge_source_sink(
+            work_dir=work_dir,
+            root_dir=work_dir,
+            prebuilt_dir=prebuilt_dir,
+        )
+
+        # 4. Partition mesh
+        self._update_substep("Partitioning mesh")
+        self._log(
+            f"Partitioning for {self.model.total_tasks} tasks ({self.model.nscribes} scribes)"
+        )
+        partition_mesh(
+            work_dir=work_dir,
+            total_tasks=self.model.total_tasks,
+            nscribes=self.model.nscribes,
+        )
+
+        # Verify critical files exist
         required_files = ["source.nc", "param.nml", "hgrid.gr3"]
         missing = [f for f in required_files if not (work_dir / f).exists()]
         if missing:
             raise RuntimeError(
-                f"pre_schism: required files missing from {work_dir}: {', '.join(missing)}. "
-                "Check logs from earlier stages (initial_discharge, combine_sink_source, "
-                "merge_source_sink, update_params) for errors."
+                f"pre_schism: required files missing from {work_dir}: "
+                f"{', '.join(missing)}. Check logs above for errors."
             )
 
         # Patch param.nml to enable station output if station.in exists
@@ -369,11 +436,15 @@ class PreSCHISMStage(WorkflowStage):
 
 
 class SCHISMRunStage(WorkflowStage):
-    """Execute SCHISM model with MPI."""
+    """Execute SCHISM model with MPI.
+
+    The ``pschism`` binary is expected on ``$PATH`` (pixi installs it
+    to ``$CONDA_PREFIX/bin``).  MPI is provided by the pixi ``openmpi``
+    package.
+    """
 
     name = "schism_run"
     description = "Run SCHISM model (MPI)"
-    requires_container = True
 
     def __init__(
         self,
@@ -383,21 +454,20 @@ class SCHISMRunStage(WorkflowStage):
         super().__init__(config, monitor)
         self.model: SchismModelConfig = cast("SchismModelConfig", config.model_config)
 
+    def _build_mpi_command(self) -> list[str]:
+        """Construct the ``mpiexec … pschism N`` command list."""
+        cmd = ["mpiexec", "-n", str(self.model.total_tasks)]
+        if self.model.oversubscribe:
+            cmd.append("--oversubscribe")
+        cmd.extend([self.model.binary, str(self.model.nscribes)])
+        return cmd
+
     def run(self) -> dict[str, Any]:
         """Execute SCHISM model run."""
+        import subprocess
+
         self._update_substep("Building environment")
         env = self.build_environment()
-
-        self._update_substep("Setting up MPI environment")
-        nfs_mount = str(self.config.paths.nfs_mount)
-        env["PATH"] = f"{nfs_mount}/openmpi/bin:{env.get('PATH', '/usr/local/bin:/usr/bin')}"
-        env["LD_LIBRARY_PATH"] = f"{nfs_mount}/openmpi/lib:{env.get('LD_LIBRARY_PATH', '')}"
-        env["OMPI_ALLOW_RUN_AS_ROOT"] = "1"
-        env["OMPI_ALLOW_RUN_AS_ROOT_CONFIRM"] = "1"
-
-        nscribes = self.model.nscribes
-        exec_dir = env.get("EXECnwm", "")
-        schism_binary = f"{exec_dir}/{self.model.binary}"
 
         self._log(
             f"Launching {self.model.binary} with {self.model.total_tasks} MPI tasks "
@@ -405,14 +475,22 @@ class SCHISMRunStage(WorkflowStage):
         )
         self._update_substep(f"Running pschism with {self.model.total_tasks} MPI tasks")
 
-        self.run_singularity_command(
-            ["/bin/bash", "-c", f"{schism_binary} {nscribes}"],
-            sif_path=self.model.singularity_image,
+        cmd = self._build_mpi_command()
+        self._log(f"Command: {' '.join(cmd)}")
+
+        result = subprocess.run(
+            cmd,
+            cwd=self.config.paths.work_dir,
             env=env,
-            pwd=self.config.paths.work_dir,
-            use_mpi=True,
-            mpi_tasks=self.model.total_tasks,
+            capture_output=True,
+            text=True,
+            check=False,
         )
+
+        if result.returncode != 0:
+            stderr = result.stderr or ""
+            self._log(f"SCHISM run failed: {stderr[-2000:]}", "error")
+            raise RuntimeError(f"SCHISM run failed (exit {result.returncode}): {stderr[-2000:]}")
 
         self._log("SCHISM run completed successfully")
         return {
@@ -422,11 +500,15 @@ class SCHISMRunStage(WorkflowStage):
 
 
 class PostSCHISMStage(WorkflowStage):
-    """Post-process SCHISM outputs."""
+    """Post-process SCHISM outputs.
 
-    name = "post_schism"
+    Checks for fatal errors and combines hotstart files when running
+    reanalysis or chained runs.  ``combine_hotstart7`` is expected on
+    ``$PATH`` (pixi installs it to ``$CONDA_PREFIX/bin``).
+    """
+
+    name = "schism_postprocess"
     description = "Post-process SCHISM outputs"
-    requires_container = True
 
     def __init__(
         self,
@@ -438,28 +520,29 @@ class PostSCHISMStage(WorkflowStage):
 
     def run(self) -> dict[str, Any]:
         """Execute SCHISM post-processing."""
-        self._update_substep("Building environment")
-        env = self.build_environment()
+        work_dir = self.config.paths.work_dir
+        outputs_dir = work_dir / "outputs"
+        outputs_dir.mkdir(parents=True, exist_ok=True)
 
         self._update_substep("Checking for errors")
-        fatal_error = self.config.paths.work_dir / "outputs" / "fatal.error"
+        fatal_error = outputs_dir / "fatal.error"
         if fatal_error.exists() and fatal_error.stat().st_size > 0:
             error_content = fatal_error.read_text()[-2000:]
             raise RuntimeError(f"SCHISM run failed: {error_content}")
 
-        self._log("Checking outputs and combining hotstarts")
-        self._update_substep("Running post_schism")
-        script_path = self._get_scripts_dir() / "run_sing_coastal_workflow_post_schism.bash"
+        # Combine hotstarts for reanalysis / chained runs
+        sim = self.config.simulation
+        is_reanalysis = sim.duration_hours < 0
+        if is_reanalysis:
+            self._update_substep("Combining hotstarts")
+            self._log("Running combine_hotstart7")
+            from coastal_calibration.schism_prep import combine_hotstart
 
-        self.run_singularity_command(
-            [str(script_path)],
-            sif_path=self.model.singularity_image,
-            env=env,
-        )
+            combine_hotstart(outputs_dir)
 
         self._log("SCHISM post-processing complete")
         return {
-            "outputs_dir": str(self.config.paths.work_dir / "outputs"),
+            "outputs_dir": str(outputs_dir),
             "status": "completed",
         }
 

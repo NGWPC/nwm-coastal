@@ -16,30 +16,34 @@ if TYPE_CHECKING:
 class UpdateParamsStage(WorkflowStage):
     """Update SCHISM parameter files."""
 
-    name = "update_params"
-    description = "Create SCHISM param.nml"
-    requires_container = True
+    name = "schism_params"
+    description = "Create param.nml and symlink mesh files"
 
     def __init__(self, config: CoastalCalibConfig, monitor: WorkflowMonitor | None = None) -> None:
         super().__init__(config, monitor)
         self.model: SchismModelConfig = cast("SchismModelConfig", config.model_config)
 
     def run(self) -> dict[str, Any]:
-        """Execute parameter file creation."""
+        """Create param.nml and symlink static mesh files."""
+        from coastal_calibration.schism_prep import update_params
+
         self._update_substep("Building environment")
-        env = self.build_environment()
+        self.build_environment()
+
+        work_dir = self.config.paths.work_dir
+        sim = self.config.simulation
 
         self._log("Creating param.nml and symlinking mesh files")
         self._update_substep("Running update_params")
-        script_path = self._get_scripts_dir() / "run_sing_coastal_workflow_update_params.bash"
 
-        self.run_singularity_command(
-            [str(script_path)],
-            sif_path=self.model.singularity_image,
-            env=env,
+        param_file = update_params(
+            work_dir=work_dir,
+            prebuilt_dir=self.model.prebuilt_dir,
+            start_date=sim.start_date,
+            duration_hours=sim.duration_hours,
+            hot_start_file=self.config.paths.hot_start_file,
         )
 
-        param_file = self.config.paths.work_dir / "param.nml"
         self._log(f"Parameter file created: {param_file}")
         return {
             "param_file": str(param_file),
@@ -52,28 +56,33 @@ class TPXOBoundaryStage(WorkflowStage):
 
     name = "tpxo_boundary"
     description = "Create boundary forcing from TPXO"
-    requires_container = True
 
     def __init__(self, config: CoastalCalibConfig, monitor: WorkflowMonitor | None = None) -> None:
         super().__init__(config, monitor)
         self.model: SchismModelConfig = cast("SchismModelConfig", config.model_config)
 
     def run(self) -> dict[str, Any]:
-        """Execute TPXO boundary condition generation."""
+        """Generate tidal boundary conditions from TPXO atlas."""
+        from coastal_calibration.schism_prep import make_tpxo_boundary
+
         self._update_substep("Building environment")
-        env = self.build_environment()
+        self.build_environment()
+
+        sim = self.config.simulation
 
         self._log("Generating tidal boundary from TPXO atlas")
         self._update_substep("Running make_tpxo_ocean")
-        script_path = self._get_scripts_dir() / "run_sing_coastal_workflow_make_tpxo_ocean.bash"
 
-        self.run_singularity_command(
-            [str(script_path)],
-            sif_path=self.model.singularity_image,
-            env=env,
+        elev_file = make_tpxo_boundary(
+            work_dir=self.config.paths.work_dir,
+            start_date=sim.start_date,
+            duration_hours=sim.duration_hours,
+            timestep_seconds=sim.timestep_seconds,
+            prebuilt_dir=self.model.prebuilt_dir,
+            otps_dir=self.config.paths.otps_dir,
+            tpxo_data_dir=self.config.paths.tpxo_data_dir,
         )
 
-        elev_file = self.config.paths.work_dir / "elev2D.th.nc"
         self._log(f"TPXO boundary file created: {elev_file}")
         return {
             "elev2d_file": str(elev_file),
@@ -86,7 +95,6 @@ class STOFSBoundaryStage(WorkflowStage):
 
     name = "stofs_boundary"
     description = "Regrid STOFS boundary data"
-    requires_container = True
 
     def __init__(self, config: CoastalCalibConfig, monitor: WorkflowMonitor | None = None) -> None:
         super().__init__(config, monitor)
@@ -120,71 +128,27 @@ class STOFSBoundaryStage(WorkflowStage):
 
     def run(self) -> dict[str, Any]:
         """Execute STOFS boundary condition regridding."""
+        from coastal_calibration.schism_prep import make_stofs_boundary
+
         self._update_substep("Building environment")
-        env = self.build_environment()
+        self.build_environment()
 
         stofs_file = self._resolve_stofs_file()
         self._log(f"Using STOFS file: {stofs_file}")
 
-        self._update_substep("Pre-processing STOFS data")
-        pre_script = self._get_scripts_dir() / "run_sing_coastal_workflow_pre_make_stofs_ocean.bash"
-
-        self.run_singularity_command(
-            [str(pre_script)],
-            sif_path=self.model.singularity_image,
-            env=env,
-        )
-
-        # The pre-script computes LENGTH_HRS as abs(duration) + 1 and
-        # exports it inside the container.  Since run_singularity_command
-        # discards stdout (to avoid pipe-buffer deadlocks), we replicate
-        # the same arithmetic here instead of parsing the echo output.
-        raw_hrs = int(self.config.simulation.duration_hours)
-        length_hrs = str(abs(raw_hrs) + 1)
+        sim = self.config.simulation
 
         self._update_substep("Running regrid_estofs.py with MPI")
-        work_dir = self.config.paths.work_dir
 
-        env["CYCLE_DATE"] = self.config.simulation.start_pdy
-        env["CYCLE_TIME"] = f"{self.config.simulation.start_cyc}00"
-        env["LENGTH_HRS"] = length_hrs
-        env["ESTOFS_INPUT_FILE"] = str(stofs_file)
-        env["SCHISM_OUTPUT_FILE"] = str(work_dir / "elev2D.th.nc")
-        env["OPEN_BNDS_HGRID_FILE"] = str(work_dir / "open_bnds_hgrid.nc")
-
-        conda_envs = env.get("CONDA_ENVS_PATH", "")
-        conda_env = env.get("CONDA_ENV_NAME", "ngen_forcing_coastal")
-        ush_dir = env.get("USHnwm", "")
-
-        python_path = f"{conda_envs}/{conda_env}/bin/python"
-        regrid_script = f"{ush_dir}/wrf_hydro_workflow_dev/coastal/regrid_estofs.py"
-
-        self.run_singularity_command(
-            [
-                python_path,
-                regrid_script,
-                env["ESTOFS_INPUT_FILE"],
-                env["OPEN_BNDS_HGRID_FILE"],
-                env["SCHISM_OUTPUT_FILE"],
-            ],
-            sif_path=self.model.singularity_image,
-            env=env,
-            use_mpi=True,
+        elev_file = make_stofs_boundary(
+            work_dir=self.config.paths.work_dir,
+            start_date=sim.start_date,
+            duration_hours=sim.duration_hours,
+            stofs_file=stofs_file,
+            prebuilt_dir=self.model.prebuilt_dir,
             mpi_tasks=self.model.total_tasks,
         )
 
-        self._update_substep("Post-processing STOFS data")
-        post_script = (
-            self._get_scripts_dir() / "run_sing_coastal_workflow_post_make_stofs_ocean.bash"
-        )
-
-        self.run_singularity_command(
-            [str(post_script)],
-            sif_path=self.model.singularity_image,
-            env=env,
-        )
-
-        elev_file = work_dir / "elev2D.th.nc"
         self._log(f"STOFS boundary file created: {elev_file}")
         return {
             "elev2d_file": str(elev_file),
@@ -206,9 +170,8 @@ class STOFSBoundaryStage(WorkflowStage):
 class BoundaryConditionStage(WorkflowStage):
     """Wrapper stage that selects TPXO or STOFS based on config."""
 
-    name = "boundary_conditions"
+    name = "schism_boundary"
     description = "Generate boundary conditions"
-    requires_container = True
 
     def run(self) -> dict[str, Any]:
         """Execute appropriate boundary condition stage."""

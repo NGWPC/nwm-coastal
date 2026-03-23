@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING, Any, cast
 from coastal_calibration.stages.base import WorkflowStage
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from coastal_calibration.config.schema import CoastalCalibConfig, SchismModelConfig
     from coastal_calibration.utils.logging import WorkflowMonitor
 
@@ -16,18 +18,19 @@ if TYPE_CHECKING:
 class PreForcingStage(WorkflowStage):
     """Prepare data for atmospheric forcing generation."""
 
-    name = "pre_forcing"
-    description = "Prepare NWM forcing data"
-    requires_container = True
+    name = "schism_forcing_prep"
+    description = "Prepare LDASIN forcing data"
 
     def __init__(self, config: CoastalCalibConfig, monitor: WorkflowMonitor | None = None) -> None:
         super().__init__(config, monitor)
         self.model: SchismModelConfig = cast("SchismModelConfig", config.model_config)
 
     def run(self) -> dict[str, Any]:
-        """Execute pre-forcing preparation."""
+        """Stage LDASIN forcing files and create output directories."""
+        from coastal_calibration.schism_prep import stage_ldasin_files
+
         self._update_substep("Building environment")
-        env = self.build_environment()
+        self.build_environment()
 
         self._update_substep("Creating output directories")
         work_dir = self.config.paths.work_dir
@@ -36,21 +39,23 @@ class PreForcingStage(WorkflowStage):
         forcing_output = work_dir / "coastal_forcing_output"
         if forcing_output.exists():
             shutil.rmtree(forcing_output)
-        forcing_output.mkdir(exist_ok=True)
 
-        self._update_substep("Running pre_nwm_forcing_coastal")
+        self._update_substep("Staging LDASIN files")
         self._log("Creating forcing symlinks and output directories")
-        script_path = self._get_scripts_dir() / "run_sing_coastal_workflow_pre_forcing_coastal.bash"
 
-        self.run_singularity_command(
-            [str(script_path)],
-            sif_path=self.model.singularity_image,
-            env=env,
+        sim = self.config.simulation
+        nwm_forcing_dir = self.config.paths.meteo_dir(sim.meteo_source)
+
+        _forcing_input_dir, coastal_forcing_output = stage_ldasin_files(
+            work_dir=work_dir,
+            start_date=sim.start_date,
+            duration_hours=sim.duration_hours,
+            nwm_forcing_dir=nwm_forcing_dir,
         )
 
-        self._log(f"Pre-forcing complete — output dir: {forcing_output}")
+        self._log(f"Pre-forcing complete — output dir: {coastal_forcing_output}")
         return {
-            "forcing_output_dir": str(forcing_output),
+            "forcing_output_dir": str(coastal_forcing_output),
             "status": "completed",
         }
 
@@ -58,16 +63,66 @@ class PreForcingStage(WorkflowStage):
 class NWMForcingStage(WorkflowStage):
     """Generate atmospheric forcing using WRF-Hydro workflow driver."""
 
-    name = "nwm_forcing"
-    description = "Generate NWM atmospheric forcing (MPI)"
-    requires_container = True
+    name = "schism_forcing"
+    description = "Regrid atmospheric forcing (MPI)"
 
     def __init__(self, config: CoastalCalibConfig, monitor: WorkflowMonitor | None = None) -> None:
         super().__init__(config, monitor)
         self.model: SchismModelConfig = cast("SchismModelConfig", config.model_config)
 
+    def _build_mpi_command(
+        self,
+        *,
+        input_dir: Path,
+        output_dir: Path,
+        geogrid_file: Path,
+        schism_mesh: Path,
+        length_hrs: int,
+        forcing_begin_date: str,
+        forcing_end_date: str,
+        job_index: int = 0,
+        job_count: int = 1,
+    ) -> list[str]:
+        """Build the MPI command for regrid_forcings.
+
+        Extracted as a testable seam.
+        """
+        import sys
+
+        cmd = ["mpiexec", "-n", str(self.model.total_tasks)]
+        if self.model.oversubscribe:
+            cmd.append("--oversubscribe")
+        cmd.extend(
+            [
+                sys.executable,
+                "-m",
+                "coastal_calibration.regridding.regrid_forcings",
+                "--input-dir",
+                str(input_dir),
+                "--output-dir",
+                str(output_dir),
+                "--geogrid-file",
+                str(geogrid_file),
+                "--schism-mesh",
+                str(schism_mesh),
+                "--length-hrs",
+                str(length_hrs),
+                "--forcing-begin-date",
+                forcing_begin_date,
+                "--forcing-end-date",
+                forcing_end_date,
+                "--job-index",
+                str(job_index),
+                "--job-count",
+                str(job_count),
+            ]
+        )
+        return cmd
+
     def run(self) -> dict[str, Any]:
         """Execute NWM forcing generation with MPI."""
+        import subprocess
+
         self._update_substep("Building environment")
         env = self.build_environment()
 
@@ -75,93 +130,94 @@ class NWMForcingStage(WorkflowStage):
         sim = self.config.simulation
         start_pdy = sim.start_pdy
         start_cyc = sim.start_cyc
-
-        env["LENGTH_HRS"] = str(int(sim.duration_hours))
+        length_hrs = int(sim.duration_hours)
 
         forcing_begin = f"{start_pdy}{start_cyc}00"
-        env["FORCING_BEGIN_DATE"] = forcing_begin
-
         start_dt = datetime.strptime(f"{start_pdy} {start_cyc}", "%Y%m%d %H").replace(tzinfo=UTC)
         end_dt = start_dt + timedelta(hours=sim.duration_hours)
-        env["FORCING_END_DATE"] = end_dt.strftime("%Y%m%d%H00")
+        forcing_end = end_dt.strftime("%Y%m%d%H00")
 
-        nwm_forcing_output = str(self.config.paths.work_dir / "forcing_input")
-        env["NWM_FORCING_OUTPUT_DIR"] = nwm_forcing_output
-        env["COASTAL_FORCING_INPUT_DIR"] = f"{nwm_forcing_output}/{forcing_begin[:10]}"
-        env["COASTAL_FORCING_OUTPUT_DIR"] = str(
-            self.config.paths.work_dir / "coastal_forcing_output"
-        )
-        env["COASTAL_WORK_DIR"] = str(self.config.paths.work_dir)
+        nwm_forcing_output = self.config.paths.work_dir / "forcing_input"
+        coastal_forcing_output = self.config.paths.work_dir / "coastal_forcing_output"
+        geogrid_file = self.model.geogrid_file
+        schism_mesh = self.model.schism_mesh
 
-        env["FORCING_START_YEAR"] = start_pdy[:4]
-        env["FORCING_START_MONTH"] = start_pdy[4:6]
-        env["FORCING_START_DAY"] = start_pdy[6:8]
-        env["FORCING_START_HOUR"] = start_cyc
-
-        env["FECPP_JOB_INDEX"] = "0"
-        env["FECPP_JOB_COUNT"] = "1"
-
-        conda_envs = env.get("CONDA_ENVS_PATH", "")
-        conda_env = env.get("CONDA_ENV_NAME", "ngen_forcing_coastal")
-        ush_dir = env.get("USHnwm", "")
-
-        python_path = f"{conda_envs}/{conda_env}/bin/python"
-        workflow_script = (
-            f"{ush_dir}/wrf_hydro_workflow_dev/forcings/WrfHydroFECPP/workflow_driver.py"
+        cmd = self._build_mpi_command(
+            input_dir=nwm_forcing_output,
+            output_dir=coastal_forcing_output,
+            geogrid_file=geogrid_file,
+            schism_mesh=schism_mesh,
+            length_hrs=length_hrs,
+            forcing_begin_date=forcing_begin,
+            forcing_end_date=forcing_end,
+            job_index=0,
+            job_count=1,
         )
 
-        self._log(f"Generating {sim.duration_hours}h forcing from {forcing_begin} via MPI")
-        self._update_substep("Running workflow_driver.py with MPI")
-        self.run_singularity_command(
-            [python_path, workflow_script],
-            sif_path=self.model.singularity_image,
+        self._log(f"Generating {length_hrs}h forcing from {forcing_begin} via MPI")
+        self._update_substep("Running regrid_forcings with MPI")
+
+        result = subprocess.run(
+            cmd,
             env=env,
-            use_mpi=True,
-            mpi_tasks=self.model.total_tasks,
+            cwd=self.config.paths.work_dir,
+            capture_output=True,
+            text=True,
+            check=False,
         )
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"regrid_forcings failed (exit {result.returncode}): {result.stderr[-2000:]}"
+            )
 
         self._log(f"NWM forcing generated in {nwm_forcing_output}")
         return {
-            "forcing_output_dir": env["NWM_FORCING_OUTPUT_DIR"],
+            "forcing_output_dir": str(nwm_forcing_output),
             "status": "completed",
         }
 
 
 class PostForcingStage(WorkflowStage):
-    """Clean up and post-process forcing generation."""
+    """Generate sflux atmospheric forcing from LDASIN data."""
 
-    name = "post_forcing"
-    description = "Post-process forcing data"
-    requires_container = True
+    name = "schism_sflux"
+    description = "Generate sflux atmospheric files"
 
     def __init__(self, config: CoastalCalibConfig, monitor: WorkflowMonitor | None = None) -> None:
         super().__init__(config, monitor)
         self.model: SchismModelConfig = cast("SchismModelConfig", config.model_config)
 
     def run(self) -> dict[str, Any]:
-        """Execute post-forcing cleanup."""
+        """Generate sflux files from LDASIN forcing data."""
+        from coastal_calibration.schism_prep import make_sflux
+
         self._update_substep("Building environment")
-        env = self.build_environment()
+        self.build_environment()
 
-        self._log("Running makeAtmo.py post-processing")
-        self._update_substep("Running post_nwm_forcing_coastal")
-        script_path = (
-            self._get_scripts_dir() / "run_sing_coastal_workflow_post_forcing_coastal.bash"
-        )
+        work_dir = self.config.paths.work_dir
+        sim = self.config.simulation
 
-        self.run_singularity_command(
-            [str(script_path)],
-            sif_path=self.model.singularity_image,
-            env=env,
+        # Symlink precip_source.nc from coastal_forcing_output
+        precip_src = work_dir / "coastal_forcing_output" / "precip_source.nc"
+        precip_dst = work_dir / "precip_source.nc"
+        if precip_src.exists() and not precip_dst.exists():
+            precip_dst.symlink_to(precip_src)
+
+        self._log("Generating sflux from LDASIN files")
+        self._update_substep("Running make_atmo_sflux")
+
+        make_sflux(
+            work_dir=work_dir,
+            forcing_input_dir=work_dir / "forcing_input",
+            start_date=sim.start_date,
+            duration_hours=sim.duration_hours,
+            geogrid_file=self.model.geogrid_file,
         )
 
         # Verify sflux output was produced
-        sflux_dir = self.config.paths.work_dir / "sflux"
+        sflux_dir = work_dir / "sflux"
         if not sflux_dir.exists() or not any(sflux_dir.iterdir()):
-            raise RuntimeError(
-                f"post_forcing: no sflux files produced in {sflux_dir}. "
-                "Check makeAtmo.py log for errors."
-            )
+            raise RuntimeError(f"post_forcing: no sflux files produced in {sflux_dir}")
 
         n_sflux = sum(1 for _ in sflux_dir.iterdir())
         self._log(f"Post-processing complete — {n_sflux} sflux file(s) produced")
