@@ -108,7 +108,7 @@ def make_hgrid_nc(path: Path, n_nodes: int = 20, n_bnd: int = 10) -> None:
 # ---------------------------------------------------------------------------
 
 
-def make_geo_em_nc(path: Path, nx: int = 6, ny: int = 5) -> None:
+def make_geo_em_nc(path: Path, nx: int = 20, ny: int = 16) -> None:
     """Write a minimal WRF geo_em-style NetCDF file.
 
     Grid is stored in ``(Time, south_north, west_east)`` order as WRF does.
@@ -157,8 +157,8 @@ _LDASIN_TIME_MINUTES = 28512000.0  # 2024-03-15 00:00:00 UTC
 
 def make_ldasin_nc(
     path: Path,
-    nx: int = 6,
-    ny: int = 5,
+    nx: int = 20,
+    ny: int = 16,
     time_minutes: float = _LDASIN_TIME_MINUTES,
 ) -> None:
     """Write a minimal WRF-Hydro LDASIN forcing NetCDF file.
@@ -201,41 +201,47 @@ def make_ldasin_nc(
 # ---------------------------------------------------------------------------
 
 
-def make_esmfmesh_nc(path: Path) -> None:
-    r"""Write a minimal ESMFMESH NetCDF file.
+def make_esmfmesh_nc(path: Path, mesh_nx: int = 12, mesh_ny: int = 10) -> None:
+    r"""Write an ESMFMESH NetCDF file with a regular triangulated grid.
 
-    Six nodes forming four triangular elements, covering the same Hawaii-like
-    domain as the other fixtures.  Node indices in ``elementConn`` are
-    1-based per the ESMFMESH specification.
+    Creates a ``mesh_nx * mesh_ny`` node grid covering the Hawaii-like domain,
+    triangulated into ``2 * (mesh_nx-1) * (mesh_ny-1)`` elements.  Node indices
+    in ``elementConn`` are 1-based per the ESMFMESH specification.
 
-    Node layout::
-
-        4 --- 5 --- 6    lat=21.0
-        |  \\ |  \\ |
-        1 --- 2 --- 3    lat=20.5
-      lon=-157.5  -156.5
+    Default size: 120 nodes, 198 triangles -- large enough for ESMF BILINEAR
+    regridding to work reliably across platforms (the previous 6-node / 4-element
+    mesh triggered ESMC_RC_ARG_VALUE on some Linux ESMF builds).
     """
-    node_lons = np.array([-157.5, -157.0, -156.5, -157.5, -157.0, -156.5], dtype="f8")
-    node_lats = np.array([20.5, 20.5, 20.5, 21.0, 21.0, 21.0], dtype="f8")
+    lons_1d = np.linspace(LON_W + 0.1, LON_E - 0.1, mesh_nx)
+    lats_1d = np.linspace(LAT_S + 0.1, LAT_N - 0.1, mesh_ny)
+    lons_2d, lats_2d = np.meshgrid(lons_1d, lats_1d)  # (mesh_ny, mesh_nx)
 
-    # 1-based connectivity for four triangles
-    conn = np.array(
-        [
-            [1, 2, 5],
-            [1, 5, 4],
-            [2, 3, 6],
-            [2, 6, 5],
-        ],
-        dtype="i4",
-    )
-    num_nodes_per_elem = np.array([3, 3, 3, 3], dtype="i1")
+    node_lons = lons_2d.ravel().astype("f8")
+    node_lats = lats_2d.ravel().astype("f8")
+    n_nodes = len(node_lons)
+
+    # Triangulate: each quad cell (i,j)-(i+1,j)-(i+1,j+1)-(i,j+1) -> 2 triangles
+    triangles = []
+    for j in range(mesh_ny - 1):
+        for i in range(mesh_nx - 1):
+            n0 = j * mesh_nx + i  # bottom-left
+            n1 = n0 + 1  # bottom-right
+            n2 = n0 + mesh_nx  # top-left
+            n3 = n2 + 1  # top-right
+            # 1-based indices
+            triangles.append([n0 + 1, n1 + 1, n3 + 1])
+            triangles.append([n0 + 1, n3 + 1, n2 + 1])
+
+    conn = np.array(triangles, dtype="i4")
+    n_elems = len(conn)
+    num_nodes_per_elem = np.full(n_elems, 3, dtype="i1")
 
     with netCDF4.Dataset(path, "w", format="NETCDF4") as ds:
         ds.gridType = "unstructured mesh"
         ds.version = "0.9"
 
-        ds.createDimension("nodeCount", 6)
-        ds.createDimension("elementCount", 4)
+        ds.createDimension("nodeCount", n_nodes)
+        ds.createDimension("elementCount", n_elems)
         ds.createDimension("maxNodePElement", 3)
         ds.createDimension("coordDim", 2)
 
