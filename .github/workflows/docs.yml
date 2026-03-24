@@ -38,8 +38,6 @@ jobs:
 
     - name: Build documentation
       if: github.event_name == 'pull_request'
-      env:
-        JUPYTER_PLATFORM_DIRS: '1'
       run: pixi r docs-build
 
     - name: Configure git
@@ -57,8 +55,6 @@ jobs:
 
     - name: Deploy dev docs
       if: github.ref == 'refs/heads/development' && !inputs.version
-      env:
-        JUPYTER_PLATFORM_DIRS: '1'
       run: |
         pixi r mike deploy --push --update-aliases dev latest
         if ! pixi r mike list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -q stable; then
@@ -67,8 +63,6 @@ jobs:
 
     - name: Deploy tagged version
       if: startsWith(github.ref, 'refs/tags/3.1.') || inputs.version
-      env:
-        JUPYTER_PLATFORM_DIRS: '1'
       run: |
         if [ -n "${{ inputs.version }}" ]; then
           VERSION="${{ inputs.version }}"

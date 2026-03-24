@@ -54,7 +54,7 @@ dependencies = [
 optional-dependencies.docs = [
   "mike>=2",
   "mkdocs>=1.6",
-  "mkdocs-jupyter",
+  "mkdocs-jupyter>=0.25,<0.26",
   "mkdocs-materialx",
   "mkdocstrings[python]>=0.27",
   "ruff",
