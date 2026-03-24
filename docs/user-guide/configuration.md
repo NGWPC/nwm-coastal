@@ -172,28 +172,30 @@ Model-specific parameters live in the `model_config` section. The contents depen
 ```yaml
 # model: schism (default, can be omitted)
 model_config:
-  singularity_image: /ngencerf-app/singularity/ngen-coastal.sif
+  prebuilt_dir: /ngen-test/coastal/ngwpc-coastal/hawaii
+  geogrid_file: /ngen-test/coastal/ngwpc-coastal/hawaii/geo_em_HI.nc
   nodes: 2                        # Number of compute nodes
   ntasks_per_node: 18             # MPI tasks per node
   exclusive: true                 # Request exclusive node access
   nscribes: 2                     # SCHISM I/O scribes
   omp_num_threads: 2              # OpenMP threads
   oversubscribe: false            # Allow MPI oversubscription
-  binary: pschism_wcoss2_NO_PARMETIS_TVD-VL.openmpi
+  binary: pschism                 # SCHISM executable (must be on $PATH)
   include_noaa_gages: true        # Enable NOAA observation stations & comparison plots
 ```
 
-| Parameter            | Type   | Default                                      | Description                                  |
-| -------------------- | ------ | -------------------------------------------- | -------------------------------------------- |
-| `singularity_image`  | path   | `/ngencerf-app/singularity/ngen-coastal.sif` | Singularity/Apptainer SIF image for SCHISM   |
-| `nodes`              | int    | 2                                            | Number of compute nodes                      |
-| `ntasks_per_node`    | int    | 18                                           | MPI tasks per node                           |
-| `exclusive`          | bool   | true                                         | Request exclusive node access                |
-| `nscribes`           | int    | 2                                            | SCHISM I/O scribes                           |
-| `omp_num_threads`    | int    | 2                                            | OpenMP threads                               |
-| `oversubscribe`      | bool   | false                                        | Allow MPI oversubscription                   |
-| `binary`             | string | `pschism_wcoss2_NO_PARMETIS_TVD-VL.openmpi`  | SCHISM executable name                       |
-| `include_noaa_gages` | bool   | false                                        | Enable NOAA station discovery and comparison |
+| Parameter            | Type   | Default   | Description                                         |
+| -------------------- | ------ | --------- | --------------------------------------------------- |
+| `prebuilt_dir`       | path   | -         | Path to pre-built SCHISM model directory            |
+| `geogrid_file`       | path   | -         | WRF geogrid file for atmospheric forcing regridding |
+| `nodes`              | int    | 2         | Number of compute nodes                             |
+| `ntasks_per_node`    | int    | 18        | MPI tasks per node                                  |
+| `exclusive`          | bool   | true      | Request exclusive node access                       |
+| `nscribes`           | int    | 2         | SCHISM I/O scribes                                  |
+| `omp_num_threads`    | int    | 2         | OpenMP threads                                      |
+| `oversubscribe`      | bool   | false     | Allow MPI oversubscription                          |
+| `binary`             | string | `pschism` | SCHISM executable name (must be on `$PATH`)         |
+| `include_noaa_gages` | bool   | false     | Enable NOAA station discovery and comparison        |
 
 #### NOAA Observation Stations (`include_noaa_gages`)
 
@@ -203,7 +205,7 @@ When set to `true`, two additional stages are activated in the SCHISM pipeline:
     model domain by computing a concave hull around the open boundary nodes in
     `hgrid.gr3` and querying the CO-OPS API. Writes a `station.in` file so SCHISM
     outputs time-series at those locations, and a `station_noaa_ids.txt` companion that
-    maps station indices to NOAA station IDs. The `pre_schism` stage then patches
+    maps station indices to NOAA station IDs. The `schism_prep` stage then patches
     `param.nml` to enable station output (`iout_sta = 1`, `nspool_sta = 18`).
 - **`schism_plot`**: After the SCHISM run completes, reads the station output
     (`staout_1`), fetches the corresponding NOAA CO-OPS observations (converting from
@@ -476,7 +478,7 @@ Each dataset entry:
 | ----------- | ---- | ------- | ------------------------------------------ |
 | `data_libs` | list | `[]`    | Additional HydroMT data catalog YAML paths |
 
-#### River Discharge (`river_discharge`) — Optional
+#### River Discharge (`river_discharge`, Optional)
 
 When configured, adds river discharge source points to the model by intersecting
 hydrofabric flowpaths with the AOI boundary.

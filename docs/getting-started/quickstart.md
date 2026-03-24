@@ -9,7 +9,7 @@ Before starting, ensure you have:
 
 - `coastal-calibration` installed (see [Installation](installation.md))
 - Access to an HPC cluster with SLURM
-- The Singularity image at `/ngencerf-app/singularity/ngen-coastal.sif` (SCHISM only)
+- A compiled SCHISM binary on `$PATH` (SCHISM only; pixi builds it automatically)
 - Access to the `/ngen-test` NFS mount
 
 ## SCHISM Quick Start

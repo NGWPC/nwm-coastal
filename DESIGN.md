@@ -200,11 +200,11 @@ src/coastal_calibration/
 ├── cli.py                       # Command-line interface
 ├── runner.py                    # Main workflow orchestrator
 ├── downloader.py                # Async data downloading
-├── scripts_path.py              # Script path management
 │
 ├── config/
 │   ├── __init__.py
-│   └── schema.py                # YAML config dataclasses + ModelConfig ABC
+│   ├── schema.py                # YAML config dataclasses + ModelConfig ABC
+│   └── create_schema.py         # SFINCS creation config schema
 │
 ├── stages/                      # Workflow stages
 │   ├── __init__.py
@@ -215,16 +215,20 @@ src/coastal_calibration/
 │   ├── schism.py                # SCHISM execution stages
 │   ├── sfincs.py                # SFINCS data catalog & symlinks
 │   ├── sfincs_build.py          # SFINCS model build stages (HydroMT)
+│   ├── sfincs_create.py         # SFINCS model creation stages
 │   └── _hydromt_compat.py       # Compatibility patches for hydromt bugs
 │
-├── scripts/                     # Embedded bash scripts
-│   ├── tpxo_to_open_bnds_hgrid/ # TPXO Python utilities
-│   └── wrf_hydro_workflow_dev/  # WRF-Hydro forcing code
+├── schism_prep.py               # Pure-Python SCHISM preparation functions
+├── sflux.py                     # Atmospheric forcing generation
+├── tides/                       # TPXO boundary utilities + pytides
+├── regridding/                  # ESMF-based regridding (STOFS, NWM forcing)
 │
 └── utils/
     ├── __init__.py
     ├── logging.py               # Workflow monitoring
     ├── time.py                  # Datetime utilities
+    ├── streamflow.py            # NWM streamflow read utilities
+    ├── floodmap.py              # Flood depth map generation
     └── workflow.py              # Workflow helper functions
 ```
 
@@ -633,7 +637,7 @@ user-written `sbatch` scripts.
 
 **Rationale**:
 
-Users need full control over SLURM resource allocation—for example when using
+Users need full control over SLURM resource allocation, for example when using
 non-default partitions, requesting specific hardware, or embedding the workflow in a
 larger pipeline. The `run` command executes all stages locally on whatever resources are
 already allocated, making it ideal for use inside manually written `sbatch` scripts.
@@ -648,7 +652,7 @@ the preferred method because:
     YAML controls workflow configuration
 - Everything is contained in a single file that can be submitted with `sbatch`
 - No separate YAML file needs to be managed or kept in sync with SLURM settings
-- The heredoc is self-documenting — reviewers can see the exact configuration used
+- The heredoc is self-documenting: reviewers can see the exact configuration used
 
 ```bash
 #!/usr/bin/env bash

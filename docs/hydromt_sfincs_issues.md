@@ -21,7 +21,7 @@ Each `create()` method follows a two-step pattern (`meteo.py`, precipitation exa
 lines 351-413):
 
 ```python
-# Step 1 — clip in source CRS (correct)
+# Step 1: clip in source CRS (correct)
 precip = self.data_catalog.get_rasterdataset(
     precip,
     bbox=self.model.bbox,   # model bbox in geographic coords
@@ -29,7 +29,7 @@ precip = self.data_catalog.get_rasterdataset(
     ...
 )
 
-# Step 2 — reproject to model CRS (no post-clip)
+# Step 2: reproject to model CRS (no post-clip)
 precip_out = precip.raster.reproject(
     dst_crs=self.model.crs, dst_res=dst_res, **kwargs
 ).fillna(0)
@@ -57,7 +57,7 @@ NWM LDASIN forcing (LCC, ~1 km):
 | `sfincs_netamp.nc` (pressure) | ~23 MB        | **24 GB**   | 4797 x 4085     |
 
 The output grid covered x = -1,793 km to 3,118 km and y = 2,339 km to 6,581 km in UTM
-zone 14N — essentially the entire CONUS. The SFINCS simulation, which must read these
+zone 14N, essentially the entire CONUS. The SFINCS simulation, which must read these
 files every time step, slowed from ~7 minutes to an estimated **15+ hours**.
 
 **Suggested fix**:
@@ -86,7 +86,7 @@ This applies identically to `SfincsPrecipitation.create()` (line 411),
 
 In our pipeline we bypass the upstream `component.create()` entirely via
 `_create_meteo_forcing()` (in `sfincs_build.py`), which clips the source data in its
-**native CRS** before reprojecting — so the CONUS-scale grid is never allocated. The
+**native CRS** before reprojecting, so the CONUS-scale grid is never allocated. The
 destination grid is also constrained to the model domain bounds. This replaces the
 earlier post-hoc `_clip_meteo_to_domain()` approach that still triggered the full CONUS
 reprojection in memory. The `meteo_res` config option allows users to override the
@@ -401,7 +401,7 @@ ______________________________________________________________________
 
 `SfincsModel._parse_river_list()` crashes with `KeyError: 'geoms'` when called on a
 model created in write mode (`mode="w+"`). This makes it impossible to use river burning
-(`burn_river_rect`) during subgrid table creation on new models — i.e. whenever
+(`burn_river_rect`) during subgrid table creation on new models, i.e., whenever
 `subgrid.create(river_list=...)` is called as part of a model-building workflow rather
 than on a model read from disk.
 
@@ -429,7 +429,7 @@ KeyError: "geoms"
 Python's `and` operator should short-circuit, but the `KeyError` is raised by the
 attribute access itself (`self.geoms`), not by the `in` operator. The exception
 propagates before the `in` check can execute, and the `else` branch
-(`data_catalog.get_geodataframe`) — which is the correct code path for new models — is
+(`data_catalog.get_geodataframe`), which is the correct code path for new models, is
 never reached.
 
 **Reproduction**:
@@ -483,8 +483,8 @@ ______________________________________________________________________
 
 `SfincsOutput.read_map_file()` (`output.py`, line 149) calls `xugrid.load_dataset()` on
 `sfincs_map.nc` for quadtree grids, expecting UGRID mesh topology. The SFINCS Fortran
-executable writes the map output on a regular *(n, m)* structured grid — even for
-quadtree models — without any UGRID topology variables. `xugrid` raises:
+executable writes the map output on a regular *(n, m)* structured grid, even for
+quadtree models, without any UGRID topology variables. `xugrid` raises:
 
 ```python
 ValueError: The file or object does not contain UGRID conventions data.
@@ -653,7 +653,7 @@ ifirst[ilev] = np.where(self.data["level"].to_numpy()[:] == ilev + 1)[0][0]
 
 ______________________________________________________________________
 
-## 14. `make_index_cog` — wrong component names, closed-dataset access, missing CRS reprojection
+## 14. `make_index_cog`: wrong component names, closed-dataset access, missing CRS reprojection
 
 **Summary**:
 

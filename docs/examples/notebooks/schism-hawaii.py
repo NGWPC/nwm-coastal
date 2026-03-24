@@ -1,11 +1,13 @@
 # ---
 # jupyter:
 #   jupytext:
+#     cell_metadata_filter: -all
+#     notebook_metadata_filter: kernelspec,jupytext
 #     text_representation:
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.16.6
+#       jupytext_version: 1.19.1
 #   kernelspec:
 #     display_name: Python 3
 #     language: python
@@ -126,10 +128,13 @@ print(result)
 # water levels at NOAA CO-OPS tide gauges).
 
 # %%
+import shutil
+
 from IPython.display import Image, display
 
-figs_dir = Path("run/figs")
-for png in sorted(figs_dir.glob("stations_comparison_*.png")):
+figs = sorted(Path("run/figs").glob("stations_comparison_*.png"))
+shutil.copy2(figs[-1], "images/hawaii_thumb.png")
+for png in figs:
     display(Image(filename=str(png), width=800))
 
 # %% [markdown]

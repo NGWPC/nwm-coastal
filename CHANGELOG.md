@@ -118,8 +118,21 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     sync automatically.
 - Configure `ty` type-checker to resolve third-party imports from the pixi `typecheck`
     environment via `python` path instead of `extra-paths`.
-- Exclude `docs/examples/downloads/` from MkDocs static file copying to prevent
-    `No space left on device` errors from large NWM data files.
+- Exclude `docs/examples/downloads/`, `examples/hawaii/run/`, `examples/lavaca-tx/run/`,
+    and example `cache/` directories from MkDocs static file copying to prevent
+    `No space left on device` errors from large simulation data files.
+- Update all documentation to reflect SCHISM de-containerization: new stage names
+    (`schism_forcing_prep`, `schism_sflux`, `schism_params`, `schism_boundary`,
+    `schism_prep`, `schism_postprocess`), removal of `singularity_image` config field,
+    addition of `prebuilt_dir` and `geogrid_file` fields, and removal of all
+    Singularity/container references from user-facing docs.
+- Remove `sfincs_obs` from the SFINCS stage pipeline documentation.
+- Add Hawaii SCHISM example card with correct thumbnail to the examples index page.
+- Fix jupytext `formats` config in `pyproject.toml` (trailing slash in the prefix key
+    caused a triple-slash path that resolved to the read-only root filesystem on macOS).
+- Scope the jupytext pre-commit hook to `docs/examples/notebooks/` and exclude `.ipynb`
+    files from `pretty-format-json` to prevent hook conflicts.
+- Improve writing quality and consistency across all documentation files.
 - Discharge snapping now always snaps to the nearest active cell (previously kept points
     as-is when they happened to land on an active cell) and converts KDTree distances
     from CRS units to meters before comparing with `max_snap_distance_m`.
@@ -214,14 +227,14 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Removed
 
-- `scripts_path.py` module — all script paths now resolved via Python imports.
-- `src/coastal_calibration/scripts/` directory — legacy bash and Python scripts moved to
+- `scripts_path.py` module. All script paths now resolved via Python imports.
+- `src/coastal_calibration/scripts/` directory. Legacy bash and Python scripts moved to
     `tests/legacy_scripts/` as reference implementations for regression testing.
-- `run_singularity_command()` and `_get_default_bindings()` from `stages/base.py` —
+- `run_singularity_command()` and `_get_default_bindings()` from `stages/base.py`.
     Singularity execution infrastructure fully removed.
-- `requires_container` class attribute from `WorkflowStage` — all stages now run
+- `requires_container` class attribute from `WorkflowStage`. All stages now run
     natively.
-- `Dockerfile.ngencoastal` — container build file no longer needed.
+- `Dockerfile.ngencoastal`. Container build file no longer needed.
 - All `run_sing_*.bash` Singularity wrapper scripts.
 - `MPIConfig` class (fields absorbed into `SchismModelConfig`).
 
@@ -252,7 +265,7 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     resolution is derived from the SFINCS quadtree grid base cell size.
 - Meteo grid clipping (`_clip_meteo_to_domain`) that trims reprojected meteo grids to
     the model domain extent, preventing the LCC → UTM reprojection from inflating grids
-    to CONUS scale — **reducing SFINCS runtime from 15 h+ to under 15 min**.
+    to CONUS scale, **reducing SFINCS runtime from 15 h+ to under 15 min**.
 - Stale netCDF file cleanup in `SfincsInitStage` to prevent HDF5 segfaults when
     re-running a pipeline over an existing model directory.
 - `GeoDataset`-based water-level forcing with IDW interpolation to boundary points,
@@ -264,7 +277,7 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     `hydromt`/`hydromt-sfincs` compatibility patches in one call, with logging.
 - `quiet` parameter on `WorkflowMonitor.mark_stage_completed()` to control whether a
     visible COMPLETED log line is emitted for externally-executed stages.
-- Unified `run` and `submit` execution pipelines — both commands now execute the same
+- Unified `run` and `submit` execution pipelines. Both commands now execute the same
     stage pipeline. `submit` automatically partitions stages into login-node
     (Python-only) and SLURM job (container) groups.
 - `--start-from` and `--stop-after` options for `submit` command, matching `run`
@@ -370,7 +383,7 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     so that the bind-mounted (package) versions are used rather than the stale copies
     baked into the container image.
 - Export `COASTAL_SCRIPTS_DIR`, `WRF_HYDRO_DIR`, `TPXO_SCRIPTS_DIR`, and
-    `FORCINGS_SCRIPTS_DIR` in the `submit` path's generated runner script — these
+    `FORCINGS_SCRIPTS_DIR` in the `submit` path's generated runner script. These
     variables were only set in the `run` path, causing
     `$COASTAL_SCRIPTS_DIR/makeAtmo.py` (and similar) to resolve to just `/makeAtmo.py`
     and fail silently.
@@ -395,7 +408,7 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     when sub-hourly `CHRTOUT` files (e.g., Hawaii) produce one extra trailing timestep.
 - Export `SCHISM_BEGIN_DATE` and `SCHISM_END_DATE` in the `submit` path header so that
     `update_param.bash` can patch `param.nml` with the correct simulation start/end
-    dates — without these, `param.nml` retains its template defaults (2000-01-01) and
+    dates. Without these, `param.nml` retains its template defaults (2000-01-01) and
     SCHISM aborts with a time mismatch against `sflux` forcing files.
 - Report accurately which container stages completed vs failed when a SLURM job ends
     with a non-zero exit status, instead of marking all container stages as failed.

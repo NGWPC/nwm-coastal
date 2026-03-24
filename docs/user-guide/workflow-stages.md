@@ -4,23 +4,23 @@ The coastal calibration workflow consists of sequential stages, each performing 
 specific task in the simulation pipeline. The stage order depends on the selected model
 (SCHISM or SFINCS).
 
-The `run` command executes all stages sequentially. Each stage is classified as either
-**Python-only** or **container** (requires Singularity/MPI). All stages execute locally
-on the allocated compute nodes (e.g., inside an `sbatch` script).
+The `run` command executes all stages sequentially. All stages run natively; no
+containers are required. Stages execute locally on the allocated compute nodes (e.g.,
+inside an `sbatch` script).
 
 ## SCHISM Stage Overview
 
 ```mermaid
 flowchart TD
-    A[download] --> B[pre_forcing]
-    B --> C[nwm_forcing]
-    C --> D[post_forcing]
-    D --> E[schism_obs]
-    E --> F[update_params]
-    F --> G[boundary_conditions]
-    G --> H[pre_schism]
+    A[download] --> B[schism_forcing_prep]
+    B --> C[schism_forcing]
+    C --> D[schism_sflux]
+    D --> E[schism_params]
+    E --> F[schism_obs]
+    F --> G[schism_boundary]
+    G --> H[schism_prep]
     H --> I[schism_run]
-    I --> J[post_schism]
+    I --> J[schism_postprocess]
     J --> K[schism_plot]
 ```
 
@@ -33,15 +33,14 @@ flowchart TD
     C --> D[sfincs_init]
     D --> E[sfincs_timing]
     E --> F[sfincs_forcing]
-    F --> G[sfincs_obs]
-    G --> H[sfincs_discharge]
-    H --> I[sfincs_precip]
-    I --> J[sfincs_wind]
-    J --> K[sfincs_pressure]
-    K --> L[sfincs_write]
-    L --> M[sfincs_run]
-    M --> N[sfincs_floodmap]
-    N --> O[sfincs_plot]
+    F --> G[sfincs_discharge]
+    G --> H[sfincs_precip]
+    H --> I[sfincs_wind]
+    I --> J[sfincs_pressure]
+    J --> K[sfincs_write]
+    K --> L[sfincs_run]
+    L --> M[sfincs_floodmap]
+    M --> N[sfincs_plot]
 ```
 
 ## SCHISM Stage Details
@@ -56,7 +55,7 @@ flowchart TD
 - NWM streamflow data (CHRTOUT files)
 - STOFS or GLOFS water level data (when applicable)
 
-**Runs On:** Compute node (Python-only, no container needed)
+**Runs On:** Compute node (Python-only)
 
 **Outputs:**
 
@@ -70,53 +69,63 @@ raw_download_dir/
     └── *.fields.cwl.nc
 ```
 
-### 2. pre_forcing
+### 2. schism_forcing_prep
 
 **Purpose:** Prepare NWM forcing data for SCHISM.
 
 **Tasks:**
 
-- Copy and organize downloaded NWM files
+- Stage and organize downloaded NWM LDASIN and CHRTOUT files
 - Set up directory structure for forcing generation
 - Validate input data integrity
 
-**Runs On:** Compute node (inside Singularity)
+**Runs On:** Compute node (Python)
 
-### 3. nwm_forcing
+### 3. schism_forcing
 
 **Purpose:** Generate atmospheric forcing files using MPI.
 
 **Tasks:**
 
-- Regrid NWM data to SCHISM mesh
+- Regrid NWM data to SCHISM mesh using ESMF
 - Interpolate forcing variables
 - Generate SCHISM-compatible forcing files
 
-**Runs On:** Compute node (MPI parallel, inside Singularity)
+**Runs On:** Compute node (MPI parallel via `mpiexec`)
+
+### 4. schism_sflux
+
+**Purpose:** Generate sflux atmospheric forcing files.
+
+**Tasks:**
+
+- Generate sflux air, precipitation, and radiation files
+- Inline sea-level pressure reduction
+
+**Runs On:** Compute node (Python)
+
+### 5. schism_params
+
+**Purpose:** Generate SCHISM parameter file and symlink mesh files.
+
+**Tasks:**
+
+- Symlink `hgrid.gr3` and other mesh files into the work directory
+- Create `param.nml` with simulation parameters
+- Set time stepping configuration
+- Configure output options
+
+**Runs On:** Compute node (Python)
 
 **Outputs:**
 
 ```
 work_dir/
-└── sflux/
-    ├── sflux_air_1.*.nc
-    ├── sflux_prc_1.*.nc
-    └── sflux_rad_1.*.nc
+├── hgrid.gr3 (symlink)
+└── param.nml
 ```
 
-### 4. post_forcing
-
-**Purpose:** Post-process forcing data.
-
-**Tasks:**
-
-- Validate generated forcing files
-- Create forcing summary
-- Clean up temporary files
-
-**Runs On:** Compute node (inside Singularity)
-
-### 5. schism_obs
+### 6. schism_obs
 
 **Purpose:** Automatically discover NOAA CO-OPS water level stations within the model
 domain and generate a SCHISM `station.in` file so that SCHISM writes time-series output
@@ -135,8 +144,7 @@ at those locations.
     and a companion `station_noaa_ids.txt` that maps each station index to its NOAA
     station ID.
 
-**Runs On:** Compute node (Python-only). Requires network access for the CO-OPS API
-call.
+**Runs On:** Compute node (Python). Requires network access for the CO-OPS API call.
 
 **Outputs:**
 
@@ -148,34 +156,13 @@ work_dir/
 
 !!! note "param.nml patching"
 
-    When `station.in` exists, the `pre_schism` stage automatically patches `param.nml` to
+    When `station.in` exists, the `schism_prep` stage automatically patches `param.nml` to
     set `iout_sta = 1` (enable station output) and `nspool_sta = 18` (output interval in
     time-steps). The value `nspool_sta = 18` is chosen because it divides all `nhot_write`
     values used across domain templates (162, 324, 8640, etc.), satisfying the SCHISM
     constraint `mod(nhot_write, nspool_sta) == 0`.
 
-### 6. update_params
-
-**Purpose:** Generate SCHISM parameter file and symlink mesh files.
-
-**Tasks:**
-
-- Symlink `hgrid.gr3` and other mesh files into the work directory
-- Create `param.nml` with simulation parameters
-- Set time stepping configuration
-- Configure output options
-
-**Runs On:** Compute node (inside Singularity)
-
-**Outputs:**
-
-```
-work_dir/
-├── hgrid.gr3 (symlink)
-└── param.nml
-```
-
-### 7. boundary_conditions
+### 7. schism_boundary
 
 **Purpose:** Generate boundary conditions from TPXO or STOFS.
 
@@ -191,19 +178,21 @@ work_dir/
 - Generate time-varying boundary files
 - Create `elev2D.th.nc` file
 
-**Runs On:** Compute node (inside Singularity)
+**Runs On:** Compute node (Python / MPI for ESMF regridding)
 
-### 8. pre_schism
+### 8. schism_prep
 
 **Purpose:** Final preparation before SCHISM execution.
 
 **Tasks:**
 
 - Validate all input files present
-- Set up symbolic links
+- Partition the mesh using METIS
+- Combine hotstart files
 - Configure MPI environment
 
-**Runs On:** Compute node (inside Singularity)
+**Runs On:** Compute node (Python + subprocess calls to `metis_prep`, `gpmetis`,
+`combine_hotstart7`)
 
 ### 9. schism_run
 
@@ -211,11 +200,11 @@ work_dir/
 
 **Tasks:**
 
-- Run SCHISM with MPI
+- Run SCHISM with MPI via `mpiexec`
 - Monitor progress
 - Handle I/O scribes
 
-**Runs On:** Compute node (MPI parallel, inside Singularity)
+**Runs On:** Compute node (MPI parallel, native binary)
 
 **Configuration:**
 
@@ -223,7 +212,7 @@ work_dir/
 - OpenMP threads configured via `omp_num_threads`
 - Total processes = `nodes * ntasks_per_node`
 
-### 10. post_schism
+### 10. schism_postprocess
 
 **Purpose:** Post-process SCHISM outputs.
 
@@ -233,7 +222,7 @@ work_dir/
 - Generate statistics
 - Create visualization-ready files
 
-**Runs On:** Compute node (inside Singularity)
+**Runs On:** Compute node (Python)
 
 ### 11. schism_plot
 
@@ -343,16 +332,7 @@ STOFS water level data.
     set this to `0.0`. The offset can be obtained from the
     [NOAA VDatum API](https://vdatum.noaa.gov/vdatumweb/api/convert).
 
-### 7. sfincs_obs
-
-**Purpose:** Add observation points.
-
-**Tasks:**
-
-- Add tide gauge locations from `observation_points`
-- Configure observation output
-
-### 8. sfincs_discharge
+### 7. sfincs_discharge
 
 **Purpose:** Add discharge sources.
 
@@ -363,7 +343,7 @@ STOFS water level data.
     segfault caused by out-of-bounds array access)
 - Generate discharge forcing time series
 
-### 9. sfincs_precip
+### 8. sfincs_precip
 
 **Purpose:** Add precipitation forcing.
 
@@ -373,7 +353,7 @@ STOFS water level data.
 - Set the output resolution to `meteo_res` (or auto-derive from the quadtree grid)
 - Clip the reprojected grid to the model domain to prevent CONUS-scale inflation
 
-### 10. sfincs_wind
+### 9. sfincs_wind
 
 **Purpose:** Add wind forcing.
 
@@ -385,7 +365,7 @@ STOFS water level data.
 
 **Runs On:** Login node (Python-only)
 
-### 11. sfincs_pressure
+### 10. sfincs_pressure
 
 **Purpose:** Add atmospheric pressure forcing.
 
@@ -398,7 +378,7 @@ STOFS water level data.
 
 **Runs On:** Login node (Python-only)
 
-### 12. sfincs_write
+### 11. sfincs_write
 
 **Purpose:** Write the final SFINCS model.
 
@@ -409,7 +389,7 @@ STOFS water level data.
 
 **Runs On:** Login node (Python-only)
 
-### 13. sfincs_run
+### 12. sfincs_run
 
 **Purpose:** Execute the SFINCS model.
 
@@ -420,7 +400,7 @@ STOFS water level data.
 
 **Runs On:** Compute node (OpenMP, native binary)
 
-### 14. sfincs_floodmap
+### 13. sfincs_floodmap
 
 **Purpose:** Downscale SFINCS water levels to a high-resolution flood depth map.
 
@@ -438,10 +418,10 @@ is skipped when `floodmap_dem` is not configured, `floodmap_enabled` is false,
 
 **Configuration:**
 
-- `floodmap_dem` — path to the high-resolution DEM GeoTIFF
-- `floodmap_hmin` — minimum depth threshold (default: `0.05` m); shallower cells are
+- `floodmap_dem`: path to the high-resolution DEM GeoTIFF
+- `floodmap_hmin`: minimum depth threshold (default: `0.05` m); shallower cells are
     masked out
-- `floodmap_enabled` — set to `false` to skip this stage entirely (default: `true`)
+- `floodmap_enabled`: set to `false` to skip this stage entirely (default: `true`)
 
 **Runs On:** Login node or compute node (Python-only)
 
@@ -453,7 +433,7 @@ model_root/
 └── floodmap_index.tif   # Index COG (DEM pixel → SFINCS cell mapping)
 ```
 
-### 15. sfincs_plot
+### 14. sfincs_plot
 
 **Purpose:** Compare simulated water levels against observations.
 
@@ -484,8 +464,8 @@ The `run` command supports `--start-from` and `--stop-after`.
 ```bash
 # SCHISM examples
 coastal-calibration run config.yaml --stop-after download
-coastal-calibration run config.yaml --start-from pre_forcing --stop-after post_forcing
-coastal-calibration run config.yaml --start-from boundary_conditions
+coastal-calibration run config.yaml --start-from schism_forcing_prep --stop-after schism_sflux
+coastal-calibration run config.yaml --start-from schism_boundary
 
 # SFINCS examples
 coastal-calibration run config.yaml --stop-after sfincs_write
@@ -501,7 +481,7 @@ config = CoastalCalibConfig.from_yaml("config.yaml")
 runner = CoastalCalibRunner(config)
 
 # Run specific stages
-result = runner.run(start_from="pre_forcing", stop_after="post_forcing")
+result = runner.run(start_from="schism_forcing_prep", stop_after="schism_sflux")
 ```
 
 ## Error Handling
@@ -528,24 +508,24 @@ tracked and reported:
 ```console
 Stage timing:
   download: 45.2s
-  pre_forcing: 12.3s
-  nwm_forcing: 234.5s
-  post_forcing: 8.7s
+  schism_forcing_prep: 12.3s
+  schism_forcing: 234.5s
+  schism_sflux: 8.7s
+  schism_params: 2.1s
   schism_obs: 3.8s
-  update_params: 2.1s
-  boundary_conditions: 156.8s
-  pre_schism: 5.4s
+  schism_boundary: 156.8s
+  schism_prep: 5.4s
   schism_run: 1823.6s
-  post_schism: 67.2s
+  schism_postprocess: 67.2s
   schism_plot: 15.4s
-Total: 2375.0s
+Total: 2359.4s
 ```
 
 ## SFINCS Creation Stages
 
 The `create` command builds a new SFINCS quadtree model from an AOI polygon. It uses a
 separate configuration schema (`SfincsCreateConfig`) and a dedicated runner
-(`SfincsCreator`) with resumable execution — completion is tracked in
+(`SfincsCreator`) with resumable execution. Completion is tracked in
 `.create_status.json` so that interrupted runs can be resumed with `--start-from`.
 
 ```mermaid

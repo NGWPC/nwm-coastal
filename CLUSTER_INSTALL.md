@@ -2,7 +2,7 @@
 
 This guide sets up `coastal-calibration` as a globally available CLI tool on a shared
 cluster using [pixi](https://pixi.sh). All dependencies (including system libraries like
-PROJ, GDAL, HDF5, and NetCDF) are fully isolated and managed by pixi — nothing is
+PROJ, GDAL, HDF5, and NetCDF) are fully isolated and managed by pixi. Nothing is
 installed into the system Python or shared libraries.
 
 **Important:** The install directory must be on the **shared filesystem** (e.g., NFS) so
@@ -107,7 +107,7 @@ across nodes, so this single file makes the command available everywhere.
 
 !!! warning "Node-local symlinks don't work"
 
-    Do **not** symlink into `/usr/local/bin/` — that directory is node-local and will only
+    Do **not** symlink into `/usr/local/bin/`. That directory is node-local and will only
     exist on the node where the admin ran the command. Compute nodes launched by SLURM will
     not have the symlink and jobs will fail with `command not found`.
 
@@ -156,5 +156,5 @@ sudo rm -f /etc/profile.d/coastal-calibration.sh
     don't need pixi installed or any knowledge of the environment
 - The install lives on the shared filesystem (`/ngen-test`) so all compute nodes can
     access it when running Slurm jobs
-- Nothing is installed into the system Python — the cluster's existing software is
+- Nothing is installed into the system Python, so the cluster's existing software is
     completely unaffected

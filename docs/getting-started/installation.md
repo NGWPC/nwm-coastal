@@ -3,17 +3,18 @@
 ## Requirements
 
 - Python >= 3.11
-- Access to an HPC cluster with Singularity (SCHISM workflow only)
+- Access to an HPC cluster with SLURM (for production runs)
 - NFS mount point (default: `/ngen-test`)
-- Singularity image with SCHISM and dependencies pre-compiled (SCHISM workflow only)
-- Compiled SFINCS binary (SFINCS workflow only — see
+- Compiled SCHISM binary (SCHISM workflow only; pixi environments with the `schism`
+    feature build it automatically on first activation)
+- Compiled SFINCS binary (SFINCS workflow only; see
     [Compiling SFINCS](../sfincs_compilation.md))
 
 !!! note "Model Executables"
 
-    The SCHISM workflow requires a pre-compiled Singularity container on the HPC cluster.
-    The SFINCS workflow uses a natively compiled binary — pixi environments with the
-    `sfincs` feature build it automatically on first activation.
+    Both SCHISM and SFINCS workflows use natively compiled binaries. Pixi environments with
+    the `schism` or `sfincs` feature build them automatically on first activation. No
+    Singularity containers are required.
 
 ## Install from PyPI
 
@@ -61,7 +62,7 @@ pixi install -e dev
 | ----------- | ------------------------------------------- | ------------------------------- |
 | `dev`       | Development with all tools                  | `pixi r -e dev <cmd>`           |
 | `test311`   | Testing with Python 3.11                    | `pixi r -e test311 test`        |
-| `test314`   | Testing with Python 3.14                    | `pixi r -e test314 test`        |
+| `test313`   | Testing with Python 3.13                    | `pixi r -e test313 test`        |
 | `schism`    | Local development with SCHISM I/O libraries | `pixi r -e schism <cmd>`        |
 | `sfincs`    | Local development with HydroMT-SFINCS       | `pixi r -e sfincs <cmd>`        |
 | `typecheck` | Type checking with ty                       | `pixi r -e typecheck typecheck` |
@@ -80,8 +81,9 @@ useful for:
 !!! warning "Not Required for Cluster Execution"
 
     These optional dependencies are **not required** to submit and run jobs on the cluster.
-    SCHISM must be pre-compiled inside a Singularity container on the HPC cluster. SFINCS is
-    compiled natively (see [Compiling SFINCS](../sfincs_compilation.md)).
+    Both SCHISM and SFINCS are compiled natively via pixi activation scripts. See
+    [Compiling SFINCS](../sfincs_compilation.md) and
+    [Compiling SCHISM](../schism_compilation.md) for details.
 
 ```bash
 # SCHISM I/O dependencies (netCDF, numpy, etc.) - for local development

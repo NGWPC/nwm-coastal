@@ -191,12 +191,7 @@ LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 ### Default Paths
 
 ```python
-DEFAULT_SING_IMAGE_PATH = Path("/ngencerf-app/singularity/ngen-coastal.sif")
-DEFAULT_PARM_DIR = Path("/ngen-test/coastal/ngwpc-coastal")
 DEFAULT_NFS_MOUNT = Path("/ngen-test")
-DEFAULT_CONDA_ENV_NAME = "ngen_forcing_coastal"
-DEFAULT_NWM_DIR = Path("/ngen-app/nwm.v3.0.6")
-DEFAULT_OTPS_DIR = Path("/ngen-app/OTPSnc")
 ```
 
 ### Default Path Templates
