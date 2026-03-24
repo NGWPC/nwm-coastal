@@ -63,7 +63,7 @@ def _read_from_zarr(
     ds = xr.open_zarr(mapper, consolidated=True, chunks="auto")
 
     fids = list(feature_ids)
-    available = ds["feature_id"].values
+    available = set(ds["feature_id"].values.tolist())
     keep = [f for f in fids if f in available]
 
     if not keep:
@@ -142,7 +142,11 @@ def _read_from_chrtout(
             if ts is None:
                 # Fallback: parse timestamp from filename (YYYYMMDDHHMM.CHRTOUT_DOMAIN1)
                 stem = fpath.stem.split(".")[0]
-                ts = pd.Timestamp(stem[:10])
+                # Use the full leading digit run to avoid collapsing
+                # sub-hourly files (YYYYMMDDHH vs YYYYMMDDHHMM).
+                fmt = {8: "%Y%m%d", 10: "%Y%m%d%H", 12: "%Y%m%d%H%M", 14: "%Y%m%d%H%M%S"}
+                n = len(stem)
+                ts = pd.to_datetime(stem, format=fmt.get(n, "%Y%m%d%H%M"))
             timestamps.append(ts)
 
     df = pd.DataFrame(
