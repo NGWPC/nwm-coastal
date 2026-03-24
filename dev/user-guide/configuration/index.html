@@ -1079,6 +1079,8 @@
       
         
       
+        
+      
     
     
     
@@ -1176,6 +1178,34 @@
     
   
     Narragansett Bay SFINCS Tutorial
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/notebooks/schism-hawaii/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hawaii SCHISM Tutorial
   
 
     
@@ -1704,15 +1734,16 @@ the full home directory path.</p>
 <h4 id="schism-model-configuration">SCHISM Model Configuration<a class="headerlink" href="#schism-model-configuration" title="Permanent link">#</a></h4>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># model: schism (default, can be omitted)</span>
 </span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="nt">model_config</span><span class="p">:</span>
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="nt">singularity_image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/ngencerf-app/singularity/ngen-coastal.sif</span>
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span><span class="nt">nodes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span><span class="w">                        </span><span class="c1"># Number of compute nodes</span>
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">  </span><span class="nt">ntasks_per_node</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">18</span><span class="w">             </span><span class="c1"># MPI tasks per node</span>
-</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">  </span><span class="nt">exclusive</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">                 </span><span class="c1"># Request exclusive node access</span>
-</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">  </span><span class="nt">nscribes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span><span class="w">                     </span><span class="c1"># SCHISM I/O scribes</span>
-</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">  </span><span class="nt">omp_num_threads</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span><span class="w">              </span><span class="c1"># OpenMP threads</span>
-</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">  </span><span class="nt">oversubscribe</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span><span class="w">            </span><span class="c1"># Allow MPI oversubscription</span>
-</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="w">  </span><span class="nt">binary</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pschism_wcoss2_NO_PARMETIS_TVD-VL.openmpi</span>
-</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="w">  </span><span class="nt">include_noaa_gages</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">        </span><span class="c1"># Enable NOAA observation stations &amp; comparison plots</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="nt">prebuilt_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/ngen-test/coastal/ngwpc-coastal/hawaii</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span><span class="nt">geogrid_file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/ngen-test/coastal/ngwpc-coastal/hawaii/geo_em_HI.nc</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">  </span><span class="nt">nodes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span><span class="w">                        </span><span class="c1"># Number of compute nodes</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">  </span><span class="nt">ntasks_per_node</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">18</span><span class="w">             </span><span class="c1"># MPI tasks per node</span>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">  </span><span class="nt">exclusive</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">                 </span><span class="c1"># Request exclusive node access</span>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">  </span><span class="nt">nscribes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span><span class="w">                     </span><span class="c1"># SCHISM I/O scribes</span>
+</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">  </span><span class="nt">omp_num_threads</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span><span class="w">              </span><span class="c1"># OpenMP threads</span>
+</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="w">  </span><span class="nt">oversubscribe</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span><span class="w">            </span><span class="c1"># Allow MPI oversubscription</span>
+</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="w">  </span><span class="nt">binary</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pschism</span><span class="w">                 </span><span class="c1"># SCHISM executable (must be on $PATH)</span>
+</span><span id="__span-8-12"><a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="w">  </span><span class="nt">include_noaa_gages</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">        </span><span class="c1"># Enable NOAA observation stations &amp; comparison plots</span>
 </span></code></pre></div>
 <table>
 <thead>
@@ -1725,10 +1756,16 @@ the full home directory path.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>singularity_image</code></td>
+<td><code>prebuilt_dir</code></td>
 <td>path</td>
-<td><code>/ngencerf-app/singularity/ngen-coastal.sif</code></td>
-<td>Singularity/Apptainer SIF image for SCHISM</td>
+<td>-</td>
+<td>Path to pre-built SCHISM model directory</td>
+</tr>
+<tr>
+<td><code>geogrid_file</code></td>
+<td>path</td>
+<td>-</td>
+<td>WRF geogrid file for atmospheric forcing regridding</td>
 </tr>
 <tr>
 <td><code>nodes</code></td>
@@ -1769,8 +1806,8 @@ the full home directory path.</p>
 <tr>
 <td><code>binary</code></td>
 <td>string</td>
-<td><code>pschism_wcoss2_NO_PARMETIS_TVD-VL.openmpi</code></td>
-<td>SCHISM executable name</td>
+<td><code>pschism</code></td>
+<td>SCHISM executable name (must be on <code>$PATH</code>)</td>
 </tr>
 <tr>
 <td><code>include_noaa_gages</code></td>
@@ -1787,7 +1824,7 @@ the full home directory path.</p>
     model domain by computing a concave hull around the open boundary nodes in
     <code>hgrid.gr3</code> and querying the CO-OPS API. Writes a <code>station.in</code> file so SCHISM
     outputs time-series at those locations, and a <code>station_noaa_ids.txt</code> companion that
-    maps station indices to NOAA station IDs. The <code>pre_schism</code> stage then patches
+    maps station indices to NOAA station IDs. The <code>schism_prep</code> stage then patches
     <code>param.nml</code> to enable station output (<code>iout_sta = 1</code>, <code>nspool_sta = 18</code>).</li>
 <li><strong><code>schism_plot</code></strong>: After the SCHISM run completes, reads the station output
     (<code>staout_1</code>), fetches the corresponding NOAA CO-OPS observations (converting from
@@ -2395,7 +2432,7 @@ run/simulation config above.</p>
 </tr>
 </tbody>
 </table>
-<h4 id="river-discharge-river_discharge-optional">River Discharge (<code>river_discharge</code>) — Optional<a class="headerlink" href="#river-discharge-river_discharge-optional" title="Permanent link">#</a></h4>
+<h4 id="river-discharge-river_discharge-optional">River Discharge (<code>river_discharge</code>, Optional)<a class="headerlink" href="#river-discharge-river_discharge-optional" title="Permanent link">#</a></h4>
 <p>When configured, adds river discharge source points to the model by intersecting
 hydrofabric flowpaths with the AOI boundary.</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="nt">river_discharge</span><span class="p">:</span>

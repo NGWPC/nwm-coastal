@@ -807,6 +807,8 @@
       
         
       
+        
+      
     
     
     
@@ -904,6 +906,34 @@
     
   
     Narragansett Bay SFINCS Tutorial
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/notebooks/schism-hawaii/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hawaii SCHISM Tutorial
   
 
     
@@ -1446,8 +1476,21 @@ this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic V
     sync automatically.</li>
 <li>Configure <code>ty</code> type-checker to resolve third-party imports from the pixi <code>typecheck</code>
     environment via <code>python</code> path instead of <code>extra-paths</code>.</li>
-<li>Exclude <code>docs/examples/downloads/</code> from MkDocs static file copying to prevent
-    <code>No space left on device</code> errors from large NWM data files.</li>
+<li>Exclude <code>docs/examples/downloads/</code>, <code>examples/hawaii/run/</code>, <code>examples/lavaca-tx/run/</code>,
+    and example <code>cache/</code> directories from MkDocs static file copying to prevent
+    <code>No space left on device</code> errors from large simulation data files.</li>
+<li>Update all documentation to reflect SCHISM de-containerization: new stage names
+    (<code>schism_forcing_prep</code>, <code>schism_sflux</code>, <code>schism_params</code>, <code>schism_boundary</code>,
+    <code>schism_prep</code>, <code>schism_postprocess</code>), removal of <code>singularity_image</code> config field,
+    addition of <code>prebuilt_dir</code> and <code>geogrid_file</code> fields, and removal of all
+    Singularity/container references from user-facing docs.</li>
+<li>Remove <code>sfincs_obs</code> from the SFINCS stage pipeline documentation.</li>
+<li>Add Hawaii SCHISM example card with correct thumbnail to the examples index page.</li>
+<li>Fix jupytext <code>formats</code> config in <code>pyproject.toml</code> (trailing slash in the prefix key
+    caused a triple-slash path that resolved to the read-only root filesystem on macOS).</li>
+<li>Scope the jupytext pre-commit hook to <code>docs/examples/notebooks/</code> and exclude <code>.ipynb</code>
+    files from <code>pretty-format-json</code> to prevent hook conflicts.</li>
+<li>Improve writing quality and consistency across all documentation files.</li>
 <li>Discharge snapping now always snaps to the nearest active cell (previously kept points
     as-is when they happened to land on an active cell) and converts KDTree distances
     from CRS units to meters before comparing with <code>max_snap_distance_m</code>.</li>
@@ -1542,14 +1585,14 @@ this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic V
 </ul>
 <h3 id="removed">Removed<a class="headerlink" href="#removed" title="Permanent link">#</a></h3>
 <ul>
-<li><code>scripts_path.py</code> module — all script paths now resolved via Python imports.</li>
-<li><code>src/coastal_calibration/scripts/</code> directory — legacy bash and Python scripts moved to
+<li><code>scripts_path.py</code> module. All script paths now resolved via Python imports.</li>
+<li><code>src/coastal_calibration/scripts/</code> directory. Legacy bash and Python scripts moved to
     <code>tests/legacy_scripts/</code> as reference implementations for regression testing.</li>
-<li><code>run_singularity_command()</code> and <code>_get_default_bindings()</code> from <code>stages/base.py</code> —
+<li><code>run_singularity_command()</code> and <code>_get_default_bindings()</code> from <code>stages/base.py</code>.
     Singularity execution infrastructure fully removed.</li>
-<li><code>requires_container</code> class attribute from <code>WorkflowStage</code> — all stages now run
+<li><code>requires_container</code> class attribute from <code>WorkflowStage</code>. All stages now run
     natively.</li>
-<li><code>Dockerfile.ngencoastal</code> — container build file no longer needed.</li>
+<li><code>Dockerfile.ngencoastal</code>. Container build file no longer needed.</li>
 <li>All <code>run_sing_*.bash</code> Singularity wrapper scripts.</li>
 <li><code>MPIConfig</code> class (fields absorbed into <code>SchismModelConfig</code>).</li>
 </ul>
@@ -1579,7 +1622,7 @@ this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic V
     resolution is derived from the SFINCS quadtree grid base cell size.</li>
 <li>Meteo grid clipping (<code>_clip_meteo_to_domain</code>) that trims reprojected meteo grids to
     the model domain extent, preventing the LCC → UTM reprojection from inflating grids
-    to CONUS scale — <strong>reducing SFINCS runtime from 15 h+ to under 15 min</strong>.</li>
+    to CONUS scale, <strong>reducing SFINCS runtime from 15 h+ to under 15 min</strong>.</li>
 <li>Stale netCDF file cleanup in <code>SfincsInitStage</code> to prevent HDF5 segfaults when
     re-running a pipeline over an existing model directory.</li>
 <li><code>GeoDataset</code>-based water-level forcing with IDW interpolation to boundary points,
@@ -1591,7 +1634,7 @@ this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic V
     <code>hydromt</code>/<code>hydromt-sfincs</code> compatibility patches in one call, with logging.</li>
 <li><code>quiet</code> parameter on <code>WorkflowMonitor.mark_stage_completed()</code> to control whether a
     visible COMPLETED log line is emitted for externally-executed stages.</li>
-<li>Unified <code>run</code> and <code>submit</code> execution pipelines — both commands now execute the same
+<li>Unified <code>run</code> and <code>submit</code> execution pipelines. Both commands now execute the same
     stage pipeline. <code>submit</code> automatically partitions stages into login-node
     (Python-only) and SLURM job (container) groups.</li>
 <li><code>--start-from</code> and <code>--stop-after</code> options for <code>submit</code> command, matching <code>run</code></li>
@@ -1697,7 +1740,7 @@ this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic V
     so that the bind-mounted (package) versions are used rather than the stale copies
     baked into the container image.</li>
 <li>Export <code>COASTAL_SCRIPTS_DIR</code>, <code>WRF_HYDRO_DIR</code>, <code>TPXO_SCRIPTS_DIR</code>, and
-    <code>FORCINGS_SCRIPTS_DIR</code> in the <code>submit</code> path's generated runner script — these
+    <code>FORCINGS_SCRIPTS_DIR</code> in the <code>submit</code> path's generated runner script. These
     variables were only set in the <code>run</code> path, causing
     <code>$COASTAL_SCRIPTS_DIR/makeAtmo.py</code> (and similar) to resolve to just <code>/makeAtmo.py</code>
     and fail silently.</li>
@@ -1722,7 +1765,7 @@ this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic V
     when sub-hourly <code>CHRTOUT</code> files (e.g., Hawaii) produce one extra trailing timestep.</li>
 <li>Export <code>SCHISM_BEGIN_DATE</code> and <code>SCHISM_END_DATE</code> in the <code>submit</code> path header so that
     <code>update_param.bash</code> can patch <code>param.nml</code> with the correct simulation start/end
-    dates — without these, <code>param.nml</code> retains its template defaults (2000-01-01) and
+    dates. Without these, <code>param.nml</code> retains its template defaults (2000-01-01) and
     SCHISM aborts with a time mismatch against <code>sflux</code> forcing files.</li>
 <li>Report accurately which container stages completed vs failed when a SLURM job ends
     with a non-zero exit status, instead of marking all container stages as failed.</li>

@@ -801,6 +801,8 @@
       
         
       
+        
+      
     
     
     
@@ -898,6 +900,34 @@
     
   
     Narragansett Bay SFINCS Tutorial
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/notebooks/schism-hawaii/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hawaii SCHISM Tutorial
   
 
     
@@ -1167,7 +1197,7 @@ the source data uses a different CRS than the model.</p>
 <p><strong>Root cause</strong>:</p>
 <p>Each <code>create()</code> method follows a two-step pattern (<code>meteo.py</code>, precipitation example at
 lines 351-413):</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Step 1 — clip in source CRS (correct)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Step 1: clip in source CRS (correct)</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">precip</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data_catalog</span><span class="o">.</span><span class="n">get_rasterdataset</span><span class="p">(</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">precip</span><span class="p">,</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">bbox</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">bbox</span><span class="p">,</span>   <span class="c1"># model bbox in geographic coords</span>
@@ -1175,7 +1205,7 @@ lines 351-413):</p>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="o">...</span>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">)</span>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="c1"># Step 2 — reproject to model CRS (no post-clip)</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="c1"># Step 2: reproject to model CRS (no post-clip)</span>
 </span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="n">precip_out</span> <span class="o">=</span> <span class="n">precip</span><span class="o">.</span><span class="n">raster</span><span class="o">.</span><span class="n">reproject</span><span class="p">(</span>
 </span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">dst_crs</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">crs</span><span class="p">,</span> <span class="n">dst_res</span><span class="o">=</span><span class="n">dst_res</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
 </span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="p">)</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
@@ -1222,7 +1252,7 @@ NWM LDASIN forcing (LCC, ~1 km):</p>
 </tbody>
 </table>
 <p>The output grid covered x = -1,793 km to 3,118 km and y = 2,339 km to 6,581 km in UTM
-zone 14N — essentially the entire CONUS. The SFINCS simulation, which must read these
+zone 14N, essentially the entire CONUS. The SFINCS simulation, which must read these
 files every time step, slowed from ~7 minutes to an estimated <strong>15+ hours</strong>.</p>
 <p><strong>Suggested fix</strong>:</p>
 <p>Add a <code>rio.clip_box</code> call after <code>reproject()</code> in each <code>create()</code> method, clipping to
@@ -1244,7 +1274,7 @@ files every time step, slowed from ~7 minutes to an estimated <strong>15+ hours<
 <p><strong>Current workaround</strong>:</p>
 <p>In our pipeline we bypass the upstream <code>component.create()</code> entirely via
 <code>_create_meteo_forcing()</code> (in <code>sfincs_build.py</code>), which clips the source data in its
-<strong>native CRS</strong> before reprojecting — so the CONUS-scale grid is never allocated. The
+<strong>native CRS</strong> before reprojecting, so the CONUS-scale grid is never allocated. The
 destination grid is also constrained to the model domain bounds. This replaces the
 earlier post-hoc <code>_clip_meteo_to_domain()</code> approach that still triggered the full CONUS
 reprojection in memory. The <code>meteo_res</code> config option allows users to override the
@@ -1464,7 +1494,7 @@ logged as a warning.</p>
 <p><strong>Summary</strong>:</p>
 <p><code>SfincsModel._parse_river_list()</code> crashes with <code>KeyError: 'geoms'</code> when called on a
 model created in write mode (<code>mode="w+"</code>). This makes it impossible to use river burning
-(<code>burn_river_rect</code>) during subgrid table creation on new models — i.e. whenever
+(<code>burn_river_rect</code>) during subgrid table creation on new models, i.e., whenever
 <code>subgrid.create(river_list=...)</code> is called as part of a model-building workflow rather
 than on a model read from disk.</p>
 <p><strong>Root cause</strong>:</p>
@@ -1484,7 +1514,7 @@ registered, so the lookup raises:</p>
 <p>Python's <code>and</code> operator should short-circuit, but the <code>KeyError</code> is raised by the
 attribute access itself (<code>self.geoms</code>), not by the <code>in</code> operator. The exception
 propagates before the <code>in</code> check can execute, and the <code>else</code> branch
-(<code>data_catalog.get_geodataframe</code>) — which is the correct code path for new models — is
+(<code>data_catalog.get_geodataframe</code>), which is the correct code path for new models, is
 never reached.</p>
 <p><strong>Reproduction</strong>:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">hydromt_sfincs</span><span class="w"> </span><span class="kn">import</span> <span class="n">SfincsModel</span>
@@ -1525,8 +1555,8 @@ to <code>False</code>.</p>
 <p><strong>Summary</strong>:</p>
 <p><code>SfincsOutput.read_map_file()</code> (<code>output.py</code>, line 149) calls <code>xugrid.load_dataset()</code> on
 <code>sfincs_map.nc</code> for quadtree grids, expecting UGRID mesh topology. The SFINCS Fortran
-executable writes the map output on a regular <em>(n, m)</em> structured grid — even for
-quadtree models — without any UGRID topology variables. <code>xugrid</code> raises:</p>
+executable writes the map output on a regular <em>(n, m)</em> structured grid, even for
+quadtree models, without any UGRID topology variables. <code>xugrid</code> raises:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="ne">ValueError</span><span class="p">:</span> <span class="n">The</span> <span class="n">file</span> <span class="ow">or</span> <span class="nb">object</span> <span class="n">does</span> <span class="ow">not</span> <span class="n">contain</span> <span class="n">UGRID</span> <span class="n">conventions</span> <span class="n">data</span><span class="o">.</span>
 </span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="n">One</span> <span class="ow">or</span> <span class="n">more</span> <span class="n">UGRID</span> <span class="n">topologies</span> <span class="n">are</span> <span class="n">required</span><span class="o">.</span>
 </span></code></pre></div>
@@ -1650,7 +1680,7 @@ first-index.</p>
 <code>apply_all_patches()</code>) replaces the entire method with a corrected copy that fixes the
 <code>ifirst</code> computation and caches the result for reuse.</p>
 <hr />
-<h2 id="14-make_index_cog-wrong-component-names-closed-dataset-access-missing-crs-reprojection">14. <code>make_index_cog</code> — wrong component names, closed-dataset access, missing CRS reprojection<a class="headerlink" href="#14-make_index_cog-wrong-component-names-closed-dataset-access-missing-crs-reprojection" title="Permanent link">#</a></h2>
+<h2 id="14-make_index_cog-wrong-component-names-closed-dataset-access-missing-crs-reprojection">14. <code>make_index_cog</code>: wrong component names, closed-dataset access, missing CRS reprojection<a class="headerlink" href="#14-make_index_cog-wrong-component-names-closed-dataset-access-missing-crs-reprojection" title="Permanent link">#</a></h2>
 <p><strong>Summary</strong>:</p>
 <p><code>make_index_cog()</code> (<code>workflows/downscaling.py</code>) has three bugs that collectively make it
 impossible to build a flood-depth index COG for quadtree models when the DEM uses a

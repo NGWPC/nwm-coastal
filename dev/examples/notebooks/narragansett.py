@@ -1,11 +1,13 @@
 # ---
 # jupyter:
 #   jupytext:
+#     cell_metadata_filter: -all
+#     notebook_metadata_filter: kernelspec,jupytext
 #     text_representation:
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.16.6
+#       jupytext_version: 1.19.1
 #   kernelspec:
 #     display_name: Python 3
 #     language: python
@@ -74,7 +76,12 @@ create_config = SfincsCreateConfig.from_dict(
         },
         "elevation": {
             "datasets": [
-                {"name": "nws_30m", "zmin": -20000, "source": "nws_30m", "coastal_domain": "atlgulf"},
+                {
+                    "name": "nws_30m",
+                    "zmin": -20000,
+                    "source": "nws_30m",
+                    "coastal_domain": "atlgulf",
+                },
                 {"name": "gebco_15arcs", "zmin": -20000, "source": "gebco_15arcs"},
             ],
             "buffer_cells": 1,
@@ -150,8 +157,8 @@ run_config = CoastalCalibConfig.from_dict(
             "prebuilt_dir": "./output",
             "discharge_locations_file": "./output/sfincs_nwm.src",
             "merge_discharge": True,
-            "forcing_to_mesh_offset_m": 0.0, # STOFS already in NAVD88
-            "vdatum_mesh_to_msl_m": 0.1,     # NAVD88 mesh -> MSL
+            "forcing_to_mesh_offset_m": 0.0,  # STOFS already in NAVD88
+            "vdatum_mesh_to_msl_m": 0.1,  # NAVD88 mesh -> MSL
             "include_precip": True,
             "include_wind": True,
             "include_pressure": True,

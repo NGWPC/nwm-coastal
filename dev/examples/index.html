@@ -809,6 +809,8 @@
       
         
       
+        
+      
     
     
     
@@ -907,6 +909,34 @@
     
   
     Narragansett Bay SFINCS Tutorial
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="notebooks/schism-hawaii/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hawaii SCHISM Tutorial
   
 
     
@@ -1203,33 +1233,40 @@
 
 
 <h1 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">#</a></h1>
-<p>These tutorial notebooks walk through the full SFINCS coastal flood modeling workflow —
-from building the model grid to running the simulation and comparing results against
-NOAA tide-gauge observations.</p>
-<p>Each notebook covers the same three-phase workflow:</p>
+<p>These tutorial notebooks walk through coastal flood modeling workflows, from building
+the model grid to running the simulation and comparing results against NOAA tide-gauge
+observations.</p>
+<p>The SFINCS notebooks cover a three-phase workflow:</p>
 <ol>
-<li><strong>Create</strong> — build a SFINCS model from an Area of Interest polygon (grid, elevation,
+<li><strong>Create</strong>: build a SFINCS model from an Area of Interest polygon (grid, elevation,
     subgrid tables, boundary conditions, observation points).</li>
-<li><strong>Run</strong> — download forcing data, write SFINCS input files, execute the model, and
-    plot simulated vs. observed water levels.</li>
-<li><strong>Flood Map</strong> — downscale SFINCS water surface elevations onto a high-resolution DEM
+<li><strong>Run</strong>: download forcing data, write SFINCS input files, execute the model, and plot
+    simulated vs. observed water levels.</li>
+<li><strong>Flood Map</strong>: downscale SFINCS water surface elevations onto a high-resolution DEM
     to produce a Cloud Optimized GeoTIFF of maximum flood depth.</li>
 </ol>
+<p>The SCHISM notebook demonstrates the end-to-end workflow with native (container-free)
+execution.</p>
 <div class="admonition note">
 <p class="admonition-title">Prerequisites</p>
-<p>The examples require the downloaded forcing data cache (<code>docs/examples/downloads/</code>) and
-a compiled SFINCS executable. See <a href="../sfincs_compilation/">Compiling SFINCS</a> for build
-instructions.</p>
+<p>The SFINCS examples require the downloaded forcing data cache
+(<code>docs/examples/downloads/</code>) and a compiled SFINCS executable. See
+<a href="../sfincs_compilation/">Compiling SFINCS</a> for build instructions. The SCHISM example
+requires a compiled SCHISM binary; see <a href="../schism_compilation/">Compiling SCHISM</a>.</p>
 </div>
 <div class="grid cards">
 <ul>
 <li>
-<p><a href="notebooks/lavaca/" title="Lavaca Bay, TX"><img alt="Lavaca Bay" loading="lazy" src="images/lavaca_thumb.png" /></a>
+<p><a href="notebooks/lavaca/" title="Lavaca Bay, TX"><img alt="Lavaca Bay (SFINCS)" loading="lazy" src="images/lavaca_thumb.png" /></a>
     <strong>Lavaca Bay, TX</strong></p>
 </li>
 <li>
-<p><a href="notebooks/narragansett/" title="Narragansett Bay, RI"><img alt="Narragansett Bay" loading="lazy" src="images/narragansett_thumb.png" /></a>
+<p><a href="notebooks/narragansett/" title="Narragansett Bay, RI"><img alt="Narragansett Bay (SFINCS)" loading="lazy" src="images/narragansett_thumb.png" /></a>
     <strong>Narragansett Bay, RI</strong></p>
+</li>
+<li>
+<p><a href="notebooks/schism-hawaii/" title="Hawaii"><img alt="Hawaii (SCHISM)" loading="lazy" src="images/hawaii_thumb.png" /></a>
+    <strong>Hawaii (SCHISM)</strong></p>
 </li>
 </ul>
 </div>

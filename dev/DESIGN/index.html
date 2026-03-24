@@ -15,7 +15,7 @@
         <link rel="canonical" href="https://NGWPC.github.io/nwm-coastal/stable/DESIGN/">
       
       
-        <link rel="prev" href="../examples/notebooks/narragansett/">
+        <link rel="prev" href="../examples/notebooks/schism-hawaii/">
       
       
         <link rel="next" href="../reference/api/">
@@ -807,6 +807,8 @@
       
         
       
+        
+      
     
     
     
@@ -904,6 +906,34 @@
     
   
     Narragansett Bay SFINCS Tutorial
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/notebooks/schism-hawaii/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hawaii SCHISM Tutorial
   
 
     
@@ -1854,11 +1884,11 @@ workflow had no date validation, no source awareness, and no progress tracking.<
 </span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="go">├── cli.py                       # Command-line interface</span>
 </span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="go">├── runner.py                    # Main workflow orchestrator</span>
 </span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="go">├── downloader.py                # Async data downloading</span>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="go">├── scripts_path.py              # Script path management</span>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="go">│</span>
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="go">├── config/</span>
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="go">│   ├── __init__.py</span>
-</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="go">│   └── schema.py                # YAML config dataclasses + ModelConfig ABC</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="go">│</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="go">├── config/</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="go">│   ├── __init__.py</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="go">│   ├── schema.py                # YAML config dataclasses + ModelConfig ABC</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="go">│   └── create_schema.py         # SFINCS creation config schema</span>
 </span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="go">│</span>
 </span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="go">├── stages/                      # Workflow stages</span>
 </span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="go">│   ├── __init__.py</span>
@@ -1869,17 +1899,21 @@ workflow had no date validation, no source awareness, and no progress tracking.<
 </span><span id="__span-5-18"><a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a><span class="go">│   ├── schism.py                # SCHISM execution stages</span>
 </span><span id="__span-5-19"><a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a><span class="go">│   ├── sfincs.py                # SFINCS data catalog &amp; symlinks</span>
 </span><span id="__span-5-20"><a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a><span class="go">│   ├── sfincs_build.py          # SFINCS model build stages (HydroMT)</span>
-</span><span id="__span-5-21"><a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a><span class="go">│   └── _hydromt_compat.py       # Compatibility patches for hydromt bugs</span>
-</span><span id="__span-5-22"><a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a><span class="go">│</span>
-</span><span id="__span-5-23"><a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a><span class="go">├── scripts/                     # Embedded bash scripts</span>
-</span><span id="__span-5-24"><a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a><span class="go">│   ├── tpxo_to_open_bnds_hgrid/ # TPXO Python utilities</span>
-</span><span id="__span-5-25"><a id="__codelineno-5-25" name="__codelineno-5-25" href="#__codelineno-5-25"></a><span class="go">│   └── wrf_hydro_workflow_dev/  # WRF-Hydro forcing code</span>
-</span><span id="__span-5-26"><a id="__codelineno-5-26" name="__codelineno-5-26" href="#__codelineno-5-26"></a><span class="go">│</span>
-</span><span id="__span-5-27"><a id="__codelineno-5-27" name="__codelineno-5-27" href="#__codelineno-5-27"></a><span class="go">└── utils/</span>
-</span><span id="__span-5-28"><a id="__codelineno-5-28" name="__codelineno-5-28" href="#__codelineno-5-28"></a><span class="go">    ├── __init__.py</span>
-</span><span id="__span-5-29"><a id="__codelineno-5-29" name="__codelineno-5-29" href="#__codelineno-5-29"></a><span class="go">    ├── logging.py               # Workflow monitoring</span>
-</span><span id="__span-5-30"><a id="__codelineno-5-30" name="__codelineno-5-30" href="#__codelineno-5-30"></a><span class="go">    ├── time.py                  # Datetime utilities</span>
-</span><span id="__span-5-31"><a id="__codelineno-5-31" name="__codelineno-5-31" href="#__codelineno-5-31"></a><span class="go">    └── workflow.py              # Workflow helper functions</span>
+</span><span id="__span-5-21"><a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a><span class="go">│   ├── sfincs_create.py         # SFINCS model creation stages</span>
+</span><span id="__span-5-22"><a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a><span class="go">│   └── _hydromt_compat.py       # Compatibility patches for hydromt bugs</span>
+</span><span id="__span-5-23"><a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a><span class="go">│</span>
+</span><span id="__span-5-24"><a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a><span class="go">├── schism_prep.py               # Pure-Python SCHISM preparation functions</span>
+</span><span id="__span-5-25"><a id="__codelineno-5-25" name="__codelineno-5-25" href="#__codelineno-5-25"></a><span class="go">├── sflux.py                     # Atmospheric forcing generation</span>
+</span><span id="__span-5-26"><a id="__codelineno-5-26" name="__codelineno-5-26" href="#__codelineno-5-26"></a><span class="go">├── tides/                       # TPXO boundary utilities + pytides</span>
+</span><span id="__span-5-27"><a id="__codelineno-5-27" name="__codelineno-5-27" href="#__codelineno-5-27"></a><span class="go">├── regridding/                  # ESMF-based regridding (STOFS, NWM forcing)</span>
+</span><span id="__span-5-28"><a id="__codelineno-5-28" name="__codelineno-5-28" href="#__codelineno-5-28"></a><span class="go">│</span>
+</span><span id="__span-5-29"><a id="__codelineno-5-29" name="__codelineno-5-29" href="#__codelineno-5-29"></a><span class="go">└── utils/</span>
+</span><span id="__span-5-30"><a id="__codelineno-5-30" name="__codelineno-5-30" href="#__codelineno-5-30"></a><span class="go">    ├── __init__.py</span>
+</span><span id="__span-5-31"><a id="__codelineno-5-31" name="__codelineno-5-31" href="#__codelineno-5-31"></a><span class="go">    ├── logging.py               # Workflow monitoring</span>
+</span><span id="__span-5-32"><a id="__codelineno-5-32" name="__codelineno-5-32" href="#__codelineno-5-32"></a><span class="go">    ├── time.py                  # Datetime utilities</span>
+</span><span id="__span-5-33"><a id="__codelineno-5-33" name="__codelineno-5-33" href="#__codelineno-5-33"></a><span class="go">    ├── streamflow.py            # NWM streamflow read utilities</span>
+</span><span id="__span-5-34"><a id="__codelineno-5-34" name="__codelineno-5-34" href="#__codelineno-5-34"></a><span class="go">    ├── floodmap.py              # Flood depth map generation</span>
+</span><span id="__span-5-35"><a id="__codelineno-5-35" name="__codelineno-5-35" href="#__codelineno-5-35"></a><span class="go">    └── workflow.py              # Workflow helper functions</span>
 </span></code></pre></div>
 <h3 id="core-components">Core Components<a class="headerlink" href="#core-components" title="Permanent link">#</a></h3>
 <h4 id="1-configuration-system-configschemapy">1. Configuration System (<code>config/schema.py</code>)<a class="headerlink" href="#1-configuration-system-configschemapy" title="Permanent link">#</a></h4>
@@ -2225,7 +2259,7 @@ validation.</p>
 <p><strong>Decision</strong>: Provide a <code>run</code> command for direct, in-process execution inside
 user-written <code>sbatch</code> scripts.</p>
 <p><strong>Rationale</strong>:</p>
-<p>Users need full control over SLURM resource allocation—for example when using
+<p>Users need full control over SLURM resource allocation, for example when using
 non-default partitions, requesting specific hardware, or embedding the workflow in a
 larger pipeline. The <code>run</code> command executes all stages locally on whatever resources are
 already allocated, making it ideal for use inside manually written <code>sbatch</code> scripts.</p>
@@ -2238,7 +2272,7 @@ the preferred method because:</p>
     YAML controls workflow configuration</li>
 <li>Everything is contained in a single file that can be submitted with <code>sbatch</code></li>
 <li>No separate YAML file needs to be managed or kept in sync with SLURM settings</li>
-<li>The heredoc is self-documenting — reviewers can see the exact configuration used</li>
+<li>The heredoc is self-documenting: reviewers can see the exact configuration used</li>
 </ul>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="ch">#!/usr/bin/env bash</span>
 </span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="c1">#SBATCH --job-name=coastal_schism</span>
@@ -3140,7 +3174,7 @@ supporting multiple coastal models (SCHISM and SFINCS) through a polymorphic
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../examples/notebooks/narragansett/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Narragansett Bay SFINCS Tutorial">
+          <a href="../examples/notebooks/schism-hawaii/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Hawaii SCHISM Tutorial">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -3150,7 +3184,7 @@ supporting multiple coastal models (SCHISM and SFINCS) through a polymorphic
                 Previous
               </span>
               <div class="md-ellipsis">
-                Narragansett Bay SFINCS Tutorial
+                Hawaii SCHISM Tutorial
               </div>
             </div>
           </a>

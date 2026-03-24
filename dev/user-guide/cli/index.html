@@ -995,6 +995,8 @@
       
         
       
+        
+      
     
     
     
@@ -1092,6 +1094,34 @@
     
   
     Narragansett Bay SFINCS Tutorial
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/notebooks/schism-hawaii/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hawaii SCHISM Tutorial
   
 
     
@@ -1533,15 +1563,15 @@ and SFINCS coastal model workflows.</p>
 <p><strong>Available Stages (SCHISM):</strong></p>
 <ul>
 <li><code>download</code></li>
-<li><code>pre_forcing</code></li>
-<li><code>nwm_forcing</code></li>
-<li><code>post_forcing</code></li>
+<li><code>schism_forcing_prep</code></li>
+<li><code>schism_forcing</code></li>
+<li><code>schism_sflux</code></li>
+<li><code>schism_params</code></li>
 <li><code>schism_obs</code></li>
-<li><code>update_params</code></li>
-<li><code>boundary_conditions</code></li>
-<li><code>pre_schism</code></li>
+<li><code>schism_boundary</code></li>
+<li><code>schism_prep</code></li>
 <li><code>schism_run</code></li>
-<li><code>post_schism</code></li>
+<li><code>schism_postprocess</code></li>
 <li><code>schism_plot</code></li>
 </ul>
 <p><strong>Available Stages (SFINCS):</strong></p>
@@ -1552,7 +1582,6 @@ and SFINCS coastal model workflows.</p>
 <li><code>sfincs_init</code></li>
 <li><code>sfincs_timing</code></li>
 <li><code>sfincs_forcing</code></li>
-<li><code>sfincs_obs</code></li>
 <li><code>sfincs_discharge</code></li>
 <li><code>sfincs_precip</code></li>
 <li><code>sfincs_wind</code></li>
@@ -1567,7 +1596,7 @@ and SFINCS coastal model workflows.</p>
 </span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>coastal-calibration<span class="w"> </span>run<span class="w"> </span>config.yaml
 </span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
 </span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="c1"># Run only forcing stages (SCHISM)</span>
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>coastal-calibration<span class="w"> </span>run<span class="w"> </span>config.yaml<span class="w"> </span>--start-from<span class="w"> </span>pre_forcing<span class="w"> </span>--stop-after<span class="w"> </span>post_forcing
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>coastal-calibration<span class="w"> </span>run<span class="w"> </span>config.yaml<span class="w"> </span>--start-from<span class="w"> </span>schism_forcing_prep<span class="w"> </span>--stop-after<span class="w"> </span>schism_sflux
 </span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>
 </span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="c1"># Run only the model build (SFINCS)</span>
 </span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>coastal-calibration<span class="w"> </span>run<span class="w"> </span>config.yaml<span class="w"> </span>--stop-after<span class="w"> </span>sfincs_write
@@ -1575,7 +1604,7 @@ and SFINCS coastal model workflows.</p>
 </span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="c1"># Run only the model execution (SFINCS)</span>
 </span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>coastal-calibration<span class="w"> </span>run<span class="w"> </span>config.yaml<span class="w"> </span>--start-from<span class="w"> </span>sfincs_run
 </span></code></pre></div>
-<h4 id="using-run-inside-a-slurm-job-heredoc-recommended">Using <code>run</code> Inside a SLURM Job — Heredoc (Recommended)<a class="headerlink" href="#using-run-inside-a-slurm-job-heredoc-recommended" title="Permanent link">#</a></h4>
+<h4 id="using-run-inside-a-slurm-job-heredoc-recommended">Using <code>run</code> Inside a SLURM Job: Heredoc (Recommended)<a class="headerlink" href="#using-run-inside-a-slurm-job-heredoc-recommended" title="Permanent link">#</a></h4>
 <p>The recommended way to run workflows on a cluster is to write an <code>sbatch</code> script with an
 inline YAML configuration using a heredoc. This keeps everything in a single,
 self-contained file and gives you full control over SLURM resource allocation:</p>
@@ -1626,10 +1655,10 @@ self-contained file and gives you full control over SLURM resource allocation:</
 </ul>
 <p>Complete examples for both models are available in <code>docs/examples/</code>:</p>
 <ul>
-<li><a href="https://github.com/NGWPC/nwm-coastal/blob/development/docs/examples/schism.sh"><code>schism.sh</code></a>
-    — SCHISM multi-node MPI</li>
-<li><a href="https://github.com/NGWPC/nwm-coastal/blob/development/docs/examples/sfincs.sh"><code>sfincs.sh</code></a>
-    — SFINCS single-node OpenMP</li>
+<li><a href="https://github.com/NGWPC/nwm-coastal/blob/development/docs/examples/schism.sh"><code>schism.sh</code></a>:
+    SCHISM multi-node MPI</li>
+<li><a href="https://github.com/NGWPC/nwm-coastal/blob/development/docs/examples/sfincs.sh"><code>sfincs.sh</code></a>:
+    SFINCS single-node OpenMP</li>
 </ul>
 <h3 id="create">create<a class="headerlink" href="#create" title="Permanent link">#</a></h3>
 <p>Create a SFINCS quadtree model from an AOI polygon.</p>
@@ -1679,15 +1708,15 @@ self-contained file and gives you full control over SLURM resource allocation:</
 </table>
 <p><strong>Available Stages:</strong></p>
 <ul>
-<li><code>create_grid</code> — Create SFINCS grid from AOI polygon</li>
-<li><code>create_fetch_data</code> — Fetch elevation and land cover data for AOI</li>
-<li><code>create_elevation</code> — Add elevation and bathymetry data</li>
-<li><code>create_mask</code> — Create active cell mask</li>
-<li><code>create_boundary</code> — Create water level boundary cells</li>
-<li><code>create_discharge</code> — Add NWM discharge source points <em>(optional)</em></li>
-<li><code>create_subgrid</code> — Create subgrid tables</li>
-<li><code>create_obs</code> — Add observation points <em>(optional)</em></li>
-<li><code>create_write</code> — Write SFINCS model to disk</li>
+<li><code>create_grid</code>: Create SFINCS grid from AOI polygon</li>
+<li><code>create_fetch_data</code>: Fetch elevation and land cover data for AOI</li>
+<li><code>create_elevation</code>: Add elevation and bathymetry data</li>
+<li><code>create_mask</code>: Create active cell mask</li>
+<li><code>create_boundary</code>: Create water level boundary cells</li>
+<li><code>create_discharge</code>: Add NWM discharge source points <em>(optional)</em></li>
+<li><code>create_subgrid</code>: Create subgrid tables</li>
+<li><code>create_obs</code>: Add observation points <em>(optional)</em></li>
+<li><code>create_write</code>: Write SFINCS model to disk</li>
 </ul>
 <p><strong>Examples:</strong></p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># Run entire creation workflow</span>
@@ -1826,15 +1855,15 @@ self-contained file and gives you full control over SLURM resource allocation:</
 <p><strong>Output (all):</strong></p>
 <div class="language-console highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="go">SCHISM workflow stages:</span>
 </span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="go">  1. download: Download NWM/STOFS data (optional)</span>
-</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="go">  2. pre_forcing: Prepare NWM forcing data</span>
-</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="go">  3. nwm_forcing: Generate atmospheric forcing (MPI)</span>
-</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="go">  4. post_forcing: Post-process forcing data</span>
-</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="go">  5. schism_obs: Add NOAA observation stations</span>
-</span><span id="__span-18-7"><a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="go">  6. update_params: Create SCHISM param.nml</span>
-</span><span id="__span-18-8"><a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a><span class="go">  7. boundary_conditions: Generate boundary conditions (TPXO/STOFS)</span>
-</span><span id="__span-18-9"><a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a><span class="go">  8. pre_schism: Prepare SCHISM inputs</span>
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="go">  2. schism_forcing_prep: Prepare NWM forcing data</span>
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="go">  3. schism_forcing: Generate atmospheric forcing (MPI)</span>
+</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="go">  4. schism_sflux: Generate sflux atmospheric files</span>
+</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="go">  5. schism_params: Create SCHISM param.nml</span>
+</span><span id="__span-18-7"><a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="go">  6. schism_obs: Add NOAA observation stations</span>
+</span><span id="__span-18-8"><a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a><span class="go">  7. schism_boundary: Generate boundary conditions (TPXO/STOFS)</span>
+</span><span id="__span-18-9"><a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a><span class="go">  8. schism_prep: Prepare SCHISM inputs</span>
 </span><span id="__span-18-10"><a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a><span class="go">  9. schism_run: Run SCHISM model (MPI)</span>
-</span><span id="__span-18-11"><a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a><span class="go">  10. post_schism: Post-process SCHISM outputs</span>
+</span><span id="__span-18-11"><a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a><span class="go">  10. schism_postprocess: Post-process SCHISM outputs</span>
 </span><span id="__span-18-12"><a id="__codelineno-18-12" name="__codelineno-18-12" href="#__codelineno-18-12"></a><span class="go">  11. schism_plot: Plot simulated vs observed water levels</span>
 </span><span id="__span-18-13"><a id="__codelineno-18-13" name="__codelineno-18-13" href="#__codelineno-18-13"></a>
 </span><span id="__span-18-14"><a id="__codelineno-18-14" name="__codelineno-18-14" href="#__codelineno-18-14"></a><span class="go">SFINCS workflow stages:</span>
@@ -1844,26 +1873,25 @@ self-contained file and gives you full control over SLURM resource allocation:</
 </span><span id="__span-18-18"><a id="__codelineno-18-18" name="__codelineno-18-18" href="#__codelineno-18-18"></a><span class="go">  4. sfincs_init: Initialize SFINCS model (pre-built)</span>
 </span><span id="__span-18-19"><a id="__codelineno-18-19" name="__codelineno-18-19" href="#__codelineno-18-19"></a><span class="go">  5. sfincs_timing: Set SFINCS timing</span>
 </span><span id="__span-18-20"><a id="__codelineno-18-20" name="__codelineno-18-20" href="#__codelineno-18-20"></a><span class="go">  6. sfincs_forcing: Add water level forcing</span>
-</span><span id="__span-18-21"><a id="__codelineno-18-21" name="__codelineno-18-21" href="#__codelineno-18-21"></a><span class="go">  7. sfincs_obs: Add observation points</span>
-</span><span id="__span-18-22"><a id="__codelineno-18-22" name="__codelineno-18-22" href="#__codelineno-18-22"></a><span class="go">  8. sfincs_discharge: Add discharge sources</span>
-</span><span id="__span-18-23"><a id="__codelineno-18-23" name="__codelineno-18-23" href="#__codelineno-18-23"></a><span class="go">  9. sfincs_precip: Add precipitation forcing</span>
-</span><span id="__span-18-24"><a id="__codelineno-18-24" name="__codelineno-18-24" href="#__codelineno-18-24"></a><span class="go">  10. sfincs_wind: Add wind forcing</span>
-</span><span id="__span-18-25"><a id="__codelineno-18-25" name="__codelineno-18-25" href="#__codelineno-18-25"></a><span class="go">  11. sfincs_pressure: Add atmospheric pressure forcing</span>
-</span><span id="__span-18-26"><a id="__codelineno-18-26" name="__codelineno-18-26" href="#__codelineno-18-26"></a><span class="go">  12. sfincs_write: Write SFINCS model</span>
-</span><span id="__span-18-27"><a id="__codelineno-18-27" name="__codelineno-18-27" href="#__codelineno-18-27"></a><span class="go">  13. sfincs_run: Run SFINCS model (OpenMP)</span>
-</span><span id="__span-18-28"><a id="__codelineno-18-28" name="__codelineno-18-28" href="#__codelineno-18-28"></a><span class="go">  14. sfincs_floodmap: Downscale flood depth map</span>
-</span><span id="__span-18-29"><a id="__codelineno-18-29" name="__codelineno-18-29" href="#__codelineno-18-29"></a><span class="go">  15. sfincs_plot: Plot simulated vs observed water levels</span>
-</span><span id="__span-18-30"><a id="__codelineno-18-30" name="__codelineno-18-30" href="#__codelineno-18-30"></a>
-</span><span id="__span-18-31"><a id="__codelineno-18-31" name="__codelineno-18-31" href="#__codelineno-18-31"></a><span class="go">SFINCS creation stages (create subcommand):</span>
-</span><span id="__span-18-32"><a id="__codelineno-18-32" name="__codelineno-18-32" href="#__codelineno-18-32"></a><span class="go">  1. create_grid: Create SFINCS grid from AOI polygon</span>
-</span><span id="__span-18-33"><a id="__codelineno-18-33" name="__codelineno-18-33" href="#__codelineno-18-33"></a><span class="go">  2. create_fetch_data: Fetch elevation and land cover data for AOI</span>
-</span><span id="__span-18-34"><a id="__codelineno-18-34" name="__codelineno-18-34" href="#__codelineno-18-34"></a><span class="go">  3. create_elevation: Add elevation and bathymetry data</span>
-</span><span id="__span-18-35"><a id="__codelineno-18-35" name="__codelineno-18-35" href="#__codelineno-18-35"></a><span class="go">  4. create_mask: Create active cell mask</span>
-</span><span id="__span-18-36"><a id="__codelineno-18-36" name="__codelineno-18-36" href="#__codelineno-18-36"></a><span class="go">  5. create_boundary: Create water level boundary cells</span>
-</span><span id="__span-18-37"><a id="__codelineno-18-37" name="__codelineno-18-37" href="#__codelineno-18-37"></a><span class="go">  6. create_discharge: Add NWM discharge source points</span>
-</span><span id="__span-18-38"><a id="__codelineno-18-38" name="__codelineno-18-38" href="#__codelineno-18-38"></a><span class="go">  7. create_subgrid: Create subgrid tables</span>
-</span><span id="__span-18-39"><a id="__codelineno-18-39" name="__codelineno-18-39" href="#__codelineno-18-39"></a><span class="go">  8. create_obs: Add observation points (NOAA CO-OPS, file, inline)</span>
-</span><span id="__span-18-40"><a id="__codelineno-18-40" name="__codelineno-18-40" href="#__codelineno-18-40"></a><span class="go">  9. create_write: Write SFINCS model to disk</span>
+</span><span id="__span-18-21"><a id="__codelineno-18-21" name="__codelineno-18-21" href="#__codelineno-18-21"></a><span class="go">  7. sfincs_discharge: Add discharge sources</span>
+</span><span id="__span-18-22"><a id="__codelineno-18-22" name="__codelineno-18-22" href="#__codelineno-18-22"></a><span class="go">  8. sfincs_precip: Add precipitation forcing</span>
+</span><span id="__span-18-23"><a id="__codelineno-18-23" name="__codelineno-18-23" href="#__codelineno-18-23"></a><span class="go">  9. sfincs_wind: Add wind forcing</span>
+</span><span id="__span-18-24"><a id="__codelineno-18-24" name="__codelineno-18-24" href="#__codelineno-18-24"></a><span class="go">  10. sfincs_pressure: Add atmospheric pressure forcing</span>
+</span><span id="__span-18-25"><a id="__codelineno-18-25" name="__codelineno-18-25" href="#__codelineno-18-25"></a><span class="go">  11. sfincs_write: Write SFINCS model</span>
+</span><span id="__span-18-26"><a id="__codelineno-18-26" name="__codelineno-18-26" href="#__codelineno-18-26"></a><span class="go">  12. sfincs_run: Run SFINCS model (OpenMP)</span>
+</span><span id="__span-18-27"><a id="__codelineno-18-27" name="__codelineno-18-27" href="#__codelineno-18-27"></a><span class="go">  13. sfincs_floodmap: Downscale flood depth map</span>
+</span><span id="__span-18-28"><a id="__codelineno-18-28" name="__codelineno-18-28" href="#__codelineno-18-28"></a><span class="go">  14. sfincs_plot: Plot simulated vs observed water levels</span>
+</span><span id="__span-18-29"><a id="__codelineno-18-29" name="__codelineno-18-29" href="#__codelineno-18-29"></a>
+</span><span id="__span-18-30"><a id="__codelineno-18-30" name="__codelineno-18-30" href="#__codelineno-18-30"></a><span class="go">SFINCS creation stages (create subcommand):</span>
+</span><span id="__span-18-31"><a id="__codelineno-18-31" name="__codelineno-18-31" href="#__codelineno-18-31"></a><span class="go">  1. create_grid: Create SFINCS grid from AOI polygon</span>
+</span><span id="__span-18-32"><a id="__codelineno-18-32" name="__codelineno-18-32" href="#__codelineno-18-32"></a><span class="go">  2. create_fetch_data: Fetch elevation and land cover data for AOI</span>
+</span><span id="__span-18-33"><a id="__codelineno-18-33" name="__codelineno-18-33" href="#__codelineno-18-33"></a><span class="go">  3. create_elevation: Add elevation and bathymetry data</span>
+</span><span id="__span-18-34"><a id="__codelineno-18-34" name="__codelineno-18-34" href="#__codelineno-18-34"></a><span class="go">  4. create_mask: Create active cell mask</span>
+</span><span id="__span-18-35"><a id="__codelineno-18-35" name="__codelineno-18-35" href="#__codelineno-18-35"></a><span class="go">  5. create_boundary: Create water level boundary cells</span>
+</span><span id="__span-18-36"><a id="__codelineno-18-36" name="__codelineno-18-36" href="#__codelineno-18-36"></a><span class="go">  6. create_discharge: Add NWM discharge source points</span>
+</span><span id="__span-18-37"><a id="__codelineno-18-37" name="__codelineno-18-37" href="#__codelineno-18-37"></a><span class="go">  7. create_subgrid: Create subgrid tables</span>
+</span><span id="__span-18-38"><a id="__codelineno-18-38" name="__codelineno-18-38" href="#__codelineno-18-38"></a><span class="go">  8. create_obs: Add observation points (NOAA CO-OPS, file, inline)</span>
+</span><span id="__span-18-39"><a id="__codelineno-18-39" name="__codelineno-18-39" href="#__codelineno-18-39"></a><span class="go">  9. create_write: Write SFINCS model to disk</span>
 </span></code></pre></div>
 <h2 id="exit-codes">Exit Codes<a class="headerlink" href="#exit-codes" title="Permanent link">#</a></h2>
 <table>

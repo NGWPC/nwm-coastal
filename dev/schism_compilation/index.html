@@ -801,6 +801,8 @@
       
         
       
+        
+      
     
     
     
@@ -898,6 +900,34 @@
     
   
     Narragansett Bay SFINCS Tutorial
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/notebooks/schism-hawaii/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hawaii SCHISM Tutorial
   
 
     
@@ -1156,7 +1186,7 @@
 <h1 id="schism-de-containerization-pixi-native-build-execution">SCHISM De-containerization: Pixi Native Build &amp; Execution<a class="headerlink" href="#schism-de-containerization-pixi-native-build-execution" title="Permanent link">#</a></h1>
 <p><strong>Goal:</strong> Migrate SCHISM compilation and execution from Singularity containers to
 pixi-managed native builds, following the same pattern used for SFINCS.</p>
-<p><strong>Status:</strong> Complete — validated end-to-end on macOS arm64 with the Hawaii domain.
+<p><strong>Status:</strong> Complete. Validated end-to-end on macOS arm64 with the Hawaii domain.
 Codebase cleanup (Phase 5) completed: unified logging, env-var elimination, Singularity
 removal, stage renaming to match SFINCS conventions.</p>
 <p><strong>Last updated:</strong> 2026-03-19</p>
@@ -1209,14 +1239,14 @@ SCHISM binary, METIS tools, and the full conda environment.</p>
 <p>All Singularity invocations and Python-script subprocess calls have been replaced by
 either:</p>
 <ul>
-<li><strong>Direct Python function calls</strong> — for all logic that was previously in bash scripts
-    or standalone Python scripts (makeAtmo.py, correct_elevation.py, TPXO scripts,
+<li><strong>Direct Python function calls</strong>: for all logic that was previously in bash scripts or
+    standalone Python scripts (makeAtmo.py, correct_elevation.py, TPXO scripts,
     makeOceanTide.py, etc.). Functions take explicit parameters; no environment variable
     reading.</li>
-<li><strong><code>mpiexec -m &lt;module&gt;</code></strong> — for ESMF/MPI-dependent regridding (regrid_estofs,
+<li><strong><code>mpiexec -m &lt;module&gt;</code></strong>: for ESMF/MPI-dependent regridding (regrid_estofs,
     regrid_forcings). Invoked as proper Python modules with CLI arguments (no env-var
     passing).</li>
-<li><strong>Subprocess for Fortran binaries</strong> — <code>pschism</code>, <code>metis_prep</code>, <code>gpmetis</code>,
+<li><strong>Subprocess for Fortran binaries</strong>: <code>pschism</code>, <code>metis_prep</code>, <code>gpmetis</code>,
     <code>combine_sink_source</code>, <code>combine_hotstart7</code>, <code>predict_tide</code>.</li>
 </ul>
 <p>The legacy bash and Python scripts have been moved to <code>tests/legacy_scripts/</code> as
@@ -1343,10 +1373,10 @@ a <strong>prebuilt model directory</strong> and executes the simulation. A separ
 (future work) will handle model setup from scratch.</p>
 <p>The workflow expects a prebuilt model directory containing at minimum:</p>
 <ul>
-<li><code>hgrid.gr3</code> / <code>hgrid.ll</code> — horizontal grid</li>
-<li><code>vgrid.in</code> — vertical grid</li>
-<li><code>param.nml.template</code> — parameter template</li>
-<li><code>drag.gr3</code>, <code>manning.gr3</code>, etc. — ancillary grid files</li>
+<li><code>hgrid.gr3</code> / <code>hgrid.ll</code>: horizontal grid</li>
+<li><code>vgrid.in</code>: vertical grid</li>
+<li><code>param.nml.template</code>: parameter template</li>
+<li><code>drag.gr3</code>, <code>manning.gr3</code>, etc.: ancillary grid files</li>
 </ul>
 <p>All SCHISM stage names are prefixed with <code>schism_</code> and follow the same concise naming
 convention as SFINCS stages (<code>sfincs_run</code>, <code>sfincs_forcing</code>, <code>sfincs_plot</code>, etc.).</p>
@@ -1511,7 +1541,7 @@ convention as SFINCS stages (<code>sfincs_run</code>, <code>sfincs_forcing</code
 <h3 id="stage-details">Stage details<a class="headerlink" href="#stage-details" title="Permanent link">#</a></h3>
 <p><strong><code>schism_forcing_prep</code></strong> (PreForcingStage):</p>
 <ul>
-<li>Calls <code>schism_prep.stage_ldasin_files()</code> — pure Python</li>
+<li>Calls <code>schism_prep.stage_ldasin_files()</code> (pure Python)</li>
 <li>Creates <code>forcing_input/</code> and <code>forcing_output/</code> directories</li>
 </ul>
 <p><strong><code>schism_forcing</code></strong> (NWMForcingStage):</p>
@@ -1527,7 +1557,7 @@ convention as SFINCS stages (<code>sfincs_run</code>, <code>sfincs_forcing</code
 </ul>
 <p><strong><code>schism_params</code></strong> (UpdateParamsStage):</p>
 <ul>
-<li>Calls <code>schism_prep.update_params()</code> — pure Python</li>
+<li>Calls <code>schism_prep.update_params()</code> (pure Python)</li>
 <li>Creates param.nml from template, removes deprecated params, adds mandatory params,
     symlinks mesh files</li>
 </ul>
@@ -1564,7 +1594,7 @@ convention as SFINCS stages (<code>sfincs_run</code>, <code>sfincs_forcing</code
 <ul>
 <li>Plots simulation vs observed water levels from NOAA stations</li>
 </ul>
-<h3 id="schism_preppy-pure-python-functions"><code>schism_prep.py</code> — pure Python functions<a class="headerlink" href="#schism_preppy-pure-python-functions" title="Permanent link">#</a></h3>
+<h3 id="schism_preppy-pure-python-functions"><code>schism_prep.py</code>: pure Python functions<a class="headerlink" href="#schism_preppy-pure-python-functions" title="Permanent link">#</a></h3>
 <p>All bash-script logic was extracted into testable Python functions in
 <code>src/coastal_calibration/schism_prep.py</code>. Each function takes explicit parameters (no
 environment variable reading), making them unit-testable.</p>
@@ -1653,7 +1683,7 @@ environment variable reading), making them unit-testable.</p>
 <tr>
 <td><code>src/coastal_calibration/sflux.py</code></td>
 <td><code>makeAtmo.py</code></td>
-<td><code>make_atmo_sflux()</code> — creates sflux netCDF from LDASIN files</td>
+<td><code>make_atmo_sflux()</code>: creates sflux netCDF from LDASIN files</td>
 </tr>
 <tr>
 <td><code>src/coastal_calibration/regridding/regrid_estofs.py</code></td>
@@ -1740,7 +1770,7 @@ environment variable reading), making them unit-testable.</p>
 </tr>
 </tbody>
 </table>
-<p>No module creates its own <code>logging.getLogger(__name__)</code> logger — all go through the
+<p>No module creates its own <code>logging.getLogger(__name__)</code> logger; all go through the
 central <code>coastal_calibration</code> logger hierarchy, ensuring consistent formatting, levels,
 and file output.</p>
 <h3 id="log-indentation-convention">Log indentation convention<a class="headerlink" href="#log-indentation-convention" title="Permanent link">#</a></h3>
@@ -1758,7 +1788,7 @@ stage-level messages:</p>
 </span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>  Running combine_sink_source
 </span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    combine_sink_source completed
 </span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>  Running merge_source_sink
-</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>    Wrote source.nc — 487 sources (from 487), 149 sinks, 4 timesteps
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>    Wrote source.nc: 487 sources (from 487), 149 sinks, 4 timesteps
 </span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>  Partitioning for 4 tasks (2 scribes)
 </span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>    Partitioned mesh into 2 compute ranks → .../partition.prop
 </span></code></pre></div>
@@ -1769,11 +1799,11 @@ stage-level messages:</p>
 parameters are passed explicitly as Python arguments. The only remaining environment
 variables are for:</p>
 <ol>
-<li><strong>MPI / OpenMP runtime configuration</strong> — set by
+<li><strong>MPI / OpenMP runtime configuration</strong>: set by
     <code>SchismModelConfig.build_environment()</code> in <code>config/schema.py</code></li>
-<li><strong>HDF5 NFS reliability</strong> — set by <code>WorkflowStage.build_environment()</code> in
+<li><strong>HDF5 NFS reliability</strong>: set by <code>WorkflowStage.build_environment()</code> in
     <code>stages/base.py</code></li>
-<li><strong>PATH / LD_LIBRARY_PATH</strong> — for subprocess binary discovery</li>
+<li><strong>PATH / LD_LIBRARY_PATH</strong>: for subprocess binary discovery</li>
 </ol>
 <h3 id="complete-list-of-env-vars-set-by-the-codebase">Complete list of env vars set by the codebase<a class="headerlink" href="#complete-list-of-env-vars-set-by-the-codebase" title="Permanent link">#</a></h3>
 <h4 id="schismmodelconfigbuild_environment-schemapy"><code>SchismModelConfig.build_environment()</code> (schema.py)<a class="headerlink" href="#schismmodelconfigbuild_environment-schemapy" title="Permanent link">#</a></h4>
@@ -1783,7 +1813,7 @@ settings required for cluster execution:</p>
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">env</span><span class="p">[</span><span class="s2">&quot;OMP_NUM_THREADS&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">omp_num_threads</span><span class="p">)</span>
 </span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">env</span><span class="p">[</span><span class="s2">&quot;OMP_PLACES&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;cores&quot;</span>
 </span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="c1"># MPI / AWS EFA fabric tuning — required for reliable MPI</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="c1"># MPI / AWS EFA fabric tuning, required for reliable MPI</span>
 </span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="c1"># on EFA-enabled instances (e.g. c5n-18xlarge). Without</span>
 </span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="c1"># these, MPI collectives can hang during ESMF initialization.</span>
 </span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="n">env</span><span class="p">[</span><span class="s2">&quot;MPICH_OFI_STARTUP_CONNECT&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;1&quot;</span>
@@ -1853,33 +1883,33 @@ subprocess scripts. All modules handle the ESMF/esmpy import fallback internally
 </span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
 </span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    <span class="kn">import</span><span class="w"> </span><span class="nn">esmpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ESMF</span>
 </span></code></pre></div>
-<h4 id="esmf_utilspy-mpi-aware-esmf-utilities"><code>esmf_utils.py</code> — MPI-aware ESMF utilities<a class="headerlink" href="#esmf_utilspy-mpi-aware-esmf-utilities" title="Permanent link">#</a></h4>
+<h4 id="esmf_utilspy-mpi-aware-esmf-utilities"><code>esmf_utils.py</code>: MPI-aware ESMF utilities<a class="headerlink" href="#esmf_utilspy-mpi-aware-esmf-utilities" title="Permanent link">#</a></h4>
 <p>Key abstractions:</p>
 <ul>
 <li><strong><code>build_grid(lon, lat, ...)</code></strong> → <code>(ESMF.Grid, GridBounds)</code> for 2D structured grids.</li>
 <li><strong><code>build_locstream(lon, lat)</code></strong> → <code>ESMF.LocStream</code> for unstructured point data.
     Properly partitions the <em>global</em> coordinate array across MPI ranks (see
     <a href="#locstream-partitioning">LocStream partitioning</a> below).</li>
-<li><strong><code>MaskedRegridder</code></strong> — callable class for time-varying source masks. Recomputes
+<li><strong><code>MaskedRegridder</code></strong>: callable class for time-varying source masks. Recomputes
     weights each call because the ESTOFS wet/dry mask changes every timestep.</li>
-<li><strong><code>gather_reduce()</code></strong>, <strong><code>gatherv_1d()</code></strong>, <strong><code>allreduce_minmax()</code></strong> — MPI collective
+<li><strong><code>gather_reduce()</code></strong>, <strong><code>gatherv_1d()</code></strong>, <strong><code>allreduce_minmax()</code></strong>: MPI collective
     helpers.</li>
 </ul>
-<h4 id="regrid_estofspy-estofs-boundary-regridding"><code>regrid_estofs.py</code> — ESTOFS boundary regridding<a class="headerlink" href="#regrid_estofspy-estofs-boundary-regridding" title="Permanent link">#</a></h4>
+<h4 id="regrid_estofspy-estofs-boundary-regridding"><code>regrid_estofs.py</code>: ESTOFS boundary regridding<a class="headerlink" href="#regrid_estofspy-estofs-boundary-regridding" title="Permanent link">#</a></h4>
 <p>Regrids ESTOFS <code>zeta</code> (water level) from the global unstructured STOFS grid (~12.8M
 nodes) to SCHISM open boundary nodes (~4K nodes) using ESMF
 nearest-source-to-destination interpolation.</p>
 <p>Invoked via:
 <code>mpiexec -n &lt;N&gt; python -m coastal_calibration.regridding.regrid_estofs &lt;nc_in&gt; &lt;nc_grid&gt; &lt;nc_out&gt; --cycle-date PDY --cycle-time CYC00 --length-hrs N</code></p>
-<p>All parameters are passed via CLI arguments — no env-var reading.</p>
-<h4 id="regrid_forcingspy-nwm-atmospheric-forcing-regridding"><code>regrid_forcings.py</code> — NWM atmospheric forcing regridding<a class="headerlink" href="#regrid_forcingspy-nwm-atmospheric-forcing-regridding" title="Permanent link">#</a></h4>
+<p>All parameters are passed via CLI arguments; no env-var reading.</p>
+<h4 id="regrid_forcingspy-nwm-atmospheric-forcing-regridding"><code>regrid_forcings.py</code>: NWM atmospheric forcing regridding<a class="headerlink" href="#regrid_forcingspy-nwm-atmospheric-forcing-regridding" title="Permanent link">#</a></h4>
 <p>Regrids NWM LDASIN atmospheric variables (U2D, V2D, T2D, Q2D, PSFC, LWDOWN, SWDOWN,
 LQFRAC) from the WRF lat-lon grid to SCHISM's lat-lon output grid, and converts RAINRATE
 to volumetric flux (m³/s) on the SCHISM mesh.</p>
 <p>Invoked via: <code>mpiexec -n &lt;N&gt; python -m coastal_calibration.regridding.regrid_forcings</code></p>
 <h3 id="locstream-partitioning">LocStream partitioning<a class="headerlink" href="#locstream-partitioning" title="Permanent link">#</a></h3>
 <p><code>ESMF.LocStream(n)</code> creates <em>n</em> points <strong>locally</strong> on the calling rank. If every rank
-passes the full global count, the total LocStream has <code>nranks × n</code> points — wrong.</p>
+passes the full global count, the total LocStream has <code>nranks × n</code> points (wrong).</p>
 <p><code>build_locstream()</code> handles this by computing a contiguous partition of the global array
 across MPI ranks:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">n_global</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">lon</span><span class="p">)</span>
@@ -1908,7 +1938,7 @@ uses <code>import ESMF</code>.</p>
 <p>The ESMF compat shim calls <code>Manager(debug=False)</code> because some legacy code (in
 <code>tests/legacy_scripts/</code>) calls <code>ESMF.local_pet()</code> at <strong>module level</strong> before any
 explicit <code>Manager()</code> call. The old ESMF package auto-initialized; esmpy does not.
-<code>Manager</code> is a singleton — subsequent calls are harmless no-ops.</p>
+<code>Manager</code> is a singleton; subsequent calls are harmless no-ops.</p>
 <hr />
 <h2 id="parallel-netcdf4-and-mpi">Parallel netCDF4 and MPI<a class="headerlink" href="#parallel-netcdf4-and-mpi" title="Permanent link">#</a></h2>
 <h3 id="problem_1">Problem<a class="headerlink" href="#problem_1" title="Permanent link">#</a></h3>
@@ -1951,17 +1981,17 @@ netCDF files independently.</p>
 <tr>
 <td><code>isconsv</code></td>
 <td>Same era</td>
-<td>—</td>
+<td>-</td>
 </tr>
 <tr>
 <td><code>isav</code></td>
 <td>Same era</td>
-<td>—</td>
+<td>-</td>
 </tr>
 <tr>
 <td><code>vclose_surf_frac</code></td>
 <td>Same era</td>
-<td>—</td>
+<td>-</td>
 </tr>
 </tbody>
 </table>
@@ -2095,7 +2125,7 @@ to crash immediately. Do not use it.</p>
 the <code>predict_tide</code> binary which has additional dependencies. Use <code>source: "stofs"</code> for
 Hawaii and PRVI domains when running locally.</p>
 <h3 id="nwm-analysis-2-hour-lag">NWM analysis 2-hour lag<a class="headerlink" href="#nwm-analysis-2-hour-lag" title="Permanent link">#</a></h3>
-<p>NWM Analysis/Assimilation data has a 2-hour lag — the downloader automatically accounts
+<p>NWM Analysis/Assimilation data has a 2-hour lag. The downloader automatically accounts
 for this by fetching <code>tm02</code> files offset by +2 hours from the simulation time.</p>
 <hr />
 <h2 id="decision-log">Decision log<a class="headerlink" href="#decision-log" title="Permanent link">#</a></h2>
@@ -2214,7 +2244,7 @@ for this by fetching <code>tm02</code> files offset by +2 hours from the simulat
 <tbody>
 <tr>
 <td><code>scripts/ensure-schism.sh</code></td>
-<td>Pixi activation script — builds SCHISM binaries</td>
+<td>Pixi activation script that builds SCHISM binaries</td>
 </tr>
 <tr>
 <td><code>src/coastal_calibration/schism_prep.py</code></td>

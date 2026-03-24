@@ -951,6 +951,8 @@
       
         
       
+        
+      
     
     
     
@@ -1048,6 +1050,34 @@
     
   
     Narragansett Bay SFINCS Tutorial
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/notebooks/schism-hawaii/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hawaii SCHISM Tutorial
   
 
     
@@ -1347,17 +1377,18 @@
 <h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">#</a></h2>
 <ul>
 <li>Python &gt;= 3.11</li>
-<li>Access to an HPC cluster with Singularity (SCHISM workflow only)</li>
+<li>Access to an HPC cluster with SLURM (for production runs)</li>
 <li>NFS mount point (default: <code>/ngen-test</code>)</li>
-<li>Singularity image with SCHISM and dependencies pre-compiled (SCHISM workflow only)</li>
-<li>Compiled SFINCS binary (SFINCS workflow only — see
+<li>Compiled SCHISM binary (SCHISM workflow only; pixi environments with the <code>schism</code>
+    feature build it automatically on first activation)</li>
+<li>Compiled SFINCS binary (SFINCS workflow only; see
     <a href="../../sfincs_compilation/">Compiling SFINCS</a>)</li>
 </ul>
 <div class="admonition note">
 <p class="admonition-title">Model Executables</p>
-<p>The SCHISM workflow requires a pre-compiled Singularity container on the HPC cluster.
-The SFINCS workflow uses a natively compiled binary — pixi environments with the
-<code>sfincs</code> feature build it automatically on first activation.</p>
+<p>Both SCHISM and SFINCS workflows use natively compiled binaries. Pixi environments with
+the <code>schism</code> or <code>sfincs</code> feature build them automatically on first activation. No
+Singularity containers are required.</p>
 </div>
 <h2 id="install-from-pypi">Install from PyPI<a class="headerlink" href="#install-from-pypi" title="Permanent link">#</a></h2>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>coastal-calibration
@@ -1406,9 +1437,9 @@ environment management:</p>
 <td><code>pixi r -e test311 test</code></td>
 </tr>
 <tr>
-<td><code>test314</code></td>
-<td>Testing with Python 3.14</td>
-<td><code>pixi r -e test314 test</code></td>
+<td><code>test313</code></td>
+<td>Testing with Python 3.13</td>
+<td><code>pixi r -e test313 test</code></td>
 </tr>
 <tr>
 <td><code>schism</code></td>
@@ -1448,8 +1479,9 @@ useful for:</p>
 <div class="admonition warning">
 <p class="admonition-title">Not Required for Cluster Execution</p>
 <p>These optional dependencies are <strong>not required</strong> to submit and run jobs on the cluster.
-SCHISM must be pre-compiled inside a Singularity container on the HPC cluster. SFINCS is
-compiled natively (see <a href="../../sfincs_compilation/">Compiling SFINCS</a>).</p>
+Both SCHISM and SFINCS are compiled natively via pixi activation scripts. See
+<a href="../../sfincs_compilation/">Compiling SFINCS</a> and
+<a href="../../schism_compilation/">Compiling SCHISM</a> for details.</p>
 </div>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># SCHISM I/O dependencies (netCDF, numpy, etc.) - for local development</span>
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>pip<span class="w"> </span>install<span class="w"> </span>coastal-calibration<span class="o">[</span>schism<span class="o">]</span>
