@@ -110,11 +110,14 @@ def _read_staout(staout_path: Path) -> tuple[NDArray[np.float64], NDArray[np.flo
     Returns
     -------
     time_seconds : ndarray
-        Time in seconds from simulation start.
+        Time in seconds from simulation start (empty if file has no data).
     elevation : ndarray
-        Water elevation array of shape (n_times, n_stations).
+        Water elevation array of shape ``(n_times, n_stations)``
+        (empty ``(0, 0)`` if file has no data).
     """
     data = np.loadtxt(staout_path, comments="!")
+    if data.ndim < 2 or data.size == 0:
+        return np.empty(0, dtype=np.float64), np.empty((0, 0), dtype=np.float64)
     time_seconds = data[:, 0]
     elevation = data[:, 1:]
     return time_seconds, elevation
@@ -527,8 +530,19 @@ class PostSCHISMStage(WorkflowStage):
         self._update_substep("Checking for errors")
         fatal_error = outputs_dir / "fatal.error"
         if fatal_error.exists() and fatal_error.stat().st_size > 0:
-            error_content = fatal_error.read_text()[-2000:]
-            raise RuntimeError(f"SCHISM run failed: {error_content}")
+            error_content = fatal_error.read_text()
+            # SCHISM writes dry-node diagnostics (QUICKSEARCH) to
+            # fatal.error even on successful runs.  Only treat lines
+            # that do NOT match known non-fatal patterns as true errors.
+            non_fatal_patterns = ("QUICKSEARCH",)
+            true_errors = [
+                line
+                for line in error_content.splitlines()
+                if line.strip() and not any(p in line for p in non_fatal_patterns)
+            ]
+            if true_errors:
+                raise RuntimeError(f"SCHISM run failed: {error_content[-2000:]}")
+            self._log("fatal.error contains only dry-node warnings (QUICKSEARCH); continuing")
 
         # Combine hotstarts for reanalysis / chained runs
         sim = self.config.simulation
@@ -669,6 +683,10 @@ class SchismPlotStage(WorkflowStage):
         # Read SCHISM station output
         self._update_substep("Reading SCHISM station output")
         time_seconds, elevation = _read_staout(staout_path)
+
+        if elevation.size == 0:
+            self._log("staout_1 is empty (no station output written), skipping plot stage")
+            return {"status": "skipped", "reason": "empty staout_1"}
 
         if elevation.shape[1] != len(station_ids):
             self._log(
