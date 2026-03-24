@@ -148,6 +148,31 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Clean all generated files (discharge, boundary, sflux, partitioning, outputs, status)
+    from the run directory at the start of a full workflow run via
+    `clean_run_directory()`. When resuming with `start_from`, no wipe occurs so
+    prerequisites and earlier outputs are preserved. Consolidates the per-stage cleanup
+    previously in `make_sflux()` and `PreForcingStage`.
+- Use `CONSERVE` regrid method for Grid-to-Mesh(ELEMENT) regridding in
+    `_regrid_to_schism`. ESMF `BILINEAR` only supports `MeshLoc.NODE` destinations; the
+    `BILINEAR` + `ELEMENT` combination was silently accepted by some ESMF builds (macOS)
+    but correctly rejected with `ESMC_RC_ARG_VALUE` (rc=509) on others (Ubuntu CI).
+- `_read_staout` now returns empty arrays when `staout_1` has no data (e.g., station
+    output not enabled), preventing `IndexError` on 1-dimensional array indexing.
+- `PostSCHISMStage` filters known non-fatal `QUICKSEARCH` dry-node warnings from
+    `fatal.error` instead of treating all content as a hard failure.
+- `SchismPlotStage` skips gracefully when `staout_1` is empty instead of crashing.
+- Skip ESMF regridding tests on platforms where `ESMF.Mesh` is unavailable or
+    `ESMC_FieldRegridStore` fails with rc=509. Enlarge synthetic ESMF grids to avoid
+    BILINEAR regrid failures on small domains.
+- Exclude regridding tests from CI catch-all test environments that lack MPI/ESMF.
+- Replace `assert` statements with proper exceptions (`ValueError`, `RuntimeError`,
+    `FileNotFoundError`) throughout `src/` modules.
+- Use `ty: ignore[rule-name]` with specific rule names instead of blanket `type: ignore`
+    comments.
+- Add `*.ESMF_LogFile` to `.gitignore`.
+- Configure `schism` submodule to track only HEAD (no internal changes tracked),
+    matching the SFINCS submodule pattern.
 - SFINCS activation script now detects stale `Makefile` configured for a different
     environment prefix and reconfigures automatically, fixing `sfincs` binary not found
     when switching between pixi environments.
