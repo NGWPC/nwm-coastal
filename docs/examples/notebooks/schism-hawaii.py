@@ -133,9 +133,12 @@ import shutil
 from IPython.display import Image, display
 
 figs = sorted(Path("run/figs").glob("stations_comparison_*.png"))
-shutil.copy2(figs[-1], "images/hawaii_thumb.png")
-for png in figs:
-    display(Image(filename=str(png), width=800))
+if not figs:
+    print("No station comparison figures were generated; skipping thumbnail creation and display.")
+else:
+    shutil.copy2(figs[-1], "../images/hawaii_thumb.png")
+    for png in figs:
+        display(Image(filename=str(png), width=800))
 
 # %% [markdown]
 # ## 4. Inspect outputs

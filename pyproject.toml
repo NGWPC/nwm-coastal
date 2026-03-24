@@ -68,6 +68,7 @@ optional-dependencies.notebook = [
   "ipykernel",
   "ipywidgets",
   "jupytext",
+  "nbconvert",
 ]
 optional-dependencies.plot = [
   "contextily>=1.6",
