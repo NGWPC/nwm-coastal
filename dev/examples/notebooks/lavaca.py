@@ -143,6 +143,7 @@ run_config = CoastalCalibConfig.from_dict(
         "download": {"enabled": True},
         "model_config": {
             "prebuilt_dir": "./output",
+            "discharge_locations_file": "./output/sfincs_nwm.src",
             "merge_discharge": True,
             "forcing_to_mesh_offset_m": 0.0, # STOFS already in NAVD88
             "vdatum_mesh_to_msl_m": 0.17,    # NAVD88 mesh -> MSL

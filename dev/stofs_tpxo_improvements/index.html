@@ -12,7 +12,7 @@
         <meta name="author" content="Taher Chegini">
       
       
-        <link rel="canonical" href="https://NGWPC.github.io/nwm-coastal/stable/sfincs_compilation/">
+        <link rel="canonical" href="https://NGWPC.github.io/nwm-coastal/stable/stofs_tpxo_improvements/">
       
       
       
@@ -25,7 +25,7 @@
     
     
       
-        <title>Compiling SFINCS from Source - NWM Coastal</title>
+        <title>STOFS Boundary Condition Pipeline: Analysis and Improvement Plan - NWM Coastal</title>
       
     
     
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#compiling-sfincs-from-source" class="md-skip">
+        <a href="#stofs-boundary-condition-pipeline-analysis-and-improvement-plan" class="md-skip">
           Skip to content
         </a>
       
@@ -120,7 +120,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Compiling SFINCS from Source
+              STOFS Boundary Condition Pipeline: Analysis and Improvement Plan
             
           </span>
         </div>
@@ -1145,7 +1145,7 @@
 
 
   
-    <a href="https://github.com/NGWPC/nwm-coastal/edit/development/docs/sfincs_compilation.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/NGWPC/nwm-coastal/edit/development/docs/stofs_tpxo_improvements.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75z"/></svg>
     </a>
@@ -1153,162 +1153,333 @@
   
 
 
-<h1 id="compiling-sfincs-from-source">Compiling SFINCS from Source<a class="headerlink" href="#compiling-sfincs-from-source" title="Permanent link">#</a></h1>
-<p>SFINCS is included as a Git submodule under <code>SFINCS/</code>. The <code>sfincs_run</code> workflow stage
-requires the <code>sfincs</code> binary to be on <code>PATH</code> (or pointed to via the <code>sfincs_exe</code> config
-option).</p>
+<h1 id="stofs-boundary-condition-pipeline-analysis-and-improvement-plan">STOFS Boundary Condition Pipeline: Analysis and Improvement Plan<a class="headerlink" href="#stofs-boundary-condition-pipeline-analysis-and-improvement-plan" title="Permanent link">#</a></h1>
 <hr />
-<h2 id="using-pixi-recommended">Using Pixi (Recommended)<a class="headerlink" href="#using-pixi-recommended" title="Permanent link">#</a></h2>
-<p>All build dependencies (compilers, autotools, NetCDF) are declared in the <code>sfincs</code> pixi
-feature. Any environment that includes this feature (<strong><code>sfincs</code></strong>, <strong><code>dev</code></strong>,
-<strong><code>test311</code></strong>, <strong><code>test314</code></strong>) will <strong>automatically compile SFINCS</strong> on first activation
-if the binary is not already present. Subsequent activations skip the build instantly
-(just a file-existence check).</p>
-<p>The binary is installed into the active pixi environment (<code>$CONDA_PREFIX/bin/sfincs</code>),
-so it is immediately available on <code>PATH</code> when running inside that environment. The build
-is <strong>incremental</strong> -- if you have already configured once, subsequent runs skip
-<code>autoreconf</code> and <code>configure</code> and only recompile changed source files.</p>
+<h2 id="table-of-contents">Table of contents<a class="headerlink" href="#table-of-contents" title="Permanent link">#</a></h2>
+<ol>
+<li><a href="#problem-statement">Problem statement</a></li>
+<li><a href="#current-implementation">Current implementation</a></li>
+<li><a href="#root-cause-analysis">Root cause analysis</a></li>
+<li><a href="#stofs-data-availability">STOFS data availability</a></li>
+<li><a href="#issues-with-tpxo-tidal-prediction">Issues with TPXO tidal prediction</a></li>
+<li><a href="#proposed-solution">Proposed solution</a></li>
+</ol>
 <hr />
-<h2 id="manual-build">Manual Build<a class="headerlink" href="#manual-build" title="Permanent link">#</a></h2>
-<p>If you prefer to build outside pixi, follow the platform-specific instructions below.
-The resulting binary has no runtime library dependencies -- just copy it wherever you
-need it and run.</p>
-<h3 id="ubuntu">Ubuntu<a class="headerlink" href="#ubuntu" title="Permanent link">#</a></h3>
-<h4 id="install-dependencies">Install Dependencies<a class="headerlink" href="#install-dependencies" title="Permanent link">#</a></h4>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>sudo<span class="w"> </span>apt<span class="w"> </span>update
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>build-essential<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span>gfortran<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span>autoconf<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span>automake<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">  </span>libtool<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">  </span>m4<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">  </span>pkg-config<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">  </span>libnetcdf-dev
-</span></code></pre></div>
-<h4 id="build">Build<a class="headerlink" href="#build" title="Permanent link">#</a></h4>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">cd</span><span class="w"> </span>SFINCS/source
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="c1"># Generate the configure script (only needed when building from the git repo)</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>autoreconf<span class="w"> </span>-vif
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="c1"># -fallow-argument-mismatch is needed for netcdf-fortran with GCC &gt;= 10</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="c1"># see https://github.com/Unidata/netcdf-fortran/issues/212</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="nb">export</span><span class="w"> </span><span class="nv">FCFLAGS</span><span class="o">=</span><span class="s2">&quot;-fopenmp -O3 -fallow-argument-mismatch -w&quot;</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="nb">export</span><span class="w"> </span><span class="nv">FFLAGS</span><span class="o">=</span><span class="s2">&quot;-fopenmp -O3 -fallow-argument-mismatch -w&quot;</span>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="c1"># Only for older SFINCS versions bundling netcdf-fortran 4.4.4:</span>
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="c1"># GCC &gt;= 14 errors on implicit function declarations in its configure tests.</span>
-</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="c1"># Also need explicit netCDF paths since 4.4.4 doesn&#39;t pick them up from pkg-config,</span>
-</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="c1"># and parallel make must be disabled (use make -j1) due to missing Fortran module</span>
-</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="c1"># dependency declarations in the Makefile.</span>
-</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="c1"># export CFLAGS=&quot;-Wno-error=implicit-function-declaration&quot;</span>
-</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="c1"># export CPPFLAGS=&quot;-I$(nc-config --includedir)&quot;</span>
-</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="c1"># export LDFLAGS=&quot;-L$(nc-config --libdir)&quot;</span>
-</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>
-</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="nv">CC</span><span class="o">=</span>gcc<span class="w"> </span><span class="nv">FC</span><span class="o">=</span>gfortran<span class="w"> </span>./configure<span class="w"> </span>--prefix<span class="o">=</span><span class="nv">$HOME</span>/.local<span class="w"> </span>--disable-shared<span class="w"> </span>--disable-openacc
-</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>make<span class="w"> </span>-j1
-</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>make<span class="w"> </span>install
-</span></code></pre></div>
-<p>The statically linked executable is at <code>~/.local/bin/sfincs</code>. Verify with:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>file<span class="w"> </span>~/.local/bin/sfincs<span class="w">   </span><span class="c1"># should show &quot;statically linked&quot;</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>ldd<span class="w"> </span>~/.local/bin/sfincs<span class="w">    </span><span class="c1"># should print &quot;not a dynamic executable&quot;</span>
-</span></code></pre></div>
+<h2 id="problem-statement">Problem statement<a class="headerlink" href="#problem-statement" title="Permanent link">#</a></h2>
+<p>The boundary condition pipeline has three issues that affect simulation quality,
+portability, and scalability:</p>
+<ol>
+<li>
+<p><strong>Blind TPXO fallback for simulations &gt; 180 hours.</strong> When
+    <code>boundary.source == "stofs"</code> and the simulation exceeds 180 hours, the code
+    unconditionally replaces hours 181+ with tidal-only predictions. This degrades
+    quality for retrospective runs where STOFS data covers the full period; the
+    tidal-only fill loses storm surge, wind setup, and pressure effects that STOFS
+    captures.</p>
+</li>
+<li>
+<p><strong>Single-cycle download.</strong> The downloader fetches one STOFS forecast file (matching
+    the simulation start time) regardless of duration. Each STOFS file covers at most
+    180 hours. For longer simulations, additional STOFS cycles are needed but never
+    downloaded.</p>
+</li>
+<li>
+<p><strong>Fragile and inaccurate TPXO prediction stack.</strong> The tidal prediction path relies on
+    a compiled Fortran binary (<code>predict_tide</code>) invoked via subprocess, a bundled legacy
+    Python library (<code>pytides</code>) with only 8 constituents, and ad-hoc spatial
+    interpolation via <code>scipy.griddata</code> that ignores the native TPXO grid structure.
+    This is both a portability problem (binary dependency) and an accuracy problem.</p>
+</li>
+</ol>
 <hr />
-<h3 id="macos">macOS<a class="headerlink" href="#macos" title="Permanent link">#</a></h3>
-<blockquote>
-<p><strong>Note:</strong> macOS does not support fully static executables (Apple does not ship static
-versions of system libraries). The instructions below statically link all non-system
-libraries (netCDF, HDF5, gfortran runtime, etc.) so the binary is as self-contained as
-possible.</p>
-</blockquote>
-<h4 id="install-dependencies_1">Install Dependencies<a class="headerlink" href="#install-dependencies_1" title="Permanent link">#</a></h4>
-<p>Install <a href="https://brew.sh">Homebrew</a> if not already present:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>/bin/bash<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh<span class="k">)</span><span class="s2">&quot;</span>
+<h2 id="current-implementation">Current implementation<a class="headerlink" href="#current-implementation" title="Permanent link">#</a></h2>
+<h3 id="download-downloaderpy">Download (<code>downloader.py</code>)<a class="headerlink" href="#download-downloaderpy" title="Permanent link">#</a></h3>
+<p><code>_build_stofs_urls()</code> constructs a single URL based on the simulation start date and the
+nearest 6-hourly cycle:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>s3://noaa-gestofs-pds/stofs_2d_glo.{YYYYMMDD}/stofs_2d_glo.t{HH}z.fields.cwl.nc
 </span></code></pre></div>
-<p>Install packages:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>brew<span class="w"> </span>install<span class="w"> </span>gcc<span class="w"> </span>autoconf<span class="w"> </span>automake<span class="w"> </span>libtool<span class="w"> </span>pkg-config<span class="w"> </span>netcdf
+<p>Only one file is downloaded per simulation. The end date / duration is not considered.</p>
+<h3 id="regridding-regrid_estofspy">Regridding (<code>regrid_estofs.py</code>)<a class="headerlink" href="#regridding-regrid_estofspy" title="Permanent link">#</a></h3>
+<p><code>regrid_estofs</code> receives the single STOFS file, a cycle date/time, and <code>--length-hrs</code>.
+It extracts time steps starting at a fixed forecast offset (<code>FORECAST_START = 5</code>) and
+interpolates the unstructured STOFS grid onto the SCHISM open boundary nodes via ESMF.
+Output: <code>elev2D.th.nc</code>.</p>
+<p>If the requested duration exceeds the file's available time steps, the regridder
+produces output only for the hours present in the file (up to ~180 hours of forecast).</p>
+<h3 id="tpxo-fallback-schism_preppy-lines-907924">TPXO fallback (<code>schism_prep.py</code>, lines 907–924)<a class="headerlink" href="#tpxo-fallback-schism_preppy-lines-907924" title="Permanent link">#</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">raw_length</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">duration_hours</span><span class="p">))</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="k">if</span> <span class="n">raw_length</span> <span class="o">&gt;</span> <span class="mi">180</span><span class="p">:</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">generate_ocean_tide</span><span class="p">(</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>        <span class="n">hgrid_gr3</span><span class="o">=...</span><span class="p">,</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>        <span class="n">output_file</span><span class="o">=...</span><span class="p">,</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>        <span class="n">start_dt</span><span class="o">=...</span><span class="p">,</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>        <span class="n">duration_hours</span><span class="o">=</span><span class="n">raw_length</span><span class="p">,</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>        <span class="n">tidal_constants_dir</span><span class="o">=...</span><span class="p">,</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    <span class="p">)</span>
 </span></code></pre></div>
-<h4 id="build_1">Build<a class="headerlink" href="#build_1" title="Permanent link">#</a></h4>
-<p>Homebrew installs GCC as versioned commands (<code>gcc-14</code>, <code>gfortran-14</code>, etc.). The snippet
-below detects the version automatically:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nb">cd</span><span class="w"> </span>SFINCS/source
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>autoreconf<span class="w"> </span>-vif
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1"># Detect Homebrew GCC version</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="nv">GCC_VERSION</span><span class="o">=</span><span class="k">$(</span>brew<span class="w"> </span>list<span class="w"> </span>--versions<span class="w"> </span>gcc<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-oE<span class="w"> </span><span class="s1">&#39;[0-9]+&#39;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-1<span class="k">)</span>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="nb">export</span><span class="w"> </span><span class="nv">FCFLAGS</span><span class="o">=</span><span class="s2">&quot;-fopenmp -O3 -fallow-argument-mismatch -w&quot;</span>
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="nb">export</span><span class="w"> </span><span class="nv">FFLAGS</span><span class="o">=</span><span class="s2">&quot;-fopenmp -O3 -fallow-argument-mismatch -w&quot;</span>
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>
-</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="c1"># Enable zstd support in netcdf-fortran (Homebrew netCDF is built with zstd)</span>
-</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="nb">export</span><span class="w"> </span><span class="nv">HDF5_PLUGIN_PATH</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>nc-config<span class="w"> </span>--plugindir<span class="k">)</span><span class="s2">&quot;</span>
-</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>
-</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="c1"># Only for older SFINCS versions bundling netcdf-fortran 4.4.4:</span>
-</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="c1"># GCC &gt;= 14 errors on implicit function declarations in its configure tests.</span>
-</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a><span class="c1"># Also need explicit netCDF paths since 4.4.4 doesn&#39;t pick them up from pkg-config,</span>
-</span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="c1"># and parallel make must be disabled (use make -j1) due to missing Fortran module</span>
-</span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="c1"># dependency declarations in the Makefile.</span>
-</span><span id="__span-5-18"><a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a><span class="c1"># export CFLAGS=&quot;-Wno-error=implicit-function-declaration&quot;</span>
-</span><span id="__span-5-19"><a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a><span class="c1"># export CPPFLAGS=&quot;-I$(nc-config --includedir)&quot;</span>
-</span><span id="__span-5-20"><a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a><span class="c1"># export LDFLAGS=&quot;-L$(nc-config --libdir)&quot;</span>
-</span><span id="__span-5-21"><a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a>
-</span><span id="__span-5-22"><a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a><span class="nv">CC</span><span class="o">=</span>gcc-<span class="si">${</span><span class="nv">GCC_VERSION</span><span class="si">}</span><span class="w"> </span><span class="nv">FC</span><span class="o">=</span>gfortran-<span class="si">${</span><span class="nv">GCC_VERSION</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-5-23"><a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a><span class="w">  </span>./configure<span class="w"> </span>--prefix<span class="o">=</span><span class="nv">$HOME</span>/.local<span class="w"> </span>--disable-shared<span class="w"> </span>--disable-openacc
-</span><span id="__span-5-24"><a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a>make<span class="w"> </span>-j1
-</span><span id="__span-5-25"><a id="__codelineno-5-25" name="__codelineno-5-25" href="#__codelineno-5-25"></a>make<span class="w"> </span>install
-</span></code></pre></div>
-<p>The executable is at <code>~/.local/bin/sfincs</code>.</p>
-<blockquote>
-<p><strong>Apple Silicon (M1/M2/M3/M4):</strong> Homebrew installs to <code>/opt/homebrew</code>. If <code>pkg-config</code>
-cannot find <code>netcdf</code>, export the path before running <code>configure</code>:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">PKG_CONFIG_PATH</span><span class="o">=</span><span class="s2">&quot;/opt/homebrew/lib/pkgconfig:</span><span class="nv">$PKG_CONFIG_PATH</span><span class="s2">&quot;</span>
-</span></code></pre></div>
-</blockquote>
+<p>This unconditionally overwrites <code>elev2D.th.nc</code> from hour 181 onward with tidal-only
+predictions. There is no check for whether the simulation is retrospective (STOFS data
+exists for the full window) or prospective (a real-time forecast beyond the STOFS
+horizon).</p>
+<h3 id="pytides-tidal-fill-_ocean_tidepy"><code>pytides</code> tidal fill (<code>_ocean_tide.py</code>)<a class="headerlink" href="#pytides-tidal-fill-_ocean_tidepy" title="Permanent link">#</a></h3>
+<p><code>generate_ocean_tide()</code>:</p>
+<ol>
+<li>Reads 8 separate TPXO constituent grid files (<code>k1.nc</code> … <code>s2.nc</code>).</li>
+<li>Interpolates amplitude/phase to SCHISM boundary nodes via <code>scipy.griddata</code> (linear,
+    ignoring the native Arakawa C-grid staggering).</li>
+<li>Sums harmonics for 8 constituents using the bundled <code>pytides</code> library.</li>
+<li>Opens <code>elev2D.th.nc</code> in append mode and overwrites from index 181.</li>
+</ol>
+<h3 id="tpxo-boundary-path-make_tpxo_boundary">TPXO boundary path (<code>make_tpxo_boundary</code>)<a class="headerlink" href="#tpxo-boundary-path-make_tpxo_boundary" title="Permanent link">#</a></h3>
+<p>When <code>boundary.source == "tpxo"</code>, the code shells out to the Fortran <code>predict_tide</code>
+binary, then converts its text output to <code>elev2D.th.nc</code> via <code>otps_to_open_bnds()</code>. This
+path is functionally correct but carries a compiled binary dependency that complicates
+portability and CI.</p>
 <hr />
-<h2 id="verifying-the-build">Verifying the Build<a class="headerlink" href="#verifying-the-build" title="Permanent link">#</a></h2>
-<p>A minimal smoke test is included in the repository:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nb">cd</span><span class="w"> </span>SFINCS/source
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>make<span class="w"> </span><span class="nb">test</span><span class="w">   </span><span class="c1"># runs test/01_noadv</span>
-</span></code></pre></div>
+<h2 id="root-cause-analysis">Root cause analysis<a class="headerlink" href="#root-cause-analysis" title="Permanent link">#</a></h2>
+<p>The 180-hour threshold originates from the <strong>NWM operational forecast pipeline on
+WCOSS/AWS</strong>. In that context:</p>
+<ul>
+<li>STOFS-2D-Global produces forecasts to exactly 180 hours (7.5 days), 4 cycles per day.</li>
+<li>NWM medium-range forecasts extend to 240 hours and extended-range to 720 hours.</li>
+<li>For the hours beyond the STOFS forecast horizon (181+), the only option was tidal-only
+    extrapolation.</li>
+</ul>
+<p>This was correct for real-time operational use. The code was ported to this package
+without accounting for retrospective runs, where overlapping STOFS cycles can be
+stitched to cover any historical period.</p>
 <hr />
-<h2 id="quick-reference">Quick Reference<a class="headerlink" href="#quick-reference" title="Permanent link">#</a></h2>
+<h2 id="stofs-data-availability">STOFS data availability<a class="headerlink" href="#stofs-data-availability" title="Permanent link">#</a></h2>
 <table>
 <thead>
 <tr>
-<th>Item</th>
-<th>Ubuntu</th>
-<th>macOS (Homebrew)</th>
+<th>Property</th>
+<th>Value</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Fortran compiler</td>
-<td><code>gfortran</code> (via <code>apt</code>)</td>
-<td><code>gfortran</code> (via <code>brew install gcc</code>)</td>
+<td>Archive start</td>
+<td>2020-12-30 (<code>estofs</code> naming) / 2023-01-08 (<code>stofs_2d_glo</code> naming)</td>
 </tr>
 <tr>
-<td>C compiler</td>
-<td><code>gcc</code> (via <code>build-essential</code>)</td>
-<td><code>gcc-N</code> (via <code>brew install gcc</code>)</td>
+<td>Forecast horizon</td>
+<td>180 hours per cycle</td>
 </tr>
 <tr>
-<td>Autotools</td>
-<td><code>autoconf automake libtool m4</code></td>
-<td><code>autoconf automake libtool</code></td>
+<td>Cycle frequency</td>
+<td>Every 6 hours (00, 06, 12, 18 UTC)</td>
 </tr>
 <tr>
-<td>NetCDF C library</td>
-<td><code>libnetcdf-dev</code></td>
-<td><code>netcdf</code></td>
+<td>Archive location</td>
+<td><code>s3://noaa-gestofs-pds</code> (public, no auth)</td>
 </tr>
 <tr>
-<td>pkg-config</td>
-<td><code>pkg-config</code></td>
-<td><code>pkg-config</code></td>
+<td>File format</td>
+<td>Unstructured NetCDF (ADCIRC triangular mesh)</td>
+</tr>
+<tr>
+<td>File size</td>
+<td>~12 GB per cycle (global)</td>
+</tr>
+<tr>
+<td>Subsetting API</td>
+<td>None (no OPeNDAP/THREDDS endpoint for STOFS-2D-Global)</td>
 </tr>
 </tbody>
 </table>
+<p>For any retrospective simulation starting after 2020-12-30, STOFS data exists for the
+entire period. A 240-hour simulation starting 2024-01-09T00Z can be covered by:</p>
+<ul>
+<li>Cycle 2024-01-09T00Z → hours 0–180</li>
+<li>Cycle 2024-01-09T06Z → hours 6–186 (overlap provides hours 180–186)</li>
+<li>Cycle 2024-01-09T12Z → hours 12–192 (provides hours 186–192)</li>
+<li>… and so on every 6 hours.</li>
+</ul>
+<hr />
+<h2 id="issues-with-tpxo-tidal-prediction">Issues with TPXO tidal prediction<a class="headerlink" href="#issues-with-tpxo-tidal-prediction" title="Permanent link">#</a></h2>
+<p>Even when the TPXO fallback is genuinely needed (prospective forecasts beyond the STOFS
+horizon), the current implementation has significant quality and portability problems:</p>
+<h3 id="quality-limitations">Quality limitations<a class="headerlink" href="#quality-limitations" title="Permanent link">#</a></h3>
+<ul>
+<li><strong>Only 8 tidal constituents</strong> (K1, K2, M2, N2, O1, P1, Q1, S2). The TPXO10 atlas
+    provides 32 constituents and 18 additional minor constituents can be inferred via
+    admittance methods. Using only 8 loses significant tidal energy, especially in
+    regions with strong shallow-water harmonics (M4, M6, MS4).</li>
+<li><strong>No minor constituent inference.</strong> The OTPS Fortran code and modern implementations
+    like <code>pyTMD</code> use Richard Ray's PERTH2 admittance method to infer 18 minor
+    constituents from the 8 major ones. The current <code>pytides</code> path does not do this.</li>
+<li><strong>Incorrect spatial interpolation.</strong> <code>scipy.griddata</code> with <code>method='linear'</code> treats
+    the TPXO data as scattered points. TPXO uses an Arakawa C-grid where elevation,
+    u-transport, and v-transport live on different staggered nodes. Proper bilinear
+    interpolation on the C-grid (with land masking and periodic longitude wrapping) is
+    required for correct results.</li>
+<li><strong>Node-by-node loop.</strong> The current code loops over each boundary node individually
+    (<code>for i in range(amp.shape[0])</code>) to create a <code>Tide</code> object and call <code>tide.at()</code>. A
+    vectorized implementation over all nodes would be significantly faster.</li>
+<li><strong>No solid Earth tide correction.</strong> The OTPS Fortran code applies a <code>BETA_SE</code> scaling
+    factor (~0.94–0.954) to remove first-order load tides. <code>pytides</code> does not.</li>
+</ul>
+<h3 id="portability-problems">Portability problems<a class="headerlink" href="#portability-problems" title="Permanent link">#</a></h3>
+<ul>
+<li><strong>Compiled Fortran binary dependency.</strong> The <code>predict_tide</code> binary must be compiled
+    from the OTPS source code (or provided via pixi). This complicates CI,
+    cross-platform builds, and container-less deployment.</li>
+<li><strong>Text file I/O pipeline.</strong> The current TPXO path writes a text input file
+    (<code>otps_lat_lon_time.txt</code>), invokes <code>predict_tide</code> via subprocess, parses its text
+    output (<code>otps_out.txt</code>), then converts to NetCDF. This is fragile and slow.</li>
+<li><strong>Separate constituent files.</strong> The <code>pytides</code> fallback path requires 8 separate TPXO
+    constituent files (<code>k1.nc</code> … <code>s2.nc</code>) in a specific directory, separate from the
+    atlas files used by <code>predict_tide</code>. This creates a confusing dual data requirement.</li>
+</ul>
+<h3 id="suspected-bugs-in-the-otps-fortran-code">Suspected bugs in the OTPS Fortran code<a class="headerlink" href="#suspected-bugs-in-the-otps-fortran-code" title="Permanent link">#</a></h3>
+<p>Preliminary review of the OTPS Fortran source (<code>subs.f90</code>, <code>arguments</code> subroutine,
+originally by Richard Ray / NASA GSFC) has identified three suspected bugs in the nodal
+correction factor computation that require systematic investigation and quantification:</p>
+<ol>
+<li>
+<p><strong>L2 nodal factor: possible missing radian conversion.</strong> The <code>sin(2p)</code> term in the L2
+    amplitude factor may omit the degree-to-radian conversion while the adjacent
+    <code>cos(2p*rad)</code> term applies it. L2 is absent from the TPXO10 atlas v2 set but would
+    affect non-atlas models.</p>
+</li>
+<li>
+<p><strong>MS4 nodal factor: possible wrong compound formula.</strong> MS4 is a compound of M2 and
+    S2, so its factor should be <code>f_M2 * f_S2</code>. The code appears to assign <code>f_M2^2</code> (the
+    M4/MN4 factor) instead. MS4 IS present in the TPXO10 atlas.</p>
+</li>
+<li>
+<p><strong>M3 nodal factor: possible hardcoded value.</strong> The M3 factor appears hardcoded to 1.0
+    rather than <code>f_M2^1.5</code>. Absent from the TPXO10 atlas v2 set.</p>
+</li>
+</ol>
+<p>These need to be confirmed by direct comparison of the Fortran output against an
+independent implementation (e.g., <code>pyTMD</code>) across the full 18.6-year nodal cycle and at
+stations spanning different tidal regimes. If confirmed, the errors would be systematic
+and oscillatory, scaling with tidal range, providing further motivation for replacing
+the Fortran binary with a validated pure-Python implementation where such bugs can be
+corrected.</p>
+<h3 id="what-a-proper-python-replacement-needs">What a proper Python replacement needs<a class="headerlink" href="#what-a-proper-python-replacement-needs" title="Permanent link">#</a></h3>
+<p>A pure-Python TPXO prediction module that:</p>
+<ol>
+<li>Reads the standard TPXO10 atlas NetCDF files directly (the same files <code>predict_tide</code>
+    uses).</li>
+<li>Implements proper Arakawa C-grid bilinear interpolation with land masking and
+    periodic longitude wrapping.</li>
+<li>Computes astronomical arguments and nodal corrections using the Cartwright &amp; Tayler
+    formulas, with any confirmed Fortran bugs corrected.</li>
+<li>Supports all 32 TPXO constituents.</li>
+<li>Infers 18 minor constituents via the PERTH2 admittance method.</li>
+<li>Applies solid Earth tide corrections.</li>
+<li>Vectorizes over all locations and times for performance.</li>
+<li>Returns NumPy arrays directly; no subprocess, no text parsing.</li>
+<li>Is validated against the Fortran OTPS binary and cross-validated against <code>pyTMD</code> for
+    numerical parity.</li>
+</ol>
+<hr />
+<h2 id="proposed-solution">Proposed solution<a class="headerlink" href="#proposed-solution" title="Permanent link">#</a></h2>
+<h3 id="phase-1-fix-the-tpxo-fallback-logic">Phase 1: Fix the TPXO fallback logic<a class="headerlink" href="#phase-1-fix-the-tpxo-fallback-logic" title="Permanent link">#</a></h3>
+<p>Replace the blind <code>&gt; 180</code> check with a data-availability test:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">sim_end</span> <span class="o">=</span> <span class="n">start_date</span> <span class="o">+</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">hours</span><span class="o">=</span><span class="nb">abs</span><span class="p">(</span><span class="n">duration_hours</span><span class="p">))</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">now</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="n">timezone</span><span class="o">.</span><span class="n">utc</span><span class="p">)</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="k">if</span> <span class="n">sim_end</span> <span class="o">&gt;</span> <span class="n">now</span> <span class="o">+</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">hours</span><span class="o">=</span><span class="mi">6</span><span class="p">):</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="c1"># Prospective: simulation extends into the future beyond latest</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="c1"># available STOFS cycle.  Fall back to TPXO for uncovered hours.</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">last_stofs_hour</span> <span class="o">=</span> <span class="o">...</span>  <span class="c1"># determine from downloaded data</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="n">generate_tidal_fill</span><span class="p">(</span><span class="n">start_hour</span><span class="o">=</span><span class="n">last_stofs_hour</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="k">else</span><span class="p">:</span>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    <span class="c1"># Retrospective: STOFS covers the full window.  No TPXO needed.</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>    <span class="k">pass</span>
+</span></code></pre></div>
+<p>This is a minimal, low-risk change that eliminates the quality degradation for all
+retrospective STOFS runs longer than 180 hours.</p>
+<h3 id="phase-2-multi-cycle-stofs-download-and-stitching">Phase 2: Multi-cycle STOFS download and stitching<a class="headerlink" href="#phase-2-multi-cycle-stofs-download-and-stitching" title="Permanent link">#</a></h3>
+<p>Extend the download and regridding pipeline to handle multiple STOFS cycles:</p>
+<p><strong>Download stage changes (<code>downloader.py</code>):</strong></p>
+<ul>
+<li><code>_build_stofs_urls()</code> accepts <code>start</code> and <code>end</code> date-times.</li>
+<li>Generates one URL per 6-hourly cycle needed to cover the full simulation window.</li>
+<li>Downloads only the cycles not already cached locally.</li>
+</ul>
+<p><strong>Regridding stage changes (<code>regrid_estofs.py</code>):</strong></p>
+<ul>
+<li>Accept multiple STOFS files as input.</li>
+<li>For each output time step, select the best available STOFS cycle (e.g., prefer the
+    cycle whose forecast hour is closest to the analysis time, earlier forecast hours
+    are more accurate).</li>
+<li>Produce a single continuous <code>elev2D.th.nc</code> spanning the full duration.</li>
+</ul>
+<h3 id="phase-3-spatial-subsetting-of-unstructured-stofs-grids">Phase 3: Spatial subsetting of unstructured STOFS grids<a class="headerlink" href="#phase-3-spatial-subsetting-of-unstructured-stofs-grids" title="Permanent link">#</a></h3>
+<p>Reduce download volume by cropping STOFS files to the model domain before regridding:</p>
+<p><strong>Approach:</strong></p>
+<ol>
+<li>Open each STOFS file lazily from S3 via <code>xarray</code> + <code>fsspec</code> (no full download).</li>
+<li>Normalize the ADCIRC-format STOFS variable/dimension names to a standard schema (node
+    coordinates, triangle connectivity).</li>
+<li>Crop to the SCHISM model's bounding box: select all nodes within the bounding box,
+    keep only triangles where all three vertices are inside, and remap the connectivity
+    array to reflect the new sequential node numbering.</li>
+<li>Materialize only the cropped subset to local disk.</li>
+</ol>
+<p>This could reduce per-cycle data from ~12 GB (global) to a few hundred MB (regional),
+making multi-cycle stitching practical even for extended-range simulations.</p>
+<p>The crop algorithm for unstructured triangular meshes is well-established; the
+<a href="https://github.com/ec-jrc/Thalassa">Thalassa</a> library (JRC, EUPL-1.2 license)
+implements exactly this pattern in its <code>crop()</code> function using NumPy boolean indexing
+and <code>numpy_indexed.remap()</code>. Since Thalassa has not been updated in two years and
+carries a copyleft (EUPL-1.2) license that would propagate to derivative works, we
+should implement an independent standalone crop module following the same algorithmic
+approach rather than extracting their code directly. The logic is straightforward:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>nodes_in_bbox = where(lon &gt;= xmin &amp; lon &lt;= xmax &amp; lat &gt;= ymin &amp; lat &lt;= ymax)
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>faces_in_bbox = where(all three vertex indices are in nodes_in_bbox)
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>remap vertex indices to new sequential numbering
+</span></code></pre></div>
+<p>This requires only <code>numpy</code> (and optionally <code>numpy_indexed</code> for the remap step, which can
+also be done with <code>np.searchsorted</code>).</p>
+<h3 id="phase-4-pure-python-tpxo-prediction-module">Phase 4: Pure-Python TPXO prediction module<a class="headerlink" href="#phase-4-pure-python-tpxo-prediction-module" title="Permanent link">#</a></h3>
+<p>Develop a Python module that replaces both the Fortran <code>predict_tide</code> binary and the
+bundled <code>pytides</code> library. This module would:</p>
+<ul>
+<li>Read the standard TPXO10 atlas NetCDF files directly.</li>
+<li>Implement Arakawa C-grid bilinear interpolation with land masking.</li>
+<li>Compute all 32 constituents + 18 inferred minor constituents.</li>
+<li>Apply solid Earth tide corrections.</li>
+<li>Return NumPy arrays directly (no subprocess, no text parsing).</li>
+<li>Be validated against the Fortran OTPS binary for numerical parity.</li>
+</ul>
+<p>This replaces three current components with one:</p>
+<table>
+<thead>
+<tr>
+<th>Current</th>
+<th>Replacement</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>predict_tide</code> (Fortran binary via subprocess)</td>
+<td>Pure-Python prediction function</td>
+</tr>
+<tr>
+<td><code>otps_to_open_bnds()</code> (text output parser)</td>
+<td>Direct NumPy array return</td>
+</tr>
+<tr>
+<td><code>generate_ocean_tide()</code> + <code>pytides</code> (8 constituents, <code>scipy.griddata</code>)</td>
+<td>Same function with 32 constituents, proper C-grid interpolation</td>
+</tr>
+</tbody>
+</table>
+<p>Once implemented, the following can be removed:</p>
+<ul>
+<li><code>src/coastal_calibration/tides/pytides/</code>: 4 files, ~680 lines.</li>
+<li><code>src/coastal_calibration/tides/_ocean_tide.py</code>: <code>pytides</code>-based tidal fill.</li>
+<li><code>predict_tide</code> binary dependency.</li>
+<li><code>_otps.py</code> (<code>make_otps_input</code>, <code>otps_to_open_bnds</code>): text I/O helpers.</li>
+<li>The separate TPXO constituent files (<code>k1.nc</code> … <code>s2.nc</code>): the module reads the atlas
+    directly.</li>
+</ul>
 
 
 
