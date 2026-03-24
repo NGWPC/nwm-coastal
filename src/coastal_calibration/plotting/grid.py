@@ -274,7 +274,7 @@ def _add_basemap(
     import contextily as cx
 
     if source is None:
-        source = cx.providers.Esri.WorldImagery  # type: ignore[attr-defined]
+        source = cx.providers.Esri.WorldImagery  # ty: ignore[unresolved-attribute]
     cx.add_basemap(ax, crs=crs, source=source, zoom=zoom)
 
 
@@ -334,4 +334,4 @@ def plot_mesh(
     if basemap:
         _add_basemap(ax, info.crs, basemap_source, basemap_zoom)
 
-    return fig, ax  # type: ignore[return-value]
+    return fig, ax  # ty: ignore[invalid-return-type]

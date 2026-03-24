@@ -8,6 +8,7 @@
 
 # Logs
 *.log
+*.ESMF_LogFile
 # Temporary files
 *.tmp
 *~
@@ -193,7 +194,7 @@ site/
 data/
 
 ### Test Reports ###
-junit.xml
+junit*.xml
 .htmlcov/
 
 ### Temp

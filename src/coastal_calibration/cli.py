@@ -431,15 +431,15 @@ def stages(model: str | None) -> None:
     """List available workflow stages."""
     schism_stages = [
         ("download", "Download NWM/STOFS data (optional)"),
-        ("pre_forcing", "Prepare NWM forcing data"),
-        ("nwm_forcing", "Generate atmospheric forcing (MPI)"),
-        ("post_forcing", "Post-process forcing data"),
+        ("schism_forcing_prep", "Prepare LDASIN forcing data"),
+        ("schism_forcing", "Regrid atmospheric forcing (MPI)"),
+        ("schism_sflux", "Generate sflux atmospheric files"),
+        ("schism_params", "Create param.nml and symlink mesh files"),
         ("schism_obs", "Add NOAA observation stations"),
-        ("update_params", "Create SCHISM param.nml"),
-        ("boundary_conditions", "Generate boundary conditions (TPXO/STOFS)"),
-        ("pre_schism", "Prepare SCHISM inputs"),
+        ("schism_boundary", "Generate boundary conditions (TPXO/STOFS)"),
+        ("schism_prep", "Prepare SCHISM inputs (discharge, partitioning)"),
         ("schism_run", "Run SCHISM model (MPI)"),
-        ("post_schism", "Post-process SCHISM outputs"),
+        ("schism_postprocess", "Post-process SCHISM outputs"),
         ("schism_plot", "Plot simulated vs observed water levels"),
     ]
 

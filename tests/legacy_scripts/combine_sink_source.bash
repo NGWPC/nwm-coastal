@@ -13,6 +13,5 @@ set -ex
 #
 nwm_coastal_combine_sink_source() {
     cd $DATAexec
-    cp  ${EXECnwm}/combine_sink_source ./
-    printf '1\n2\n' | ./combine_sink_source
+    printf '1\n2\n' | combine_sink_source
 }

@@ -131,7 +131,7 @@ def plot_floodmap(
         import contextily as cx
 
         if basemap_source is None:
-            basemap_source = cx.providers.Esri.WorldImagery  # type: ignore[attr-defined]
+            basemap_source = cx.providers.Esri.WorldImagery  # ty: ignore[unresolved-attribute]
         cx.add_basemap(ax, crs=raster_crs, source=basemap_source, zoom=basemap_zoom)
 
-    return fig, ax  # type: ignore[return-value]
+    return fig, ax  # ty: ignore[invalid-return-type]

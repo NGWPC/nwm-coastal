@@ -2,18 +2,16 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+import importlib.util
 
 import pytest
 
+_has_matplotlib = importlib.util.find_spec("matplotlib") is not None
+
 from coastal_calibration.config.schema import (
     BoundaryConfig,
-    CoastalCalibConfig,
-    DownloadConfig,
     MonitoringConfig,
-    PathConfig,
     SchismModelConfig,
-    SimulationConfig,
 )
 from coastal_calibration.plotting.stations import (
     plot_station_comparison,
@@ -47,40 +45,6 @@ class TestWorkflowStageBase:
         with pytest.raises(TypeError):
             WorkflowStage(None, None)
 
-    def test_build_date_env(self, sample_config):
-        """Test that _build_date_env sets correct environment variables.
-
-        SCHISM_BEGIN_DATE and SCHISM_END_DATE are now set by
-        SchismModelConfig.build_environment(), not by _build_date_env().
-        """
-
-        class ConcreteStage(WorkflowStage):
-            name = "test"
-            description = "test stage"
-
-            def run(self):
-                return {}
-
-        stage = ConcreteStage(sample_config, None)
-        env = {}
-        stage._build_date_env(env)
-
-        assert "FORCING_BEGIN_DATE" in env
-        assert "FORCING_END_DATE" in env
-        assert "END_DATETIME" in env
-        assert "PDY" in env
-        assert "cyc" in env
-        assert "start_dt" in env
-        assert "end_dt" in env
-        assert "FORCING_START_YEAR" in env
-        assert "FORCING_START_MONTH" in env
-        assert "FORCING_START_DAY" in env
-        assert "FORCING_START_HOUR" in env
-
-        # SCHISM date vars are NOT set by _build_date_env anymore
-        assert "SCHISM_BEGIN_DATE" not in env
-        assert "SCHISM_END_DATE" not in env
-
     def test_build_environment(self, sample_config):
         class ConcreteStage(WorkflowStage):
             name = "test"
@@ -92,11 +56,9 @@ class TestWorkflowStageBase:
         stage = ConcreteStage(sample_config, None)
         env = stage.build_environment()
 
-        assert env["STARTPDY"] == "20210611"
-        assert env["STARTCYC"] == "00"
-        assert env["COASTAL_DOMAIN"] == "pacific"
-        assert env["METEO_SOURCE"] == "NWM_RETRO"
-        assert env["USE_TPXO"] == "YES"
+        # Core runtime variables
+        assert env["HDF5_USE_FILE_LOCKING"] == "FALSE"
+        assert "PATH" in env
 
     def test_build_environment_schism_vars(self, sample_config):
         """SchismModelConfig.build_environment() sets SCHISM-specific vars."""
@@ -111,15 +73,10 @@ class TestWorkflowStageBase:
         stage = ConcreteStage(sample_config, None)
         env = stage.build_environment()
 
-        # SCHISM vars are set via model_config.build_environment delegation
-        assert "SCHISM_BEGIN_DATE" in env
-        assert "SCHISM_END_DATE" in env
-        assert "NODES" in env
-        assert "NCORES" in env
-        assert "NPROCS" in env
-        assert "NSCRIBES" in env
+        # Model-specific vars delegated to SchismModelConfig.build_environment
         assert "OMP_NUM_THREADS" in env
-        assert "SCHISM_ESMFMESH" in env
+        assert "OMP_PLACES" in env
+        assert "MPICH_OFI_STARTUP_CONNECT" in env
 
     def test_validate_default_returns_empty(self, sample_config):
         class ConcreteStage(WorkflowStage):
@@ -179,27 +136,27 @@ class TestStageNames:
 
     def test_pre_forcing_stage(self, sample_config):
         stage = PreForcingStage(sample_config)
-        assert stage.name == "pre_forcing"
+        assert stage.name == "schism_forcing_prep"
 
     def test_nwm_forcing_stage(self, sample_config):
         stage = NWMForcingStage(sample_config)
-        assert stage.name == "nwm_forcing"
+        assert stage.name == "schism_forcing"
 
     def test_post_forcing_stage(self, sample_config):
         stage = PostForcingStage(sample_config)
-        assert stage.name == "post_forcing"
+        assert stage.name == "schism_sflux"
 
     def test_update_params_stage(self, sample_config):
         stage = UpdateParamsStage(sample_config)
-        assert stage.name == "update_params"
+        assert stage.name == "schism_params"
 
     def test_boundary_condition_stage(self, sample_config):
         stage = BoundaryConditionStage(sample_config)
-        assert stage.name == "boundary_conditions"
+        assert stage.name == "schism_boundary"
 
     def test_pre_schism_stage(self, sample_config):
         stage = PreSCHISMStage(sample_config)
-        assert stage.name == "pre_schism"
+        assert stage.name == "schism_prep"
 
     def test_schism_run_stage(self, sample_config):
         stage = SCHISMRunStage(sample_config)
@@ -207,7 +164,68 @@ class TestStageNames:
 
     def test_post_schism_stage(self, sample_config):
         stage = PostSCHISMStage(sample_config)
-        assert stage.name == "post_schism"
+        assert stage.name == "schism_postprocess"
+
+
+class TestSchismRunCommandConstruction:
+    """Seam-based tests for SCHISMRunStage._build_mpi_command."""
+
+    def test_default_command(self, sample_config):
+        stage = SCHISMRunStage(sample_config)
+        cmd = stage._build_mpi_command()
+        assert cmd[0] == "mpiexec"
+        assert "-n" in cmd
+        n_idx = cmd.index("-n")
+        assert cmd[n_idx + 1] == str(sample_config.model_config.total_tasks)
+        assert cmd[-2] == "pschism"
+        assert cmd[-1] == str(sample_config.model_config.nscribes)
+
+    def test_oversubscribe_flag(self, sample_config):
+        sample_config.model_config.oversubscribe = True
+        stage = SCHISMRunStage(sample_config)
+        cmd = stage._build_mpi_command()
+        assert "--oversubscribe" in cmd
+
+    def test_no_oversubscribe_by_default(self, sample_config):
+        stage = SCHISMRunStage(sample_config)
+        cmd = stage._build_mpi_command()
+        assert "--oversubscribe" not in cmd
+
+    def test_custom_binary(self, sample_config):
+        sample_config.model_config.binary = "pschism_custom"
+        stage = SCHISMRunStage(sample_config)
+        cmd = stage._build_mpi_command()
+        assert "pschism_custom" in cmd
+
+    def test_task_count_from_config(self, sample_config):
+        sample_config.model_config.nodes = 4
+        sample_config.model_config.ntasks_per_node = 36
+        stage = SCHISMRunStage(sample_config)
+        cmd = stage._build_mpi_command()
+        n_idx = cmd.index("-n")
+        assert cmd[n_idx + 1] == "144"
+
+    def test_nscribes_passed_as_argument(self, sample_config):
+        sample_config.model_config.nscribes = 4
+        stage = SCHISMRunStage(sample_config)
+        cmd = stage._build_mpi_command()
+        assert cmd[-1] == "4"
+
+
+class TestSchismModelConfigDefaults:
+    """Verify SchismModelConfig defaults after removing Singularity."""
+
+    def test_default_binary_is_pschism(self):
+        config = SchismModelConfig()
+        assert config.binary == "pschism"
+
+    def test_validate_no_singularity_check(self, sample_config):
+        """validate() should not fail due to missing Singularity image."""
+        errors = sample_config.model_config.validate(sample_config)
+        # The only errors should be about paths, not about SIF
+        for err in errors:
+            assert "singularity" not in err.lower()
+            assert "sif" not in err.lower()
 
 
 class TestSTOFSBoundaryStage:
@@ -255,39 +273,6 @@ class TestBoundaryConditionStage:
         stage = BoundaryConditionStage(sample_config)
         errors = stage.validate()
         assert len(errors) > 0
-
-
-class TestBuildDateEnvNegativeDuration:
-    """Test _build_date_env with negative duration_hours (reanalysis)."""
-
-    def test_negative_duration(self, tmp_path):
-        config = CoastalCalibConfig(
-            simulation=SimulationConfig(
-                start_date=datetime(2021, 6, 11),
-                duration_hours=-24,
-                coastal_domain="pacific",
-                meteo_source="nwm_retro",
-            ),
-            boundary=BoundaryConfig(source="tpxo"),
-            paths=PathConfig(work_dir=tmp_path, raw_download_dir=tmp_path / "dl"),
-            model_config=SchismModelConfig(),
-            download=DownloadConfig(enabled=False),
-        )
-
-        class ConcreteStage(WorkflowStage):
-            name = "test"
-            description = "test"
-
-            def run(self):
-                return {}
-
-        stage = ConcreteStage(config, None)
-
-        # SCHISM date env is now set by model_config.build_environment,
-        # not _build_date_env. Use full build_environment to test.
-        env = stage.build_environment()
-        # With negative duration, SCHISM_BEGIN_DATE should be before SCHISM_END_DATE
-        assert env["SCHISM_END_DATE"] == "202106110000"
 
 
 class TestPatchParamNml:
@@ -467,6 +452,7 @@ class TestPlotableStations:
         assert [idx for _, idx in result] == [3]
 
 
+@pytest.mark.skipif(not _has_matplotlib, reason="requires matplotlib (sfincs/test env)")
 class TestPlotFigures:
     """Tests for plot_station_comparison."""
 
@@ -605,6 +591,7 @@ class TestSfincsPlotableStations:
         assert [sid for sid, _ in result] == ["C"]
 
 
+@pytest.mark.skipif(not _has_matplotlib, reason="requires matplotlib (sfincs/test env)")
 class TestSfincsPlotFigures:
     """Tests for plot_station_comparison (identical to SCHISM)."""
 

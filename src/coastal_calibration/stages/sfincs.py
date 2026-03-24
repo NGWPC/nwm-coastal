@@ -280,11 +280,33 @@ def _get_temporal_extent(
     return (start.isoformat(), end.isoformat())
 
 
+def _simulation_month_prefixes(sim: SimulationConfig) -> list[str]:
+    """Return sorted unique YYYYMM prefixes covering the simulation window."""
+    from datetime import timedelta
+
+    start = sim.start_date
+    end = start + timedelta(hours=sim.duration_hours)
+    prefixes: list[str] = []
+    current = start.replace(day=1)
+    while current <= end:
+        prefixes.append(current.strftime("%Y%m"))
+        # Advance to the first day of next month
+        if current.month == 12:
+            current = current.replace(year=current.year + 1, month=1)
+        else:
+            current = current.replace(month=current.month + 1)
+    return sorted(set(prefixes))
+
+
 def _build_meteo_entry(
     sim: SimulationConfig,
     meteo_source: MeteoSource,
-) -> CatalogEntry:
-    """Build catalog entry for meteorological forcing data (LDASIN).
+) -> list[CatalogEntry]:
+    """Build catalog entries for meteorological forcing data (LDASIN).
+
+    Returns one entry per month covered by the simulation window so
+    that the glob is tightly scoped and stale files from other months
+    are never loaded.
 
     Parameters
     ----------
@@ -295,14 +317,10 @@ def _build_meteo_entry(
 
     Returns
     -------
-    CatalogEntry
-        Catalog entry for meteo data.
+    list[CatalogEntry]
+        One catalog entry per simulation month.
     """
-    # URI is relative to the root (download_dir).
-    # Both nwm_retro and nwm_ana downloads use YYYYMMDDHH.LDASIN_DOMAIN1
-    # naming (extension-less).  We create .nc symlinks to work around a
-    # HydroMT ext_override bug.
-    uri = f"{PathConfig.METEO_SUBDIR}/{meteo_source}/*.LDASIN_DOMAIN1.nc"
+    month_prefixes = _simulation_month_prefixes(sim)
 
     temporal_extent = _get_temporal_extent(sim)
 
@@ -356,22 +374,31 @@ def _build_meteo_entry(
         },
     }
 
-    return CatalogEntry(
-        name=f"{meteo_source}_meteo",
-        data_type="RasterDataset",
-        driver=driver,
-        uri=uri,
-        metadata=metadata,
-        data_adapter=data_adapter,
-        version=temporal_extent[0][:10],  # Use start date as version
-    )
+    entries: list[CatalogEntry] = []
+    for i, prefix in enumerate(month_prefixes):
+        uri = f"{PathConfig.METEO_SUBDIR}/{meteo_source}/{prefix}*.LDASIN_DOMAIN1.nc"
+        suffix = f"_{i}" if i > 0 else ""
+        entries.append(
+            CatalogEntry(
+                name=f"{meteo_source}_meteo{suffix}",
+                data_type="RasterDataset",
+                driver=driver,
+                uri=uri,
+                metadata=metadata,
+                data_adapter=data_adapter,
+                version=temporal_extent[0][:10],
+            )
+        )
+    return entries
 
 
 def _build_streamflow_entry(
     sim: SimulationConfig,
     meteo_source: MeteoSource,
-) -> CatalogEntry:
-    """Build catalog entry for streamflow data (CHRTOUT).
+) -> list[CatalogEntry]:
+    """Build catalog entries for streamflow data (CHRTOUT).
+
+    Returns one entry per month covered by the simulation window.
 
     Parameters
     ----------
@@ -382,18 +409,18 @@ def _build_streamflow_entry(
 
     Returns
     -------
-    CatalogEntry
-        Catalog entry for streamflow data.
+    list[CatalogEntry]
+        One catalog entry per simulation month.
     """
-    # URI is relative to the root (download_dir)
-    # Use .nc symlinks to work around HydroMT ext_override bug
+    month_prefixes = _simulation_month_prefixes(sim)
+
     if meteo_source == "nwm_retro":
-        uri = f"{PathConfig.STREAMFLOW_SUBDIR}/nwm_retro/*.CHRTOUT_DOMAIN1.nc"
+        subdir = f"{PathConfig.STREAMFLOW_SUBDIR}/nwm_retro"
         source_url = "https://noaa-nwm-retrospective-3-0-pds.s3.amazonaws.com"
         notes = "NWM Retrospective 3.0 CHRTOUT streamflow files"
         source_version = "3.0"
     else:
-        uri = f"{PathConfig.HYDRO_SUBDIR}/nwm/*.CHRTOUT_DOMAIN1.nc"
+        subdir = f"{PathConfig.HYDRO_SUBDIR}/nwm"
         source_url = "https://storage.googleapis.com/national-water-model"
         notes = "NWM Analysis channel_rt streamflow files"
         source_version = "operational"
@@ -410,7 +437,6 @@ def _build_streamflow_entry(
         notes=notes,
     )
 
-    # Streamflow data adapter - rename to HydroMT conventions
     data_adapter = DataAdapter(
         rename={
             "streamflow": "discharge",
@@ -418,15 +444,22 @@ def _build_streamflow_entry(
         },
     )
 
-    return CatalogEntry(
-        name=f"{meteo_source}_streamflow",
-        data_type="GeoDataset",
-        driver="geodataset_xarray",
-        uri=uri,
-        metadata=metadata,
-        data_adapter=data_adapter,
-        version=temporal_extent[0][:10],
-    )
+    entries: list[CatalogEntry] = []
+    for i, prefix in enumerate(month_prefixes):
+        uri = f"{subdir}/{prefix}*.CHRTOUT_DOMAIN1.nc"
+        suffix = f"_{i}" if i > 0 else ""
+        entries.append(
+            CatalogEntry(
+                name=f"{meteo_source}_streamflow{suffix}",
+                data_type="GeoDataset",
+                driver="geodataset_xarray",
+                uri=uri,
+                metadata=metadata,
+                data_adapter=data_adapter,
+                version=temporal_extent[0][:10],
+            )
+        )
+    return entries
 
 
 def _stofs_uri(sim: SimulationConfig) -> str:
@@ -648,12 +681,12 @@ def generate_data_catalog(
     )
 
     if include_meteo:
-        meteo_entry = _build_meteo_entry(sim, meteo_source)
-        catalog.add_entry(meteo_entry)
+        for entry in _build_meteo_entry(sim, meteo_source):
+            catalog.add_entry(entry)
 
     if include_streamflow:
-        streamflow_entry = _build_streamflow_entry(sim, meteo_source)
-        catalog.add_entry(streamflow_entry)
+        for entry in _build_streamflow_entry(sim, meteo_source):
+            catalog.add_entry(entry)
 
     if include_coastal:
         if effective_coastal_source == "stofs":

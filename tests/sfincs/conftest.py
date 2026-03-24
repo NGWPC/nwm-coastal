@@ -1,0 +1,120 @@
+"""Fixtures for SFINCS tests."""
+
+from __future__ import annotations
+
+import zipfile
+from datetime import datetime
+from pathlib import Path
+
+import pytest
+import yaml
+
+from coastal_calibration.config.schema import (
+    BoundaryConfig,
+    CoastalCalibConfig,
+    DownloadConfig,
+    MonitoringConfig,
+    PathConfig,
+    SchismModelConfig,
+    SimulationConfig,
+)
+
+# Path to the pre-built SFINCS model archive
+_TEXAS_ZIP = (
+    Path(__file__).resolve().parent.parent.parent / "docs" / "examples" / "slurm" / "texas.zip"
+)
+
+
+@pytest.fixture
+def sfincs_model_dir(tmp_path):
+    """Extract the pre-built Texas SFINCS model into a temp directory.
+
+    The archive extracts to ``texas/`` which contains:
+    ``sfincs.nc``, ``sfincs.bnd``, ``sfincs.obs``, ``sfincs.inp``,
+    ``sfincs_nwm.src``, ``sfincs_ngen.src``.
+
+    Returns the ``tmp_path / "texas"`` directory.
+    """
+    if not _TEXAS_ZIP.exists():
+        pytest.skip(f"Pre-built model not found: {_TEXAS_ZIP}")
+    with zipfile.ZipFile(_TEXAS_ZIP, "r") as zf:
+        zf.extractall(tmp_path)
+    return tmp_path / "texas"
+
+
+@pytest.fixture
+def sample_simulation_config():
+    """Create a sample SimulationConfig."""
+    return SimulationConfig(
+        start_date=datetime(2021, 6, 11, 0, 0, 0),
+        duration_hours=3,
+        coastal_domain="pacific",
+        meteo_source="nwm_retro",
+    )
+
+
+@pytest.fixture
+def sample_boundary_config():
+    """Create a sample BoundaryConfig."""
+    return BoundaryConfig(source="tpxo")
+
+
+@pytest.fixture
+def sample_path_config(tmp_work_dir, tmp_download_dir):
+    """Create a sample PathConfig with temp directories."""
+    return PathConfig(
+        work_dir=tmp_work_dir,
+        raw_download_dir=tmp_download_dir,
+    )
+
+
+@pytest.fixture
+def sample_config(
+    sample_simulation_config,
+    sample_boundary_config,
+    sample_path_config,
+):
+    """Create a complete sample CoastalCalibConfig."""
+    return CoastalCalibConfig(
+        simulation=sample_simulation_config,
+        boundary=sample_boundary_config,
+        paths=sample_path_config,
+        model_config=SchismModelConfig(),
+        monitoring=MonitoringConfig(),
+        download=DownloadConfig(enabled=False),
+    )
+
+
+@pytest.fixture
+def sample_config_yaml(tmp_path, sample_config):
+    """Write a sample config to YAML and return the path."""
+    config_path = tmp_path / "config.yaml"
+    sample_config.to_yaml(config_path)
+    return config_path
+
+
+@pytest.fixture
+def minimal_config_dict(tmp_work_dir, tmp_download_dir):
+    """Return a minimal config dictionary."""
+    return {
+        "model": "schism",
+        "simulation": {
+            "start_date": "2021-06-11",
+            "duration_hours": 3,
+            "coastal_domain": "pacific",
+            "meteo_source": "nwm_retro",
+        },
+        "boundary": {"source": "tpxo"},
+        "paths": {
+            "work_dir": str(tmp_work_dir),
+            "raw_download_dir": str(tmp_download_dir),
+        },
+    }
+
+
+@pytest.fixture
+def minimal_config_yaml(tmp_path, minimal_config_dict):
+    """Write a minimal config dict to YAML and return the path."""
+    config_path = tmp_path / "minimal_config.yaml"
+    config_path.write_text(yaml.dump(minimal_config_dict))
+    return config_path

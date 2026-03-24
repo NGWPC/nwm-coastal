@@ -1,6 +1,7 @@
 [submodule "schism"]
 	path = schism
 	url = https://github.com/schism-dev/schism.git
+	ignore = dirty
 [submodule "SFINCS"]
 	path = SFINCS
 	url = https://github.com/Deltares/SFINCS.git

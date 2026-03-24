@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, ClassVar, Literal
 
@@ -18,33 +18,6 @@ CoastalDomain = Literal["prvi", "hawaii", "atlgulf", "pacific"]
 BoundarySource = Literal["tpxo", "stofs"]
 ModelType = Literal["schism", "sfincs"]
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
-
-DEFAULT_SING_IMAGE_PATH = Path("/ngencerf-app/singularity/ngen-coastal.sif")
-DEFAULT_PARM_DIR = Path("/ngen-test/coastal/ngwpc-coastal")
-DEFAULT_NFS_MOUNT = Path("/ngen-test")
-DEFAULT_CONDA_ENV_NAME = "ngen_forcing_coastal"
-DEFAULT_NWM_DIR = Path("/ngen-app/nwm.v3.0.6")
-# TPXO binary directory inside the Singularity container (not user-configurable)
-DEFAULT_OTPS_DIR = Path("/ngen-app/OTPSnc")
-# Default working directory inside the Singularity container (not user-configurable)
-DEFAULT_CONTAINER_PWD = Path("/ngen-app/ngen-forcing/coastal/calib")
-
-# Default SCHISM binary name (used as default for SchismModelConfig.binary)
-_DEFAULT_SCHISM_BINARY = "pschism_wcoss2_NO_PARMETIS_TVD-VL.openmpi"
-
-# Default path templates using interpolation syntax.
-# ${model} resolves to "schism" or "sfincs" based on the top-level ``model`` key.
-# ${user} resolves from $USER environment variable.
-DEFAULT_WORK_DIR_TEMPLATE = (
-    "/ngen-test/coastal/${user}/"
-    "${model}_${simulation.coastal_domain}_${boundary.source}_${simulation.meteo_source}/"
-    "${model}_${simulation.start_date}"
-)
-DEFAULT_RAW_DOWNLOAD_DIR_TEMPLATE = (
-    "/ngen-test/coastal/${user}/"
-    "${model}_${simulation.coastal_domain}_${boundary.source}_${simulation.meteo_source}/"
-    "raw_data"
-)
 
 
 @dataclass
@@ -116,7 +89,12 @@ class BoundaryConfig:
 
 @dataclass
 class PathConfig:
-    """Path configuration for data and executables."""
+    """Path configuration for data and executables.
+
+    Only ``work_dir`` is required.  All other fields are optional and
+    only needed by specific workflow stages (e.g. the *create* workflow
+    for SCHISM or SFINCS boundary processing that uses TPXO/OTPSnc).
+    """
 
     METEO_SUBDIR: ClassVar[str] = "meteo"
     STREAMFLOW_SUBDIR: ClassVar[str] = "streamflow"
@@ -125,57 +103,38 @@ class PathConfig:
 
     work_dir: Path
     raw_download_dir: Path | None = None
-    nfs_mount: Path = field(default_factory=lambda: DEFAULT_NFS_MOUNT)
-    nwm_dir: Path = field(default_factory=lambda: DEFAULT_NWM_DIR)
     hot_start_file: Path | None = None
-    conda_env_name: str = DEFAULT_CONDA_ENV_NAME
-    parm_dir: Path = field(default_factory=lambda: DEFAULT_PARM_DIR)
+    # Legacy create-workflow fields — not used by the run workflow.
+    parm_dir: Path | None = None
+    nwm_dir: Path | None = None
+    otps_dir: Path | None = None
 
     def __post_init__(self) -> None:
-        # Resolve all path fields to absolute so that downstream paths
-        # (model_root, sif_path, Singularity bind mounts, etc.) never
-        # contain relative components that can double up when cwd changes.
-        # expanduser() must come before resolve() so that "~" is expanded
-        # to the user's home directory instead of being treated as a
-        # literal path component.
         self.work_dir = Path(self.work_dir).expanduser().resolve()
-        self.parm_dir = Path(self.parm_dir).expanduser().resolve()
-        self.nfs_mount = Path(self.nfs_mount).expanduser().resolve()
-        self.nwm_dir = Path(self.nwm_dir).expanduser().resolve()
         if self.raw_download_dir:
             self.raw_download_dir = Path(self.raw_download_dir).expanduser().resolve()
         if self.hot_start_file:
             self.hot_start_file = Path(self.hot_start_file).expanduser().resolve()
-
-    @property
-    def otps_dir(self) -> Path:
-        """TPXO binary directory (inside Singularity container, not configurable)."""
-        return DEFAULT_OTPS_DIR
+        if self.parm_dir is not None:
+            self.parm_dir = Path(self.parm_dir).expanduser().resolve()
+        if self.nwm_dir is not None:
+            self.nwm_dir = Path(self.nwm_dir).expanduser().resolve()
+        if self.otps_dir is not None:
+            self.otps_dir = Path(self.otps_dir).expanduser().resolve()
 
     @property
     def tpxo_data_dir(self) -> Path:
-        """TPXO tidal atlas data directory."""
+        """TPXO tidal atlas data directory (requires ``parm_dir``)."""
+        if self.parm_dir is None:
+            raise ValueError("paths.parm_dir is required for TPXO data lookup")
         return self.parm_dir / "TPXO10_atlas_v2_nc"
 
     @property
-    def ush_nwm(self) -> Path:
-        """USH scripts directory."""
-        return self.nwm_dir / "ush"
-
-    @property
-    def exec_nwm(self) -> Path:
-        """Executables directory."""
-        return self.nwm_dir / "exec"
-
-    @property
     def parm_nwm(self) -> Path:
-        """Parameter files directory."""
+        """Parameter files directory (requires ``parm_dir``)."""
+        if self.parm_dir is None:
+            raise ValueError("paths.parm_dir is required for NWM parameter lookup")
         return self.parm_dir / "parm"
-
-    @property
-    def conda_envs_path(self) -> Path:
-        """Conda environments directory."""
-        return self.nfs_mount / "ngen-app" / "conda" / "envs"
 
     @property
     def download_dir(self) -> Path:
@@ -197,7 +156,7 @@ class PathConfig:
         return self.download_dir / self.COASTAL_SUBDIR / coastal_source
 
     def geogrid_file(self, sim: SimulationConfig) -> Path:
-        """Geogrid file path for the given domain."""
+        """Geogrid file path for the given domain (requires ``parm_dir``)."""
         return self.parm_nwm / sim.inland_domain / sim.geo_grid
 
 
@@ -275,14 +234,18 @@ class ModelConfig(ABC):
 class SchismModelConfig(ModelConfig):
     """SCHISM model configuration.
 
-    Contains compute parameters (MPI layout, SCHISM binary).
+    Contains compute parameters (MPI layout, SCHISM binary), the path
+    to a prebuilt model directory, and the geogrid file used for
+    atmospheric forcing regridding.
 
     Parameters
     ----------
-    singularity_image : Path
-        Path to the Singularity/Apptainer SIF image used to run
-        SCHISM and its pre-/post-processing scripts inside a
-        container.  SFINCS uses a natively compiled binary instead.
+    prebuilt_dir : Path
+        Path to the directory containing the pre-built SCHISM model
+        files (``hgrid.gr3``, ``vgrid.in``, ``param.nml``, etc.).
+    geogrid_file : Path
+        Path to the WRF geogrid file (e.g. ``geo_em_HI.nc``) used by
+        the atmospheric forcing regridding stage.
     nodes : int
         Number of SLURM nodes.
     ntasks_per_node : int
@@ -296,7 +259,8 @@ class SchismModelConfig(ModelConfig):
     oversubscribe : bool
         Allow MPI oversubscription.
     binary : str
-        SCHISM executable name.
+        SCHISM executable name.  Must be on ``$PATH`` (pixi installs
+        it to ``$CONDA_PREFIX/bin/pschism``).
     include_noaa_gages : bool
         When True, automatically query NOAA CO-OPS for water level
         stations within the model domain (computed from the concave
@@ -306,18 +270,20 @@ class SchismModelConfig(ModelConfig):
         Requires the ``plot`` optional dependencies.
     """
 
-    singularity_image: Path = field(default_factory=lambda: DEFAULT_SING_IMAGE_PATH)
+    prebuilt_dir: Path = field(default_factory=Path)
+    geogrid_file: Path = field(default_factory=Path)
     nodes: int = 2
     ntasks_per_node: int = 18
     exclusive: bool = True
     nscribes: int = 2
     omp_num_threads: int = 2
     oversubscribe: bool = False
-    binary: str = _DEFAULT_SCHISM_BINARY
+    binary: str = "pschism"
     include_noaa_gages: bool = False
 
     def __post_init__(self) -> None:
-        self.singularity_image = Path(self.singularity_image).expanduser().resolve()
+        self.prebuilt_dir = Path(self.prebuilt_dir).expanduser().resolve()
+        self.geogrid_file = Path(self.geogrid_file).expanduser().resolve()
 
     @property
     def model_name(self) -> str:  # noqa: D102
@@ -328,36 +294,37 @@ class SchismModelConfig(ModelConfig):
         """Total number of MPI tasks (nodes * ntasks_per_node)."""
         return self.nodes * self.ntasks_per_node
 
-    def schism_mesh(self, sim: SimulationConfig, paths: PathConfig) -> Path:
-        """SCHISM ESMF mesh file path for the given domain."""
-        return paths.parm_nwm / "coastal" / sim.coastal_domain / "hgrid.nc"
+    @property
+    def coastal_parm(self) -> Path:
+        """Directory containing prebuilt SCHISM model files."""
+        return self.prebuilt_dir
+
+    @property
+    def schism_mesh(self) -> Path:
+        """SCHISM ESMF mesh file path."""
+        return self.prebuilt_dir / "hgrid.nc"
 
     @property
     def stage_order(self) -> list[str]:  # noqa: D102
         return [
             "download",
-            "pre_forcing",
-            "nwm_forcing",
-            "post_forcing",
-            "update_params",
+            "schism_forcing_prep",
+            "schism_forcing",
+            "schism_sflux",
+            "schism_params",
             "schism_obs",
-            "boundary_conditions",
-            "pre_schism",
+            "schism_boundary",
+            "schism_prep",
             "schism_run",
-            "post_schism",
+            "schism_postprocess",
             "schism_plot",
         ]
 
     def build_environment(  # noqa: D102
         self, env: dict[str, str], config: CoastalCalibConfig
     ) -> dict[str, str]:
-        env["NODES"] = str(self.nodes)
-        env["NCORES"] = str(self.ntasks_per_node)
-        env["NPROCS"] = str(self.total_tasks)
-        env["NSCRIBES"] = str(self.nscribes)
         env["OMP_NUM_THREADS"] = str(self.omp_num_threads)
         env["OMP_PLACES"] = "cores"
-        env["SCHISM_ESMFMESH"] = str(self.schism_mesh(config.simulation, config.paths))
 
         # MPI / AWS EFA fabric tuning — required for reliable MPI
         # on EFA-enabled instances (e.g. c5n-18xlarge).  Without
@@ -368,23 +335,6 @@ class SchismModelConfig(ModelConfig):
         env["FI_OFI_RXM_SAR_LIMIT"] = "3145728"
         env["FI_MR_CACHE_MAX_COUNT"] = "0"
         env["FI_EFA_RECVWIN_SIZE"] = "65536"
-
-        # SCHISM date variables
-        sim = config.simulation
-        start_dt = datetime.strptime(f"{sim.start_pdy} {sim.start_cyc}", "%Y%m%d %H").replace(
-            tzinfo=UTC
-        )
-        length_hrs = int(sim.duration_hours)
-        pdycyc = f"{sim.start_pdy}{sim.start_cyc}"
-
-        if length_hrs <= 0:
-            schism_begin_dt = start_dt + timedelta(hours=length_hrs)
-            env["SCHISM_BEGIN_DATE"] = schism_begin_dt.strftime("%Y%m%d%H00")
-            env["SCHISM_END_DATE"] = f"{pdycyc}00"
-        else:
-            env["SCHISM_BEGIN_DATE"] = f"{pdycyc}00"
-            schism_end_dt = start_dt + timedelta(hours=length_hrs)
-            env["SCHISM_END_DATE"] = schism_end_dt.strftime("%Y%m%d%H00")
 
         return env
 
@@ -403,11 +353,28 @@ class SchismModelConfig(ModelConfig):
         if config.paths.hot_start_file and not config.paths.hot_start_file.exists():
             errors.append(f"Hot start file not found: {config.paths.hot_start_file}")
 
-        if not config.paths.raw_download_dir:
-            errors.append("paths.raw_download_dir is required")
+        if not self.prebuilt_dir.exists():
+            errors.append(f"model_config.prebuilt_dir not found: {self.prebuilt_dir}")
+        else:
+            required = [
+                "hgrid.gr3",
+                "vgrid.in",
+                "param.nml",
+                "nwmReaches.csv",
+                "bctides.in",
+            ]
+            errors.extend(
+                f"Required file missing in model_config.prebuilt_dir: {fname}"
+                for fname in required
+                if not (self.prebuilt_dir / fname).exists()
+            )
 
-        if not self.singularity_image.exists():
-            errors.append(f"Singularity image not found: {self.singularity_image}")
+        if self.geogrid_file is None:
+            errors.append(
+                "model_config.geogrid_file is required for atmospheric forcing regridding"
+            )
+        elif not self.geogrid_file.exists():
+            errors.append(f"model_config.geogrid_file not found: {self.geogrid_file}")
 
         return errors
 
@@ -434,22 +401,23 @@ class SchismModelConfig(ModelConfig):
 
         return {
             "download": DownloadStage(config, monitor),
-            "pre_forcing": PreForcingStage(config, monitor),
-            "nwm_forcing": NWMForcingStage(config, monitor),
-            "post_forcing": PostForcingStage(config, monitor),
+            "schism_forcing_prep": PreForcingStage(config, monitor),
+            "schism_forcing": NWMForcingStage(config, monitor),
+            "schism_sflux": PostForcingStage(config, monitor),
+            "schism_params": UpdateParamsStage(config, monitor),
             "schism_obs": SchismObservationStage(config, monitor),
-            "update_params": UpdateParamsStage(config, monitor),
-            "boundary_conditions": BoundaryConditionStage(config, monitor),
-            "pre_schism": PreSCHISMStage(config, monitor),
+            "schism_boundary": BoundaryConditionStage(config, monitor),
+            "schism_prep": PreSCHISMStage(config, monitor),
             "schism_run": SCHISMRunStage(config, monitor),
-            "post_schism": PostSCHISMStage(config, monitor),
+            "schism_postprocess": PostSCHISMStage(config, monitor),
             "schism_plot": SchismPlotStage(config, monitor),
         }
 
     def to_dict(self) -> dict[str, Any]:  # noqa: D102
-        return {
+        d: dict[str, Any] = {
+            "prebuilt_dir": str(self.prebuilt_dir),
+            "geogrid_file": str(self.geogrid_file) if self.geogrid_file else None,
             "nodes": self.nodes,
-            "singularity_image": str(self.singularity_image),
             "ntasks_per_node": self.ntasks_per_node,
             "exclusive": self.exclusive,
             "nscribes": self.nscribes,
@@ -458,6 +426,7 @@ class SchismModelConfig(ModelConfig):
             "binary": self.binary,
             "include_noaa_gages": self.include_noaa_gages,
         }
+        return d
 
 
 @dataclass
@@ -1134,11 +1103,11 @@ class CoastalCalibConfig:
 
         paths_data = data.get("paths", {})
         # Remove deprecated keys that have moved elsewhere
-        paths_data.pop("otps_dir", None)
-        # singularity_image moved to model_config (SchismModelConfig)
-        simg = paths_data.pop("singularity_image", None)
-        if simg and model_type == "schism":
-            model_config_data.setdefault("singularity_image", simg)
+        paths_data.pop("singularity_image", None)
+        model_config_data.pop("singularity_image", None)
+        # Remove legacy cluster-specific keys
+        paths_data.pop("nfs_mount", None)
+        paths_data.pop("conda_env_name", None)
         paths = PathConfig(**paths_data)
 
         monitoring_data = data.get("monitoring", {})
@@ -1219,14 +1188,6 @@ class CoastalCalibConfig:
         # Ensure model key has a default before interpolation
         data.setdefault("model", "schism")
 
-        # Inject default path templates if not provided (before interpolation)
-        if "paths" not in data:
-            data["paths"] = {}
-        if "work_dir" not in data["paths"]:
-            data["paths"]["work_dir"] = DEFAULT_WORK_DIR_TEMPLATE
-        if "raw_download_dir" not in data["paths"]:
-            data["paths"]["raw_download_dir"] = DEFAULT_RAW_DOWNLOAD_DIR_TEMPLATE
-
         # Interpolate variables after merging
         data = _interpolate_config(data)
 
@@ -1252,13 +1213,12 @@ class CoastalCalibConfig:
                 "raw_download_dir": (
                     str(self.paths.raw_download_dir) if self.paths.raw_download_dir else None
                 ),
-                "nfs_mount": str(self.paths.nfs_mount),
-                "nwm_dir": str(self.paths.nwm_dir),
                 "hot_start_file": (
                     str(self.paths.hot_start_file) if self.paths.hot_start_file else None
                 ),
-                "conda_env_name": self.paths.conda_env_name,
-                "parm_dir": str(self.paths.parm_dir),
+                **({"parm_dir": str(self.paths.parm_dir)} if self.paths.parm_dir else {}),
+                **({"nwm_dir": str(self.paths.nwm_dir)} if self.paths.nwm_dir else {}),
+                **({"otps_dir": str(self.paths.otps_dir)} if self.paths.otps_dir else {}),
             },
             "model_config": self.model_config.to_dict(),
             "monitoring": {
@@ -1304,9 +1264,12 @@ class CoastalCalibConfig:
             ):
                 errors.append(f"STOFS file not found: {self.boundary.stofs_file}")
 
-        # TPXO binary (predict_tide) is inside the Singularity container at
-        # DEFAULT_OTPS_DIR, so we only validate the data directory on the host
-        elif self.boundary.source == "tpxo" and not self.paths.tpxo_data_dir.exists():
+        # TPXO data directory is derived from paths.parm_dir
+        elif (
+            self.boundary.source == "tpxo"
+            and self.paths.parm_dir is not None
+            and not self.paths.tpxo_data_dir.exists()
+        ):
             errors.append(
                 f"TPXO data directory not found: {self.paths.tpxo_data_dir}. "
                 "TPXO tidal atlas data requires local installation."

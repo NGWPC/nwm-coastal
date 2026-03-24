@@ -10,6 +10,7 @@ Run with::
 
 from __future__ import annotations
 
+import importlib.util
 import json
 from pathlib import Path
 from typing import Any
@@ -408,6 +409,10 @@ class TestWriteCatalog:
 # ------------------------------------------------------------------
 
 
+@pytest.mark.skipif(
+    not importlib.util.find_spec("dotenv"),
+    reason="requires python-dotenv (sfincs/test env)",
+)
 class TestFetchTopobathyBuffer:
     """Ensure fetch_topobathy buffers in geographic CRS (EPSG:4326)."""
 

@@ -14,11 +14,13 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
-from datetime import timedelta
+from datetime import datetime, timedelta
+from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
+from pyproj import Transformer
 
 from coastal_calibration.config.schema import SfincsModelConfig
 from coastal_calibration.stages.base import WorkflowStage
@@ -32,6 +34,8 @@ if TYPE_CHECKING:
     from coastal_calibration.config.schema import CoastalCalibConfig
     from coastal_calibration.utils.logging import WorkflowMonitor
 
+
+TransformerCRS = lru_cache(Transformer.from_crs)
 
 # ---------------------------------------------------------------------------
 # Shared model instance management
@@ -68,6 +72,31 @@ def get_model_root(config: CoastalCalibConfig) -> Path:
     """Effective model output directory."""
     sfincs = _sfincs_cfg(config)
     return sfincs.model_root or (config.paths.work_dir / "sfincs_model")
+
+
+def _filter_chrtout_files(
+    files: list[Path],
+    start: datetime,
+    end: datetime,
+) -> list[Path]:
+    """Keep only CHRTOUT files whose filename timestamp falls within [start, end].
+
+    Filenames follow ``YYYYMMDDHHMM.CHRTOUT_DOMAIN1`` convention.
+    Files that cannot be parsed are silently skipped.
+    """
+    kept: list[Path] = []
+    for f in files:
+        stem = f.name.split(".")[0]
+        try:
+            ts = datetime.strptime(stem[:12], "%Y%m%d%H%M")
+        except (ValueError, IndexError):
+            try:
+                ts = datetime.strptime(stem[:10], "%Y%m%d%H")
+            except (ValueError, IndexError):
+                continue
+        if start <= ts <= end:
+            kept.append(f)
+    return kept
 
 
 def _data_catalog_path(config: CoastalCalibConfig) -> Path | None:
@@ -319,8 +348,9 @@ def _run_and_log(
         text=True,
     ) as proc:
         with log_path.open("w") as f:
-            assert proc.stdout is not None  # noqa: S101
-            assert proc.stderr is not None  # noqa: S101
+            if proc.stdout is None or proc.stderr is None:
+                msg = "Popen streams not available (stdout/stderr must use PIPE)"
+                raise RuntimeError(msg)
             for line in proc.stdout:
                 stdout_lines.append(line)
                 f.write(line)
@@ -369,7 +399,9 @@ class _SfincsStageBase(WorkflowStage):
         monitor: WorkflowMonitor | None = None,
     ) -> None:
         super().__init__(config, monitor)
-        assert isinstance(config.model_config, SfincsModelConfig)  # noqa: S101
+        if not isinstance(config.model_config, SfincsModelConfig):
+            msg = f"Expected SfincsModelConfig, got {type(config.model_config).__name__}"
+            raise TypeError(msg)
         self.sfincs: SfincsModelConfig = config.model_config
 
 
@@ -770,11 +802,10 @@ class SfincsForcingStage(_SfincsStageBase):
         """Copy OTPS setup files and symlink the TPXO atlas data."""
         import shutil as _shutil
 
-        from coastal_calibration.scripts_path import get_scripts_dir
+        from coastal_calibration.tides import TIDES_DATA_DIR
 
-        scripts_dir = get_scripts_dir()
         for fname in ("setup_tpxo.txt", "Model_tpxo10_atlas"):
-            src = scripts_dir / fname
+            src = TIDES_DATA_DIR / fname
             dst = model_root / fname
             if not dst.exists():
                 _shutil.copy2(src, dst)
@@ -786,37 +817,32 @@ class SfincsForcingStage(_SfincsStageBase):
             self._log(f"Symlinked {tpxo_data_dir} -> {link_target}")
 
     def _run_predict_tide(self, model_root: Path) -> Path:
-        """Run the OTPS ``predict_tide`` binary inside Singularity.
+        """Run the OTPS ``predict_tide`` binary.
 
         Returns the path to the ``otps_out.txt`` output file.
-
-        .. note::
-           This uses the SCHISM Singularity container for the OTPS
-           binary.  A pure-Python TPXO implementation will replace
-           this shortly.
+        The ``predict_tide`` binary is expected on ``$PATH``
+        (pixi installs it to ``$CONDA_PREFIX/bin``).
         """
-        from coastal_calibration.config.schema import DEFAULT_SING_IMAGE_PATH
-
         env = self.build_environment()
-        otps_dir = str(self.config.paths.otps_dir)
 
-        bindings = self._get_default_bindings()
-        bindings.append(str(model_root))
-        tpxo_real = str(self.config.paths.tpxo_data_dir.resolve())
-        if tpxo_real not in bindings:
-            bindings.append(tpxo_real)
+        if self.config.paths.otps_dir is not None:
+            predict_tide_bin = str(self.config.paths.otps_dir / "predict_tide")
+        else:
+            predict_tide_bin = "predict_tide"
 
-        self.run_singularity_command(
-            command=[
-                "bash",
-                "-c",
-                f"cd {model_root} && {otps_dir}/predict_tide < setup_tpxo.txt",
-            ],
-            bindings=bindings,
-            pwd=model_root,
+        result = subprocess.run(
+            ["bash", "-c", f"cd {model_root} && {predict_tide_bin} < setup_tpxo.txt"],
+            cwd=model_root,
             env=env,
-            sif_path=DEFAULT_SING_IMAGE_PATH,
+            capture_output=True,
+            text=True,
+            check=False,
         )
+        if result.returncode != 0:
+            self._log(f"predict_tide failed: {result.stderr[-2000:]}", "error")
+            raise RuntimeError(
+                f"predict_tide failed (exit {result.returncode}): {result.stderr[-2000:]}"
+            )
 
         otps_out = model_root / "otps_out.txt"
         if not otps_out.exists():
@@ -967,20 +993,23 @@ class SfincsForcingStage(_SfincsStageBase):
         from datetime import datetime as _dt
 
         import geopandas as gpd
-        from pyproj import Transformer
-        from shapely import Point
 
         model_root = get_model_root(self.config)
 
         # 1. Read boundary points (sfincs.bnd or quadtree mask fallback)
         bnd_points = self._get_boundary_points(model)
+        xx, yy, names = zip(*bnd_points, strict=True)
 
-        # 2. Transform to lon/lat
-        model_crs = model.crs
-        transformer = Transformer.from_crs(model_crs, 4326, always_xy=True)
-        lonlats = [transformer.transform(x, y) for x, y, _ in bnd_points]
+        # 2. Build GeoDataFrame for boundary locations
+        gdf_bnd = gpd.GeoDataFrame(  # ty: ignore[no-matching-overload]
+            {"name": list(names)},
+            geometry=gpd.points_from_xy(list(xx), list(yy), crs=model.crs),
+        )
 
-        # 3. Generate OTPS input file
+        # 3. Transform to lon/lat
+        lonlats = gdf_bnd.to_crs(4326).get_coordinates().to_list()
+
+        # 4. Generate OTPS input file
         tstart = model.config.data.tstart
         tstop = model.config.data.tstop
         if isinstance(tstart, str):
@@ -992,7 +1021,7 @@ class SfincsForcingStage(_SfincsStageBase):
         self._write_otps_input(otps_input_path, lonlats, tstart, tstop, self._TPXO_RAW_DT)
         self._log(f"Wrote OTPS input ({len(lonlats)} points) to {otps_input_path}")
 
-        # 4-5. Copy setup files and symlink atlas data
+        # 5. Copy setup files and symlink atlas data
         self._prepare_tpxo_files(model_root)
 
         # 6. Run predict_tide
@@ -1011,16 +1040,6 @@ class SfincsForcingStage(_SfincsStageBase):
         df_fine = df_ts.resample(interp_freq).interpolate(method="linear")
         df_fine = df_fine.loc[df_ts.index[0] : df_ts.index[-1]]
         self._log(f"Interpolated to {interp_freq}: {len(df_fine)} timesteps")
-
-        # 9. Build GeoDataFrame for boundary locations
-        geom = [Point(x, y) for x, y, _ in bnd_points]
-        names = [name for _, _, name in bnd_points]
-        gdf_bnd = gpd.GeoDataFrame(
-            {"name": names},
-            geometry=geom,
-            index=range(n_points),
-            crs=model_crs,
-        )
 
         # 10. Inject into HydroMT model
         self._inject_water_level(model, df_fine, gdf_bnd)
@@ -1088,7 +1107,7 @@ class SfincsForcingStage(_SfincsStageBase):
         tstart, tstop = model.get_model_time()
 
         xx, yy, _ = zip(*bnd_points, strict=False)
-        bbox_gdf = gpd.GeoDataFrame(
+        bbox_gdf = gpd.GeoDataFrame(  # ty: ignore[no-matching-overload]
             geometry=gpd.points_from_xy(list(xx), list(yy), crs=model.crs),
         ).to_crs(4326)
 
@@ -1111,7 +1130,6 @@ class SfincsForcingStage(_SfincsStageBase):
     ) -> Any:
         """IDW-interpolate a geodataset to the boundary point locations."""
         import pandas as pd
-        from pyproj import Transformer
 
         src_gdf = da.vector.to_gdf()
         src_xy = np.column_stack([src_gdf.geometry.x.values, src_gdf.geometry.y.values])
@@ -1119,7 +1137,7 @@ class SfincsForcingStage(_SfincsStageBase):
         # Transform boundary points to the same CRS as the source data
         src_crs = da.vector.crs
         if src_crs is not None and src_crs != model_crs:
-            tr = Transformer.from_crs(model_crs, src_crs, always_xy=True)
+            tr = TransformerCRS(model_crs, src_crs, always_xy=True)
             xx, yy, _ = zip(*bnd_points, strict=False)
             bnd_in_src = list(zip(*tr.transform(xx, yy), strict=False))
         else:
@@ -1152,7 +1170,6 @@ class SfincsForcingStage(_SfincsStageBase):
         4. Injects the result into HydroMT the same way the TPXO path does.
         """
         import geopandas as gpd
-        from shapely import Point
 
         # 1. Read boundary points (sfincs.bnd or quadtree mask fallback)
         bnd_points = self._get_boundary_points(model)
@@ -1169,11 +1186,10 @@ class SfincsForcingStage(_SfincsStageBase):
         )
 
         # 4. Build GeoDataFrame for boundary locations (model CRS)
-        gdf_bnd = gpd.GeoDataFrame(
-            {"name": [name for _, _, name in bnd_points]},
-            geometry=[Point(x, y) for x, y, _ in bnd_points],
-            index=range(n_bnd),
-            crs=model.crs,
+        xx, yy, names = zip(*bnd_points, strict=True)
+        gdf_bnd = gpd.GeoDataFrame(  # ty: ignore[no-matching-overload]
+            {"name": list(names)},
+            geometry=gpd.points_from_xy(list(xx), list(yy), crs=model.crs),
         )
 
         # 5. Inject into HydroMT model (same approach as TPXO path)
@@ -1285,136 +1301,24 @@ class SfincsDischargeStage(_SfincsStageBase):
 
         return kept, dropped
 
-    @staticmethod
-    def _load_discharge_dataframe(
-        model: Any,
-        source_name: str,
-        feature_ids: list[int],
-        tstart: Any,
-        tstop: Any,
-    ) -> Any:
-        """Load discharge timeseries from the data catalog.
-
-        First tries ``get_geodataset`` (works for data with embedded
-        lat/lon such as test fixtures).  If that fails because of
-        missing spatial coordinates (real NWM CHRTOUT files), falls
-        back to direct xarray loading of the catalog source files.
-
-        Returns a DataFrame (rows = time, columns = feature_ids) or
-        ``None`` on failure.
-        """
-        import pandas as pd
-        import xarray as xr
-
-        # --- attempt 1: HydroMT GeoDataset path ---
-        try:
-            da = model.data_catalog.get_geodataset(
-                source_name,
-                variables=["discharge"],
-                time_range=(tstart, tstop),
-            )
-            idx_dim = da.vector.index_dim if hasattr(da, "vector") else "feature_id"
-            discharge_da = da["discharge"] if hasattr(da, "data_vars") else da
-            discharge_da = discharge_da.sel(
-                {idx_dim: [f for f in feature_ids if f in da[idx_dim].values]}
-            )
-            time_idx = discharge_da.indexes["time"]
-            if time_idx.duplicated().any():
-                discharge_da = discharge_da.sel(time=~time_idx.duplicated())
-            return discharge_da.to_pandas()
-        except Exception:  # noqa: S110
-            pass
-
-        # --- attempt 2: direct xarray (NWM CHRTOUT without lat/lon) ---
-        # Each CHRTOUT file stores streamflow(feature_id) with a scalar
-        # time coordinate. Using a ``preprocess`` callback to (a) select
-        # only the needed feature_ids (saves ~99.99% of memory) and
-        # (b) drop ``reference_time`` to avoid join conflicts.
-        try:
-            source = model.data_catalog.get_source(source_name)
-            full_uri = str(Path(source.root) / source.uri)
-            rename_map = dict(source.data_adapter.rename)
-
-            fid_set = set(feature_ids)
-
-            def _preprocess(ds_file: xr.Dataset) -> xr.Dataset:
-                """Select needed features and apply rename per file."""
-                avail = ds_file["feature_id"].values
-                keep_ids = [f for f in avail if f in fid_set]
-                if not keep_ids:
-                    ds_file = ds_file.isel(feature_id=slice(0, 0))
-                else:
-                    ds_file = ds_file.sel(feature_id=keep_ids)
-                rn = {k: v for k, v in rename_map.items() if k in ds_file}
-                if rn:
-                    ds_file = ds_file.rename(rn)
-                return ds_file.drop_vars(
-                    ["reference_time", "crs"],
-                    errors="ignore",
-                )
-
-            ds = xr.open_mfdataset(
-                full_uri,
-                preprocess=_preprocess,
-                combine="nested",
-                concat_dim="time",
-            )
-
-            var = "discharge" if "discharge" in ds else "streamflow"
-            if var not in ds or ds.sizes.get("feature_id", 0) == 0:
-                return None
-
-            da_sel = ds[var]
-
-            # Filter to model time range & drop duplicates
-            da_sel = da_sel.sel(time=slice(pd.Timestamp(tstart), pd.Timestamp(tstop)))
-            time_idx = da_sel.indexes["time"]
-            if time_idx.duplicated().any():
-                da_sel = da_sel.sel(time=~time_idx.duplicated())
-
-            return da_sel.to_pandas()
-        except Exception:
-            import logging
-
-            logging.getLogger(__name__).debug(
-                "Failed to load discharge from '%s' via xarray fallback",
-                source_name,
-                exc_info=True,
-            )
-            return None
-
     def _assign_discharge_timeseries(self, model: Any) -> None:
         """Assign NWM CHRTOUT discharge timeseries to existing source points.
 
-        Uses the model's data catalog to load streamflow data and maps it
-        to the discharge source points by NWM ``feature_id``.  Points whose
-        feature_id is not found in the CHRTOUT data keep their default
-        zero-discharge value.
+        For ``nwm_retro`` reads directly from the S3 Zarr store.
+        For ``nwm_ana`` reads from downloaded CHRTOUT netCDF files.
         """
-        streamflow_name = f"{self.config.simulation.meteo_source}_streamflow"
+        import pandas as pd
 
-        # Guard: catalog must exist and contain the streamflow entry.
-        # Use ``contains_source`` rather than ``in`` because the
-        # DataCatalog ``__iter__`` yields (name, source) tuples.
-        catalog_path = _data_catalog_path(self.config)
-        if catalog_path is None or not model.data_catalog.contains_source(streamflow_name):
-            self._log(
-                f"Streamflow data ('{streamflow_name}') not available, "
-                "skipping discharge timeseries"
-            )
-            return
+        from coastal_calibration.utils.streamflow import read_streamflow
 
         if model.discharge_points.nr_points == 0:
             return
 
-        # Map point index → feature_id from the GeoDataFrame
         gdf = model.discharge_points.gdf
         if "name" not in gdf.columns or gdf.empty:
             self._log("Discharge points have no 'name' column, cannot match feature_ids")
             return
 
-        # Convert string feature_id names to integers for matching
-        # against CHRTOUT's integer feature_id dimension.
         try:
             fid_by_idx = {idx: int(name) for idx, name in gdf["name"].items()}
         except (ValueError, TypeError):
@@ -1423,41 +1327,58 @@ class SfincsDischargeStage(_SfincsStageBase):
             )
             return
 
-        self._update_substep("Loading discharge timeseries from catalog")
+        self._update_substep("Loading discharge timeseries")
         tstart, tstop = model.get_model_time()
         needed_fids = list(fid_by_idx.values())
-        df_fid = self._load_discharge_dataframe(
-            model,
-            streamflow_name,
-            needed_fids,
-            tstart,
-            tstop,
-        )
-        if df_fid is None:
+        sim = self.config.simulation
+        start_dt = pd.Timestamp(tstart).to_pydatetime()
+        end_dt = pd.Timestamp(tstop).to_pydatetime()
+
+        if sim.meteo_source == "nwm_retro":
+            df_fid = read_streamflow(
+                needed_fids,
+                start_dt,
+                end_dt,
+                meteo_source="nwm_retro",
+                domain=sim.coastal_domain,
+            )
+        else:
+            streamflow_dir = self.config.paths.streamflow_dir(sim.meteo_source)
+            files = _filter_chrtout_files(
+                sorted(streamflow_dir.glob("*.CHRTOUT_DOMAIN1*")),
+                start_dt,
+                end_dt,
+            )
+            if not files:
+                self._log(
+                    f"No CHRTOUT files found in {streamflow_dir} "
+                    f"for {start_dt:%Y-%m-%d %H:%M}-{end_dt:%Y-%m-%d %H:%M}, "
+                    "discharge points will use default (zero) values"
+                )
+                return
+            df_fid = read_streamflow(
+                needed_fids,
+                start_dt,
+                end_dt,
+                meteo_source="nwm_ana",
+                chrtout_files=files,
+            )
+
+        if df_fid.empty:
             self._log(
-                f"Could not load '{streamflow_name}' from catalog, "
-                "discharge points will use default (zero) values"
+                "Could not load streamflow data, discharge points will use default (zero) values"
             )
             return
 
-        # df_fid has feature_id columns; keep only those that match
         available_fids = {int(c) for c in df_fid.columns}
         valid_fids = sorted(set(needed_fids) & available_fids)
         missing_fids = set(needed_fids) - available_fids
 
         if not valid_fids:
             self._log(
-                f"No matching feature_ids in '{streamflow_name}' — "
-                f"all {len(missing_fids)} point(s) keep zero discharge"
+                f"No matching feature_ids — all {len(missing_fids)} point(s) keep zero discharge"
             )
             return
-
-        # Map feature_id columns → integer point indices expected by
-        # set_timeseries (columns must match the GeoDataFrame index).
-        # Multiple points may share the same feature_id (e.g. duplicate
-        # source entries), so we build a one-to-many mapping and create
-        # a column for every point index.
-        import pandas as pd
 
         idxs_by_fid: dict[int, list[int]] = {}
         for idx, fid in fid_by_idx.items():
@@ -1474,13 +1395,10 @@ class SfincsDischargeStage(_SfincsStageBase):
 
         model.discharge_points.set_timeseries(df_ts)
 
-        msg = (
-            f"Assigned discharge timeseries to {n_assigned} point(s) "
-            f"({len(valid_fids)} unique feature_id(s)) from '{streamflow_name}'"
-        )
+        msg = f"Assigned discharge timeseries to {n_assigned} point(s) ({len(valid_fids)} unique feature_id(s))"
         if missing_fids:
             examples = ", ".join(str(f) for f in sorted(missing_fids)[:5])
-            msg += f"; {len(missing_fids)} point(s) not found in data (zero discharge): {examples}"
+            msg += f"; {len(missing_fids)} point(s) not found (zero discharge): {examples}"
         self._log(msg)
 
     def run(self) -> dict[str, Any]:

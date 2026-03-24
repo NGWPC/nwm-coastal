@@ -5,6 +5,7 @@ downloads/
 **/output/
 **/run/
 **/sfincs_model/
+**/parm/
 
 # SFINCS files
 *.nc

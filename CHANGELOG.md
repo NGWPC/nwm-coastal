@@ -24,9 +24,10 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - `_KNOWN_INP_PARAMS` allowlist on `SfincsModelConfig` that validates `inp_overrides`
     keys against all ~170 recognized `sfincs.inp` parameters, catching typos early
     (SFINCS silently ignores unknown parameters).
-- `SfincsDischargeStage` now assigns real NWM CHRTOUT discharge timeseries to source
-    points via `_assign_discharge_timeseries`, with support for both HydroMT GeoDataset
-    and raw `xarray` `open_mfdataset` loading strategies.
+- `SfincsDischargeStage` now assigns real NWM `CHRTOUT` discharge timeseries to source
+    points via `_assign_discharge_timeseries`, using the shared `read_streamflow`
+    utility (`nwm_retro` reads from S3 Zarr, `nwm_ana` reads from local CHRTOUT via
+    `netCDF4`).
 - `tests/test_floodmap.py` with unit tests for `_write_floodmap_cog`,
     `_ensure_overviews`, and an integration test for `create_flood_depth_map`.
 - QGIS plugin: optional NWM Flowlines Override in the basemap dialog, allowing users to
@@ -40,6 +41,39 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     with font size 15 and text buffer.
 - Narragansett Bay, RI example notebook showing compound forcing (ocean + river
     discharge + meteo) with NWM streamflow.
+- SCHISM de-containerization: all Singularity container invocations replaced with native
+    Python function calls, MPI module invocations (`mpiexec -m`), and subprocess calls
+    for Fortran binaries (`pschism`, `combine_hotstart7`, `combine_sink_source`,
+    `metis_prep`, `gpmetis`).
+- `coastal_calibration.schism_prep` module with 12 pure-Python functions replacing bash
+    scripts: `stage_ldasin_files`, `make_sflux`, `update_params`, `make_tpxo_boundary`,
+    `make_stofs_boundary`, `correct_elevation`, `stage_chrtout_files`, `make_discharge`,
+    `run_combine_sink_source`, `merge_source_sink`, `partition_mesh`,
+    `combine_hotstart`.
+- `coastal_calibration.sflux` module replacing `makeAtmo.py` for sflux atmospheric
+    forcing generation with inline sea-level pressure reduction.
+- `coastal_calibration.tides` package replacing `tpxo_to_open_bnds_hgrid/` and
+    `makeOceanTide.py` with TPXO boundary utilities and bundled `pytides` harmonic
+    library.
+- `coastal_calibration.regridding` package with ESMF-based regridding for STOFS boundary
+    conditions (`regrid_estofs`) and NWM atmospheric forcing (`regrid_forcings`) with
+    MPI-aware LocStream partitioning.
+- `coastal_calibration.utils.streamflow` module supporting NWM retrospective (S3 Zarr)
+    and analysis (local CHRTOUT) streamflow reads via unified `read_streamflow()`
+    function.
+- `scripts/ensure-schism.sh` pixi activation script for native SCHISM binary compilation
+    with SHA256-based rebuild detection.
+- ESMF/esmpy compatibility shim (`esmf_compat/ESMF.py`) for `import ESMF` → `esmpy`
+    transition with auto-initialized `Manager`.
+- Hawaii SCHISM example notebook demonstrating end-to-end workflow with 3-hour
+    simulation on ~878K node mesh.
+- `prepare-topobathy` and `update-dem-index` CLI commands for DEM management.
+- `docs/schism_compilation.md`: comprehensive SCHISM de-containerization guide covering
+    architecture, build system, stage inventory, and known issues.
+- `docs/stofs_tpxo_improvements.md`: analysis of STOFS/TPXO boundary condition pipeline
+    issues and improvement plan.
+- SCHISM compilation and unit tests in `tests/schism/` and regridding tests in
+    `tests/regridding/` with synthetic grid generation.
 
 ### Changed
 
@@ -84,14 +118,61 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     sync automatically.
 - Configure `ty` type-checker to resolve third-party imports from the pixi `typecheck`
     environment via `python` path instead of `extra-paths`.
-- Exclude `docs/examples/downloads/` from mkdocs static file copying to prevent
+- Exclude `docs/examples/downloads/` from MkDocs static file copying to prevent
     `No space left on device` errors from large NWM data files.
 - Discharge snapping now always snaps to the nearest active cell (previously kept points
     as-is when they happened to land on an active cell) and converts KDTree distances
     from CRS units to meters before comparing with `max_snap_distance_m`.
+- Simplify `SfincsDischargeStage` discharge loading: remove the HydroMT `get_geodataset`
+    fallback chain and call `read_streamflow` directly. Resolves CHRTOUT files from
+    `config.paths.streamflow_dir` instead of the HydroMT data catalog.
+- **Breaking:** All SCHISM stages now run natively without Singularity containers.
+    Stages call Python functions directly instead of shelling out to bash scripts inside
+    `singularity exec`.
+- **Breaking:** SCHISM stage names renamed to `schism_*` prefix convention (matching
+    SFINCS `sfincs_*` pattern): `schism_forcing_prep`, `schism_forcing`, `schism_sflux`,
+    `schism_params`, `schism_obs`, `schism_boundary`, `schism_prep`, `schism_run`,
+    `schism_postprocess`, `schism_plot`.
+- **Breaking:** `singularity_image` config field removed from `SchismModelConfig`.
+- All environment-variable-based argument passing in SCHISM stages replaced with
+    explicit Python function parameters or CLI arguments (`--cycle-date`,
+    `--cycle-time`, `--length-hrs`, `--job-index`, `--job-count`).
+- ESMF regridding modules invoked via `mpiexec -m coastal_calibration.regridding.*` with
+    CLI arguments instead of environment variables.
+- Unified logging: all SCHISM modules use central `coastal_calibration` logger with
+    4-space indent for function-level logs under 2-space stage-level logs.
+- Tests reorganized from flat `tests/` directory into `tests/common/`, `tests/schism/`,
+    `tests/sfincs/`, `tests/regridding/` subdirectories.
+- Pixi `netcdf4` dependency pinned to MPI-aware conda-forge build variant
+    (`mpi_openmpi_*`) for parallel HDF5 support across all environments.
 
 ### Fixed
 
+- Clean all generated files (discharge, boundary, sflux, partitioning, outputs, status)
+    from the run directory at the start of a full workflow run via
+    `clean_run_directory()`. When resuming with `start_from`, no wipe occurs so
+    prerequisites and earlier outputs are preserved. Consolidates the per-stage cleanup
+    previously in `make_sflux()` and `PreForcingStage`.
+- Use `CONSERVE` regrid method for Grid-to-Mesh(ELEMENT) regridding in
+    `_regrid_to_schism`. ESMF `BILINEAR` only supports `MeshLoc.NODE` destinations; the
+    `BILINEAR` + `ELEMENT` combination was silently accepted by some ESMF builds (macOS)
+    but correctly rejected with `ESMC_RC_ARG_VALUE` (rc=509) on others (Ubuntu CI).
+- `_read_staout` now returns empty arrays when `staout_1` has no data (e.g., station
+    output not enabled), preventing `IndexError` on 1-dimensional array indexing.
+- `PostSCHISMStage` filters known non-fatal `QUICKSEARCH` dry-node warnings from
+    `fatal.error` instead of treating all content as a hard failure.
+- `SchismPlotStage` skips gracefully when `staout_1` is empty instead of crashing.
+- Skip ESMF regridding tests on platforms where `ESMF.Mesh` is unavailable or
+    `ESMC_FieldRegridStore` fails with rc=509. Enlarge synthetic ESMF grids to avoid
+    BILINEAR regrid failures on small domains.
+- Exclude regridding tests from CI catch-all test environments that lack MPI/ESMF.
+- Replace `assert` statements with proper exceptions (`ValueError`, `RuntimeError`,
+    `FileNotFoundError`) throughout `src/` modules.
+- Use `ty: ignore[rule-name]` with specific rule names instead of blanket `type: ignore`
+    comments.
+- Add `*.ESMF_LogFile` to `.gitignore`.
+- Configure `schism` submodule to track only HEAD (no internal changes tracked),
+    matching the SFINCS submodule pattern.
 - SFINCS activation script now detects stale `Makefile` configured for a different
     environment prefix and reconfigures automatically, fixing `sfincs` binary not found
     when switching between pixi environments.
@@ -118,6 +199,31 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     mesh visualizations.
 - QGIS plugin: use `mActionVertexToolActiveLayer.svg` icon for the Edit Polygon toolbar
     button (previously used the removed `mActionNodeTool.svg`).
+- NWM data catalog globs (`*.LDASIN_DOMAIN1.nc`, `*.CHRTOUT_DOMAIN1.nc`) now include the
+    simulation year-month prefix (e.g., `202506*.LDASIN_DOMAIN1.nc`). Previously, stale
+    files from other runs or domains in the shared download directory were loaded,
+    causing `xr.open_mfdataset` to fail with "non-monotonic global indexes along
+    dimension x" when combining grids of different sizes (e.g., Hawaii 390×590 vs CONUS
+    3840×4608).
+- `clip_and_reproject` now sorts spatial coordinates after the `nearest_index` reproject
+    step, preventing "non-monotonic global indexes" errors from floating-point drift in
+    reprojected coordinates.
+- `_read_from_chrtout` in `utils/streamflow.py` now handles CHRTOUT files with 2D
+    `streamflow(time, feature_id)` arrays by squeezing the time dimension, fixing
+    compatibility with test fixtures that write multi-dimensional streamflow data.
+
+### Removed
+
+- `scripts_path.py` module — all script paths now resolved via Python imports.
+- `src/coastal_calibration/scripts/` directory — legacy bash and Python scripts moved to
+    `tests/legacy_scripts/` as reference implementations for regression testing.
+- `run_singularity_command()` and `_get_default_bindings()` from `stages/base.py` —
+    Singularity execution infrastructure fully removed.
+- `requires_container` class attribute from `WorkflowStage` — all stages now run
+    natively.
+- `Dockerfile.ngencoastal` — container build file no longer needed.
+- All `run_sing_*.bash` Singularity wrapper scripts.
+- `MPIConfig` class (fields absorbed into `SchismModelConfig`).
 
 ## [3.1.1.0.0] - 2026-02-19
 

@@ -95,15 +95,15 @@ class TestCoastalCalibRunner:
         """SchismModelConfig.stage_order returns the correct SCHISM stages."""
         expected = [
             "download",
-            "pre_forcing",
-            "nwm_forcing",
-            "post_forcing",
-            "update_params",
+            "schism_forcing_prep",
+            "schism_forcing",
+            "schism_sflux",
+            "schism_params",
             "schism_obs",
-            "boundary_conditions",
-            "pre_schism",
+            "schism_boundary",
+            "schism_prep",
             "schism_run",
-            "post_schism",
+            "schism_postprocess",
             "schism_plot",
         ]
         assert expected == SchismModelConfig().stage_order
@@ -142,21 +142,21 @@ class TestCoastalCalibRunner:
         # download is disabled in sample_config
         stages = runner._get_stages_to_run(None, None)
         assert "download" not in stages
-        assert "pre_forcing" in stages
-        assert "post_schism" in stages
+        assert "schism_forcing_prep" in stages
+        assert "schism_postprocess" in stages
 
     def test_get_stages_to_run_start_from(self, sample_config):
         runner = CoastalCalibRunner(sample_config)
-        stages = runner._get_stages_to_run("boundary_conditions", None)
-        assert "pre_forcing" not in stages
-        assert "boundary_conditions" in stages
-        assert stages[0] == "boundary_conditions"
+        stages = runner._get_stages_to_run("schism_boundary", None)
+        assert "schism_forcing_prep" not in stages
+        assert "schism_boundary" in stages
+        assert stages[0] == "schism_boundary"
 
     def test_get_stages_to_run_stop_after(self, sample_config):
         runner = CoastalCalibRunner(sample_config)
-        stages = runner._get_stages_to_run(None, "nwm_forcing")
-        assert "nwm_forcing" in stages
-        assert "post_forcing" not in stages
+        stages = runner._get_stages_to_run(None, "schism_forcing")
+        assert "schism_forcing" in stages
+        assert "schism_sflux" not in stages
 
     def test_get_stages_to_run_invalid_stage(self, sample_config):
         runner = CoastalCalibRunner(sample_config)
