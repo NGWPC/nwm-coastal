@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import shutil
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any, cast
 
@@ -35,10 +34,6 @@ class PreForcingStage(WorkflowStage):
         self._update_substep("Creating output directories")
         work_dir = self.config.paths.work_dir
         work_dir.mkdir(parents=True, exist_ok=True)
-
-        forcing_output = work_dir / "coastal_forcing_output"
-        if forcing_output.exists():
-            shutil.rmtree(forcing_output)
 
         self._update_substep("Staging LDASIN files")
         self._log("Creating forcing symlinks and output directories")

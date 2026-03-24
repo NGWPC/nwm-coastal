@@ -301,6 +301,13 @@ class CoastalCalibRunner:
                 errors=[],
             )
 
+        # Clean generated files from previous runs when starting fresh.
+        # When resuming (start_from is set), preserve existing outputs.
+        if not start_from:
+            from coastal_calibration.schism_prep import clean_run_directory
+
+            clean_run_directory(self.config.paths.work_dir)
+
         self.monitor.register_stages(self.STAGE_ORDER)
         self.monitor.start_workflow()
         self.monitor.info("-" * 40)

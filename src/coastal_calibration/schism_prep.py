@@ -28,6 +28,57 @@ def _symlink(src: Path, dst: Path) -> None:
     dst.symlink_to(src)
 
 
+def clean_run_directory(work_dir: Path) -> None:
+    """Remove generated files from a previous SCHISM run.
+
+    Preserves symlinks to prebuilt model files and log files.
+    Safe to call on a fresh directory (no-ops if files don't exist).
+    """
+    generated_files = [
+        "vsource.th",
+        "vsource.th.1",
+        "vsink.th",
+        "vsink.th.1",
+        "source_sink.in",
+        "source_sink.in.1",
+        "i_sink_source.txt",
+        "source.nc",
+        "precip_source.nc",
+        "elev2D.th.nc",
+        "param.nml",
+        "partition.prop",
+        "nwmReaches.csv",
+        "otps_lat_lon_time.txt",
+        "otps_out.txt",
+        "station_noaa_ids.txt",
+        ".pipeline_status.json",
+    ]
+    for name in generated_files:
+        (work_dir / name).unlink(missing_ok=True)
+
+    for f in work_dir.glob("graphinfo*"):
+        f.unlink(missing_ok=True)
+
+    sflux_dir = work_dir / "sflux"
+    if sflux_dir.is_dir():
+        for f in sflux_dir.glob("*.nc"):
+            f.unlink(missing_ok=True)
+
+    for dirname in [
+        "outputs",
+        "coastal_forcing_output",
+        "forcing_input",
+        "nwm_output",
+        "nwm_output_ana",
+        "figs",
+    ]:
+        d = work_dir / dirname
+        if d.exists():
+            shutil.rmtree(d)
+
+    logger.info("Cleaned generated files from %s", work_dir)
+
+
 # ---------------------------------------------------------------------------
 # 1. Stage CHRTOUT files  (was initial_discharge.bash symlink logic)
 # ---------------------------------------------------------------------------
@@ -538,9 +589,6 @@ def make_sflux(
     forcing_subdir = forcing_input_dir / forcing_begin[:10]
     sflux_dir = work_dir / "sflux"
     sflux_dir.mkdir(parents=True, exist_ok=True)
-    # Remove stale sflux files from previous runs
-    for stale in sflux_dir.glob("sflux_air_*.nc"):
-        stale.unlink()
 
     sflux_out = sflux_dir / "sflux_air_1.0001.nc"
 
