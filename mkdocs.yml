@@ -63,6 +63,11 @@ theme:
 
 exclude_docs: |
   examples/downloads/
+  examples/hawaii/run/
+  examples/hawaii/cache/
+  examples/lavaca-tx/run/
+  examples/lavaca-tx/cache/
+  examples/narragansett-ri/cache/
 
 hooks:
 - docs/hooks.py
@@ -167,6 +172,7 @@ nav:
   - Overview: examples/index.md
   - Lavaca Bay: examples/notebooks/lavaca.ipynb
   - Narragansett Bay: examples/notebooks/narragansett.ipynb
+  - Hawaii: examples/notebooks/schism-hawaii.ipynb
 - Design: DESIGN.md
 - Reference:
   - API Reference: reference/api.md

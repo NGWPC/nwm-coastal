@@ -207,7 +207,7 @@ Ready to contribute? Here's how to set up NWM Coastal for local development.
     pixi r lint
     pixi r -e typecheck typecheck
     pixi r -e test311 test
-    pixi r -e test314 test
+    pixi r -e test313 test
     ```
 
 1. If you are making breaking changes make sure to reflect them in the documentation,

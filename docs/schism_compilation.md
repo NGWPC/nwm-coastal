@@ -3,7 +3,7 @@
 **Goal:** Migrate SCHISM compilation and execution from Singularity containers to
 pixi-managed native builds, following the same pattern used for SFINCS.
 
-**Status:** Complete — validated end-to-end on macOS arm64 with the Hawaii domain.
+**Status:** Complete. Validated end-to-end on macOS arm64 with the Hawaii domain.
 Codebase cleanup (Phase 5) completed: unified logging, env-var elimination, Singularity
 removal, stage renaming to match SFINCS conventions.
 
@@ -68,14 +68,14 @@ CoastalCalibRunner
 All Singularity invocations and Python-script subprocess calls have been replaced by
 either:
 
-- **Direct Python function calls** — for all logic that was previously in bash scripts
-    or standalone Python scripts (makeAtmo.py, correct_elevation.py, TPXO scripts,
+- **Direct Python function calls**: for all logic that was previously in bash scripts or
+    standalone Python scripts (makeAtmo.py, correct_elevation.py, TPXO scripts,
     makeOceanTide.py, etc.). Functions take explicit parameters; no environment variable
     reading.
-- **`mpiexec -m <module>`** — for ESMF/MPI-dependent regridding (regrid_estofs,
+- **`mpiexec -m <module>`**: for ESMF/MPI-dependent regridding (regrid_estofs,
     regrid_forcings). Invoked as proper Python modules with CLI arguments (no env-var
     passing).
-- **Subprocess for Fortran binaries** — `pschism`, `metis_prep`, `gpmetis`,
+- **Subprocess for Fortran binaries**: `pschism`, `metis_prep`, `gpmetis`,
     `combine_sink_source`, `combine_hotstart7`, `predict_tide`.
 
 The legacy bash and Python scripts have been moved to `tests/legacy_scripts/` as
@@ -152,10 +152,10 @@ a **prebuilt model directory** and executes the simulation. A separate create wo
 
 The workflow expects a prebuilt model directory containing at minimum:
 
-- `hgrid.gr3` / `hgrid.ll` — horizontal grid
-- `vgrid.in` — vertical grid
-- `param.nml.template` — parameter template
-- `drag.gr3`, `manning.gr3`, etc. — ancillary grid files
+- `hgrid.gr3` / `hgrid.ll`: horizontal grid
+- `vgrid.in`: vertical grid
+- `param.nml.template`: parameter template
+- `drag.gr3`, `manning.gr3`, etc.: ancillary grid files
 
 All SCHISM stage names are prefixed with `schism_` and follow the same concise naming
 convention as SFINCS stages (`sfincs_run`, `sfincs_forcing`, `sfincs_plot`, etc.).
@@ -202,7 +202,7 @@ ______________________________________________________________________
 
 **`schism_forcing_prep`** (PreForcingStage):
 
-- Calls `schism_prep.stage_ldasin_files()` — pure Python
+- Calls `schism_prep.stage_ldasin_files()` (pure Python)
 - Creates `forcing_input/` and `forcing_output/` directories
 
 **`schism_forcing`** (NWMForcingStage):
@@ -218,7 +218,7 @@ ______________________________________________________________________
 
 **`schism_params`** (UpdateParamsStage):
 
-- Calls `schism_prep.update_params()` — pure Python
+- Calls `schism_prep.update_params()` (pure Python)
 - Creates param.nml from template, removes deprecated params, adds mandatory params,
     symlinks mesh files
 
@@ -255,7 +255,7 @@ ______________________________________________________________________
 
 - Plots simulation vs observed water levels from NOAA stations
 
-### `schism_prep.py` — pure Python functions
+### `schism_prep.py`: pure Python functions
 
 All bash-script logic was extracted into testable Python functions in
 `src/coastal_calibration/schism_prep.py`. Each function takes explicit parameters (no
@@ -282,7 +282,7 @@ ______________________________________________________________________
 
 | Module                                                  | Replaces                                            | Description                                                         |
 | ------------------------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------- |
-| `src/coastal_calibration/sflux.py`                      | `makeAtmo.py`                                       | `make_atmo_sflux()` — creates sflux netCDF from LDASIN files        |
+| `src/coastal_calibration/sflux.py`                      | `makeAtmo.py`                                       | `make_atmo_sflux()`: creates sflux netCDF from LDASIN files         |
 | `src/coastal_calibration/regridding/regrid_estofs.py`   | `wrf_hydro/.../regrid_estofs.py`                    | ESTOFS → SCHISM boundary regridding via ESMF                        |
 | `src/coastal_calibration/regridding/regrid_forcings.py` | `WrfHydroFECPP/workflow_driver.py`                  | NWM atmospheric forcing regridding via ESMF                         |
 | `src/coastal_calibration/regridding/esmf_utils.py`      | (new)                                               | ESMF Grid/LocStream/Regridder utilities with MPI-aware partitioning |
@@ -317,7 +317,7 @@ The central logger is `logging.getLogger("coastal_calibration")` and is configur
 | `regridding/regrid_estofs.py`, `regrid_forcings.py`, `esmf_utils.py`            | `from coastal_calibration.utils.logging import logger` |
 | `utils/floodmap.py`                                                             | `from coastal_calibration.utils.logging import logger` |
 
-No module creates its own `logging.getLogger(__name__)` logger — all go through the
+No module creates its own `logging.getLogger(__name__)` logger; all go through the
 central `coastal_calibration` logger hierarchy, ensuring consistent formatting, levels,
 and file output.
 
@@ -339,7 +339,7 @@ Stage: schism_prep
   Running combine_sink_source
     combine_sink_source completed
   Running merge_source_sink
-    Wrote source.nc — 487 sources (from 487), 149 sinks, 4 timesteps
+    Wrote source.nc: 487 sources (from 487), 149 sinks, 4 timesteps
   Partitioning for 4 tasks (2 scribes)
     Partitioned mesh into 2 compute ranks → .../partition.prop
 ```
@@ -354,11 +354,11 @@ Environment variables are **not** used to pass arguments to functions. All funct
 parameters are passed explicitly as Python arguments. The only remaining environment
 variables are for:
 
-1. **MPI / OpenMP runtime configuration** — set by
+1. **MPI / OpenMP runtime configuration**: set by
     `SchismModelConfig.build_environment()` in `config/schema.py`
-1. **HDF5 NFS reliability** — set by `WorkflowStage.build_environment()` in
+1. **HDF5 NFS reliability**: set by `WorkflowStage.build_environment()` in
     `stages/base.py`
-1. **PATH / LD_LIBRARY_PATH** — for subprocess binary discovery
+1. **PATH / LD_LIBRARY_PATH**: for subprocess binary discovery
 
 ### Complete list of env vars set by the codebase
 
@@ -372,7 +372,7 @@ settings required for cluster execution:
 env["OMP_NUM_THREADS"] = str(self.omp_num_threads)
 env["OMP_PLACES"] = "cores"
 
-# MPI / AWS EFA fabric tuning — required for reliable MPI
+# MPI / AWS EFA fabric tuning, required for reliable MPI
 # on EFA-enabled instances (e.g. c5n-18xlarge). Without
 # these, MPI collectives can hang during ESMF initialization.
 env["MPICH_OFI_STARTUP_CONNECT"] = "1"
@@ -423,7 +423,7 @@ except ImportError:
     import esmpy as ESMF
 ```
 
-#### `esmf_utils.py` — MPI-aware ESMF utilities
+#### `esmf_utils.py`: MPI-aware ESMF utilities
 
 Key abstractions:
 
@@ -431,12 +431,12 @@ Key abstractions:
 - **`build_locstream(lon, lat)`** → `ESMF.LocStream` for unstructured point data.
     Properly partitions the *global* coordinate array across MPI ranks (see
     [LocStream partitioning](#locstream-partitioning) below).
-- **`MaskedRegridder`** — callable class for time-varying source masks. Recomputes
+- **`MaskedRegridder`**: callable class for time-varying source masks. Recomputes
     weights each call because the ESTOFS wet/dry mask changes every timestep.
-- **`gather_reduce()`**, **`gatherv_1d()`**, **`allreduce_minmax()`** — MPI collective
+- **`gather_reduce()`**, **`gatherv_1d()`**, **`allreduce_minmax()`**: MPI collective
     helpers.
 
-#### `regrid_estofs.py` — ESTOFS boundary regridding
+#### `regrid_estofs.py`: ESTOFS boundary regridding
 
 Regrids ESTOFS `zeta` (water level) from the global unstructured STOFS grid (~12.8M
 nodes) to SCHISM open boundary nodes (~4K nodes) using ESMF
@@ -445,9 +445,9 @@ nearest-source-to-destination interpolation.
 Invoked via:
 `mpiexec -n <N> python -m coastal_calibration.regridding.regrid_estofs <nc_in> <nc_grid> <nc_out> --cycle-date PDY --cycle-time CYC00 --length-hrs N`
 
-All parameters are passed via CLI arguments — no env-var reading.
+All parameters are passed via CLI arguments; no env-var reading.
 
-#### `regrid_forcings.py` — NWM atmospheric forcing regridding
+#### `regrid_forcings.py`: NWM atmospheric forcing regridding
 
 Regrids NWM LDASIN atmospheric variables (U2D, V2D, T2D, Q2D, PSFC, LWDOWN, SWDOWN,
 LQFRAC) from the WRF lat-lon grid to SCHISM's lat-lon output grid, and converts RAINRATE
@@ -458,7 +458,7 @@ Invoked via: `mpiexec -n <N> python -m coastal_calibration.regridding.regrid_for
 ### LocStream partitioning
 
 `ESMF.LocStream(n)` creates *n* points **locally** on the calling rank. If every rank
-passes the full global count, the total LocStream has `nranks × n` points — wrong.
+passes the full global count, the total LocStream has `nranks × n` points (wrong).
 
 `build_locstream()` handles this by computing a contiguous partition of the global array
 across MPI ranks:
@@ -501,7 +501,7 @@ Manager(debug=False)  # auto-initialize (old ESMF did this implicitly)
 The ESMF compat shim calls `Manager(debug=False)` because some legacy code (in
 `tests/legacy_scripts/`) calls `ESMF.local_pet()` at **module level** before any
 explicit `Manager()` call. The old ESMF package auto-initialized; esmpy does not.
-`Manager` is a singleton — subsequent calls are harmless no-ops.
+`Manager` is a singleton; subsequent calls are harmless no-ops.
 
 ______________________________________________________________________
 
@@ -548,9 +548,9 @@ The following parameters were removed in newer SCHISM versions and cause
 | Parameter          | Removed in | Commit    |
 | ------------------ | ---------- | --------- |
 | `impose_net_flux`  | Aug 2022   | `ed26f60` |
-| `isconsv`          | Same era   | —         |
-| `isav`             | Same era   | —         |
-| `vclose_surf_frac` | Same era   | —         |
+| `isconsv`          | Same era   | -         |
+| `isav`             | Same era   | -         |
+| `vclose_surf_frac` | Same era   | -         |
 
 The `update_params()` function in `schism_prep.py` strips these automatically using
 regex:
@@ -674,7 +674,7 @@ Hawaii and PRVI domains when running locally.
 
 ### NWM analysis 2-hour lag
 
-NWM Analysis/Assimilation data has a 2-hour lag — the downloader automatically accounts
+NWM Analysis/Assimilation data has a 2-hour lag. The downloader automatically accounts
 for this by fetching `tm02` files offset by +2 hours from the simulation time.
 
 ______________________________________________________________________
@@ -715,7 +715,7 @@ ______________________________________________________________________
 
 | File                                          | Description                                                                               |
 | --------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `scripts/ensure-schism.sh`                    | Pixi activation script — builds SCHISM binaries                                           |
+| `scripts/ensure-schism.sh`                    | Pixi activation script that builds SCHISM binaries                                        |
 | `src/coastal_calibration/schism_prep.py`      | Pure-Python SCHISM pre/post-processing functions                                          |
 | `src/coastal_calibration/sflux.py`            | sflux atmospheric forcing generation (replaces makeAtmo.py)                               |
 | `src/coastal_calibration/regridding/`         | ESMF-based regridding (ESTOFS + NWM forcing) with MPI support                             |

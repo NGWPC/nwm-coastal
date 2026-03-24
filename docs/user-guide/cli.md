@@ -109,15 +109,15 @@ coastal-calibration run <config> [OPTIONS]
 **Available Stages (SCHISM):**
 
 - `download`
-- `pre_forcing`
-- `nwm_forcing`
-- `post_forcing`
+- `schism_forcing_prep`
+- `schism_forcing`
+- `schism_sflux`
+- `schism_params`
 - `schism_obs`
-- `update_params`
-- `boundary_conditions`
-- `pre_schism`
+- `schism_boundary`
+- `schism_prep`
 - `schism_run`
-- `post_schism`
+- `schism_postprocess`
 - `schism_plot`
 
 **Available Stages (SFINCS):**
@@ -128,7 +128,6 @@ coastal-calibration run <config> [OPTIONS]
 - `sfincs_init`
 - `sfincs_timing`
 - `sfincs_forcing`
-- `sfincs_obs`
 - `sfincs_discharge`
 - `sfincs_precip`
 - `sfincs_wind`
@@ -145,7 +144,7 @@ coastal-calibration run <config> [OPTIONS]
 coastal-calibration run config.yaml
 
 # Run only forcing stages (SCHISM)
-coastal-calibration run config.yaml --start-from pre_forcing --stop-after post_forcing
+coastal-calibration run config.yaml --start-from schism_forcing_prep --stop-after schism_sflux
 
 # Run only the model build (SFINCS)
 coastal-calibration run config.yaml --stop-after sfincs_write
@@ -154,7 +153,7 @@ coastal-calibration run config.yaml --stop-after sfincs_write
 coastal-calibration run config.yaml --start-from sfincs_run
 ```
 
-#### Using `run` Inside a SLURM Job — Heredoc (Recommended)
+#### Using `run` Inside a SLURM Job: Heredoc (Recommended)
 
 The recommended way to run workflows on a cluster is to write an `sbatch` script with an
 inline YAML configuration using a heredoc. This keeps everything in a single,
@@ -209,10 +208,10 @@ Key points:
 
 Complete examples for both models are available in `docs/examples/`:
 
-- [`schism.sh`](https://github.com/NGWPC/nwm-coastal/blob/development/docs/examples/schism.sh)
-    — SCHISM multi-node MPI
-- [`sfincs.sh`](https://github.com/NGWPC/nwm-coastal/blob/development/docs/examples/sfincs.sh)
-    — SFINCS single-node OpenMP
+- [`schism.sh`](https://github.com/NGWPC/nwm-coastal/blob/development/docs/examples/schism.sh):
+    SCHISM multi-node MPI
+- [`sfincs.sh`](https://github.com/NGWPC/nwm-coastal/blob/development/docs/examples/sfincs.sh):
+    SFINCS single-node OpenMP
 
 ### create
 
@@ -238,15 +237,15 @@ coastal-calibration create <config> [OPTIONS]
 
 **Available Stages:**
 
-- `create_grid` — Create SFINCS grid from AOI polygon
-- `create_fetch_data` — Fetch elevation and land cover data for AOI
-- `create_elevation` — Add elevation and bathymetry data
-- `create_mask` — Create active cell mask
-- `create_boundary` — Create water level boundary cells
-- `create_discharge` — Add NWM discharge source points _(optional)_
-- `create_subgrid` — Create subgrid tables
-- `create_obs` — Add observation points _(optional)_
-- `create_write` — Write SFINCS model to disk
+- `create_grid`: Create SFINCS grid from AOI polygon
+- `create_fetch_data`: Fetch elevation and land cover data for AOI
+- `create_elevation`: Add elevation and bathymetry data
+- `create_mask`: Create active cell mask
+- `create_boundary`: Create water level boundary cells
+- `create_discharge`: Add NWM discharge source points _(optional)_
+- `create_subgrid`: Create subgrid tables
+- `create_obs`: Add observation points _(optional)_
+- `create_write`: Write SFINCS model to disk
 
 **Examples:**
 
@@ -358,15 +357,15 @@ coastal-calibration stages --model create
 ```console
 SCHISM workflow stages:
   1. download: Download NWM/STOFS data (optional)
-  2. pre_forcing: Prepare NWM forcing data
-  3. nwm_forcing: Generate atmospheric forcing (MPI)
-  4. post_forcing: Post-process forcing data
-  5. schism_obs: Add NOAA observation stations
-  6. update_params: Create SCHISM param.nml
-  7. boundary_conditions: Generate boundary conditions (TPXO/STOFS)
-  8. pre_schism: Prepare SCHISM inputs
+  2. schism_forcing_prep: Prepare NWM forcing data
+  3. schism_forcing: Generate atmospheric forcing (MPI)
+  4. schism_sflux: Generate sflux atmospheric files
+  5. schism_params: Create SCHISM param.nml
+  6. schism_obs: Add NOAA observation stations
+  7. schism_boundary: Generate boundary conditions (TPXO/STOFS)
+  8. schism_prep: Prepare SCHISM inputs
   9. schism_run: Run SCHISM model (MPI)
-  10. post_schism: Post-process SCHISM outputs
+  10. schism_postprocess: Post-process SCHISM outputs
   11. schism_plot: Plot simulated vs observed water levels
 
 SFINCS workflow stages:
@@ -376,15 +375,14 @@ SFINCS workflow stages:
   4. sfincs_init: Initialize SFINCS model (pre-built)
   5. sfincs_timing: Set SFINCS timing
   6. sfincs_forcing: Add water level forcing
-  7. sfincs_obs: Add observation points
-  8. sfincs_discharge: Add discharge sources
-  9. sfincs_precip: Add precipitation forcing
-  10. sfincs_wind: Add wind forcing
-  11. sfincs_pressure: Add atmospheric pressure forcing
-  12. sfincs_write: Write SFINCS model
-  13. sfincs_run: Run SFINCS model (OpenMP)
-  14. sfincs_floodmap: Downscale flood depth map
-  15. sfincs_plot: Plot simulated vs observed water levels
+  7. sfincs_discharge: Add discharge sources
+  8. sfincs_precip: Add precipitation forcing
+  9. sfincs_wind: Add wind forcing
+  10. sfincs_pressure: Add atmospheric pressure forcing
+  11. sfincs_write: Write SFINCS model
+  12. sfincs_run: Run SFINCS model (OpenMP)
+  13. sfincs_floodmap: Downscale flood depth map
+  14. sfincs_plot: Plot simulated vs observed water levels
 
 SFINCS creation stages (create subcommand):
   1. create_grid: Create SFINCS grid from AOI polygon

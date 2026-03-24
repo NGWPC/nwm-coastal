@@ -204,10 +204,10 @@ else:
 result = runner.run()
 
 # Run partial workflow
-result = runner.run(start_from="pre_forcing", stop_after="post_forcing")
+result = runner.run(start_from="schism_forcing_prep", stop_after="schism_sflux")
 
 # Run from a specific stage to the end
-result = runner.run(start_from="pre_schism")
+result = runner.run(start_from="schism_prep")
 ```
 
 ### Workflow Result

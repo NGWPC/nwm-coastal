@@ -52,6 +52,7 @@ dependencies = [
   "xarray>=2024.1",
 ]
 optional-dependencies.docs = [
+  "jupytext",
   "mike>=2",
   "mkdocs>=1.6",
   "mkdocs-jupyter>=0.25,<0.26",
@@ -66,6 +67,8 @@ optional-dependencies.lint = [
 optional-dependencies.notebook = [
   "ipykernel",
   "ipywidgets",
+  "jupytext",
+  "nbconvert",
 ]
 optional-dependencies.plot = [
   "contextily>=1.6",
@@ -261,6 +264,16 @@ ignore-words-list = "gages,parm,oce,gage,nd"
 [tool.pyproject-fmt]
 expand_tables = [ "tool.pixi" ]
 
+[tool.ty]
+environment.python-version = "3.11"
+environment.python = ".pixi/envs/typecheck"
+rules.all = "error"
+src.include = [ "src/coastal_calibration" ]
+src.exclude = [
+  "**/__pycache__",
+  "**/__init__.py",
+]
+
 [tool.pytest]
 ini_options.addopts = [
   "--import-mode=importlib",
@@ -307,15 +320,10 @@ report.omit = [
   "*/legacy_scripts/*",
 ]
 
-[tool.ty]
-environment.python-version = "3.11"
-environment.python = ".pixi/envs/typecheck"
-rules.all = "error"
-src.include = [ "src/coastal_calibration" ]
-src.exclude = [
-  "**/__pycache__",
-  "**/__init__.py",
-]
+[tool.jupytext]
+notebook_metadata_filter = "kernelspec,jupytext"
+cell_metadata_filter = "-all"
+formats = "ipynb,py:percent"
 
 [tool.pixi.environments]
 test311-common = { features = [ "test", "test-common", "py311" ] }
@@ -343,6 +351,18 @@ docs-release = "mike deploy --push --update-aliases $(git describe --tags --abbr
 lint = "pre-commit run --all-files"
 pcupdate = "pre-commit autoupdate"
 spell = "codespell -w"
+
+[tool.pixi.feature.notebook.tasks]
+# Sync all percent-format .py scripts → paired .ipynb files
+nb-sync = "jupytext --sync docs/examples/notebooks/*.py"
+# Execute all notebooks in-place (requires .ipynb to exist; run nb-sync first)
+nb-execute = "jupyter nbconvert --to notebook --execute --inplace docs/examples/notebooks/*.ipynb"
+# Full workflow: sync .py → .ipynb, then execute — use before building docs or committing
+nb-run = { depends-on = [ "nb-sync", "nb-execute" ] }
+# Pair an existing .ipynb with a .py counterpart (one-time setup for imported notebooks)
+nb-pair = "jupytext --set-formats 'ipynb,py:percent' docs/examples/notebooks/*.ipynb"
+# Strip all cell outputs from .ipynb files (keeps repo diff clean)
+nb-clear = "jupyter nbconvert --ClearOutputPreprocessor.enabled=True --to notebook --inplace docs/examples/notebooks/*.ipynb"
 
 [tool.pixi.feature.plot.dependencies]
 proj = "*"

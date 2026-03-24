@@ -104,8 +104,8 @@ to be used inside a user-written `sbatch` script for full control over SLURM res
 allocation. It supports `--start-from` and `--stop-after` for partial workflows:
 
 ```bash
-coastal-calibration run config.yaml --start-from boundary_conditions
-coastal-calibration run config.yaml --stop-after post_forcing
+coastal-calibration run config.yaml --start-from schism_boundary
+coastal-calibration run config.yaml --stop-after schism_sflux
 ```
 
 ### Running Inside a SLURM Job (`sbatch`)
@@ -114,8 +114,8 @@ Write an `sbatch` script with an inline YAML configuration and use
 `coastal-calibration run` to execute it. Complete examples are provided in
 [`docs/examples/`](docs/examples/):
 
-- [`schism.sh`](docs/examples/schism.sh) — SCHISM workflow (multi-node MPI)
-- [`sfincs.sh`](docs/examples/sfincs.sh) — SFINCS workflow (single-node OpenMP)
+- [`schism.sh`](docs/examples/schism.sh): SCHISM workflow (multi-node MPI)
+- [`sfincs.sh`](docs/examples/sfincs.sh): SFINCS workflow (single-node OpenMP)
 
 ```bash
 sbatch docs/examples/schism.sh
@@ -152,8 +152,8 @@ if result.success:
 ### Running Partial Workflows
 
 ```python
-result = runner.run(start_from="pre_forcing", stop_after="post_forcing")
-result = runner.run(start_from="pre_schism")
+result = runner.run(start_from="schism_forcing_prep", stop_after="schism_sflux")
+result = runner.run(start_from="schism_prep")
 ```
 
 ## Configuration Reference
@@ -166,17 +166,18 @@ present.
 
 #### SCHISM (`SchismModelConfig`)
 
-| Parameter            | Type | Default                                      | Description                                  |
-| -------------------- | ---- | -------------------------------------------- | -------------------------------------------- |
-| `singularity_image`  | path | `/ngencerf-app/singularity/ngen-coastal.sif` | Singularity/Apptainer SIF image              |
-| `nodes`              | int  | 2                                            | Number of compute nodes                      |
-| `ntasks_per_node`    | int  | 18                                           | MPI tasks per node                           |
-| `exclusive`          | bool | true                                         | Request exclusive nodes                      |
-| `nscribes`           | int  | 2                                            | Number of SCHISM I/O scribes                 |
-| `omp_num_threads`    | int  | 2                                            | OpenMP threads                               |
-| `oversubscribe`      | bool | false                                        | Allow MPI oversubscription                   |
-| `binary`             | str  | `pschism_wcoss2_NO_PARMETIS_TVD-VL.openmpi`  | SCHISM executable name                       |
-| `include_noaa_gages` | bool | false                                        | Enable NOAA station discovery and comparison |
+| Parameter            | Type | Default   | Description                                  |
+| -------------------- | ---- | --------- | -------------------------------------------- |
+| `prebuilt_dir`       | path | -         | Path to pre-built SCHISM model directory     |
+| `geogrid_file`       | path | -         | WRF geogrid file for forcing regridding      |
+| `nodes`              | int  | 2         | Number of compute nodes                      |
+| `ntasks_per_node`    | int  | 18        | MPI tasks per node                           |
+| `exclusive`          | bool | true      | Request exclusive nodes                      |
+| `nscribes`           | int  | 2         | Number of SCHISM I/O scribes                 |
+| `omp_num_threads`    | int  | 2         | OpenMP threads                               |
+| `oversubscribe`      | bool | false     | Allow MPI oversubscription                   |
+| `binary`             | str  | `pschism` | SCHISM executable name                       |
+| `include_noaa_gages` | bool | false     | Enable NOAA station discovery and comparison |
 
 #### SFINCS (`SfincsModelConfig`)
 
@@ -247,38 +248,37 @@ the full home directory path.
 
 ### SCHISM Stages
 
-Each stage is classified as Python-only or container-based (requires Singularity). The
-`run` command executes all stages sequentially.
+The `run` command executes all stages sequentially. All stages run natively (no
+containers required).
 
-1. **`download`** - Download NWM/STOFS data _(Python-only)_
-1. **`pre_forcing`** - Prepare NWM forcing data _(container)_
-1. **`nwm_forcing`** - Generate atmospheric forcing (MPI) _(container)_
-1. **`post_forcing`** - Post-process forcing data _(container)_
-1. **`schism_obs`** - Add NOAA observation stations _(Python-only)_
-1. **`update_params`** - Create SCHISM `param.nml` file _(container)_
-1. **`boundary_conditions`** - Generate boundary conditions _(container)_
-1. **`pre_schism`** - Prepare SCHISM inputs _(container)_
-1. **`schism_run`** - Run SCHISM model (MPI) _(container)_
-1. **`post_schism`** - Post-process outputs _(container)_
-1. **`schism_plot`** - Plot simulated vs observed water levels _(Python-only)_
+1. **`download`** - Download NWM/STOFS data
+1. **`schism_forcing_prep`** - Prepare NWM forcing data
+1. **`schism_forcing`** - Generate atmospheric forcing (MPI)
+1. **`schism_sflux`** - Generate sflux atmospheric files
+1. **`schism_params`** - Create SCHISM `param.nml` file
+1. **`schism_obs`** - Add NOAA observation stations
+1. **`schism_boundary`** - Generate boundary conditions
+1. **`schism_prep`** - Prepare SCHISM inputs (mesh partitioning, etc.)
+1. **`schism_run`** - Run SCHISM model (MPI)
+1. **`schism_postprocess`** - Post-process outputs
+1. **`schism_plot`** - Plot simulated vs observed water levels
 
 ### SFINCS Stages
 
-1. **`download`** - Download NWM/STOFS data _(Python-only)_
-1. **`sfincs_symlinks`** - Create `.nc` symlinks for NWM data _(Python-only)_
-1. **`sfincs_data_catalog`** - Generate HydroMT data catalog _(Python-only)_
-1. **`sfincs_init`** - Initialize SFINCS model (pre-built) _(Python-only)_
-1. **`sfincs_timing`** - Set SFINCS timing _(Python-only)_
-1. **`sfincs_forcing`** - Add water level forcing _(Python-only)_
-1. **`sfincs_obs`** - Add observation points _(Python-only)_
-1. **`sfincs_discharge`** - Add discharge sources _(Python-only)_
-1. **`sfincs_precip`** - Add precipitation forcing _(Python-only)_
-1. **`sfincs_wind`** - Add wind forcing _(Python-only)_
-1. **`sfincs_pressure`** - Add atmospheric pressure forcing _(Python-only)_
-1. **`sfincs_write`** - Write SFINCS model _(Python-only)_
-1. **`sfincs_run`** - Run SFINCS model (OpenMP) _(native binary)_
-1. **`sfincs_floodmap`** - Downscale flood depth map _(Python-only)_
-1. **`sfincs_plot`** - Plot simulated vs observed water levels _(Python-only)_
+1. **`download`** - Download NWM/STOFS data
+1. **`sfincs_symlinks`** - Create `.nc` symlinks for NWM data
+1. **`sfincs_data_catalog`** - Generate HydroMT data catalog
+1. **`sfincs_init`** - Initialize SFINCS model (pre-built)
+1. **`sfincs_timing`** - Set SFINCS timing
+1. **`sfincs_forcing`** - Add water level forcing
+1. **`sfincs_discharge`** - Add discharge sources
+1. **`sfincs_precip`** - Add precipitation forcing
+1. **`sfincs_wind`** - Add wind forcing
+1. **`sfincs_pressure`** - Add atmospheric pressure forcing
+1. **`sfincs_write`** - Write SFINCS model
+1. **`sfincs_run`** - Run SFINCS model (OpenMP)
+1. **`sfincs_floodmap`** - Downscale flood depth map
+1. **`sfincs_plot`** - Plot simulated vs observed water levels
 
 ### SFINCS Creation Stages
 
@@ -339,8 +339,8 @@ coastal-calibration validate config.yaml
 
 # Run workflow (inside SLURM job or for testing)
 coastal-calibration run config.yaml
-coastal-calibration run config.yaml --start-from update_params
-coastal-calibration run config.yaml --stop-after post_forcing
+coastal-calibration run config.yaml --start-from schism_params
+coastal-calibration run config.yaml --stop-after schism_sflux
 
 # Create a SFINCS model from an AOI polygon
 coastal-calibration create create_config.yaml
