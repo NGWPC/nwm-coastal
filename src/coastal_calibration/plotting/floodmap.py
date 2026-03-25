@@ -102,7 +102,7 @@ def plot_floodmap(
         hmax = src.read(1)
 
     hmax_masked = np.ma.masked_where(~np.isfinite(hmax) | (hmax <= 0), hmax)
-    if not np.any(hmax_masked.mask):
+    if hmax_masked.count() == 0:
         raise ValueError("No valid flood depth values found in the raster.")
 
     if ax is None:

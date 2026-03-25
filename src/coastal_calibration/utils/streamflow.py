@@ -126,7 +126,6 @@ def _read_from_chrtout(
         return pd.DataFrame()
 
     fid_list = sorted(set(feature_ids))
-    set(fid_list)
     fid_to_col = {f: i for i, f in enumerate(fid_list)}
     n_fids = len(fid_list)
 
@@ -135,7 +134,7 @@ def _read_from_chrtout(
     for fpath in chrtout_files:
         with nc.Dataset(str(fpath), "r") as ds:
             all_fids = ds.variables["feature_id"][:]
-            sf = ds.variables["streamflow"][:].filled(0.0)
+            sf = np.ma.filled(ds.variables["streamflow"][:], 0.0)
             if sf.ndim > 1:
                 sf = sf.squeeze()
 
