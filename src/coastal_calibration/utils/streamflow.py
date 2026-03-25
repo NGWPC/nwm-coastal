@@ -11,7 +11,7 @@ data it reads from local CHRTOUT netCDF files using fast direct
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 import pandas as pd
@@ -88,71 +88,80 @@ def _read_from_zarr(
 # ---------------------------------------------------------------------------
 
 
+def _extract_timestamp(ds: Any, fpath: Path) -> pd.Timestamp:
+    """Extract timestamp from an open netCDF4 Dataset or fall back to filename."""
+    import netCDF4 as nc  # noqa: N813
+
+    for tvar_name in ("time", "model_output_valid_time"):
+        if tvar_name in ds.variables:
+            tvar = ds.variables[tvar_name]
+            t_val = nc.num2date(
+                tvar[:].item(),
+                units=tvar.units,
+                calendar=getattr(tvar, "calendar", "standard"),
+            )
+            return pd.Timestamp(str(t_val))
+
+    # Fallback: parse timestamp from filename (YYYYMMDDHHMM.CHRTOUT_DOMAIN1)
+    stem = fpath.stem.split(".")[0]
+    fmt = {8: "%Y%m%d", 10: "%Y%m%d%H", 12: "%Y%m%d%H%M", 14: "%Y%m%d%H%M%S"}
+    n = len(stem)
+    return pd.to_datetime(stem, format=fmt.get(n, "%Y%m%d%H%M"))
+
+
 def _read_from_chrtout(
     chrtout_files: list[Path],
     feature_ids: list[int],
 ) -> pd.DataFrame:
     """Read streamflow from local CHRTOUT netCDF files.
 
-    Uses direct ``netCDF4.Dataset`` access with pre-computed integer
-    indices for speed — avoids xarray/dask overhead.
+    Uses direct ``netCDF4.Dataset`` access for speed — avoids xarray/dask
+    overhead.  Each file's ``feature_id`` array is mapped independently so
+    files from different NWM domains (with different feature layouts) are
+    handled correctly.
     """
     import netCDF4 as nc  # noqa: N813
 
     if not chrtout_files:
         return pd.DataFrame()
 
-    # Build integer index mapping from the first file
-    with nc.Dataset(str(chrtout_files[0]), "r") as ds0:
-        all_fids = ds0.variables["feature_id"][:]
+    fid_list = sorted(set(feature_ids))
+    set(fid_list)
+    fid_to_col = {f: i for i, f in enumerate(fid_list)}
+    n_fids = len(fid_list)
 
-    fid_set = set(feature_ids)
-    keep_mask = np.isin(all_fids, list(fid_set))
-    keep_idx = np.where(keep_mask)[0]
-    keep_fids = all_fids[keep_idx].tolist()
+    rows: list[tuple[pd.Timestamp, np.ndarray]] = []
 
-    if not keep_idx.size:
-        logger.warning("None of the requested feature_ids found in CHRTOUT files")
-        return pd.DataFrame()
-
-    n_files = len(chrtout_files)
-    n_features = len(keep_idx)
-    data = np.empty((n_files, n_features), dtype=np.float64)
-    timestamps: list[pd.Timestamp] = []
-
-    for i, fpath in enumerate(chrtout_files):
+    for fpath in chrtout_files:
         with nc.Dataset(str(fpath), "r") as ds:
+            all_fids = ds.variables["feature_id"][:]
             sf = ds.variables["streamflow"][:].filled(0.0)
             if sf.ndim > 1:
                 sf = sf.squeeze()
-            data[i, :] = sf[keep_idx]
 
-            # Extract timestamp
-            ts: pd.Timestamp | None = None
-            for tvar_name in ("time", "model_output_valid_time"):
-                if tvar_name in ds.variables:
-                    tvar = ds.variables[tvar_name]
-                    t_val = nc.num2date(
-                        tvar[:].item(),
-                        units=tvar.units,
-                        calendar=getattr(tvar, "calendar", "standard"),
-                    )
-                    ts = pd.Timestamp(str(t_val))
-                    break
-            if ts is None:
-                # Fallback: parse timestamp from filename (YYYYMMDDHHMM.CHRTOUT_DOMAIN1)
-                stem = fpath.stem.split(".")[0]
-                # Use the full leading digit run to avoid collapsing
-                # sub-hourly files (YYYYMMDDHH vs YYYYMMDDHHMM).
-                fmt = {8: "%Y%m%d", 10: "%Y%m%d%H", 12: "%Y%m%d%H%M", 14: "%Y%m%d%H%M%S"}
-                n = len(stem)
-                ts = pd.to_datetime(stem, format=fmt.get(n, "%Y%m%d%H%M"))
-            timestamps.append(ts)
+            # Per-file index mapping — safe even if files have different
+            # feature_id layouts (e.g. CONUS vs Hawaii CHRTOUT).
+            keep_mask = np.isin(all_fids, fid_list)
+            keep_idx = np.where(keep_mask)[0]
+            if keep_idx.size == 0:
+                continue
 
+            vals = np.zeros(n_fids, dtype=np.float64)
+            for pos in keep_idx:
+                fid = int(all_fids[pos])
+                vals[fid_to_col[fid]] = sf[pos]
+
+            rows.append((_extract_timestamp(ds, fpath), vals))
+
+    if not rows:
+        logger.warning("None of the requested feature_ids found in CHRTOUT files")
+        return pd.DataFrame()
+
+    timestamps, data_rows = zip(*rows, strict=True)
     df = pd.DataFrame(
-        data,
+        np.array(data_rows),
         index=pd.DatetimeIndex(timestamps, name="time"),
-        columns=keep_fids,
+        columns=fid_list,
     )
 
     if df.index.duplicated().any():

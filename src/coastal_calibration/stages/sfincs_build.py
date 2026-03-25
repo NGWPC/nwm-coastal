@@ -1343,7 +1343,7 @@ class SfincsDischargeStage(_SfincsStageBase):
                 domain=sim.coastal_domain,
             )
         else:
-            streamflow_dir = self.config.paths.streamflow_dir(sim.meteo_source)
+            streamflow_dir = self.config.paths.streamflow_dir(sim.meteo_source, sim.coastal_domain)
             files = _filter_chrtout_files(
                 sorted(streamflow_dir.glob("*.CHRTOUT_DOMAIN1*")),
                 start_dt,
