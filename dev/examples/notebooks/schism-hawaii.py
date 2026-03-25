@@ -162,7 +162,7 @@ else:
 # directly in an `sbatch` script:
 #
 # ```bash
-# #!/usr/bin/env bash
+# !/usr/bin/env bash
 # #SBATCH --job-name=coastal_schism
 # #SBATCH --partition=c5n-18xlarge
 # #SBATCH -N 2
