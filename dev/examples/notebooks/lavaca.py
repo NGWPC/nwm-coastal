@@ -9,7 +9,7 @@
 #       format_version: '1.3'
 #       jupytext_version: 1.19.1
 #   kernelspec:
-#     display_name: Python 3
+#     display_name: dev
 #     language: python
 #     name: python3
 # ---
@@ -232,7 +232,7 @@ fig, ax = plot_mesh(info, title="Lavaca Bay SFINCS mesh")
 # %%
 fig, ax = plot_floodmap(
     "run/sfincs_model/floodmap_hmax.tif",
-    title="Lavaca Bay flood depth (hmax) from SFINCS simulation",
+    title="Max water depth, Lavaca Bay, TX",
 )
 fig.savefig("../images/lavaca_thumb.png", dpi=150, bbox_inches="tight")
 

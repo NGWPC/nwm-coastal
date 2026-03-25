@@ -9,31 +9,29 @@
 #       format_version: '1.3'
 #       jupytext_version: 1.19.1
 #   kernelspec:
-#     display_name: Python 3
+#     display_name: dev
 #     language: python
 #     name: python3
 # ---
 
 # %% [markdown]
-# # Hawaii SCHISM Tutorial
+# # Hawaii: SCHISM Demo
 #
-# This notebook demonstrates how to run the SCHISM ocean model for the
-# Hawaii coast using the `coastal_calibration` Python API.
+# This notebook demonstrates the SCHISM ocean model workflow using
+# the same `coastal-calibration` API shown in the SFINCS demo.
 #
-# The workflow mirrors the SFINCS pipeline: given a **prebuilt model
-# directory** and a **geogrid file** the runner downloads forcing data,
-# regrids atmospheric forcing, generates boundary conditions, runs
-# SCHISM, and produces comparison plots against NOAA CO-OPS tide gauge
-# observations.
+# SCHISM differs from SFINCS in a few key ways:
 #
-# ## Prerequisites
+# - **Prebuilt mesh**: SCHISM uses an unstructured triangular mesh
+#   that is prepared ahead of time (hgrid.gr3, vgrid.in, etc.)
+# - **MPI execution**: runs across multiple nodes using `mpiexec`
+#   and `pschism`
+# - **Atmospheric regridding**: NWM forcing is regridded onto the
+#   SCHISM mesh using ESMF, which requires a geogrid file
 #
-# - The **pixi `schism` environment** must be active so that `pschism`,
-#   `metis_prep`, `gpmetis`, and other SCHISM binaries are on `$PATH`.
-# - **Pre-built model files** (hgrid.gr3, vgrid.in, param.nml,
-#   bctides.in, nwmReaches.csv, etc.).
-# - A **geogrid file** (e.g. `geo_em_HI.nc`) for atmospheric forcing
-#   regridding.
+# Despite these differences, the Python API is identical:
+# `CoastalCalibConfig` for configuration and `CoastalCalibRunner`
+# for execution. Only the `model_config` section changes.
 
 # %% [markdown]
 # ## Setup
@@ -50,19 +48,22 @@ os.chdir(notebook_dir.parent / "hawaii")
 # %% [markdown]
 # ## 1. Build the run configuration
 #
-# `CoastalCalibConfig.from_dict` accepts the same dictionary structure as
-# the run YAML file.  The interface is identical to the SFINCS workflow:
-# `prebuilt_dir` and `geogrid_file` under `model_config` point to the
-# model inputs, `work_dir` is the run directory, and `raw_download_dir`
-# is where NWM data is cached.
+# The configuration mirrors the SFINCS workflow. The main differences
+# are in `model_config`:
+#
+# - `prebuilt_dir`: path to the pre-built SCHISM model files
+# - `geogrid_file`: WRF geogrid for ESMF atmospheric regridding
+# - `nodes`, `ntasks_per_node`, `nscribes`: MPI layout for `pschism`
+# - `include_noaa_gages`: auto-discover NOAA tide gauges in the domain
+#
+# **Note**: the pre-built model directory (`./model`) and geogrid file
+# (`./geo_em_HI.nc`) are not included in the repository. Users must
+# place the correct files at these paths (or adjust the paths below).
 
 # %%
 from coastal_calibration import CoastalCalibConfig, CoastalCalibRunner, configure_logger
 
 configure_logger(level="INFO")
-
-MODEL_DIR = "/Volumes/data/schism_models/hawaii"
-GEOGRID = "/Volumes/data/schism_models/geo_em_HI.nc"
 
 run_config = CoastalCalibConfig.from_dict(
     {
@@ -72,7 +73,7 @@ run_config = CoastalCalibConfig.from_dict(
             "duration_hours": 50,
             "coastal_domain": "hawaii",
             "meteo_source": "nwm_ana",
-            "timestep_seconds": 300,
+            "timestep_seconds": 300,  # 5-minute timestep
         },
         "boundary": {"source": "stofs"},
         "paths": {
@@ -81,11 +82,11 @@ run_config = CoastalCalibConfig.from_dict(
         },
         "download": {"enabled": True},
         "model_config": {
-            "prebuilt_dir": MODEL_DIR,
-            "geogrid_file": GEOGRID,
-            "nodes": 1,
-            "ntasks_per_node": 4,
-            "nscribes": 2,
+            "prebuilt_dir": "./model",  # pre-built mesh and config files
+            "geogrid_file": "./geo_em_HI.nc",  # for ESMF atmospheric regridding
+            "nodes": 1,  # number of compute nodes
+            "ntasks_per_node": 4,  # MPI tasks per node
+            "nscribes": 2,  # I/O server tasks
             "oversubscribe": True,
             "include_noaa_gages": True,
         },
@@ -100,19 +101,16 @@ print(f"Duration:       {run_config.simulation.duration_hours}h")
 # %% [markdown]
 # ## 2. Run the pipeline
 #
-# `CoastalCalibRunner` executes all stages in order:
+# The pipeline executes 11 stages grouped into four phases:
 #
-# 1. `download` — fetch NWM CHRTOUT, LDASIN, and STOFS data
-# 2. `schism_forcing_prep` — stage LDASIN files
-# 3. `schism_forcing` — ESMF regridding of atmospheric forcing (MPI)
-# 4. `schism_sflux` — generate sflux files
-# 5. `schism_params` — create param.nml, symlink mesh files
-# 6. `schism_obs` — discover NOAA tide gauge stations
-# 7. `schism_boundary` — boundary forcing (TPXO or STOFS → elev2D.th.nc)
-# 8. `schism_prep` — discharge generation, mesh partitioning
-# 9. `schism_run` — run `pschism` via `mpiexec`
-# 10. `schism_postprocess` — check outputs, combine hotstarts
-# 11. `schism_plot` — sim vs obs comparison plots
+# 1. **Download**: fetch NWM meteorological data and STOFS boundary data
+# 2. **Forcing**: regrid atmospheric forcing onto the SCHISM mesh (ESMF),
+#    generate sflux files, process river discharge, and set up boundary
+#    conditions
+# 3. **Model Prep**: update parameters, discover NOAA stations, partition
+#    the mesh for MPI
+# 4. **Run & Validate**: execute `pschism` via `mpiexec`, post-process
+#    outputs, and generate comparison plots against NOAA observations
 
 # %%
 runner = CoastalCalibRunner(run_config)
@@ -124,8 +122,8 @@ print(result)
 # %% [markdown]
 # ## 3. View results
 #
-# The pipeline generates station comparison plots (modeled vs. observed
-# water levels at NOAA CO-OPS tide gauges).
+# The pipeline compares modeled water levels against NOAA CO-OPS
+# tide gauge observations at stations within the domain.
 
 # %%
 import shutil
@@ -157,19 +155,61 @@ else:
     print("No outputs directory found")
 
 # %% [markdown]
+# ## Running on HPC
+#
+# The same configuration can be submitted to any HPC cluster using
+# a job scheduler. For example, with SLURM you can embed the config
+# directly in an `sbatch` script:
+#
+# ```bash
+# #!/usr/bin/env bash
+# #SBATCH --job-name=coastal_schism
+# #SBATCH --partition=c5n-18xlarge
+# #SBATCH -N 2
+# #SBATCH --ntasks-per-node=18
+# #SBATCH --exclusive
+# #SBATCH --output=slurm-%j.out
+#
+# CONFIG_FILE="/tmp/coastal_config_${SLURM_JOB_ID}.yaml"
+#
+# cat > "${CONFIG_FILE}" <<'EOF'
+# model: schism
+#
+# simulation:
+#   start_date: 2025-11-26
+#   duration_hours: 50
+#   coastal_domain: hawaii
+#   meteo_source: nwm_ana
+#
+# boundary:
+#   source: stofs
+#
+# model_config:
+#   include_noaa_gages: true
+# EOF
+#
+# coastal-calibration run "${CONFIG_FILE}"
+# rm -f "${CONFIG_FILE}"
+# ```
+#
+# The same approach works with PBS, LSF, or any other scheduler.
+# The only requirement is that the `coastal-calibration` command
+# is available on the compute nodes.
+
+# %% [markdown]
 # ## Summary
 #
-# This notebook ran the full SCHISM pipeline for Hawaii using the same
-# `CoastalCalibConfig` + `CoastalCalibRunner` API as SFINCS:
+# This notebook ran the full SCHISM pipeline for Hawaii using the
+# same API as SFINCS:
 #
-# 1. Pointed `prebuilt_dir` at the pre-built model files and
-#    `geogrid_file` at the WRF geogrid for regridding
-# 2. Downloaded NWM and STOFS coastal data
-# 3. Regridded atmospheric forcing onto the SCHISM mesh
-# 4. Generated boundary conditions (elev2D.th.nc)
-# 5. Prepared discharge inputs and partitioned the mesh
-# 6. Ran `pschism` via `mpiexec`
-# 7. Post-processed outputs and generated comparison plots
+# 1. Configured `CoastalCalibConfig` with SCHISM-specific settings
+#    (MPI layout, geogrid for ESMF regridding)
+# 2. Executed the 11-stage pipeline with `CoastalCalibRunner`
+#    (download, forcing, model prep, run, validate)
+# 3. Compared modeled water levels against NOAA observations
+# 4. Showed how the same config can be submitted to an HPC cluster
+#    via `sbatch` or any other job scheduler
 #
-# The interface is identical to the SFINCS workflow — only the
-# `model_config` fields differ (MPI layout vs. OpenMP threads).
+# The interface is identical to SFINCS. Only the `model_config`
+# section differs (MPI layout vs. OpenMP, geogrid for atmospheric
+# regridding, prebuilt mesh vs. automated creation).

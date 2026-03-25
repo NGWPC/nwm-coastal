@@ -82,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#nwm-coastal-coastal-model-workflow" class="md-skip">
+        <a href="#nwm-coastal-automated-coastal-model-calibration" class="md-skip">
           Skip to content
         </a>
       
@@ -496,10 +496,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#features" class="md-nav__link">
+  <a href="#why-this-tool" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Features
+        Why This Tool?
       
     </span>
   </a>
@@ -507,10 +507,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#quick-example" class="md-nav__link">
+  <a href="#what-it-does" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Quick Example
+        What It Does
       
     </span>
   </a>
@@ -529,10 +529,176 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#use-cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Use Cases
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Start
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Quick Start">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#installation" class="md-nav__link">
     <span class="md-ellipsis">
       
         Installation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python API
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#creating-a-sfincs-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Creating a SFINCS Model
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#supported-data-sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported Data Sources
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#workflow-stages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workflow Stages
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Workflow Stages">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#schism-11-stages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SCHISM (11 stages)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sfincs-14-stages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SFINCS (14 stages)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sfincs-creation-9-stages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SFINCS Creation (9 stages)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#roadmap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Roadmap
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#credits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Credits
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#license" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        License
       
     </span>
   </a>
@@ -994,7 +1160,7 @@
   <span class="md-ellipsis">
     
   
-    Narragansett Bay SFINCS Tutorial
+    Narragansett Bay: SFINCS Demo
   
 
     
@@ -1022,7 +1188,7 @@
   <span class="md-ellipsis">
     
   
-    Hawaii SCHISM Tutorial
+    Hawaii: SCHISM Demo
   
 
     
@@ -1278,99 +1444,224 @@
   
 
 
-<h1 id="nwm-coastal-coastal-model-workflow">NWM Coastal: Coastal Model Workflow<a class="headerlink" href="#nwm-coastal-coastal-model-workflow" title="Permanent link">#</a></h1>
-<p><code>nwm-coastal</code> is a collection of tools designed to implement skill assessments for
-coastal model runs and execute National Water Model (NWM) hindcast/forecast runs for
-standalone coastal models utilized in NWMv4 operations. This includes the Semi-implicit
-Cross-scale Hydroscience Integrated System Model (SCHISM) and Super-Fast INundation of
-CoastS (SFINCS) as the intended coastal models for implementation in NWMv4 operations.
-This repository stores symlinks to both coastal modeling development groups, which are
-used to compile and run the NWMv4 coastal models. The coastal modeling output for NWMv4
-operations is the Total Water Level (TWL) fields. These fields are the focus of the
-coastal tools in this repository for skill assessments across NWM domains, as well as
-the end result to retrieve from tools in this repository that set up and execute NWMv4
-hindcast and operational forecast runs.</p>
-<h2 id="features">Features<a class="headerlink" href="#features" title="Permanent link">#</a></h2>
+<h1 id="nwm-coastal-automated-coastal-model-calibration">NWM Coastal: Automated Coastal Model Calibration<a class="headerlink" href="#nwm-coastal-automated-coastal-model-calibration" title="Permanent link">#</a></h1>
+<h2 id="why-this-tool">Why This Tool?<a class="headerlink" href="#why-this-tool" title="Permanent link">#</a></h2>
+<p>Running coastal models for calibration and forecasting involves many moving parts:
+downloading and preparing meteorological, ocean boundary, river discharge data, and
+configuring the model, running on HPC, and validating against observations. Previously,
+this required 20+ bash scripts with dozens of environment variables, fragile date
+arithmetic, and manual data management.</p>
+<p><code>coastal-calibration</code> replaces that workflow with a single Python package. One
+configuration file drives the entire pipeline, from data download through model
+execution to validation against NOAA tide gauges.</p>
+<h2 id="what-it-does">What It Does<a class="headerlink" href="#what-it-does" title="Permanent link">#</a></h2>
 <ul>
-<li><strong>Multi-Model Support</strong>: SCHISM (multi-node MPI) and SFINCS (single-node OpenMP) via a
-    polymorphic <code>ModelConfig</code> architecture</li>
-<li><strong>YAML Configuration</strong>: Simple, human-readable configuration files with variable
-    interpolation</li>
-<li><strong>Data Download</strong>: Automated download of NWM and STOFS boundary data</li>
-<li><strong>Multiple Domains</strong>: Support for Hawaii, Puerto Rico/Virgin Islands, Atlantic/Gulf,
-    and Pacific</li>
-<li><strong>Boundary Conditions</strong>: TPXO tidal model and STOFS water level support</li>
-<li><strong>NOAA Observation Stations</strong>: Automatic discovery of CO-OPS water level stations
-    within the model domain, with post-run comparison plots (simulated vs observed)</li>
-<li><strong>Plotting Utilities</strong>: Reusable <code>plotting</code> module for SFINCS grid inspection
-    (<code>SfincsGridInfo</code>, <code>plot_mesh</code>), flood depth visualization (<code>plot_floodmap</code>), and
-    simulated vs observed station comparison (<code>plot_station_comparison</code>)</li>
-<li><strong>Flood Depth Map</strong>: Downscale SFINCS water surface elevations onto a high-resolution
-    DEM to produce a Cloud Optimized GeoTIFF of maximum flood depth</li>
-<li><strong>SFINCS Model Creation</strong>: Build SFINCS quadtree models from an AOI polygon with
-    automatic NOAA DEM discovery, elevation/bathymetry, boundary cells, and subgrid
-    tables</li>
-<li><strong>QGIS Plugin</strong>: Interactive domain definition with National HydroFabric basemaps,
-    polygon sketching, union with NHF divides, and GeoJSON export for the <code>create</code>
-    workflow</li>
-<li><strong>Workflow Control</strong>: <code>run</code> pipeline with <code>--start-from</code> / <code>--stop-after</code> support for
-    partial workflows</li>
-<li><strong>Configuration Inheritance</strong>: Share common settings across multiple runs</li>
+<li><strong>Domain definition</strong>: QGIS plugin for interactively drawing the model domain and
+    selecting NWM river discharge points</li>
+<li><strong>Model creation</strong> (SFINCS): automated quadtree mesh generation from an AOI polygon</li>
+<li><strong>Data management</strong>: download of NWM forcing (retrospective 1979-2023 or real-time
+    analysis), STOFS ocean boundary conditions, and TPXO tidal data with date-range
+    validation</li>
+<li><strong>Forcing preparation</strong>: atmospheric regridding via ESMF, boundary condition
+    processing with STOFS/TPXO fallback</li>
+<li><strong>Model execution</strong>: SFINCS (single-node OpenMP) and SCHISM (multi-node MPI) with
+    resumable stage-based pipelines</li>
+<li><strong>Validation</strong>: automatic NOAA CO-OPS station discovery, water level comparison plots,
+    and flood depth mapping</li>
 </ul>
-<h2 id="quick-example">Quick Example<a class="headerlink" href="#quick-example" title="Permanent link">#</a></h2>
-<p>On clusters, the recommended approach is to use a heredoc <code>sbatch</code> script:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="ch">#!/usr/bin/env bash</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="c1">#SBATCH --job-name=coastal_schism</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1">#SBATCH --partition=c5n-18xlarge</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1">#SBATCH -N 2</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="c1">#SBATCH --ntasks-per-node=18</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="c1">#SBATCH --exclusive</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1">#SBATCH --output=slurm-%j.out</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="nv">CONFIG_FILE</span><span class="o">=</span><span class="s2">&quot;/tmp/coastal_config_</span><span class="si">${</span><span class="nv">SLURM_JOB_ID</span><span class="si">}</span><span class="s2">.yaml&quot;</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>cat<span class="w"> </span>&gt;<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">CONFIG_FILE</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span><span class="s">&lt;&lt;&#39;EOF&#39;</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="s">simulation:</span>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="s">  start_date: 2021-06-11</span>
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="s">  duration_hours: 24</span>
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="s">  coastal_domain: hawaii</span>
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="s">  meteo_source: nwm_ana</span>
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="s">boundary:</span>
-</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="s">  source: stofs</span>
-</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="s">EOF</span>
-</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>
-</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>coastal-calibration<span class="w"> </span>run<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">CONFIG_FILE</span><span class="si">}</span><span class="s2">&quot;</span>
-</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>rm<span class="w"> </span>-f<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">CONFIG_FILE</span><span class="si">}</span><span class="s2">&quot;</span>
-</span></code></pre></div>
-<p>Submit with <code>sbatch my_run.sh</code>. The full NFS path ensures the command is found on
-compute nodes. See the <a href="getting-started/quickstart/">Quick Start</a> for more options.</p>
+<p align="center">
+  <img src="examples/images/qgis_plugin_merge.png" alt="QGIS Plugin: model domain with watershed boundaries" width="70%">
+  <br>
+  <em>QGIS plugin: defining the model domain aligned to watershed boundaries</em>
+</p>
+
+<p align="center">
+  <img src="examples/images/narragansett_thumb.png" alt="Flood depth map, Narragansett Bay" width="45%">
+  <br>
+  <em>Flood depth map from a SFINCS simulation of Narragansett Bay, RI</em>
+</p>
+
 <h2 id="supported-models">Supported Models<a class="headerlink" href="#supported-models" title="Permanent link">#</a></h2>
 <table>
 <thead>
 <tr>
-<th>Model</th>
-<th>Status</th>
+<th></th>
+<th>SFINCS</th>
+<th>SCHISM</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Grid</strong></td>
+<td>Quadtree (regular)</td>
+<td>Unstructured triangular</td>
+</tr>
+<tr>
+<td><strong>Compute</strong></td>
+<td>Single-node, OpenMP</td>
+<td>Multi-node, MPI</td>
+</tr>
+<tr>
+<td><strong>Model Creation</strong></td>
+<td>Automated</td>
+<td>Prebuilt mesh required</td>
+</tr>
+<tr>
+<td><strong>Flood Depth Map</strong></td>
+<td>Yes (downscaled to DEM)</td>
+<td>Not yet supported</td>
+</tr>
+<tr>
+<td><strong>Domains</strong></td>
+<td>CONUS, Hawaii, Puerto Rico</td>
+<td>CONUS, Hawaii, Puerto Rico</td>
+</tr>
+</tbody>
+</table>
+<h2 id="design">Design<a class="headerlink" href="#design" title="Permanent link">#</a></h2>
+<ul>
+<li><strong>Single configuration</strong>: one YAML file (or Python dictionary) defines the entire
+    simulation, with validation, sensible defaults, and support for multi-run templates</li>
+<li><strong>Resumable pipeline</strong>: each stage (download, forcing, run, plot, ...) can be
+    restarted individually, so a failed run does not need to start from scratch</li>
+<li><strong>Portable</strong>: both SFINCS and SCHISM are included as submodules and compiled from
+    source during environment setup, with no containers required. The same workflow runs
+    on a local workstation or an HPC cluster.</li>
+<li><strong>Unified API</strong>: the same two Python calls (<code>CoastalCalibConfig</code> +
+    <code>CoastalCalibRunner</code>) work for both models; only the model-specific settings differ</li>
+<li><strong>Built for large models</strong>: although written in Python, the package orchestrates
+    compiled libraries for the heavy lifting: ESMF for atmospheric regridding,
+    GDAL/NetCDF/HDF5 for spatial I/O on large files, and lazy loading to avoid reading
+    entire datasets into memory. Python handles the workflow logic while
+    performance-critical operations run in compiled code.</li>
+</ul>
+<h2 id="use-cases">Use Cases<a class="headerlink" href="#use-cases" title="Permanent link">#</a></h2>
+<p>This package supports two primary use cases:</p>
+<ol>
+<li><strong>Retrospective calibration</strong>: run historical simulations against NWM retrospective
+    data (1979-2023) to tune model parameters and validate performance at NOAA gage
+    stations</li>
+<li><strong>Operational forecasting</strong>: integrate with the Next Generation Water Modeling
+    Framework (NGEN) as a coastal model realization, where <code>coastal-calibration</code>
+    handles the model setup, forcing, and execution while NGEN orchestrates
+    catchment-level workflows</li>
+</ol>
+<h2 id="quick-start">Quick Start<a class="headerlink" href="#quick-start" title="Permanent link">#</a></h2>
+<h3 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">#</a></h3>
+<p>Prerequisites: <a href="https://git-scm.com/">Git</a> and
+<a href="https://pixi.prefix.dev/latest/installation/">Pixi</a>.
+Pixi handles all other dependencies including Python and compiling
+SFINCS and SCHISM from source.</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/NGWPC/nwm-coastal
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">cd</span><span class="w"> </span>nwm-coastal
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>pixi<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>dev
+</span></code></pre></div>
+<p>All commands below should be run with <code>pixi r -e dev</code> to activate
+the environment.</p>
+<h3 id="cli">CLI<a class="headerlink" href="#cli" title="Permanent link">#</a></h3>
+<p>Generate a configuration file, adjust it, then run:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># SCHISM (default)</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>pixi<span class="w"> </span>r<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>coastal-calibration<span class="w"> </span>init<span class="w"> </span>config.yaml<span class="w"> </span>--domain<span class="w"> </span>hawaii
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># SFINCS</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>pixi<span class="w"> </span>r<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>coastal-calibration<span class="w"> </span>init<span class="w"> </span>config.yaml<span class="w"> </span>--domain<span class="w"> </span>atlgulf<span class="w"> </span>--model<span class="w"> </span>sfincs
+</span></code></pre></div>
+<p>Validate and run:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>pixi<span class="w"> </span>r<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>coastal-calibration<span class="w"> </span>validate<span class="w"> </span>config.yaml
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>pixi<span class="w"> </span>r<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>coastal-calibration<span class="w"> </span>run<span class="w"> </span>config.yaml
+</span></code></pre></div>
+<p>The pipeline supports <code>--start-from</code> and <code>--stop-after</code> for partial workflows:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pixi<span class="w"> </span>r<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>coastal-calibration<span class="w"> </span>run<span class="w"> </span>config.yaml<span class="w"> </span>--start-from<span class="w"> </span>schism_boundary
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>pixi<span class="w"> </span>r<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>coastal-calibration<span class="w"> </span>run<span class="w"> </span>config.yaml<span class="w"> </span>--stop-after<span class="w"> </span>schism_sflux
+</span></code></pre></div>
+<h3 id="python-api">Python API<a class="headerlink" href="#python-api" title="Permanent link">#</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">coastal_calibration</span><span class="w"> </span><span class="kn">import</span> <span class="n">CoastalCalibConfig</span><span class="p">,</span> <span class="n">CoastalCalibRunner</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">config</span> <span class="o">=</span> <span class="n">CoastalCalibConfig</span><span class="o">.</span><span class="n">from_yaml</span><span class="p">(</span><span class="s2">&quot;config.yaml&quot;</span><span class="p">)</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">runner</span> <span class="o">=</span> <span class="n">CoastalCalibRunner</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">success</span><span class="p">:</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Completed in </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">duration_seconds</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">s&quot;</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="creating-a-sfincs-model">Creating a SFINCS Model<a class="headerlink" href="#creating-a-sfincs-model" title="Permanent link">#</a></h3>
+<p>Build a new SFINCS quadtree model from an AOI polygon:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>pixi<span class="w"> </span>r<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>coastal-calibration<span class="w"> </span>create<span class="w"> </span>create_config.yaml
+</span></code></pre></div>
+<p>The AOI polygon and discharge points can be created interactively using the QGIS plugin.</p>
+<h2 id="supported-data-sources">Supported Data Sources<a class="headerlink" href="#supported-data-sources" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Date Range</th>
 <th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>SCHISM</td>
-<td>Supported</td>
-<td>Semi-implicit Cross-scale Hydroscience Integrated System Model</td>
+<td><code>nwm_retro</code></td>
+<td>1979-02-01 to 2023-01-31</td>
+<td>NWM Retrospective 3.0</td>
 </tr>
 <tr>
-<td>SFINCS</td>
-<td>Supported</td>
-<td>Super-Fast INundation of CoastS</td>
+<td><code>nwm_ana</code></td>
+<td>2018-09-17 to present</td>
+<td>NWM Analysis</td>
+</tr>
+<tr>
+<td><code>stofs</code></td>
+<td>2020-12-30 to present</td>
+<td>STOFS water levels</td>
+</tr>
+<tr>
+<td><code>tpxo</code></td>
+<td>N/A (local installation)</td>
+<td>TPXO tidal model</td>
 </tr>
 </tbody>
 </table>
-<h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">#</a></h2>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pip<span class="w"> </span>install<span class="w"> </span>coastal-calibration
-</span></code></pre></div>
-<p>See the <a href="getting-started/installation/">Installation Guide</a> for detailed instructions.</p>
+<p><strong>Domains</strong>: <code>atlgulf</code>, <code>pacific</code>, <code>hawaii</code>, <code>prvi</code></p>
+<h2 id="workflow-stages">Workflow Stages<a class="headerlink" href="#workflow-stages" title="Permanent link">#</a></h2>
+<h3 id="schism-11-stages">SCHISM (11 stages)<a class="headerlink" href="#schism-11-stages" title="Permanent link">#</a></h3>
+<p><code>download</code> → <code>schism_forcing_prep</code> → <code>schism_forcing</code> → <code>schism_sflux</code> → <code>schism_params</code>
+→ <code>schism_obs</code> → <code>schism_boundary</code> → <code>schism_prep</code> → <code>schism_run</code> → <code>schism_postprocess</code>
+→ <code>schism_plot</code></p>
+<h3 id="sfincs-14-stages">SFINCS (14 stages)<a class="headerlink" href="#sfincs-14-stages" title="Permanent link">#</a></h3>
+<p><code>download</code> → <code>sfincs_symlinks</code> → <code>sfincs_data_catalog</code> → <code>sfincs_init</code> → <code>sfincs_timing</code>
+→ <code>sfincs_forcing</code> → <code>sfincs_discharge</code> → <code>sfincs_precip</code> → <code>sfincs_wind</code> →
+<code>sfincs_pressure</code> → <code>sfincs_write</code> → <code>sfincs_run</code> → <code>sfincs_floodmap</code> → <code>sfincs_plot</code></p>
+<h3 id="sfincs-creation-9-stages">SFINCS Creation (9 stages)<a class="headerlink" href="#sfincs-creation-9-stages" title="Permanent link">#</a></h3>
+<p><code>create_grid</code> → <code>create_fetch_data</code> → <code>create_elevation</code> → <code>create_mask</code> →
+<code>create_boundary</code> → <code>create_discharge</code> → <code>create_subgrid</code> → <code>create_obs</code> →
+<code>create_write</code></p>
+<h2 id="roadmap">Roadmap<a class="headerlink" href="#roadmap" title="Permanent link">#</a></h2>
+<ul>
+<li><strong>SCHISM model creation</strong>: integrate the existing SCHISM mesh subsetting capability
+    into the package, providing an automated create workflow for SCHISM similar to what
+    SFINCS already has. This will allow users to extract a regional subdomain from a
+    larger SCHISM mesh using the same QGIS plugin and API.</li>
+<li><strong>Improved tidal boundary conditions</strong>: replace the current 8-constituent TPXO
+    implementation with a pure-Python module supporting all 32+ constituents and minor
+    constituent inference, removing the dependency on an external Fortran binary</li>
+<li><strong>Multi-cycle STOFS stitching</strong>: download and stitch multiple STOFS forecast cycles to
+    cover simulations of any duration, eliminating the current 180-hour single-cycle
+    limit</li>
+<li><strong>Regional STOFS subsetting</strong>: spatially subset the global STOFS output to the model
+    domain before download, reducing data transfer from ~12 GB per cycle to a few
+    hundred MB</li>
+<li><strong>PyPI and conda-forge</strong>: publish the package on PyPI and conda-forge so users can
+    install with <code>pip install coastal-calibration</code> or
+    <code>conda install coastal-calibration</code> without cloning the repository</li>
+</ul>
+<h2 id="credits">Credits<a class="headerlink" href="#credits" title="Permanent link">#</a></h2>
+<ol>
+<li><a href="https://github.com/NOAA-OWP/ngen">NextGen Water Modeling Framework Prototype</a></li>
+<li><a href="https://ccrm.vims.edu/schismweb/">schism-dev</a> community</li>
+<li><a href="https://www.deltares.nl/en/software-and-data/products/sfincs">Deltares</a> community</li>
+</ol>
+<h2 id="license">License<a class="headerlink" href="#license" title="Permanent link">#</a></h2>
+<p>BSD-2-Clause. See <a href="LICENSE/">LICENSE</a> for details.</p>
 
 
 

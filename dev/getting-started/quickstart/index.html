@@ -659,10 +659,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#step-3-validate-the-configuration" class="md-nav__link">
+  <a href="#step-3-validate-and-run" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 3: Validate the Configuration
+        Step 3: Validate and Run
       
     </span>
   </a>
@@ -670,21 +670,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#step-4-run-the-workflow" class="md-nav__link">
+  <a href="#running-on-hpc" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 4: Run the Workflow
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-5-check-results" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 5: Check Results
+        Running on HPC
       
     </span>
   </a>
@@ -731,7 +720,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#step-3-validate-and-run" class="md-nav__link">
+  <a href="#step-3-validate-and-run_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Step 3: Validate and Run
@@ -747,15 +736,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#sfincs-model-creation-quick-start" class="md-nav__link">
+  <a href="#sfincs-model-creation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        SFINCS Model Creation Quick Start
+        SFINCS Model Creation
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="SFINCS Model Creation Quick Start">
+    <nav class="md-nav" aria-label="SFINCS Model Creation">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -797,13 +786,30 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#using-the-python-api" class="md-nav__link">
+  <a href="#python-api" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Using the Python API
+        Python API
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Python API">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#partial-workflows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Partial Workflows
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1160,7 +1166,7 @@
   <span class="md-ellipsis">
     
   
-    Narragansett Bay SFINCS Tutorial
+    Narragansett Bay: SFINCS Demo
   
 
     
@@ -1188,7 +1194,7 @@
   <span class="md-ellipsis">
     
   
-    Hawaii SCHISM Tutorial
+    Hawaii: SCHISM Demo
   
 
     
@@ -1485,54 +1491,50 @@
 
 
 <h1 id="quick-start">Quick Start<a class="headerlink" href="#quick-start" title="Permanent link">#</a></h1>
-<p>This guide walks you through running your first coastal simulation using the
-<code>coastal-calibration</code> CLI.</p>
+<p>This guide walks you through running your first coastal simulation.</p>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">#</a></h2>
-<p>Before starting, ensure you have:</p>
 <ul>
-<li><code>coastal-calibration</code> installed (see <a href="../installation/">Installation</a>)</li>
-<li>Access to an HPC cluster with SLURM</li>
-<li>A compiled SCHISM binary on <code>$PATH</code> (SCHISM only; pixi builds it automatically)</li>
-<li>Access to the <code>/ngen-test</code> NFS mount</li>
+<li>Pixi installed with the <code>dev</code> environment (see <a href="../installation/">Installation</a>)</li>
+<li>For SCHISM: a pre-built model directory and geogrid file</li>
+<li>For SFINCS: a pre-built model directory (or create one from an AOI polygon using the
+    <code>create</code> workflow)</li>
 </ul>
 <h2 id="schism-quick-start">SCHISM Quick Start<a class="headerlink" href="#schism-quick-start" title="Permanent link">#</a></h2>
 <h3 id="step-1-generate-a-configuration-file">Step 1: Generate a Configuration File<a class="headerlink" href="#step-1-generate-a-configuration-file" title="Permanent link">#</a></h3>
-<p>Create a new configuration file for your simulation:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>coastal-calibration<span class="w"> </span>init<span class="w"> </span>config.yaml<span class="w"> </span>--domain<span class="w"> </span>hawaii
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pixi<span class="w"> </span>r<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>coastal-calibration<span class="w"> </span>init<span class="w"> </span>config.yaml<span class="w"> </span>--domain<span class="w"> </span>hawaii
 </span></code></pre></div>
 <p>This generates a template configuration file with sensible defaults.</p>
 <h3 id="step-2-edit-the-configuration">Step 2: Edit the Configuration<a class="headerlink" href="#step-2-edit-the-configuration" title="Permanent link">#</a></h3>
 <p>Open <code>config.yaml</code> and set your simulation parameters:</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">simulation</span><span class="p">:</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">start_date</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2021-06-11</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">duration_hours</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">24</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">start_date</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2025-11-26</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">duration_hours</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">50</span>
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">coastal_domain</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hawaii</span>
 </span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="nt">meteo_source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nwm_ana</span>
 </span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
 </span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="nt">boundary</span><span class="p">:</span>
 </span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">  </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stofs</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="nt">model_config</span><span class="p">:</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">  </span><span class="nt">prebuilt_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/schism/model</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">  </span><span class="nt">geogrid_file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/geo_em_HI.nc</span>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">  </span><span class="nt">include_noaa_gages</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 </span></code></pre></div>
 <div class="admonition tip">
 <p class="admonition-title">Minimal Configuration</p>
-<p>The configuration above is all you need! Paths are automatically generated based on your
-username, domain, and data sources.</p>
+<p>For SCHISM, you need to specify <code>prebuilt_dir</code> (the pre-built mesh and config files) and
+<code>geogrid_file</code> (for atmospheric forcing regridding). Everything else has sensible
+defaults.</p>
 </div>
-<h3 id="step-3-validate-the-configuration">Step 3: Validate the Configuration<a class="headerlink" href="#step-3-validate-the-configuration" title="Permanent link">#</a></h3>
-<p>Before running, validate your configuration:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>coastal-calibration<span class="w"> </span>validate<span class="w"> </span>config.yaml
+<h3 id="step-3-validate-and-run">Step 3: Validate and Run<a class="headerlink" href="#step-3-validate-and-run" title="Permanent link">#</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>pixi<span class="w"> </span>r<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>coastal-calibration<span class="w"> </span>validate<span class="w"> </span>config.yaml
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>pixi<span class="w"> </span>r<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>coastal-calibration<span class="w"> </span>run<span class="w"> </span>config.yaml
 </span></code></pre></div>
-<p>This checks for:</p>
-<ul>
-<li>Required fields</li>
-<li>Valid date ranges for data sources</li>
-<li>File and directory existence</li>
-<li>Model-specific configuration validity</li>
-</ul>
-<h3 id="step-4-run-the-workflow">Step 4: Run the Workflow<a class="headerlink" href="#step-4-run-the-workflow" title="Permanent link">#</a></h3>
-<h4 id="heredoc-sbatch-script-recommended">Heredoc sbatch Script (Recommended)<a class="headerlink" href="#heredoc-sbatch-script-recommended" title="Permanent link">#</a></h4>
-<p>The preferred approach on clusters is to write an <code>sbatch</code> script with an inline YAML
-configuration using a heredoc. This keeps the SLURM directives and workflow
-configuration in a single, self-contained file:</p>
+<p>The pipeline executes 11 stages: download, forcing preparation, atmospheric regridding,
+boundary conditions, mesh partitioning, model execution, and validation against NOAA
+observations.</p>
+<h3 id="running-on-hpc">Running on HPC<a class="headerlink" href="#running-on-hpc" title="Permanent link">#</a></h3>
+<p>On clusters, write an <code>sbatch</code> script with an inline YAML config:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="ch">#!/usr/bin/env bash</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1">#SBATCH --job-name=coastal_schism</span>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="c1">#SBATCH --partition=c5n-18xlarge</span>
@@ -1547,132 +1549,114 @@ configuration in a single, self-contained file:</p>
 </span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="s">model: schism</span>
 </span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>
 </span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="s">simulation:</span>
-</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="s">  start_date: 2021-01-01</span>
-</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="s">  duration_hours: 12</span>
+</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="s">  start_date: 2025-11-26</span>
+</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="s">  duration_hours: 50</span>
 </span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a><span class="s">  coastal_domain: hawaii</span>
-</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a><span class="s">  meteo_source: nwm_retro</span>
+</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a><span class="s">  meteo_source: nwm_ana</span>
 </span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>
 </span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a><span class="s">boundary:</span>
-</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a><span class="s">  source: tpxo</span>
+</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a><span class="s">  source: stofs</span>
 </span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>
 </span><span id="__span-3-23"><a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a><span class="s">model_config:</span>
 </span><span id="__span-3-24"><a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a><span class="s">  include_noaa_gages: true</span>
 </span><span id="__span-3-25"><a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a><span class="s">EOF</span>
 </span><span id="__span-3-26"><a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a>
-</span><span id="__span-3-27"><a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a>/ngen-test/coastal-calibration/coastal-calibration<span class="w"> </span>run<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">CONFIG_FILE</span><span class="si">}</span><span class="s2">&quot;</span>
+</span><span id="__span-3-27"><a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a>coastal-calibration<span class="w"> </span>run<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">CONFIG_FILE</span><span class="si">}</span><span class="s2">&quot;</span>
 </span><span id="__span-3-28"><a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a>rm<span class="w"> </span>-f<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">CONFIG_FILE</span><span class="si">}</span><span class="s2">&quot;</span>
 </span></code></pre></div>
-<p>Save this as <code>my_run.sh</code> and submit with <code>sbatch my_run.sh</code>.</p>
-<div class="admonition tip">
-<p class="admonition-title">Use the full NFS path</p>
-<p>Compute nodes may not have <code>coastal-calibration</code> in their <code>PATH</code>. Using the full path to
-the wrapper on the shared filesystem
-(<code>/ngen-test/coastal-calibration/coastal-calibration</code>) ensures the command is always
-found.</p>
-</div>
-<div class="admonition tip">
-<p class="admonition-title">Unique config filenames</p>
-<p>The config filename uses <code>$SLURM_JOB_ID</code> to avoid collisions when multiple jobs run
-concurrently.</p>
-</div>
+<p>Submit with <code>sbatch my_run.sh</code>. Complete examples are provided for
+<a href="../../examples/slurm/schism.sh">SCHISM</a> and <a href="../../examples/slurm/sfincs.sh">SFINCS</a>.</p>
 <div class="admonition tip">
 <p class="admonition-title">Single-quoted heredoc</p>
 <p>Use <code>&lt;&lt;'EOF'</code> (single-quoted) to prevent the shell from expanding <code>$</code> variables inside
-the YAML content. This ensures the YAML is written exactly as written.</p>
-</div>
-<p>Complete sbatch examples are provided for <a href="../../examples/slurm/schism.sh">SCHISM</a> and
-<a href="../../examples/slurm/sfincs.sh">SFINCS</a>.</p>
-<h3 id="step-5-check-results">Step 5: Check Results<a class="headerlink" href="#step-5-check-results" title="Permanent link">#</a></h3>
-<p>After the job completes, find your outputs in the work directory:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>ls<span class="w"> </span>/ngen-test/coastal/your_username/schism_hawaii_stofs_nwm_ana/schism_2021-06-11/
-</span></code></pre></div>
-<div class="admonition tip">
-<p class="admonition-title">Compare with NOAA observations</p>
-<p>Add <code>include_noaa_gages: true</code> under <code>model_config</code> to automatically discover NOAA
-CO-OPS water level stations, collect station time-series during the simulation, and
-generate comparison plots after the run completes. See
-<a href="../../user-guide/configuration/#noaa-observation-stations-include_noaa_gages">Configuration</a>
-for details.</p>
+the YAML content.</p>
 </div>
 <h2 id="sfincs-quick-start">SFINCS Quick Start<a class="headerlink" href="#sfincs-quick-start" title="Permanent link">#</a></h2>
 <h3 id="step-1-generate-a-sfincs-configuration">Step 1: Generate a SFINCS Configuration<a class="headerlink" href="#step-1-generate-a-sfincs-configuration" title="Permanent link">#</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>coastal-calibration<span class="w"> </span>init<span class="w"> </span>sfincs_config.yaml<span class="w"> </span>--domain<span class="w"> </span>atlgulf<span class="w"> </span>--model<span class="w"> </span>sfincs
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>pixi<span class="w"> </span>r<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>coastal-calibration<span class="w"> </span>init<span class="w"> </span>sfincs_config.yaml<span class="w"> </span>--domain<span class="w"> </span>atlgulf<span class="w"> </span>--model<span class="w"> </span>sfincs
 </span></code></pre></div>
 <h3 id="step-2-edit-the-configuration_1">Step 2: Edit the Configuration<a class="headerlink" href="#step-2-edit-the-configuration_1" title="Permanent link">#</a></h3>
 <p>Set the path to a pre-built SFINCS model:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sfincs</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="nt">simulation</span><span class="p">:</span>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span><span class="nt">start_date</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2025-06-01</span>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">  </span><span class="nt">duration_hours</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">168</span>
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">  </span><span class="nt">coastal_domain</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">atlgulf</span>
-</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">  </span><span class="nt">meteo_source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nwm_ana</span>
-</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>
-</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="nt">boundary</span><span class="p">:</span>
-</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="w">  </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stofs</span>
-</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>
-</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="nt">model_config</span><span class="p">:</span>
-</span><span id="__span-6-13"><a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a><span class="w">  </span><span class="nt">prebuilt_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/prebuilt/sfincs/model</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sfincs</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="nt">simulation</span><span class="p">:</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="nt">start_date</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2024-01-09</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span><span class="nt">duration_hours</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">60</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">  </span><span class="nt">coastal_domain</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">atlgulf</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">  </span><span class="nt">meteo_source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nwm_ana</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="nt">boundary</span><span class="p">:</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">  </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stofs</span>
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="nt">model_config</span><span class="p">:</span>
+</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="w">  </span><span class="nt">prebuilt_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/prebuilt/sfincs/model</span>
 </span></code></pre></div>
-<h3 id="step-3-validate-and-run">Step 3: Validate and Run<a class="headerlink" href="#step-3-validate-and-run" title="Permanent link">#</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>coastal-calibration<span class="w"> </span>validate<span class="w"> </span>sfincs_config.yaml
+<h3 id="step-3-validate-and-run_1">Step 3: Validate and Run<a class="headerlink" href="#step-3-validate-and-run_1" title="Permanent link">#</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>pixi<span class="w"> </span>r<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>coastal-calibration<span class="w"> </span>validate<span class="w"> </span>sfincs_config.yaml
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>pixi<span class="w"> </span>r<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>coastal-calibration<span class="w"> </span>run<span class="w"> </span>sfincs_config.yaml
 </span></code></pre></div>
-<p>Then write an sbatch script using <code>coastal-calibration run sfincs_config.yaml</code>.</p>
-<h2 id="sfincs-model-creation-quick-start">SFINCS Model Creation Quick Start<a class="headerlink" href="#sfincs-model-creation-quick-start" title="Permanent link">#</a></h2>
+<h2 id="sfincs-model-creation">SFINCS Model Creation<a class="headerlink" href="#sfincs-model-creation" title="Permanent link">#</a></h2>
 <p>The <code>create</code> command builds a new SFINCS quadtree model from an AOI polygon, handling
 grid generation, DEM download, elevation, masking, boundary cells, and subgrid tables.</p>
 <div class="admonition tip">
 <p class="admonition-title">Draw the AOI in QGIS</p>
 <p>Use the <a href="../../user-guide/qgis-plugin/">QGIS Plugin</a> to interactively draw your AOI
-polygon over NHF basemap layers, snap it to watershed divides, and export it as GeoJSON
--- no manual coordinate editing required.</p>
+polygon, snap it to watershed divides, select discharge points, and export everything as
+GeoJSON.</p>
 </div>
 <h3 id="step-1-prepare-a-topobathy-dem">Step 1: Prepare a Topobathy DEM<a class="headerlink" href="#step-1-prepare-a-topobathy-dem" title="Permanent link">#</a></h3>
-<p>Download the NWS 30 m topobathymetric DEM clipped to your area of interest:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>coastal-calibration<span class="w"> </span>prepare-topobathy<span class="w"> </span>aoi.geojson<span class="w"> </span>--domain<span class="w"> </span>atlgulf<span class="w"> </span>--output-dir<span class="w"> </span>./dem
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>pixi<span class="w"> </span>r<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>coastal-calibration<span class="w"> </span>prepare-topobathy<span class="w"> </span>aoi.geojson<span class="w"> </span>--domain<span class="w"> </span>atlgulf<span class="w"> </span>--output-dir<span class="w"> </span>./dem
 </span></code></pre></div>
 <h3 id="step-2-write-a-creation-config">Step 2: Write a Creation Config<a class="headerlink" href="#step-2-write-a-creation-config" title="Permanent link">#</a></h3>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nt">aoi</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">aoi.geojson</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="nt">output_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./my_sfincs_model</span>
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="nt">grid</span><span class="p">:</span>
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">  </span><span class="nt">crs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">EPSG:32617</span>
-</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>
-</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="nt">elevation</span><span class="p">:</span>
-</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">  </span><span class="nt">datasets</span><span class="p">:</span>
-</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nws_topobathy</span>
-</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="w">      </span><span class="nt">zmin</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-20000</span>
-</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>
-</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="nt">data_catalog</span><span class="p">:</span>
-</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="w">  </span><span class="nt">data_libs</span><span class="p">:</span>
-</span><span id="__span-9-14"><a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./dem/data_catalog.yml</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">aoi</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">aoi.geojson</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="nt">output_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./my_sfincs_model</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="nt">grid</span><span class="p">:</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">  </span><span class="nt">crs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">EPSG:32617</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="nt">elevation</span><span class="p">:</span>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">  </span><span class="nt">datasets</span><span class="p">:</span>
+</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nws_topobathy</span>
+</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="w">      </span><span class="nt">zmin</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-20000</span>
+</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>
+</span><span id="__span-8-12"><a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="nt">data_catalog</span><span class="p">:</span>
+</span><span id="__span-8-13"><a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a><span class="w">  </span><span class="nt">data_libs</span><span class="p">:</span>
+</span><span id="__span-8-14"><a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./dem/data_catalog.yml</span>
 </span></code></pre></div>
 <h3 id="step-3-run-the-creation-workflow">Step 3: Run the Creation Workflow<a class="headerlink" href="#step-3-run-the-creation-workflow" title="Permanent link">#</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>coastal-calibration<span class="w"> </span>create<span class="w"> </span>create_config.yaml
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>pixi<span class="w"> </span>r<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>coastal-calibration<span class="w"> </span>create<span class="w"> </span>create_config.yaml
 </span></code></pre></div>
-<p>The output directory will contain a ready-to-run SFINCS model that can be used as the
+<p>The output directory will contain a ready-to-run SFINCS model that can be used as
 <code>prebuilt_dir</code> in a simulation config.</p>
-<h2 id="using-the-python-api">Using the Python API<a class="headerlink" href="#using-the-python-api" title="Permanent link">#</a></h2>
+<h2 id="python-api">Python API<a class="headerlink" href="#python-api" title="Permanent link">#</a></h2>
 <p>You can also run workflows programmatically:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">coastal_calibration</span><span class="w"> </span><span class="kn">import</span> <span class="n">CoastalCalibConfig</span><span class="p">,</span> <span class="n">CoastalCalibRunner</span>
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
-</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="c1"># Load configuration</span>
-</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="n">config</span> <span class="o">=</span> <span class="n">CoastalCalibConfig</span><span class="o">.</span><span class="n">from_yaml</span><span class="p">(</span><span class="s2">&quot;config.yaml&quot;</span><span class="p">)</span>
-</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>
-</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="c1"># Create runner and execute</span>
-</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="n">runner</span> <span class="o">=</span> <span class="n">CoastalCalibRunner</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
-</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
-</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>
-</span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">success</span><span class="p">:</span>
-</span><span id="__span-11-11"><a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Completed in </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">duration_seconds</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">s&quot;</span><span class="p">)</span>
-</span><span id="__span-11-12"><a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="k">else</span><span class="p">:</span>
-</span><span id="__span-11-13"><a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">errors</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">coastal_calibration</span><span class="w"> </span><span class="kn">import</span> <span class="n">CoastalCalibConfig</span><span class="p">,</span> <span class="n">CoastalCalibRunner</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="n">config</span> <span class="o">=</span> <span class="n">CoastalCalibConfig</span><span class="o">.</span><span class="n">from_yaml</span><span class="p">(</span><span class="s2">&quot;config.yaml&quot;</span><span class="p">)</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="n">runner</span> <span class="o">=</span> <span class="n">CoastalCalibRunner</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>
+</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">success</span><span class="p">:</span>
+</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Completed in </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">duration_seconds</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">s&quot;</span><span class="p">)</span>
+</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="k">else</span><span class="p">:</span>
+</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">errors</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="partial-workflows">Partial Workflows<a class="headerlink" href="#partial-workflows" title="Permanent link">#</a></h3>
+<p>Restart from a specific stage or stop early:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">start_from</span><span class="o">=</span><span class="s2">&quot;schism_forcing_prep&quot;</span><span class="p">,</span> <span class="n">stop_after</span><span class="o">=</span><span class="s2">&quot;schism_sflux&quot;</span><span class="p">)</span>
+</span></code></pre></div>
+<p>Or via the CLI:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>pixi<span class="w"> </span>r<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>coastal-calibration<span class="w"> </span>run<span class="w"> </span>config.yaml<span class="w"> </span>--start-from<span class="w"> </span>schism_boundary
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>pixi<span class="w"> </span>r<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>coastal-calibration<span class="w"> </span>run<span class="w"> </span>config.yaml<span class="w"> </span>--stop-after<span class="w"> </span>schism_sflux
 </span></code></pre></div>
 <h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">#</a></h2>
 <ul>
 <li>Learn about <a href="../../user-guide/configuration/">Configuration Options</a></li>
 <li>Explore <a href="../../user-guide/workflow-stages/">Workflow Stages</a></li>
 <li>See the <a href="../../user-guide/cli/">CLI Reference</a></li>
+<li>Try the example notebooks:
+    <a href="../../examples/notebooks/narragansett/">Narragansett Bay (SFINCS)</a> and
+    <a href="../../examples/notebooks/schism-hawaii/">Hawaii (SCHISM)</a></li>
 </ul>
 
 

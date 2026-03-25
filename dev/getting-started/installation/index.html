@@ -586,10 +586,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#requirements" class="md-nav__link">
+  <a href="#prerequisites" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Requirements
+        Prerequisites
       
     </span>
   </a>
@@ -597,10 +597,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#install-from-pypi" class="md-nav__link">
+  <a href="#install" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Install from PyPI
+        Install
       
     </span>
   </a>
@@ -608,10 +608,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#install-from-source" class="md-nav__link">
+  <a href="#running-commands" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Install from Source
+        Running Commands
       
     </span>
   </a>
@@ -619,38 +619,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#development-installation-with-pixi" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Development Installation with Pixi
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Development Installation with Pixi">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
   <a href="#available-environments" class="md-nav__link">
     <span class="md-ellipsis">
       
         Available Environments
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#optional-dependencies" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Optional Dependencies
       
     </span>
   </a>
@@ -662,17 +634,6 @@
     <span class="md-ellipsis">
       
         QGIS Plugin
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#verify-installation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Verify Installation
       
     </span>
   </a>
@@ -1049,7 +1010,7 @@
   <span class="md-ellipsis">
     
   
-    Narragansett Bay SFINCS Tutorial
+    Narragansett Bay: SFINCS Demo
   
 
     
@@ -1077,7 +1038,7 @@
   <span class="md-ellipsis">
     
   
-    Hawaii SCHISM Tutorial
+    Hawaii: SCHISM Demo
   
 
     
@@ -1374,49 +1335,39 @@
 
 
 <h1 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">#</a></h1>
-<h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">#</a></h2>
+<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">#</a></h2>
 <ul>
-<li>Python &gt;= 3.11</li>
-<li>Access to an HPC cluster with SLURM (for production runs)</li>
-<li>NFS mount point (default: <code>/ngen-test</code>)</li>
-<li>Compiled SCHISM binary (SCHISM workflow only; pixi environments with the <code>schism</code>
-    feature build it automatically on first activation)</li>
-<li>Compiled SFINCS binary (SFINCS workflow only; see
-    <a href="../../sfincs_compilation/">Compiling SFINCS</a>)</li>
+<li><a href="https://git-scm.com/">Git</a></li>
+<li><a href="https://pixi.prefix.dev/latest/installation/">Pixi</a></li>
 </ul>
-<div class="admonition note">
-<p class="admonition-title">Model Executables</p>
-<p>Both SCHISM and SFINCS workflows use natively compiled binaries. Pixi environments with
-the <code>schism</code> or <code>sfincs</code> feature build them automatically on first activation. No
-Singularity containers are required.</p>
-</div>
-<h2 id="install-from-pypi">Install from PyPI<a class="headerlink" href="#install-from-pypi" title="Permanent link">#</a></h2>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>coastal-calibration
+<p>Pixi handles all other dependencies including Python, and compiling
+SFINCS and SCHISM from source. No containers are required.</p>
+<h2 id="install">Install<a class="headerlink" href="#install" title="Permanent link">#</a></h2>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/NGWPC/nwm-coastal
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">cd</span><span class="w"> </span>nwm-coastal
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>pixi<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>dev
 </span></code></pre></div>
-<p>This installs the core package with CLI and workflow orchestration capabilities.</p>
-<h2 id="install-from-source">Install from Source<a class="headerlink" href="#install-from-source" title="Permanent link">#</a></h2>
-<p>For development or to get the latest features, install from source:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/NGWPC/nwm-coastal
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nb">cd</span><span class="w"> </span>nwm-coastal
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.
+<p>The first activation compiles both SFINCS and SCHISM from source (they are included as
+git submodules). Subsequent activations skip the build if dependencies have not changed.</p>
+<h2 id="running-commands">Running Commands<a class="headerlink" href="#running-commands" title="Permanent link">#</a></h2>
+<p>All commands must be run through Pixi to activate the environment:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pixi<span class="w"> </span>r<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>coastal-calibration<span class="w"> </span>--help
 </span></code></pre></div>
-<h2 id="development-installation-with-pixi">Development Installation with Pixi<a class="headerlink" href="#development-installation-with-pixi" title="Permanent link">#</a></h2>
-<p>For development, we recommend using <a href="https://pixi.prefix.dev/latest/">Pixi</a> for
-environment management:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Install Pixi (Linux/macOS)</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://pixi.sh/install.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>sh
+<p>You should see the CLI help output:</p>
+<div class="language-console highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="go">Usage: coastal-calibration [OPTIONS] COMMAND [ARGS]...</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="go">  Coastal calibration workflow manager (SCHISM, SFINCS).</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="go">Commands:</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="go">  create             Create a SFINCS model from an AOI polygon.</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="go">  init               Create a minimal configuration file.</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="go">  prepare-topobathy  Download NWS topobathy DEM clipped to an AOI bounding box.</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="go">  run                Run the calibration workflow.</span>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="go">  stages             List available workflow stages.</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="go">  update-dem-index   Rebuild the NOAA DEM spatial index from S3 STAC metadata.</span>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="go">  validate           Validate a configuration file.</span>
 </span></code></pre></div>
-<div class="admonition tip">
-<p class="admonition-title">Restart Terminal</p>
-<p>After installing Pixi, restart your terminal or run <code>source ~/.bashrc</code> (or
-<code>source ~/.zshrc</code> for Zsh) to make the <code>pixi</code> command available.</p>
-</div>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Clone and install</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/NGWPC/nwm-coastal
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nb">cd</span><span class="w"> </span>nwm-coastal
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>pixi<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>dev
-</span></code></pre></div>
-<h3 id="available-environments">Available Environments<a class="headerlink" href="#available-environments" title="Permanent link">#</a></h3>
+<h2 id="available-environments">Available Environments<a class="headerlink" href="#available-environments" title="Permanent link">#</a></h2>
 <table>
 <thead>
 <tr>
@@ -1443,17 +1394,17 @@ environment management:</p>
 </tr>
 <tr>
 <td><code>schism</code></td>
-<td>Local development with SCHISM I/O libraries</td>
+<td>Development with SCHISM I/O</td>
 <td><code>pixi r -e schism &lt;cmd&gt;</code></td>
 </tr>
 <tr>
 <td><code>sfincs</code></td>
-<td>Local development with HydroMT-SFINCS</td>
+<td>Development with HydroMT-SFINCS</td>
 <td><code>pixi r -e sfincs &lt;cmd&gt;</code></td>
 </tr>
 <tr>
 <td><code>typecheck</code></td>
-<td>Type checking with ty</td>
+<td>Type checking</td>
 <td><code>pixi r -e typecheck typecheck</code></td>
 </tr>
 <tr>
@@ -1468,55 +1419,13 @@ environment management:</p>
 </tr>
 </tbody>
 </table>
-<h2 id="optional-dependencies">Optional Dependencies<a class="headerlink" href="#optional-dependencies" title="Permanent link">#</a></h2>
-<p>Optional dependencies are available for <strong>local development purposes only</strong>. They are
-useful for:</p>
-<ul>
-<li>Reading and analyzing model output files</li>
-<li>Debugging and testing workflow components locally</li>
-<li>Building SFINCS models with HydroMT</li>
-</ul>
-<div class="admonition warning">
-<p class="admonition-title">Not Required for Cluster Execution</p>
-<p>These optional dependencies are <strong>not required</strong> to submit and run jobs on the cluster.
-Both SCHISM and SFINCS are compiled natively via pixi activation scripts. See
-<a href="../../sfincs_compilation/">Compiling SFINCS</a> and
-<a href="../../schism_compilation/">Compiling SCHISM</a> for details.</p>
-</div>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># SCHISM I/O dependencies (netCDF, numpy, etc.) - for local development</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>pip<span class="w"> </span>install<span class="w"> </span>coastal-calibration<span class="o">[</span>schism<span class="o">]</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># SFINCS/HydroMT dependencies - for local model building and analysis</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>pip<span class="w"> </span>install<span class="w"> </span>coastal-calibration<span class="o">[</span>sfincs<span class="o">]</span>
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="c1"># Development dependencies (Jupyter, etc.)</span>
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>pip<span class="w"> </span>install<span class="w"> </span>coastal-calibration<span class="o">[</span>dev<span class="o">]</span>
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>
-</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="c1"># Documentation dependencies</span>
-</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>pip<span class="w"> </span>install<span class="w"> </span>coastal-calibration<span class="o">[</span>docs<span class="o">]</span>
-</span></code></pre></div>
+<p>The <code>dev</code> environment includes everything needed for both SCHISM and SFINCS workflows.
+The model-specific environments (<code>schism</code>, <code>sfincs</code>) are lighter alternatives for
+working on a single model.</p>
 <h2 id="qgis-plugin">QGIS Plugin<a class="headerlink" href="#qgis-plugin" title="Permanent link">#</a></h2>
-<p>The repository includes a QGIS plugin for interactive AOI polygon creation. See the
+<p>The repository includes a QGIS plugin for interactive domain definition. See the
 <a href="../../user-guide/qgis-plugin/">QGIS Plugin guide</a> for installation and usage
 instructions.</p>
-<h2 id="verify-installation">Verify Installation<a class="headerlink" href="#verify-installation" title="Permanent link">#</a></h2>
-<p>After installation, verify by running:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>coastal-calibration<span class="w"> </span>--help
-</span></code></pre></div>
-<p>You should see the CLI help output with available commands:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="go">Usage: coastal-calibration [OPTIONS] COMMAND [ARGS]...</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="go">  Coastal calibration workflow manager (SCHISM, SFINCS).</span>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="go">Commands:</span>
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="go">  create             Create a SFINCS model from an AOI polygon.</span>
-</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="go">  init               Create a minimal configuration file.</span>
-</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="go">  prepare-topobathy  Download NWS topobathy DEM clipped to an AOI bounding box.</span>
-</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="go">  run                Run the calibration workflow.</span>
-</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="go">  stages             List available workflow stages.</span>
-</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="go">  update-dem-index   Rebuild the NOAA DEM spatial index from S3 STAC metadata.</span>
-</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="go">  validate           Validate a configuration file.</span>
-</span></code></pre></div>
 
 
 
