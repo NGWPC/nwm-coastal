@@ -89,6 +89,27 @@ class TestReadFromChrtout:
         df = _read_from_chrtout([], [100])
         assert df.empty
 
+    def test_mixed_feature_id_layouts(self, tmp_path: Path) -> None:
+        """Files with different feature_id arrays must not crash (GH-19)."""
+        # File 1: large feature_id array (like CONUS NWM, 2.7M reaches)
+        big_fids = np.arange(1, 10_001, dtype=np.int64)
+        big_sf = np.full(len(big_fids), 5.0, dtype=np.float32)
+        f1 = tmp_path / "202401090000.CHRTOUT_DOMAIN1"
+        _create_chrtout_file(f1, datetime(2024, 1, 9, tzinfo=UTC), big_fids, big_sf)
+
+        # File 2: small feature_id array (like Hawaii NWM, 13K reaches)
+        small_fids = np.arange(1, 101, dtype=np.int64)
+        small_sf = np.full(len(small_fids), 3.0, dtype=np.float32)
+        f2 = tmp_path / "202401090100.CHRTOUT_DOMAIN1"
+        _create_chrtout_file(f2, datetime(2024, 1, 9, 1, tzinfo=UTC), small_fids, small_sf)
+
+        # Request a feature_id that exists only in the big file.
+        # The small file is skipped (no matching features) so we get 1 row.
+        df = _read_from_chrtout([f1, f2], [5000])
+        assert len(df) == 1
+        assert 5000 in df.columns
+        assert df.iloc[0][5000] == pytest.approx(5.0)
+
 
 class TestReadStreamflow:
     """Tests for the public read_streamflow interface."""

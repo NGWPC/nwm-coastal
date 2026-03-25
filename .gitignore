@@ -199,3 +199,7 @@ junit*.xml
 
 ### Temp
 cache
+
+### Local model data (symlinks to user-specific paths)
+docs/examples/hawaii/model
+docs/examples/hawaii/geo_em_HI.nc

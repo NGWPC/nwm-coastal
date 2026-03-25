@@ -109,6 +109,13 @@ class PathConfig:
     nwm_dir: Path | None = None
     otps_dir: Path | None = None
 
+    # Maps coastal_domain → NWM product subdirectory name.
+    _NWM_DOMAIN_DIR: ClassVar[dict[str, str]] = {
+        "hawaii": "hawaii",
+        "prvi": "puertorico",
+        "alaska": "alaska",
+    }
+
     def __post_init__(self) -> None:
         self.work_dir = Path(self.work_dir).expanduser().resolve()
         if self.raw_download_dir:
@@ -145,11 +152,12 @@ class PathConfig:
         """Directory for meteorological data."""
         return self.download_dir / self.METEO_SUBDIR / meteo_source
 
-    def streamflow_dir(self, meteo_source: str) -> Path:
+    def streamflow_dir(self, meteo_source: str, coastal_domain: str = "conus") -> Path:
         """Directory for streamflow/hydro data."""
         if meteo_source == "nwm_retro":
             return self.download_dir / self.STREAMFLOW_SUBDIR / "nwm_retro"
-        return self.download_dir / self.HYDRO_SUBDIR / "nwm"
+        nwm_dir = self._NWM_DOMAIN_DIR.get(coastal_domain, "conus")
+        return self.download_dir / self.HYDRO_SUBDIR / "nwm" / nwm_dir
 
     def coastal_dir(self, coastal_source: str) -> Path:
         """Directory for coastal boundary data."""

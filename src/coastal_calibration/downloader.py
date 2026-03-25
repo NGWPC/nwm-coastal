@@ -438,7 +438,7 @@ def _build_nwm_ana_streamflow_urls(
 
     urls: list[str] = []
     paths: list[Path] = []
-    out_dir = output_dir / PathConfig.HYDRO_SUBDIR / "nwm"
+    out_dir = output_dir / PathConfig.HYDRO_SUBDIR / "nwm" / name
 
     for dt in _iter_hours(start, end):
         fetch_dt = dt + timedelta(hours=2)

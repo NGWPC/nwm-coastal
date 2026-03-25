@@ -299,36 +299,49 @@ class TestBuildUrls:
     def test_ana_streamflow_urls_conus(self, tmp_path):
         start = datetime(2023, 1, 1, 0)
         end = datetime(2023, 1, 1, 1)
-        urls, _paths = _build_nwm_ana_streamflow_urls(start, end, tmp_path, "conus")
+        urls, paths = _build_nwm_ana_streamflow_urls(start, end, tmp_path, "conus")
         assert len(urls) == 1
         assert "channel_rt" in urls[0]
+        assert paths[0].parent.name == "conus"
 
     def test_ana_streamflow_urls_hawaii_old_naming(self, tmp_path):
         """Before 2021-04-21: 1 hourly file with tm02 pattern."""
         start = datetime(2021, 4, 1, 0)
         end = datetime(2021, 4, 1, 1)
-        urls, _paths = _build_nwm_ana_streamflow_urls(start, end, tmp_path, "hawaii")
+        urls, paths = _build_nwm_ana_streamflow_urls(start, end, tmp_path, "hawaii")
         assert len(urls) == 1
         assert "channel_rt.tm02.hawaii.nc" in urls[0]
+        assert paths[0].parent.name == "hawaii"
 
     def test_ana_streamflow_urls_hawaii_new_naming(self, tmp_path):
         """From 2021-04-21: 4 sub-hourly files with tm0200/tm0145/tm0130/tm0115."""
         start = datetime(2023, 1, 1, 0)
         end = datetime(2023, 1, 1, 1)
-        urls, _paths = _build_nwm_ana_streamflow_urls(start, end, tmp_path, "hawaii")
+        urls, paths = _build_nwm_ana_streamflow_urls(start, end, tmp_path, "hawaii")
         assert len(urls) == 4
         assert "channel_rt.tm0200.hawaii.nc" in urls[0]
         assert "channel_rt.tm0145.hawaii.nc" in urls[1]
         assert "channel_rt.tm0130.hawaii.nc" in urls[2]
         assert "channel_rt.tm0115.hawaii.nc" in urls[3]
+        assert all(p.parent.name == "hawaii" for p in paths)
 
     def test_ana_streamflow_urls_alaska(self, tmp_path):
         start = datetime(2024, 1, 15, 1)
         end = datetime(2024, 1, 15, 2)
-        urls, _paths = _build_nwm_ana_streamflow_urls(start, end, tmp_path, "alaska")
+        urls, paths = _build_nwm_ana_streamflow_urls(start, end, tmp_path, "alaska")
         assert len(urls) == 1
         assert "analysis_assim_alaska" in urls[0]
         assert "channel_rt.tm02.alaska.nc" in urls[0]
+        assert paths[0].parent.name == "alaska"
+
+    def test_ana_streamflow_domain_isolation(self, tmp_path):
+        """CONUS and Hawaii files go to separate subdirectories (GH-19)."""
+        start = datetime(2023, 1, 1, 0)
+        end = datetime(2023, 1, 1, 1)
+        _, conus_paths = _build_nwm_ana_streamflow_urls(start, end, tmp_path, "conus")
+        _, hawaii_paths = _build_nwm_ana_streamflow_urls(start, end, tmp_path, "hawaii")
+        # They must not share a directory
+        assert conus_paths[0].parent != hawaii_paths[0].parent
 
     def test_ana_forcing_urls_alaska(self, tmp_path):
         start = datetime(2024, 1, 15, 1)

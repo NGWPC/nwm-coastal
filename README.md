@@ -1,32 +1,91 @@
-# NWM Coastal: Coastal Model Workflow
+# NWM Coastal: Automated Coastal Model Calibration
 
-`nwm-coastal` is a collection of tools designed to implement skill assessments for
-coastal model runs and execute National Water Model (NWM) hindcast/forecast runs for
-standalone coastal models utilized in NWMv4 operations. This includes the Semi-implicit
-Cross-scale Hydroscience Integrated System Model (SCHISM) and Super-Fast INundation of
-CoastS (SFINCS) as the intended coastal models for implementation in NWMv4 operations.
-This repository stores symlinks to both coastal modeling development groups, which are
-used to compile and run the NWMv4 coastal models. The coastal modeling output for NWMv4
-operations is the Total Water Level (TWL) fields. These fields are the focus of the
-coastal tools in this repository for skill assessments across NWM domains, as well as
-the end result to retrieve from tools in this repository that set up and execute NWMv4
-hindcast and operational forecast runs.
+## Why This Tool?
 
-## Installation
+Running coastal models for calibration and forecasting involves many moving parts:
+downloading and preparing meteorological, ocean boundary, river discharge data, and
+configuring the model, running on HPC, and validating against observations. Previously,
+this required 20+ bash scripts with dozens of environment variables, fragile date
+arithmetic, and manual data management.
 
-```bash
-pip install coastal-calibration
-```
+`coastal-calibration` replaces that workflow with a single Python package. One
+configuration file drives the entire pipeline, from data download through model
+execution to validation against NOAA tide gauges.
 
-For development, use [Pixi](https://pixi.prefix.dev/latest/). First, install Pixi
-following the instructions on the Pixi website, or run the following command for
-Linux/macOS and restart your terminal:
+## What It Does
 
-```bash
-curl -fsSL https://pixi.sh/install.sh | sh
-```
+- **Domain definition**: QGIS plugin for interactively drawing the model domain and
+    selecting NWM river discharge points
+- **Model creation** (SFINCS): automated quadtree mesh generation from an AOI polygon
+- **Data management**: download of NWM forcing (retrospective 1979-2023 or real-time
+    analysis), STOFS ocean boundary conditions, and TPXO tidal data with date-range
+    validation
+- **Forcing preparation**: atmospheric regridding via ESMF, boundary condition
+    processing with STOFS/TPXO fallback
+- **Model execution**: SFINCS (single-node OpenMP) and SCHISM (multi-node MPI) with
+    resumable stage-based pipelines
+- **Validation**: automatic NOAA CO-OPS station discovery, water level comparison plots,
+    and flood depth mapping
 
-Then, clone the repository and install the `dev` dependencies:
+<p align="center">
+  <img src="docs/examples/images/qgis_plugin_merge.png" alt="QGIS Plugin: model domain with watershed boundaries" width="70%">
+  <br>
+  <em>QGIS plugin: defining the model domain aligned to watershed boundaries</em>
+</p>
+
+<p align="center">
+  <img src="docs/examples/images/narragansett_thumb.png" alt="Flood depth map, Narragansett Bay" width="45%">
+  <br>
+  <em>Flood depth map from a SFINCS simulation of Narragansett Bay, RI</em>
+</p>
+
+## Supported Models
+
+|                     | SFINCS                     | SCHISM                     |
+| ------------------- | -------------------------- | -------------------------- |
+| **Grid**            | Quadtree (regular)         | Unstructured triangular    |
+| **Compute**         | Single-node, OpenMP        | Multi-node, MPI            |
+| **Model Creation**  | Automated                  | Prebuilt mesh required     |
+| **Flood Depth Map** | Yes (downscaled to DEM)    | Not yet supported          |
+| **Domains**         | CONUS, Hawaii, Puerto Rico | CONUS, Hawaii, Puerto Rico |
+
+## Design
+
+- **Single configuration**: one YAML file (or Python dictionary) defines the entire
+    simulation, with validation, sensible defaults, and support for multi-run templates
+- **Resumable pipeline**: each stage (download, forcing, run, plot, ...) can be
+    restarted individually, so a failed run does not need to start from scratch
+- **Portable**: both SFINCS and SCHISM are included as submodules and compiled from
+    source during environment setup, with no containers required. The same workflow runs
+    on a local workstation or an HPC cluster.
+- **Unified API**: the same two Python calls (`CoastalCalibConfig` +
+    `CoastalCalibRunner`) work for both models; only the model-specific settings differ
+- **Built for large models**: although written in Python, the package orchestrates
+    compiled libraries for the heavy lifting: ESMF for atmospheric regridding,
+    GDAL/NetCDF/HDF5 for spatial I/O on large files, and lazy loading to avoid reading
+    entire datasets into memory. Python handles the workflow logic while
+    performance-critical operations run in compiled code.
+
+## Use Cases
+
+This package supports two primary use cases:
+
+1. **Retrospective calibration**: run historical simulations against NWM retrospective
+    data (1979-2023) to tune model parameters and validate performance at NOAA gage
+    stations
+1. **Operational forecasting**: integrate with the Next Generation Water Modeling
+    Framework (NGEN) as a coastal model realization, where `coastal-calibration`
+    handles the model setup, forcing, and execution while NGEN orchestrates
+    catchment-level workflows
+
+## Quick Start
+
+### Installation
+
+Prerequisites: [Git](https://git-scm.com/) and
+[Pixi](https://pixi.prefix.dev/latest/installation/).
+Pixi handles all other dependencies including Python and compiling
+SFINCS and SCHISM from source.
 
 ```bash
 git clone https://github.com/NGWPC/nwm-coastal
@@ -34,109 +93,36 @@ cd nwm-coastal
 pixi install -e dev
 ```
 
-Requires Python >= 3.11.
+All commands below should be run with `pixi r -e dev` to activate
+the environment.
 
-## Quick Start
-
-Note that for development, all commands need to be run with `pixi r -e dev` to activate
-the virtual environment. For example:
-
-```bash
-pixi r -e dev coastal-calibration run config.yaml
-```
-
-For the rest of this section, we will omit the `pixi r -e dev` prefix for brevity, but
-it is required when running from the development environment.
+### CLI
 
 Generate a configuration file, adjust it, then run:
 
 ```bash
 # SCHISM (default)
-coastal-calibration init config.yaml --domain hawaii
+pixi r -e dev coastal-calibration init config.yaml --domain hawaii
 
 # SFINCS
-coastal-calibration init config.yaml --domain atlgulf --model sfincs
-```
-
-Edit `config.yaml` to set your simulation parameters. A minimal SCHISM configuration
-only requires the following (paths are auto-generated based on user, domain, and
-source):
-
-```yaml
-simulation:
-  start_date: 2021-06-11
-  duration_hours: 24
-  coastal_domain: hawaii
-  meteo_source: nwm_ana
-
-boundary:
-  source: stofs
-```
-
-A minimal SFINCS configuration requires a `model` key and a `model_config` section
-pointing to a pre-built SFINCS model:
-
-```yaml
-model: sfincs
-
-simulation:
-  start_date: 2025-06-01
-  duration_hours: 168
-  coastal_domain: atlgulf
-  meteo_source: nwm_ana
-
-boundary:
-  source: stofs
-
-model_config:
-  prebuilt_dir: /path/to/prebuilt/sfincs/model
+pixi r -e dev coastal-calibration init config.yaml --domain atlgulf --model sfincs
 ```
 
 Validate and run:
 
 ```bash
-coastal-calibration validate config.yaml
-coastal-calibration run config.yaml
+pixi r -e dev coastal-calibration validate config.yaml
+pixi r -e dev coastal-calibration run config.yaml
 ```
 
-The `run` command executes all stages sequentially on the current node. It is designed
-to be used inside a user-written `sbatch` script for full control over SLURM resource
-allocation. It supports `--start-from` and `--stop-after` for partial workflows:
+The pipeline supports `--start-from` and `--stop-after` for partial workflows:
 
 ```bash
-coastal-calibration run config.yaml --start-from schism_boundary
-coastal-calibration run config.yaml --stop-after schism_sflux
+pixi r -e dev coastal-calibration run config.yaml --start-from schism_boundary
+pixi r -e dev coastal-calibration run config.yaml --stop-after schism_sflux
 ```
 
-### Running Inside a SLURM Job (`sbatch`)
-
-Write an `sbatch` script with an inline YAML configuration and use
-`coastal-calibration run` to execute it. Complete examples are provided in
-[`docs/examples/`](docs/examples/):
-
-- [`schism.sh`](docs/examples/schism.sh): SCHISM workflow (multi-node MPI)
-- [`sfincs.sh`](docs/examples/sfincs.sh): SFINCS workflow (single-node OpenMP)
-
-```bash
-sbatch docs/examples/schism.sh
-```
-
-### Creating a SFINCS Model from Scratch
-
-Build a new SFINCS quadtree model from an AOI polygon:
-
-```bash
-# Optionally download NWS topobathy for the AOI
-coastal-calibration prepare-topobathy aoi.geojson --domain atlgulf
-
-# Create the model
-coastal-calibration create create_config.yaml
-```
-
-The `create` workflow generates a quadtree SFINCS model with elevation, mask, boundary
-cells, and subgrid tables. It supports automatic NOAA DEM discovery and download.
-
-## Python API
+### Python API
 
 ```python
 from coastal_calibration import CoastalCalibConfig, CoastalCalibRunner
@@ -149,217 +135,67 @@ if result.success:
     print(f"Completed in {result.duration_seconds:.1f}s")
 ```
 
-### Running Partial Workflows
+### Creating a SFINCS Model
 
-```python
-result = runner.run(start_from="schism_forcing_prep", stop_after="schism_sflux")
-result = runner.run(start_from="schism_prep")
+Build a new SFINCS quadtree model from an AOI polygon:
+
+```bash
+pixi r -e dev coastal-calibration create create_config.yaml
 ```
 
-## Configuration Reference
+The AOI polygon and discharge points can be created interactively using the QGIS plugin.
 
-### Model Configuration
-
-Model-specific parameters live in `model_config`. The `model` key selects which model
-type to use (`schism` or `sfincs`). SCHISM is the default when no `model` key is
-present.
-
-#### SCHISM (`SchismModelConfig`)
-
-| Parameter            | Type | Default   | Description                                  |
-| -------------------- | ---- | --------- | -------------------------------------------- |
-| `prebuilt_dir`       | path | -         | Path to pre-built SCHISM model directory     |
-| `geogrid_file`       | path | -         | WRF geogrid file for forcing regridding      |
-| `nodes`              | int  | 2         | Number of compute nodes                      |
-| `ntasks_per_node`    | int  | 18        | MPI tasks per node                           |
-| `exclusive`          | bool | true      | Request exclusive nodes                      |
-| `nscribes`           | int  | 2         | Number of SCHISM I/O scribes                 |
-| `omp_num_threads`    | int  | 2         | OpenMP threads                               |
-| `oversubscribe`      | bool | false     | Allow MPI oversubscription                   |
-| `binary`             | str  | `pschism` | SCHISM executable name                       |
-| `include_noaa_gages` | bool | false     | Enable NOAA station discovery and comparison |
-
-#### SFINCS (`SfincsModelConfig`)
-
-| Parameter                    | Type  | Default  | Description                                              |
-| ---------------------------- | ----- | -------- | -------------------------------------------------------- |
-| `prebuilt_dir`               | path  | required | Path to pre-built SFINCS model                           |
-| `model_root`                 | path  | null     | Output directory (defaults to `{work_dir}/sfincs_model`) |
-| `observation_points`         | list  | `[]`     | Observation point coordinates                            |
-| `observation_locations_file` | path  | null     | Observation locations file                               |
-| `merge_observations`         | bool  | false    | Merge observations into model                            |
-| `discharge_locations_file`   | path  | null     | Discharge source locations file                          |
-| `merge_discharge`            | bool  | false    | Merge discharge into model                               |
-| `include_noaa_gages`         | bool  | false    | Enable NOAA station discovery and comparison plots       |
-| `include_precip`             | bool  | false    | Add precipitation forcing                                |
-| `include_wind`               | bool  | false    | Add wind forcing                                         |
-| `include_pressure`           | bool  | false    | Add atmospheric pressure forcing                         |
-| `forcing_to_mesh_offset_m`   | float | 0.0      | Vertical offset (m) added to boundary forcing            |
-| `vdatum_mesh_to_msl_m`       | float | 0.0      | Vertical offset (m) converting model output to MSL       |
-| `meteo_res`                  | float | null     | Meteo forcing output resolution (m)                      |
-| `sfincs_exe`                 | path  | null     | Explicit SFINCS executable path (overrides PATH lookup)  |
-| `omp_num_threads`            | int   | auto     | OpenMP threads (defaults to CPU count)                   |
-| `floodmap_dem`               | path  | null     | High-resolution DEM for flood depth downscaling          |
-| `floodmap_hmin`              | float | 0.05     | Minimum flood depth threshold (m)                        |
-| `floodmap_enabled`           | bool  | true     | Enable flood depth map generation                        |
-
-### Simulation Settings
-
-| Parameter          | Type     | Options                                | Description                   |
-| ------------------ | -------- | -------------------------------------- | ----------------------------- |
-| `start_date`       | datetime | -                                      | Simulation start (ISO format) |
-| `duration_hours`   | int      | -                                      | Simulation length in hours    |
-| `coastal_domain`   | str      | `prvi`, `hawaii`, `atlgulf`, `pacific` | Coastal domain                |
-| `meteo_source`     | str      | `nwm_retro`, `nwm_ana`                 | Meteorological data source    |
-| `timestep_seconds` | int      | 3600                                   | Forcing time step             |
-
-### Boundary Settings
-
-| Parameter    | Type | Options         | Description               |
-| ------------ | ---- | --------------- | ------------------------- |
-| `source`     | str  | `tpxo`, `stofs` | Boundary condition source |
-| `stofs_file` | path | -               | STOFS file path           |
-
-### Path Settings
-
-All path fields support `~` (tilde) expansion, so you can write `~/my_data` instead of
-the full home directory path.
-
-| Parameter          | Type | Default      | Description                        |
-| ------------------ | ---- | ------------ | ---------------------------------- |
-| `work_dir`         | path | -            | Working directory for outputs      |
-| `raw_download_dir` | path | null         | Directory with downloaded NWM data |
-| `nfs_mount`        | path | `/ngen-test` | NFS mount point                    |
-| `hot_start_file`   | path | null         | Hot restart file for warm start    |
-
-## Supported Domains and Data Sources
-
-**Domains**: `atlgulf`, `pacific`, `hawaii`, `prvi`
+## Supported Data Sources
 
 | Source      | Date Range               | Description           |
 | ----------- | ------------------------ | --------------------- |
 | `nwm_retro` | 1979-02-01 to 2023-01-31 | NWM Retrospective 3.0 |
 | `nwm_ana`   | 2018-09-17 to present    | NWM Analysis          |
 | `stofs`     | 2020-12-30 to present    | STOFS water levels    |
-| `glofs`     | 2005-09-30 to present    | Great Lakes OFS       |
 | `tpxo`      | N/A (local installation) | TPXO tidal model      |
+
+**Domains**: `atlgulf`, `pacific`, `hawaii`, `prvi`
 
 ## Workflow Stages
 
-### SCHISM Stages
+### SCHISM (11 stages)
 
-The `run` command executes all stages sequentially. All stages run natively (no
-containers required).
+`download` → `schism_forcing_prep` → `schism_forcing` → `schism_sflux` → `schism_params`
+→ `schism_obs` → `schism_boundary` → `schism_prep` → `schism_run` → `schism_postprocess`
+→ `schism_plot`
 
-1. **`download`** - Download NWM/STOFS data
-1. **`schism_forcing_prep`** - Prepare NWM forcing data
-1. **`schism_forcing`** - Generate atmospheric forcing (MPI)
-1. **`schism_sflux`** - Generate sflux atmospheric files
-1. **`schism_params`** - Create SCHISM `param.nml` file
-1. **`schism_obs`** - Add NOAA observation stations
-1. **`schism_boundary`** - Generate boundary conditions
-1. **`schism_prep`** - Prepare SCHISM inputs (mesh partitioning, etc.)
-1. **`schism_run`** - Run SCHISM model (MPI)
-1. **`schism_postprocess`** - Post-process outputs
-1. **`schism_plot`** - Plot simulated vs observed water levels
+### SFINCS (14 stages)
 
-### SFINCS Stages
+`download` → `sfincs_symlinks` → `sfincs_data_catalog` → `sfincs_init` → `sfincs_timing`
+→ `sfincs_forcing` → `sfincs_discharge` → `sfincs_precip` → `sfincs_wind` →
+`sfincs_pressure` → `sfincs_write` → `sfincs_run` → `sfincs_floodmap` → `sfincs_plot`
 
-1. **`download`** - Download NWM/STOFS data
-1. **`sfincs_symlinks`** - Create `.nc` symlinks for NWM data
-1. **`sfincs_data_catalog`** - Generate HydroMT data catalog
-1. **`sfincs_init`** - Initialize SFINCS model (pre-built)
-1. **`sfincs_timing`** - Set SFINCS timing
-1. **`sfincs_forcing`** - Add water level forcing
-1. **`sfincs_discharge`** - Add discharge sources
-1. **`sfincs_precip`** - Add precipitation forcing
-1. **`sfincs_wind`** - Add wind forcing
-1. **`sfincs_pressure`** - Add atmospheric pressure forcing
-1. **`sfincs_write`** - Write SFINCS model
-1. **`sfincs_run`** - Run SFINCS model (OpenMP)
-1. **`sfincs_floodmap`** - Downscale flood depth map
-1. **`sfincs_plot`** - Plot simulated vs observed water levels
+### SFINCS Creation (9 stages)
 
-### SFINCS Creation Stages
+`create_grid` → `create_fetch_data` → `create_elevation` → `create_mask` →
+`create_boundary` → `create_discharge` → `create_subgrid` → `create_obs` →
+`create_write`
 
-Used by the `create` command to build a new SFINCS model from an AOI polygon:
+## Roadmap
 
-1. **`create_grid`** - Create SFINCS quadtree grid from AOI polygon
-1. **`create_fetch_data`** - Fetch elevation and land cover data for AOI
-1. **`create_elevation`** - Add elevation and bathymetry data
-1. **`create_mask`** - Create active cell mask
-1. **`create_boundary`** - Create water level boundary cells
-1. **`create_discharge`** - Add NWM discharge source points _(optional)_
-1. **`create_subgrid`** - Create subgrid tables
-1. **`create_obs`** - Add observation points _(optional)_
-1. **`create_write`** - Write SFINCS model to disk
+- **SCHISM model creation**: integrate the existing SCHISM mesh subsetting capability
+    into the package, providing an automated create workflow for SCHISM similar to what
+    SFINCS already has. This will allow users to extract a regional subdomain from a
+    larger SCHISM mesh using the same QGIS plugin and API.
+- **Improved tidal boundary conditions**: replace the current 8-constituent TPXO
+    implementation with a pure-Python module supporting all 32+ constituents and minor
+    constituent inference, removing the dependency on an external Fortran binary
+- **Multi-cycle STOFS stitching**: download and stitch multiple STOFS forecast cycles to
+    cover simulations of any duration, eliminating the current 180-hour single-cycle
+    limit
+- **Regional STOFS subsetting**: spatially subset the global STOFS output to the model
+    domain before download, reducing data transfer from ~12 GB per cycle to a few
+    hundred MB
+- **PyPI and conda-forge**: publish the package on PyPI and conda-forge so users can
+    install with `pip install coastal-calibration` or
+    `conda install coastal-calibration` without cloning the repository
 
-## Configuration Inheritance
-
-Use `_base` to inherit from a shared configuration. This is useful for running the same
-simulation across different domains or time periods:
-
-```yaml
-# base.yaml - shared settings
-simulation:
-  duration_hours: 24
-  meteo_source: nwm_ana
-
-boundary:
-  source: stofs
-```
-
-```yaml
-# hawaii_run.yaml - Hawaii-specific run
-_base: base.yaml
-
-simulation:
-  start_date: 2021-06-11
-  coastal_domain: hawaii
-```
-
-```yaml
-# prvi_run.yaml - Puerto Rico/Virgin Islands run
-_base: base.yaml
-
-simulation:
-  start_date: 2022-09-18
-  coastal_domain: prvi
-```
-
-## CLI Reference
-
-```bash
-# Generate a new configuration file
-coastal-calibration init config.yaml --domain pacific
-coastal-calibration init config.yaml --domain atlgulf --model sfincs
-
-# Validate a configuration file
-coastal-calibration validate config.yaml
-
-# Run workflow (inside SLURM job or for testing)
-coastal-calibration run config.yaml
-coastal-calibration run config.yaml --start-from schism_params
-coastal-calibration run config.yaml --stop-after schism_sflux
-
-# Create a SFINCS model from an AOI polygon
-coastal-calibration create create_config.yaml
-coastal-calibration create create_config.yaml --start-from create_elevation
-
-# Download NWS topobathy DEM for an AOI
-coastal-calibration prepare-topobathy aoi.geojson --domain atlgulf
-
-# Rebuild NOAA DEM spatial index
-coastal-calibration update-dem-index
-
-# List available workflow stages
-coastal-calibration stages
-coastal-calibration stages --model schism
-coastal-calibration stages --model sfincs
-coastal-calibration stages --model create
-```
-
-## Credits and references
+## Credits
 
 1. [NextGen Water Modeling Framework Prototype](https://github.com/NOAA-OWP/ngen)
 1. [schism-dev](https://ccrm.vims.edu/schismweb/) community
@@ -367,4 +203,4 @@ coastal-calibration stages --model create
 
 ## License
 
-BSD-2-Clause. See [LICENSE](LICENSE) for details.
+BSD-2-Clause. See [LICENSE](LICENSE.md) for details.

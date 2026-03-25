@@ -373,7 +373,7 @@ class PreSCHISMStage(WorkflowStage):
                 start_date=sim.start_date,
                 duration_hours=int(sim.duration_hours),
                 coastal_domain=sim.coastal_domain,
-                streamflow_dir=paths.streamflow_dir(sim.meteo_source),
+                streamflow_dir=paths.streamflow_dir(sim.meteo_source, sim.coastal_domain),
                 prebuilt_dir=prebuilt_dir,
             )
 

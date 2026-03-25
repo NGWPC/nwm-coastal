@@ -21,7 +21,7 @@ ______________________________________________________________________
 1. [Logging](#logging)
 1. [Environment variables](#environment-variables)
 1. [ESMF regridding modules](#esmf-regridding-modules)
-1. [ESMF / esmpy compatibility](#esmf--esmpy-compatibility)
+1. [ESMF / esmpy compatibility](#esmf-esmpy-compatibility)
 1. [Parallel netCDF4 and MPI](#parallel-netcdf4-and-mpi)
 1. [SCHISM version compatibility](#schism-version-compatibility)
 1. [Hawaii example notebook](#hawaii-example-notebook)
