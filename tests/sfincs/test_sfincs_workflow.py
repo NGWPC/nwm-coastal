@@ -214,7 +214,7 @@ def fake_download_dir(tmp_path: Path) -> Path:
         _create_fake_meteo_nc(nc_path, dt)
 
     # --- Streamflow ---
-    hydro_dir = dl_dir / "hydro" / "nwm"
+    hydro_dir = dl_dir / "hydro" / "nwm" / "conus"
     hydro_dir.mkdir(parents=True)
     for hour in range(2):
         dt = datetime(2025, 6, 1, hour)
