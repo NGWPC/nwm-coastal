@@ -46,11 +46,9 @@ def main() -> None:
     abs_prefix = str(root) + "/"
     notebooks = sorted((root / "docs/examples/notebooks").glob("*.ipynb"))
     if not notebooks:
-        print("No notebooks found.")
         return
     for nb_path in notebooks:
         clean_notebook(nb_path, abs_prefix)
-        print(f"Cleaned: {nb_path.relative_to(root)}")
 
 
 if __name__ == "__main__":
