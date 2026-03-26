@@ -65,28 +65,3 @@
 .doc-contents .field-list p {
   margin: 0;
 }
-
-/* prefix / prefix-light palette definitions for mkdocs-materialx.
-   mkdocs-materialx >= 10 no longer ships these CSS variables, so we
-   define them here to match the prefix.dev brand color (#4051b5 indigo). */
-[data-md-color-primary="prefix-light"] {
-  --md-primary-fg-color: #4051b5;
-  --md-primary-fg-color--transparent: #4051b51a;
-  --md-primary-fg-color--light: #5d6cc0;
-  --md-primary-fg-color--dark: #303fa1;
-  --md-primary-bg-color: #fff;
-  --md-primary-bg-color--light: #ffffffb3;
-}
-
-[data-md-color-primary="prefix"] {
-  --md-primary-fg-color: #4051b5;
-  --md-primary-fg-color--transparent: #4051b51a;
-  --md-primary-fg-color--light: #5d6cc0;
-  --md-primary-fg-color--dark: #303fa1;
-  --md-primary-bg-color: #fff;
-  --md-primary-bg-color--light: #ffffffb3;
-}
-
-[data-md-color-scheme="slate"][data-md-color-primary="prefix"] {
-  --md-typeset-a-color: #5488e8;
-}
