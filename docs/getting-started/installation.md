@@ -5,8 +5,8 @@
 - [Git](https://git-scm.com/)
 - [Pixi](https://pixi.prefix.dev/latest/installation/)
 
-Pixi handles all other dependencies including Python, and compiling
-SFINCS and SCHISM from source. No containers are required.
+Pixi handles all other dependencies including Python, and compiling SFINCS and SCHISM
+from source. No containers are required.
 
 ## Install
 

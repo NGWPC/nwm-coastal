@@ -357,8 +357,10 @@ spell = "codespell -w"
 nb-sync = "jupytext --sync docs/examples/notebooks/*.py"
 # Execute all notebooks in-place (requires .ipynb to exist; run nb-sync first)
 nb-execute = "jupyter nbconvert --to notebook --execute --inplace docs/examples/notebooks/*.ipynb"
-# Full workflow: sync .py → .ipynb, then execute — use before building docs or committing
-nb-run = { depends-on = [ "nb-sync", "nb-execute" ] }
+# Strip ANSI codes and absolute paths from outputs — run after nb-execute before committing
+nb-clean = "python scripts/clean_notebooks.py"
+# Full workflow: sync .py → .ipynb, then execute and clean — use before building docs or committing
+nb-run = { depends-on = [ "nb-sync", "nb-execute", "nb-clean" ] }
 # Pair an existing .ipynb with a .py counterpart (one-time setup for imported notebooks)
 nb-pair = "jupytext --set-formats 'ipynb,py:percent' docs/examples/notebooks/*.ipynb"
 # Strip all cell outputs from .ipynb files (keeps repo diff clean)
