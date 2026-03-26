@@ -83,9 +83,8 @@ This package supports two primary use cases:
 ### Installation
 
 Prerequisites: [Git](https://git-scm.com/) and
-[Pixi](https://pixi.prefix.dev/latest/installation/).
-Pixi handles all other dependencies including Python and compiling
-SFINCS and SCHISM from source.
+[Pixi](https://pixi.prefix.dev/latest/installation/). Pixi handles all other
+dependencies including Python and compiling SFINCS and SCHISM from source.
 
 ```bash
 git clone https://github.com/NGWPC/nwm-coastal
@@ -93,8 +92,7 @@ cd nwm-coastal
 pixi install -e dev
 ```
 
-All commands below should be run with `pixi r -e dev` to activate
-the environment.
+All commands below should be run with `pixi r -e dev` to activate the environment.
 
 ### CLI
 
