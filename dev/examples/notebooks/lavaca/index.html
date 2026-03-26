@@ -2398,103 +2398,103 @@ print(result)</div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
 <pre>========================================                                        
 Coastal Calibration Workflow                                                    
-Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">03</span>-<span class="ansi-cyan-intense-fg ansi-bold">25</span> <span class="ansi-green-intense-fg ansi-bold">11:57:27</span>                                                 
+Start Time: 2026-03-25 11:57:27                                                 
 ========================================                                        
 ----------------------------------------                                        
 Stage: create_grid                                                              
-Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">03</span>-<span class="ansi-cyan-intense-fg ansi-bold">25</span> <span class="ansi-green-intense-fg ansi-bold">11:57:27</span>                                                 
+Start Time: 2026-03-25 11:57:27                                                 
   Create SFINCS grid from AOI                                                   
-  AOI: <span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/lavaca-tx/</span><span class="ansi-magenta-intense-fg">aoi.geojson</span>
-  Resolution: <span class="ansi-cyan-intense-fg ansi-bold">512</span> m, CRS: utm                                                   
-  Refinement: <span class="ansi-cyan-intense-fg ansi-bold">1</span> <span class="ansi-magenta-intense-fg ansi-bold">polygon</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>, max level <span class="ansi-cyan-intense-fg ansi-bold">3</span>                                         
+  AOI: docs/examples/lavaca-tx/aoi.geojson
+  Resolution: 512 m, CRS: utm                                                   
+  Refinement: 1 polygon(s), max level 3                                         
   Grid created successfully                                                     
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>1s<span class="ansi-bold">)</span>                                                            
+  [✓] COMPLETED (1s)                                                            
 ----------------------------------------                                        
 Stage: create_fetch_data                                                        
-Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">03</span>-<span class="ansi-cyan-intense-fg ansi-bold">25</span> <span class="ansi-green-intense-fg ansi-bold">11:57:28</span>                                                 
+Start Time: 2026-03-25 11:57:28                                                 
   Fetch elevation and land cover data for AOI                                   
   Reusing existing noaa_3m.tif                                                  
   Reusing existing gebco_15arcs.tif                                             
   Reusing existing esa_worldcover.tif                                           
-  Fetched <span class="ansi-cyan-intense-fg ansi-bold">3</span> <span class="ansi-magenta-intense-fg ansi-bold">dataset</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>: <span class="ansi-bold">[</span><span class="ansi-green-fg">'noaa_3m'</span>, <span class="ansi-green-fg">'gebco_15arcs'</span>, <span class="ansi-green-fg">'esa_worldcover'</span><span class="ansi-bold">]</span>           
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>0s<span class="ansi-bold">)</span>                                                            
+  Fetched 3 dataset(s): ['noaa_3m', 'gebco_15arcs', 'esa_worldcover']           
+  [✓] COMPLETED (0s)                                                            
 ----------------------------------------                                        
 Stage: create_elevation                                                         
-Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">03</span>-<span class="ansi-cyan-intense-fg ansi-bold">25</span> <span class="ansi-green-intense-fg ansi-bold">11:57:28</span>                                                 
+Start Time: 2026-03-25 11:57:28                                                 
   Add elevation and bathymetry data                                             
-  Elevation datasets: <span class="ansi-bold">[</span><span class="ansi-green-fg">'noaa_3m'</span>, <span class="ansi-green-fg">'gebco_15arcs'</span><span class="ansi-bold">]</span>                               
+  Elevation datasets: ['noaa_3m', 'gebco_15arcs']                               
   Elevation created successfully                                                
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>0s<span class="ansi-bold">)</span>                                                            
+  [✓] COMPLETED (0s)                                                            
 ----------------------------------------                                        
 Stage: create_mask                                                              
-Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">03</span>-<span class="ansi-cyan-intense-fg ansi-bold">25</span> <span class="ansi-green-intense-fg ansi-bold">11:57:29</span>                                                 
+Start Time: 2026-03-25 11:57:29                                                 
   Create active cell mask                                                       
-  <span class="ansi-yellow-fg">zmin</span>=<span class="ansi-cyan-intense-fg ansi-bold">-50.0</span>                                                                    
+  zmin=-50.0                                                                    
   Active mask created successfully                                              
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>0s<span class="ansi-bold">)</span>                                                            
+  [✓] COMPLETED (0s)                                                            
 ----------------------------------------                                        
 Stage: create_boundary                                                          
-Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">03</span>-<span class="ansi-cyan-intense-fg ansi-bold">25</span> <span class="ansi-green-intense-fg ansi-bold">11:57:29</span>                                                 
+Start Time: 2026-03-25 11:57:29                                                 
   Create water level boundary cells                                             
-  <span class="ansi-yellow-fg">boundary_zmax</span>=<span class="ansi-cyan-intense-fg ansi-bold">-1.0</span>                                                            
+  boundary_zmax=-1.0                                                            
   Boundary cells created successfully                                           
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>0s<span class="ansi-bold">)</span>                                                            
+  [✓] COMPLETED (0s)                                                            
 ----------------------------------------                                        
 Stage: create_discharge                                                         
-Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">03</span>-<span class="ansi-cyan-intense-fg ansi-bold">25</span> <span class="ansi-green-intense-fg ansi-bold">11:57:29</span>                                                 
+Start Time: 2026-03-25 11:57:29                                                 
   Add river discharge source points                                             
-  Read <span class="ansi-cyan-intense-fg ansi-bold">4</span> <span class="ansi-magenta-intense-fg ansi-bold">flowpath</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span> from discharge_nwm.geojson                                 
-    <span class="ansi-cyan-intense-fg ansi-bold">9356656</span>: snapped to active cell <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">192</span> m away<span class="ansi-bold">)</span>                                
-    <span class="ansi-cyan-intense-fg ansi-bold">9356634</span>: snapped to active cell <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">155</span> m away<span class="ansi-bold">)</span>                                
-    <span class="ansi-cyan-intense-fg ansi-bold">9349399</span>: snapped to active cell <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">327</span> m away<span class="ansi-bold">)</span>                                
-    <span class="ansi-cyan-intense-fg ansi-bold">7843181</span>: snapped to active cell <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">291</span> m away<span class="ansi-bold">)</span>                                
-  Wrote <span class="ansi-cyan-intense-fg ansi-bold">4</span> discharge source <span class="ansi-magenta-intense-fg ansi-bold">location</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span> to sfincs_nwm.src                        
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>0s<span class="ansi-bold">)</span>                                                            
+  Read 4 flowpath(s) from discharge_nwm.geojson                                 
+    9356656: snapped to active cell (192 m away)                                
+    9356634: snapped to active cell (155 m away)                                
+    9349399: snapped to active cell (327 m away)                                
+    7843181: snapped to active cell (291 m away)                                
+  Wrote 4 discharge source location(s) to sfincs_nwm.src                        
+  [✓] COMPLETED (0s)                                                            
 ----------------------------------------                                        
 Stage: create_subgrid                                                           
-Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">03</span>-<span class="ansi-cyan-intense-fg ansi-bold">25</span> <span class="ansi-green-intense-fg ansi-bold">11:57:29</span>                                                 
+Start Time: 2026-03-25 11:57:29                                                 
   Create subgrid tables                                                         
-  <span class="ansi-yellow-fg">nr_subgrid_pixels</span>=<span class="ansi-cyan-intense-fg ansi-bold">4</span>                                                           
+  nr_subgrid_pixels=4                                                           
   Subgrid tables created successfully                                           
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>30s<span class="ansi-bold">)</span>                                                           
+  [✓] COMPLETED (30s)                                                           
 ----------------------------------------                                        
 Stage: create_obs                                                               
-Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">03</span>-<span class="ansi-cyan-intense-fg ansi-bold">25</span> <span class="ansi-green-intense-fg ansi-bold">11:58:00</span>                                                 
+Start Time: 2026-03-25 11:58:00                                                 
   Add observation points                                                        
   Loading cached station metadata from cache/coops_stations_metadata.json       
-  Fetching datum information for <span class="ansi-cyan-intense-fg ansi-bold">4</span> <span class="ansi-magenta-intense-fg ansi-bold">station</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>                                   
-  Fetching data from <span class="ansi-cyan-intense-fg ansi-bold">4</span> <span class="ansi-magenta-intense-fg ansi-bold">station</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>                                               
-  Added <span class="ansi-cyan-intense-fg ansi-bold">4</span> NOAA CO-OPS observation <span class="ansi-magenta-intense-fg ansi-bold">point</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>                                      
-    noaa_8773037: no wet cell within <span class="ansi-cyan-intense-fg ansi-bold">1000</span> m <span class="ansi-bold">(</span>nearest <span class="ansi-cyan-intense-fg ansi-bold">9976</span> m away<span class="ansi-bold">)</span>               
-    noaa_8773259: placed at face center <span class="ansi-yellow-fg">z</span>=<span class="ansi-cyan-intense-fg ansi-bold">-1.002</span> m <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">314</span> m from original<span class="ansi-bold">)</span>        
-    noaa_8773701: placed at face center <span class="ansi-yellow-fg">z</span>=<span class="ansi-cyan-intense-fg ansi-bold">-3.194</span> m <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">32</span> m from original<span class="ansi-bold">)</span>         
-    noaa_8773767: placed at face center <span class="ansi-yellow-fg">z</span>=<span class="ansi-cyan-intense-fg ansi-bold">-10.451</span> m <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">33</span> m from original<span class="ansi-bold">)</span>        
-  Snapped <span class="ansi-cyan-intense-fg ansi-bold">3</span> observation <span class="ansi-magenta-intense-fg ansi-bold">point</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span> to nearest wet cell                            
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>0s<span class="ansi-bold">)</span>                                                            
+  Fetching datum information for 4 station(s)                                   
+  Fetching data from 4 station(s)                                               
+  Added 4 NOAA CO-OPS observation point(s)                                      
+    noaa_8773037: no wet cell within 1000 m (nearest 9976 m away)               
+    noaa_8773259: placed at face center z=-1.002 m (314 m from original)        
+    noaa_8773701: placed at face center z=-3.194 m (32 m from original)         
+    noaa_8773767: placed at face center z=-10.451 m (33 m from original)        
+  Snapped 3 observation point(s) to nearest wet cell                            
+  [✓] COMPLETED (0s)                                                            
 ----------------------------------------                                        
 Stage: create_write                                                             
-Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">03</span>-<span class="ansi-cyan-intense-fg ansi-bold">25</span> <span class="ansi-green-intense-fg ansi-bold">11:58:00</span>                                                 
+Start Time: 2026-03-25 11:58:00                                                 
   Write SFINCS model to disk                                                    
   Output directory:                                                             
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/lavaca-tx/</span><span class="ansi-magenta-intense-fg">output</span>            
+docs/examples/lavaca-tx/output            
   Model written successfully                                                    
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>0s<span class="ansi-bold">)</span>                                                            
+  [✓] COMPLETED (0s)                                                            
 ----------------------------------------                                        
 ========================================                                        
-Workflow COMPLETED | Total Duration: <span class="ansi-green-intense-fg ansi-bold">0:00:33</span>                                    
+Workflow COMPLETED | Total Duration: 0:00:33                                    
 ========================================                                        
                                                                                 
 Timing Summary:                                                                 
 ----------------------------------------                                        
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> create_grid: 1s                                                           
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> create_fetch_data: 0s                                                     
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> create_elevation: 0s                                                      
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> create_mask: 0s                                                           
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> create_boundary: 0s                                                       
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> create_discharge: 0s                                                      
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> create_subgrid: 30s                                                       
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> create_obs: 0s                                                            
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> create_write: 0s                                                          
+  [✓] create_grid: 1s                                                           
+  [✓] create_fetch_data: 0s                                                     
+  [✓] create_elevation: 0s                                                      
+  [✓] create_mask: 0s                                                           
+  [✓] create_boundary: 0s                                                       
+  [✓] create_discharge: 0s                                                      
+  [✓] create_subgrid: 30s                                                       
+  [✓] create_obs: 0s                                                            
+  [✓] create_write: 0s                                                          
 </pre>
 </div>
 </div>
@@ -2780,176 +2780,176 @@ print(result)</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
 <pre>Cleaned generated files from                                                    
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/lavaca-tx/</span><span class="ansi-magenta-intense-fg">run</span>               
+docs/examples/lavaca-tx/run               
 ========================================                                        
 Coastal Calibration Workflow                                                    
-Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">03</span>-<span class="ansi-cyan-intense-fg ansi-bold">25</span> <span class="ansi-green-intense-fg ansi-bold">11:58:00</span>                                                 
+Start Time: 2026-03-25 11:58:00                                                 
 ========================================                                        
 ----------------------------------------                                        
 Stage: download                                                                 
-Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">03</span>-<span class="ansi-cyan-intense-fg ansi-bold">25</span> <span class="ansi-green-intense-fg ansi-bold">11:58:00</span>                                                 
-  Download input data <span class="ansi-bold">(</span>NWM, STOFS<span class="ansi-bold">)</span>                                              
-  meteo/nwm_ana: <span class="ansi-cyan-intense-fg ansi-bold">101</span>/<span class="ansi-cyan-intense-fg ansi-bold">101</span> <span class="ansi-bold">[</span>OK<span class="ansi-bold">]</span>                                                   
-  hydro/nwm: <span class="ansi-cyan-intense-fg ansi-bold">101</span>/<span class="ansi-cyan-intense-fg ansi-bold">101</span> <span class="ansi-bold">[</span>OK<span class="ansi-bold">]</span>                                                       
-  coastal/stofs: <span class="ansi-cyan-intense-fg ansi-bold">1</span>/<span class="ansi-cyan-intense-fg ansi-bold">1</span> <span class="ansi-bold">[</span>OK<span class="ansi-bold">]</span>                                                       
-  Total: <span class="ansi-cyan-intense-fg ansi-bold">203</span>/<span class="ansi-cyan-intense-fg ansi-bold">203</span> <span class="ansi-bold">(</span>failed: <span class="ansi-cyan-intense-fg ansi-bold">0</span><span class="ansi-bold">)</span>                                                    
+Start Time: 2026-03-25 11:58:00                                                 
+  Download input data (NWM, STOFS)                                              
+  meteo/nwm_ana: 101/101 [OK]                                                   
+  hydro/nwm: 101/101 [OK]                                                       
+  coastal/stofs: 1/1 [OK]                                                       
+  Total: 203/203 (failed: 0)                                                    
   Download complete — raw files stored in                                       
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/</span><span class="ansi-magenta-intense-fg">downloads</span>                   
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>10s<span class="ansi-bold">)</span>                                                           
+docs/examples/downloads                   
+  [✓] COMPLETED (10s)                                                           
 ----------------------------------------                                        
 Stage: sfincs_symlinks                                                          
-Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">03</span>-<span class="ansi-cyan-intense-fg ansi-bold">25</span> <span class="ansi-green-intense-fg ansi-bold">11:58:11</span>                                                 
+Start Time: 2026-03-25 11:58:11                                                 
   Create .nc symlinks for NWM data                                              
-  Skipped <span class="ansi-cyan-intense-fg ansi-bold">213</span> meteo + <span class="ansi-cyan-intense-fg ansi-bold">0</span> streamflow symlinks <span class="ansi-bold">(</span>already exist<span class="ansi-bold">)</span>                     
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>0s<span class="ansi-bold">)</span>                                                            
+  Skipped 213 meteo + 0 streamflow symlinks (already exist)                     
+  [✓] COMPLETED (0s)                                                            
 ----------------------------------------                                        
 Stage: sfincs_data_catalog                                                      
-Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">03</span>-<span class="ansi-cyan-intense-fg ansi-bold">25</span> <span class="ansi-green-intense-fg ansi-bold">11:58:11</span>                                                 
+Start Time: 2026-03-25 11:58:11                                                 
   Generate HydroMT data catalog for SFINCS                                      
   Data catalog written to                                                       
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/lavaca-tx/run/</span><span class="ansi-magenta-intense-fg">data_catalog.y</span>
-<span class="ansi-magenta-intense-fg">ml</span>                                                                              
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>0s<span class="ansi-bold">)</span>                                                            
+docs/examples/lavaca-tx/run/data_catalog.y
+ml                                                                              
+  [✓] COMPLETED (0s)                                                            
 ----------------------------------------                                        
 Stage: sfincs_init                                                              
-Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">03</span>-<span class="ansi-cyan-intense-fg ansi-bold">25</span> <span class="ansi-green-intense-fg ansi-bold">11:58:11</span>                                                 
-  Initialize SFINCS model <span class="ansi-bold">(</span>pre-built<span class="ansi-bold">)</span>                                           
+Start Time: 2026-03-25 11:58:11                                                 
+  Initialize SFINCS model (pre-built)                                           
   Copied pre-built model from                                                   
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/lavaca-tx/</span><span class="ansi-magenta-intense-fg">output</span> to         
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/lavaca-tx/run/</span><span class="ansi-magenta-intense-fg">sfincs_model</span>  
+docs/examples/lavaca-tx/output to         
+docs/examples/lavaca-tx/run/sfincs_model  
   Removed stale output files: sfincs_netbndbzsbzifile.nc, sfincs_netamuv.nc,    
 sfincs_netamp.nc, sfincs_netampr.nc, sfincs_map.nc, sfincs_his.nc               
-  SFINCS model initialized <span class="ansi-bold">(</span><span class="ansi-yellow-fg">grid_type</span>=<span class="ansi-magenta-fg">quadtree</span><span class="ansi-bold">)</span> at                              
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/lavaca-tx/run/</span><span class="ansi-magenta-intense-fg">sfincs_model</span>  
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>0s<span class="ansi-bold">)</span>                                                            
+  SFINCS model initialized (grid_type=quadtree) at                              
+docs/examples/lavaca-tx/run/sfincs_model  
+  [✓] COMPLETED (0s)                                                            
 ----------------------------------------                                        
 Stage: sfincs_timing                                                            
-Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">03</span>-<span class="ansi-cyan-intense-fg ansi-bold">25</span> <span class="ansi-green-intense-fg ansi-bold">11:58:12</span>                                                 
+Start Time: 2026-03-25 11:58:12                                                 
   Set SFINCS timing                                                             
-  Spinup: <span class="ansi-cyan-intense-fg ansi-bold">3600</span> s                                                                
-  Timing set: <span class="ansi-cyan-intense-fg ansi-bold">2025</span>-<span class="ansi-cyan-intense-fg ansi-bold">06</span>-<span class="ansi-cyan-intense-fg ansi-bold">01</span> <span class="ansi-green-intense-fg ansi-bold">00:00:00</span> to <span class="ansi-cyan-intense-fg ansi-bold">2025</span>-<span class="ansi-cyan-intense-fg ansi-bold">06</span>-<span class="ansi-cyan-intense-fg ansi-bold">05</span> <span class="ansi-green-intense-fg ansi-bold">04:00:00</span>                        
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>0s<span class="ansi-bold">)</span>                                                            
+  Spinup: 3600 s                                                                
+  Timing set: 2025-06-01 00:00:00 to 2025-06-05 04:00:00                        
+  [✓] COMPLETED (0s)                                                            
 ----------------------------------------                                        
 Stage: sfincs_forcing                                                           
-Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">03</span>-<span class="ansi-cyan-intense-fg ansi-bold">25</span> <span class="ansi-green-intense-fg ansi-bold">11:58:12</span>                                                 
+Start Time: 2026-03-25 11:58:12                                                 
   Add water level forcing                                                       
-  Read <span class="ansi-cyan-intense-fg ansi-bold">143</span> boundary <span class="ansi-magenta-intense-fg ansi-bold">point</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span> from                                               
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/lavaca-tx/run/sfincs_model/</span><span class="ansi-magenta-intense-fg">s</span>
-<span class="ansi-magenta-intense-fg">fincs.bnd</span>                                                                       
-  Loaded stofs_waterlevel: <span class="ansi-yellow-fg">time</span>=<span class="ansi-cyan-intense-fg ansi-bold">101</span>, <span class="ansi-yellow-fg">node</span>=<span class="ansi-cyan-intense-fg ansi-bold">98922</span>                                 
-  Interpolated stofs_waterlevel to <span class="ansi-cyan-intense-fg ansi-bold">143</span> boundary points <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">101</span> time steps<span class="ansi-bold">)</span>         
+  Read 143 boundary point(s) from                                               
+docs/examples/lavaca-tx/run/sfincs_model/s
+fincs.bnd                                                                       
+  Loaded stofs_waterlevel: time=101, node=98922                                 
+  Interpolated stofs_waterlevel to 143 boundary points (101 time steps)         
   Wrote boundary forcing to sfincs_netbndbzsbzifile.nc                          
   Water level forcing added from stofs_waterlevel                               
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>19s<span class="ansi-bold">)</span>                                                           
+  [✓] COMPLETED (19s)                                                           
 ----------------------------------------                                        
 Stage: sfincs_discharge                                                         
-Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">03</span>-<span class="ansi-cyan-intense-fg ansi-bold">25</span> <span class="ansi-green-intense-fg ansi-bold">11:58:31</span>                                                 
+Start Time: 2026-03-25 11:58:31                                                 
   Add discharge sources                                                         
-  Added <span class="ansi-cyan-intense-fg ansi-bold">4</span> discharge source <span class="ansi-magenta-intense-fg ansi-bold">point</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span> from                                        
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/lavaca-tx/output/</span><span class="ansi-magenta-intense-fg">sfincs_nwm.</span>
-<span class="ansi-magenta-intense-fg">src</span>                                                                             
-  Assigned discharge timeseries to <span class="ansi-cyan-intense-fg ansi-bold">4</span> <span class="ansi-magenta-intense-fg ansi-bold">point</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span> <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">4</span> unique <span class="ansi-magenta-intense-fg ansi-bold">feature_id</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span><span class="ansi-bold">)</span>          
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>7s<span class="ansi-bold">)</span>                                                            
+  Added 4 discharge source point(s) from                                        
+docs/examples/lavaca-tx/output/sfincs_nwm.
+src                                                                             
+  Assigned discharge timeseries to 4 point(s) (4 unique feature_id(s))          
+  [✓] COMPLETED (7s)                                                            
 ----------------------------------------                                        
 Stage: sfincs_precip                                                            
-Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">03</span>-<span class="ansi-cyan-intense-fg ansi-bold">25</span> <span class="ansi-green-intense-fg ansi-bold">11:58:38</span>                                                 
+Start Time: 2026-03-25 11:58:38                                                 
   Add precipitation forcing                                                     
-  Precipitation forcing added from nwm_ana_meteo <span class="ansi-bold">(</span><span class="ansi-yellow-fg">res</span>=<span class="ansi-cyan-intense-fg ansi-bold">512</span> m<span class="ansi-bold">)</span>                    
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>2s<span class="ansi-bold">)</span>                                                            
+  Precipitation forcing added from nwm_ana_meteo (res=512 m)                    
+  [✓] COMPLETED (2s)                                                            
 ----------------------------------------                                        
 Stage: sfincs_wind                                                              
-Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">03</span>-<span class="ansi-cyan-intense-fg ansi-bold">25</span> <span class="ansi-green-intense-fg ansi-bold">11:58:41</span>                                                 
+Start Time: 2026-03-25 11:58:41                                                 
   Add wind forcing                                                              
-  Wind forcing added from nwm_ana_meteo <span class="ansi-bold">(</span><span class="ansi-yellow-fg">res</span>=<span class="ansi-cyan-intense-fg ansi-bold">512</span> m<span class="ansi-bold">)</span>                             
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>3s<span class="ansi-bold">)</span>                                                            
+  Wind forcing added from nwm_ana_meteo (res=512 m)                             
+  [✓] COMPLETED (3s)                                                            
 ----------------------------------------                                        
 Stage: sfincs_pressure                                                          
-Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">03</span>-<span class="ansi-cyan-intense-fg ansi-bold">25</span> <span class="ansi-green-intense-fg ansi-bold">11:58:45</span>                                                 
+Start Time: 2026-03-25 11:58:45                                                 
   Add atmospheric pressure forcing                                              
-  Atmospheric pressure forcing added from nwm_ana_meteo <span class="ansi-bold">(</span><span class="ansi-yellow-fg">baro</span>=<span class="ansi-cyan-intense-fg ansi-bold">1</span>, <span class="ansi-yellow-fg">res</span>=<span class="ansi-cyan-intense-fg ansi-bold">512</span> m<span class="ansi-bold">)</span>     
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>2s<span class="ansi-bold">)</span>                                                            
+  Atmospheric pressure forcing added from nwm_ana_meteo (baro=1, res=512 m)     
+  [✓] COMPLETED (2s)                                                            
 ----------------------------------------                                        
 Stage: sfincs_write                                                             
-Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">03</span>-<span class="ansi-cyan-intense-fg ansi-bold">25</span> <span class="ansi-green-intense-fg ansi-bold">11:58:48</span>                                                 
+Start Time: 2026-03-25 11:58:48                                                 
   Write SFINCS model                                                            
-  Applied <span class="ansi-cyan-intense-fg ansi-bold">7</span> sfincs.inp <span class="ansi-magenta-intense-fg ansi-bold">override</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>: <span class="ansi-bold">{</span><span class="ansi-green-fg">'tspinup'</span>: <span class="ansi-cyan-intense-fg ansi-bold">10800</span>, <span class="ansi-green-fg">'advection'</span>: <span class="ansi-cyan-intense-fg ansi-bold">0</span>,          
-<span class="ansi-green-fg">'viscosity'</span>: <span class="ansi-cyan-intense-fg ansi-bold">0</span>, <span class="ansi-green-fg">'nuvisc'</span>: <span class="ansi-cyan-intense-fg ansi-bold">0.01</span>, <span class="ansi-green-fg">'cdnrb'</span>: <span class="ansi-cyan-intense-fg ansi-bold">3</span>, <span class="ansi-green-fg">'cdwnd'</span>: <span class="ansi-bold">[</span><span class="ansi-cyan-intense-fg ansi-bold">0.0</span>, <span class="ansi-cyan-intense-fg ansi-bold">28.0</span>, <span class="ansi-cyan-intense-fg ansi-bold">50.0</span><span class="ansi-bold">]</span>, <span class="ansi-green-fg">'cdval'</span>:
-<span class="ansi-bold">[</span><span class="ansi-cyan-intense-fg ansi-bold">0.001</span>, <span class="ansi-cyan-intense-fg ansi-bold">0.0025</span>, <span class="ansi-cyan-intense-fg ansi-bold">0.0025</span><span class="ansi-bold">]</span><span class="ansi-bold">}</span>                                                        
+  Applied 7 sfincs.inp override(s): {'tspinup': 10800, 'advection': 0,          
+'viscosity': 0, 'nuvisc': 0.01, 'cdnrb': 3, 'cdwnd': [0.0, 28.0, 50.0], 'cdval':
+[0.001, 0.0025, 0.0025]}                                                        
   SFINCS model written to                                                       
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/lavaca-tx/run/</span><span class="ansi-magenta-intense-fg">sfincs_model</span>  
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>0s<span class="ansi-bold">)</span>                                                            
+docs/examples/lavaca-tx/run/sfincs_model  
+  [✓] COMPLETED (0s)                                                            
 ----------------------------------------                                        
 Stage: sfincs_run                                                               
-Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">03</span>-<span class="ansi-cyan-intense-fg ansi-bold">25</span> <span class="ansi-green-intense-fg ansi-bold">11:58:48</span>                                                 
+Start Time: 2026-03-25 11:58:48                                                 
   Run SFINCS model                                                              
   Running SFINCS via native executable:                                         
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/.pixi/envs/dev/bin/</span><span class="ansi-magenta-intense-fg">sfincs</span>                 
+.pixi/envs/dev/bin/sfincs                 
   SFINCS run completed                                                          
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>7m 49s<span class="ansi-bold">)</span>                                                        
+  [✓] COMPLETED (7m 49s)                                                        
 ----------------------------------------                                        
 Stage: sfincs_floodmap                                                          
-Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">03</span>-<span class="ansi-cyan-intense-fg ansi-bold">25</span> <span class="ansi-green-intense-fg ansi-bold">12:06:37</span>                                                 
+Start Time: 2026-03-25 12:06:37                                                 
   Downscale flood depth map                                                     
   Loaded zsmax from                                                             
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/lavaca-tx/run/sfincs_model/</span><span class="ansi-magenta-intense-fg">s</span>
-<span class="ansi-magenta-intense-fg">fincs_map.nc</span>                                                                    
+docs/examples/lavaca-tx/run/sfincs_model/s
+fincs_map.nc                                                                    
   Creating index COG:                                                           
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/lavaca-tx/run/sfincs_model/</span><span class="ansi-magenta-intense-fg">f</span>
-<span class="ansi-magenta-intense-fg">loodmap_index.tif</span>                                                               
-  Index COG created <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">29.7</span> MB<span class="ansi-bold">)</span>                                                   
+docs/examples/lavaca-tx/run/sfincs_model/f
+loodmap_index.tif                                                               
+  Index COG created (29.7 MB)                                                   
   Downscaling flood depth map                                                   
   GeoTIFF has no overviews, building them: floodmap_hmax.tif                    
-  Building <span class="ansi-cyan-intense-fg ansi-bold">6</span> overview levels: <span class="ansi-bold">[</span><span class="ansi-cyan-intense-fg ansi-bold">2</span>, <span class="ansi-cyan-intense-fg ansi-bold">4</span>, <span class="ansi-cyan-intense-fg ansi-bold">8</span>, <span class="ansi-cyan-intense-fg ansi-bold">16</span>, <span class="ansi-cyan-intense-fg ansi-bold">32</span>, <span class="ansi-cyan-intense-fg ansi-bold">64</span><span class="ansi-bold">]</span>                             
+  Building 6 overview levels: [2, 4, 8, 16, 32, 64]                             
   Flood depth map written:                                                      
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/lavaca-tx/run/sfincs_model/</span><span class="ansi-magenta-intense-fg">f</span>
-<span class="ansi-magenta-intense-fg">loodmap_hmax.tif</span> <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">543.5</span> MB<span class="ansi-bold">)</span>                                                     
+docs/examples/lavaca-tx/run/sfincs_model/f
+loodmap_hmax.tif (543.5 MB)                                                     
   Flood depth map:                                                              
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/lavaca-tx/run/sfincs_model/</span><span class="ansi-magenta-intense-fg">f</span>
-<span class="ansi-magenta-intense-fg">loodmap_hmax.tif</span>                                                                
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>4m 7s<span class="ansi-bold">)</span>                                                         
+docs/examples/lavaca-tx/run/sfincs_model/f
+loodmap_hmax.tif                                                                
+  [✓] COMPLETED (4m 7s)                                                         
 ----------------------------------------                                        
 Stage: sfincs_plot                                                              
-Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">03</span>-<span class="ansi-cyan-intense-fg ansi-bold">25</span> <span class="ansi-green-intense-fg ansi-bold">12:10:45</span>                                                 
+Start Time: 2026-03-25 12:10:45                                                 
   Plot simulated vs observed water levels                                       
   Loading cached station metadata from cache/coops_stations_metadata.json       
-  Fetching datum information for <span class="ansi-cyan-intense-fg ansi-bold">4</span> <span class="ansi-magenta-intense-fg ansi-bold">station</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>                                   
-  Fetching data from <span class="ansi-cyan-intense-fg ansi-bold">4</span> <span class="ansi-magenta-intense-fg ansi-bold">station</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>                                               
-  Matched <span class="ansi-cyan-intense-fg ansi-bold">4</span> observation <span class="ansi-magenta-intense-fg ansi-bold">point</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span> to NOAA <span class="ansi-magenta-intense-fg ansi-bold">station</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>: <span class="ansi-cyan-intense-fg ansi-bold">8773037</span>, <span class="ansi-cyan-intense-fg ansi-bold">8773259</span>, <span class="ansi-cyan-intense-fg ansi-bold">8773701</span>, 
-<span class="ansi-cyan-intense-fg ansi-bold">8773767</span>                                                                         
-  Applied mesh→MSL vdatum offset: +<span class="ansi-cyan-intense-fg ansi-bold">0.1700</span> m                                     
+  Fetching datum information for 4 station(s)                                   
+  Fetching data from 4 station(s)                                               
+  Matched 4 observation point(s) to NOAA station(s): 8773037, 8773259, 8773701, 
+8773767                                                                         
+  Applied mesh→MSL vdatum offset: +0.1700 m                                     
   Loading cached station metadata from cache/coops_stations_metadata.json       
-  Requesting water_level data for <span class="ansi-cyan-intense-fg ansi-bold">4</span> <span class="ansi-magenta-intense-fg ansi-bold">station</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span> from <span class="ansi-cyan-intense-fg ansi-bold">20250601</span> <span class="ansi-green-intense-fg ansi-bold">00:00</span> to <span class="ansi-cyan-intense-fg ansi-bold">20250605</span>  
-<span class="ansi-green-intense-fg ansi-bold">04:00</span>                                                                           
-  Fetching data from <span class="ansi-cyan-intense-fg ansi-bold">4</span> <span class="ansi-magenta-intense-fg ansi-bold">station</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>                                               
-  Successfully retrieved data for <span class="ansi-cyan-intense-fg ansi-bold">4</span> <span class="ansi-magenta-intense-fg ansi-bold">station</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>                                  
+  Requesting water_level data for 4 station(s) from 20250601 00:00 to 20250605  
+04:00                                                                           
+  Fetching data from 4 station(s)                                               
+  Successfully retrieved data for 4 station(s)                                  
   Loading cached station metadata from cache/coops_stations_metadata.json       
-  Fetching datum information for <span class="ansi-cyan-intense-fg ansi-bold">4</span> <span class="ansi-magenta-intense-fg ansi-bold">station</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>                                   
-  Fetching data from <span class="ansi-cyan-intense-fg ansi-bold">4</span> <span class="ansi-magenta-intense-fg ansi-bold">station</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>                                               
-  Saved <span class="ansi-cyan-intense-fg ansi-bold">1</span> comparison <span class="ansi-magenta-intense-fg ansi-bold">figure</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span> to                                               
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/lavaca-tx/run/sfincs_model/</span><span class="ansi-magenta-intense-fg">f</span>
-<span class="ansi-magenta-intense-fg">igs</span>                                                                             
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>2s<span class="ansi-bold">)</span>                                                            
+  Fetching datum information for 4 station(s)                                   
+  Fetching data from 4 station(s)                                               
+  Saved 1 comparison figure(s) to                                               
+docs/examples/lavaca-tx/run/sfincs_model/f
+igs                                                                             
+  [✓] COMPLETED (2s)                                                            
 ----------------------------------------                                        
 ========================================                                        
-Workflow COMPLETED | Total Duration: <span class="ansi-green-intense-fg ansi-bold">0:12:46</span>                                    
+Workflow COMPLETED | Total Duration: 0:12:46                                    
 ========================================                                        
                                                                                 
 Timing Summary:                                                                 
 ----------------------------------------                                        
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> download: 10s                                                             
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> sfincs_symlinks: 0s                                                       
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> sfincs_data_catalog: 0s                                                   
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> sfincs_init: 0s                                                           
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> sfincs_timing: 0s                                                         
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> sfincs_forcing: 19s                                                       
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> sfincs_discharge: 7s                                                      
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> sfincs_precip: 2s                                                         
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> sfincs_wind: 3s                                                           
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> sfincs_pressure: 2s                                                       
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> sfincs_write: 0s                                                          
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> sfincs_run: 7m 49s                                                        
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> sfincs_floodmap: 4m 7s                                                    
-  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> sfincs_plot: 2s                                                           
+  [✓] download: 10s                                                             
+  [✓] sfincs_symlinks: 0s                                                       
+  [✓] sfincs_data_catalog: 0s                                                   
+  [✓] sfincs_init: 0s                                                           
+  [✓] sfincs_timing: 0s                                                         
+  [✓] sfincs_forcing: 19s                                                       
+  [✓] sfincs_discharge: 7s                                                      
+  [✓] sfincs_precip: 2s                                                         
+  [✓] sfincs_wind: 3s                                                           
+  [✓] sfincs_pressure: 2s                                                       
+  [✓] sfincs_write: 0s                                                          
+  [✓] sfincs_run: 7m 49s                                                        
+  [✓] sfincs_floodmap: 4m 7s                                                    
+  [✓] sfincs_plot: 2s                                                           
 </pre>
 </div>
 </div>

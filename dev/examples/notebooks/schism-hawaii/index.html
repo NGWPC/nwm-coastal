@@ -2121,7 +2121,7 @@ for execution. Only the <code>model_config</code> section changes.</p>
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [1]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="CodeMirror cm-s-jupyter">
 <div class="zeroclipboard-container">
 <clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-1">
@@ -2181,7 +2181,7 @@ place the correct files at these paths (or adjust the paths below).</p>
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [2]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="CodeMirror cm-s-jupyter">
 <div class="zeroclipboard-container">
 <clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-2">
@@ -2278,7 +2278,7 @@ print(f"Duration:       {run_config.simulation.duration_hours}h")</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>Work directory: /Users/tchegini/repos/nwm-coastal-dev/docs/examples/hawaii/run
+<pre>Work directory: docs/examples/hawaii/run
 Prebuilt dir:   /Volumes/data/schism_models/hawaii
 Domain:         hawaii
 Duration:       50h
@@ -2309,13 +2309,13 @@ outputs, and generate comparison plots against NOAA observations</li>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=339d68e8">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=339d68e8">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [3]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="CodeMirror cm-s-jupyter">
 <div class="zeroclipboard-container">
 <clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-3">
@@ -2343,6 +2343,182 @@ print(result)</div>
 </div>
 </div>
 </div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
+<pre>Cleaned generated files from                                                    
+docs/examples/hawaii/run                  
+========================================                                        
+Coastal Calibration Workflow                                                    
+Start Time: 2026-03-26 11:06:32                                                 
+========================================                                        
+----------------------------------------                                        
+Stage: download                                                                 
+Start Time: 2026-03-26 11:06:32                                                 
+  Download input data (NWM, STOFS)                                              
+  meteo/nwm_ana: 51/51 [OK]                                                     
+  hydro/nwm: 204/204 [OK]                                                       
+  coastal/stofs: 1/1 [OK]                                                       
+  Total: 256/256 (failed: 0)                                                    
+  Download complete — raw files stored in                                       
+docs/examples/downloads                   
+  [✓] COMPLETED (15s)                                                           
+----------------------------------------                                        
+Stage: schism_forcing_prep                                                      
+Start Time: 2026-03-26 11:06:47                                                 
+  Prepare LDASIN forcing data                                                   
+  Creating forcing symlinks and output directories                              
+    Staged LDASIN files in                                                      
+docs/examples/hawaii/run/forcing_input/202
+5112600 (50 hours from 2025112600)                                              
+  Pre-forcing complete — output dir:                                            
+docs/examples/hawaii/run/coastal_forcing_o
+utput                                                                           
+  [✓] COMPLETED (0s)                                                            
+----------------------------------------                                        
+Stage: schism_forcing                                                           
+Start Time: 2026-03-26 11:06:47                                                 
+  Regrid atmospheric forcing (MPI)                                              
+  Generating 50h forcing from 202511260000 via MPI                              
+  NWM forcing generated in                                                      
+docs/examples/hawaii/run/forcing_input    
+  [✓] COMPLETED (33s)                                                           
+----------------------------------------                                        
+Stage: schism_sflux                                                             
+Start Time: 2026-03-26 11:07:21                                                 
+  Generate sflux atmospheric files                                              
+  Generating sflux from LDASIN files                                            
+    Creating sflux from 51 LDASIN files in                                      
+docs/examples/hawaii/run/forcing_input/202
+5112600                                                                         
+    Renamed sflux_air_1.0001.nc → sflux_air_1.1.nc                              
+    Generated sflux in                                                          
+docs/examples/hawaii/run/sflux            
+  Post-processing complete — 2 sflux file(s) produced                           
+  [✓] COMPLETED (1s)                                                            
+----------------------------------------                                        
+Stage: schism_params                                                            
+Start Time: 2026-03-26 11:07:22                                                 
+  Create param.nml and symlink mesh files                                       
+  Creating param.nml and symlinking mesh files                                  
+    Created param.nml and symlinked mesh files in                               
+docs/examples/hawaii/run                  
+  Parameter file created:                                                       
+docs/examples/hawaii/run/param.nml        
+  [✓] COMPLETED (0s)                                                            
+----------------------------------------                                        
+Stage: schism_obs                                                               
+Start Time: 2026-03-26 11:07:22                                                 
+  Add NOAA observation stations for SCHISM                                      
+  hgrid.gr3: 878770 nodes, 1703252 elements                                     
+  Found 2 open boundary segment(s) with 4350 total nodes                        
+  Loading cached station metadata from cache/coops_stations_metadata.json       
+  Fetching datum information for 7 station(s)                                   
+  Fetching data from 7 station(s)                                               
+  station.in written with 7 NOAA station(s): 1611400, 1612340, 1612401, 1612480,
+1615680, 1617433, 1617760                                                       
+  [✓] COMPLETED (1s)                                                            
+----------------------------------------                                        
+Stage: schism_boundary                                                          
+Start Time: 2026-03-26 11:07:23                                                 
+  Generate boundary conditions                                                  
+  Auto-resolved STOFS file:                                                     
+docs/examples/downloads/coastal/stofs/stof
+s_2d_glo.20251126/stofs_2d_glo.t00z.fields.cwl.nc                               
+  Using STOFS file:                                                             
+docs/examples/downloads/coastal/stofs/stof
+s_2d_glo.20251126/stofs_2d_glo.t00z.fields.cwl.nc                               
+    STOFS boundary created:                                                     
+docs/examples/hawaii/run/elev2D.th.nc     
+  STOFS boundary file created:                                                  
+docs/examples/hawaii/run/elev2D.th.nc     
+  [✓] COMPLETED (4m 26s)                                                        
+----------------------------------------                                        
+Stage: schism_prep                                                              
+Start Time: 2026-03-26 11:11:49                                                 
+  Prepare SCHISM inputs (discharge, partitioning)                               
+  Symlinking NWM CHRTOUT files                                                  
+  Running make_discharge                                                        
+    Processing 204 CHRTOUT files                                                
+    Wrote vsource.th (51 rows), vsink.th, source_sink.in (731 sources, 149      
+sinks)                                                                          
+  Running combine_sink_source                                                   
+    combine_sink_source completed                                               
+  Running merge_source_sink                                                     
+    Wrote source.nc — 295 sources (from 295), 149 sinks, 51 timesteps           
+  Partitioning for 4 tasks (2 scribes)                                          
+    Partitioned mesh into 2 compute ranks →                                     
+docs/examples/hawaii/run/partition.prop   
+  Set iout_sta = 1, nspool_sta = 18 in param.nml                                
+  SCHISM pre-processing complete                                                
+  [✓] COMPLETED (16s)                                                           
+----------------------------------------                                        
+Stage: schism_run                                                               
+Start Time: 2026-03-26 11:12:06                                                 
+  Run SCHISM model (MPI)                                                        
+  Launching pschism with 4 MPI tasks (1 node(s), 2 scribe(s))                   
+  Command: mpiexec -n 4 --oversubscribe pschism 2                               
+  SCHISM run completed successfully                                             
+  [✓] COMPLETED (2h 44m 19s)                                                    
+----------------------------------------                                        
+Stage: schism_postprocess                                                       
+Start Time: 2026-03-26 13:56:25                                                 
+  Post-process SCHISM outputs                                                   
+  SCHISM post-processing complete                                               
+  [✓] COMPLETED (0s)                                                            
+----------------------------------------                                        
+Stage: schism_plot                                                              
+Start Time: 2026-03-26 13:56:25                                                 
+  Plot simulated vs observed water levels (SCHISM)                              
+  Loading cached station metadata from cache/coops_stations_metadata.json       
+  Requesting water_level data for 7 station(s) from 20251126 00:00 to 20251128  
+02:00                                                                           
+  Fetching data from 7 station(s)                                               
+  Successfully retrieved data for 7 station(s)                                  
+  Loading cached station metadata from cache/coops_stations_metadata.json       
+  Fetching datum information for 7 station(s)                                   
+  Fetching data from 7 station(s)                                               
+  Saved 2 comparison figure(s) to                                               
+docs/examples/hawaii/run/figs             
+  [✓] COMPLETED (3s)                                                            
+----------------------------------------                                        
+========================================                                        
+Workflow COMPLETED | Total Duration: 2:49:56                                    
+========================================                                        
+                                                                                
+Timing Summary:                                                                 
+----------------------------------------                                        
+  [✓] download: 15s                                                             
+  [✓] schism_forcing_prep: 0s                                                   
+  [✓] schism_forcing: 33s                                                       
+  [✓] schism_sflux: 1s                                                          
+  [✓] schism_params: 0s                                                         
+  [✓] schism_obs: 1s                                                            
+  [✓] schism_boundary: 4m 26s                                                   
+  [✓] schism_prep: 16s                                                          
+  [✓] schism_run: 2h 44m 19s                                                    
+  [✓] schism_postprocess: 0s                                                    
+  [✓] schism_plot: 3s                                                           
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>WorkflowResult: SUCCESS
+  Start:     2026-03-26 11:06:32
+  End:       2026-03-26 13:56:28
+  Duration:  2h 49m 56s
+  Completed: download, schism_forcing_prep, schism_forcing, schism_sflux, schism_params, schism_obs, schism_boundary, schism_prep, schism_run, schism_postprocess, schism_plot
+</pre>
+</div>
+</div>
+</div>
+</div>
 </div>
 </div>
 <div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=a7a8f829">
@@ -2362,7 +2538,7 @@ tide gauge observations at stations within the domain.</p>
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [4]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="CodeMirror cm-s-jupyter">
 <div class="zeroclipboard-container">
 <clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-4">
@@ -2438,7 +2614,7 @@ else:
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [5]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="CodeMirror cm-s-jupyter">
 <div class="zeroclipboard-container">
 <clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-5">
