@@ -377,11 +377,7 @@ class SchismModelConfig(ModelConfig):
                 if not (self.prebuilt_dir / fname).exists()
             )
 
-        if self.geogrid_file is None:
-            errors.append(
-                "model_config.geogrid_file is required for atmospheric forcing regridding"
-            )
-        elif not self.geogrid_file.exists():
+        if not self.geogrid_file.exists():
             errors.append(f"model_config.geogrid_file not found: {self.geogrid_file}")
 
         return errors
@@ -1060,7 +1056,7 @@ class CoastalCalibConfig:
     simulation: SimulationConfig
     boundary: BoundaryConfig
     paths: PathConfig
-    model_config: ModelConfig
+    model_config: SchismModelConfig | SfincsModelConfig
     monitoring: MonitoringConfig = field(default_factory=MonitoringConfig)
     download: DownloadConfig = field(default_factory=DownloadConfig)
     _base_config: Path | None = field(default=None, repr=False)
