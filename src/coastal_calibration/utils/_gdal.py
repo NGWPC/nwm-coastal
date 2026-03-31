@@ -231,7 +231,7 @@ def compute_aoi_coverage(
             for col_off in range(0, src.width, block_size):
                 h = min(block_size, src.height - row_off)
                 w = min(block_size, src.width - col_off)
-                win = Window(col_off, row_off, w, h)  # ty: ignore[too-many-positional-arguments]
+                win = Window(col_off, row_off, w, h)  # pyright: ignore[reportCallIssue]
                 win_transform = src.window_transform(win)
 
                 inside = geometry_mask(

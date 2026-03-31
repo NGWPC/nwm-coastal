@@ -60,7 +60,7 @@ def _read_from_zarr(
     logger.info("Reading streamflow from Zarr store: %s", url)
 
     mapper = fsspec.get_mapper(url, anon=True)
-    ds = xr.open_zarr(mapper, consolidated=True, chunks="auto")
+    ds = xr.open_zarr(mapper, consolidated=True, chunks="auto")  # pyright: ignore[reportArgumentType]
 
     fids = list(feature_ids)
     available = set(ds["feature_id"].values.tolist())
@@ -80,7 +80,7 @@ def _read_from_zarr(
     if df.index.duplicated().any():
         df = df[~df.index.duplicated(keep="first")]
 
-    return df
+    return df  # pyright: ignore[reportReturnType]
 
 
 # ---------------------------------------------------------------------------

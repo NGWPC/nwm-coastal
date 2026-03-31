@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 from coastal_calibration.runner import WorkflowResult
 from coastal_calibration.stages.sfincs_create import (
     CreateStage,
-    _load_existing_model,
+    _load_existing_model,  # pyright: ignore[reportPrivateUsage]
     create_stages,
 )
 from coastal_calibration.utils.logging import (

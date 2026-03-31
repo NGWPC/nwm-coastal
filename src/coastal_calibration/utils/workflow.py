@@ -25,7 +25,7 @@ _DATE_RE = re.compile(r"^\d{10}$")
 
 def _validate_date_string(date_string: str) -> None:
     """Validate that ``date_string`` is exactly 10 digits (YYYYMMDDHH)."""
-    if not isinstance(date_string, str) or not _DATE_RE.match(date_string):
+    if not _DATE_RE.match(date_string):
         raise ValueError(
             f"date_string must be exactly 10 digits in YYYYMMDDHH format, got {date_string!r}"
         )

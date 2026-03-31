@@ -233,7 +233,7 @@ def make_discharge(  # noqa: PLR0912, PLR0915
     # Resample sub-hourly data to hourly (e.g., Hawaii 15-min data)
     if len(df) > 1:
         freq = df.index.to_series().diff().median()
-        if freq < timedelta(hours=1):
+        if freq < timedelta(hours=1):  # pyright: ignore[reportOperatorIssue]
             df = df.resample("h").mean()
 
     # Build vsource / vsink arrays from the DataFrame

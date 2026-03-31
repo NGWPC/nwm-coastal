@@ -92,13 +92,13 @@ def _generate_tidal_levels(  # noqa: PLR0915
         pha[:, col] = griddata((xI, yI), p, (lo, la), method="linear")
         data.close()
 
-    pred_times = Tide._times(start_time, total_hours)
+    pred_times = Tide._times(start_time, total_hours)  # pyright: ignore[reportPrivateUsage]
     if not isinstance(pred_times, list):
         msg = "Expected list of prediction times"
         raise TypeError(msg)
 
     wl = np.zeros((len(pred_times), amp.shape[0]))
-    cons = [c for c in con.noaa if c != con._Z0]
+    cons = [c for c in con.noaa if c != con._Z0]  # pyright: ignore[reportPrivateUsage]
     n = [3, 34, 0, 2, 5, 29, 25, 1]
     cons = [cons[c] for c in n]
     model = np.zeros(len(cons), dtype=Tide.dtype)
