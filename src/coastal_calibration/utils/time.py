@@ -27,7 +27,7 @@ _DATE_RE = re.compile(r"^\d{10}$")
 
 def _parse_date(date_string: str) -> datetime:
     """Parse a YYYYMMDDHH string into a datetime, with strict validation."""
-    if not _DATE_RE.match(date_string):
+    if not isinstance(date_string, str) or not _DATE_RE.match(date_string):  # pyright: ignore[reportUnnecessaryIsInstance]
         raise ValueError(
             f"date_string must be exactly 10 digits in YYYYMMDDHH format, got {date_string!r}"
         )
