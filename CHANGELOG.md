@@ -7,17 +7,32 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Added
+
+- **Type stubs**: added `types-geopandas` and `types-shapely` to the typecheck
+    environment for better third-party type coverage.
+
+### Fixed
+
+- **Type checking**: resolved all 895 pyright strict-mode errors across 35 source files.
+    Real type issues (wrong argument types, unnecessary isinstance checks, missing
+    annotations, None-safety) were fixed in code; remaining noise from third-party
+    libraries without type stubs is suppressed via targeted pyright config rules.
+- **Script permissions**: marked `scripts/find_compatible_sdk.sh`,
+    `coastal_models/schism/build.sh`, and `coastal_models/sfincs/build.sh` as executable
+    to satisfy the pre-commit shebang check.
+
 ### Changed
 
 - **Build system**: migrated SFINCS and SCHISM compilation from activation scripts
     (`scripts/ensure-sfincs.sh`, `scripts/ensure-schism.sh`) to pixi-build packages
-    using the `rattler-build` backend. Build recipes live in `coastal_models/sfincs/` and
-    `coastal_models/schism/` with `recipe.yaml` + `build.sh`. Builds are cached as conda
-    packages and only recompile when the submodule source or recipe changes.
+    using the `rattler-build` backend. Build recipes live in `coastal_models/sfincs/`
+    and `coastal_models/schism/` with `recipe.yaml` + `build.sh`. Builds are cached as
+    conda packages and only recompile when the submodule source or recipe changes.
 - **Submodule layout**: moved git submodules from `SFINCS/` and `schism/` to
-    `coastal_models/sfincs/repo/` and `coastal_models/schism/repo/`. The in-tree `./repo`
-    source paths avoid a pixi-build cache invalidation bug with out-of-tree paths
-    ([prefix-dev/pixi#4837](https://github.com/prefix-dev/pixi/issues/4837)).
+    `coastal_models/sfincs/repo/` and `coastal_models/schism/repo/`. The in-tree
+    `./repo` source paths avoid a pixi-build cache invalidation bug with out-of-tree
+    paths ([prefix-dev/pixi#4837](https://github.com/prefix-dev/pixi/issues/4837)).
 - **MPI variant consistency**: both SFINCS and SCHISM recipes now pin `hdf5` and
     `libnetcdf`/`netcdf-fortran` to `mpi_openmpi_*` build variants, matching ESMF/esmpy
     runtime expectations and avoiding library conflicts in shared environments.

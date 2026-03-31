@@ -1,6 +1,6 @@
 package:
   name: schism
-  version: "0.1.0"
+  version: 0.1.0
 
 source:
   path: ./repo
@@ -11,24 +11,24 @@ build:
 
 requirements:
   build:
-    - ${{ compiler('fortran') }}
-    - ${{ compiler('c') }}
-    - ${{ compiler('cxx') }}
-    - cmake >=3.12,<4
-    - make
-    - ninja
+  - ${{ compiler('fortran') }}
+  - ${{ compiler('c') }}
+  - ${{ compiler('cxx') }}
+  - cmake >=3.12,<4
+  - make
+  - ninja
   host:
-    - libnetcdf * mpi_openmpi_*
-    - netcdf-fortran * mpi_openmpi_*
-    - hdf5 * mpi_openmpi_*
-    - openmpi
+  - libnetcdf * mpi_openmpi_*
+  - netcdf-fortran * mpi_openmpi_*
+  - hdf5 * mpi_openmpi_*
+  - openmpi
   run:
-    - openmpi
+  - openmpi
 
 tests:
-  - script:
-      - test -f $PREFIX/bin/pschism
-      - test -f $PREFIX/bin/combine_hotstart7
-      - test -f $PREFIX/bin/combine_sink_source
-      - test -f $PREFIX/bin/metis_prep
-      - test -f $PREFIX/bin/gpmetis
+- script:
+  - test -f $PREFIX/bin/pschism
+  - test -f $PREFIX/bin/combine_hotstart7
+  - test -f $PREFIX/bin/combine_sink_source
+  - test -f $PREFIX/bin/metis_prep
+  - test -f $PREFIX/bin/gpmetis
