@@ -128,7 +128,7 @@ print(result)
 # %%
 import shutil
 
-from IPython.display import Image, display
+from IPython.display import Image
 
 figs = sorted(Path("run/figs").glob("stations_comparison_*.png"))
 if not figs:

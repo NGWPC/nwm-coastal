@@ -1,23 +1,39 @@
 # Compiling SFINCS from Source
 
-SFINCS is included as a Git submodule under `SFINCS/`. The `sfincs_run` workflow stage
-requires the `sfincs` binary to be on `PATH` (or pointed to via the `sfincs_exe` config
-option).
+SFINCS is included as a Git submodule under `coastal_models/sfincs/repo/`. The
+`sfincs_run` workflow stage requires the `sfincs` binary to be on `PATH` (or pointed to
+via the `sfincs_exe` config option).
 
 ______________________________________________________________________
 
 ## Using Pixi (Recommended)
 
-All build dependencies (compilers, autotools, NetCDF) are declared in the `sfincs` pixi
-feature. Any environment that includes this feature (**`sfincs`**, **`dev`**,
-**`test311`**, **`test314`**) will **automatically compile SFINCS** on first activation
-if the binary is not already present. Subsequent activations skip the build instantly
-(just a file-existence check).
+SFINCS is built as a **pixi-build package** using the `rattler-build` backend. The
+recipe lives at `coastal_models/sfincs/` with three files:
+
+| File          | Purpose                                                        |
+| ------------- | -------------------------------------------------------------- |
+| `pixi.toml`   | Package metadata and build backend declaration                 |
+| `recipe.yaml` | Conda recipe (source path, build/host/run dependencies, tests) |
+| `build.sh`    | Build script (autotools configure + make, macOS SDK probe)     |
+
+Any pixi environment that includes the `sfincs` feature (**`sfincs`**, **`dev`**,
+**`test311`**, **`test313`**) will **automatically build and install the `sfincs` conda
+package** on first `pixi install`. Subsequent runs use the cached package and complete
+instantly (~0.3 s) unless the submodule source or recipe changes.
 
 The binary is installed into the active pixi environment (`$CONDA_PREFIX/bin/sfincs`),
-so it is immediately available on `PATH` when running inside that environment. The build
-is **incremental** -- if you have already configured once, subsequent runs skip
-`autoreconf` and `configure` and only recompile changed source files.
+so it is immediately available on `PATH` when running inside that environment.
+
+### Key recipe details
+
+- **Source**: `./repo/source` (the SFINCS autotools tree inside the submodule)
+- **MPI variants**: `hdf5` and `libnetcdf` are pinned to `mpi_openmpi_*` builds so that
+    SFINCS, SCHISM, and ESMF share the same MPI-linked libraries at runtime
+- **macOS SDK probe**: `scripts/find_compatible_sdk.sh` dynamically tests each installed
+    SDK and picks the newest one compatible with conda-forge's linker
+- **Parallel make disabled**: SFINCS's `Makefile.am` has incomplete Fortran module
+    dependency declarations, so the build uses `make -j1`
 
 ______________________________________________________________________
 
@@ -47,7 +63,7 @@ sudo apt install -y \
 #### Build
 
 ```bash
-cd SFINCS/source
+cd coastal_models/sfincs/repo/source
 
 # Generate the configure script (only needed when building from the git repo)
 autoreconf -vif
@@ -107,7 +123,7 @@ Homebrew installs GCC as versioned commands (`gcc-14`, `gfortran-14`, etc.). The
 below detects the version automatically:
 
 ```bash
-cd SFINCS/source
+cd coastal_models/sfincs/repo/source
 autoreconf -vif
 
 # Detect Homebrew GCC version
@@ -150,7 +166,7 @@ ______________________________________________________________________
 A minimal smoke test is included in the repository:
 
 ```bash
-cd SFINCS/source
+cd coastal_models/sfincs/repo/source
 make test   # runs test/01_noadv
 ```
 

@@ -102,16 +102,21 @@ def on_page_markdown(markdown: str, page: Page, **_kwargs: object) -> str:
     return markdown
 
 
-def on_page_content(html: str, page: Page, **_kwargs: object) -> str:
-    """Fix relative image paths in notebook pages for directory URLs.
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*[mGKHFABCDEFGHJKSTsu]")
+_ABS_PREFIX = str(_ROOT) + "/"
 
-    Notebooks under ``examples/notebooks/`` use ``../images/`` to
-    reference images, which is correct when running locally.  With
-    ``use_directory_urls: true``, mkdocs serves the notebook at
-    ``examples/notebooks/<name>/index.html``, adding an extra
-    directory level.  This hook rewrites ``../images/`` to
-    ``../../images/`` so the paths resolve correctly.
+
+def on_page_content(html: str, page: Page, **_kwargs: object) -> str:
+    """Post-process rendered HTML for notebook pages.
+
+    1. Fix relative image paths for directory URLs (``../images/`` →
+       ``../../images/``).
+    2. Strip ANSI escape codes that leak into ``<pre>`` output blocks
+       when notebooks are executed in a terminal-aware environment.
+    3. Remove absolute repo paths so build artefacts are portable.
     """
     if page.file.src_path.startswith("examples/notebooks/"):
         html = html.replace('src="../images/', 'src="../../images/')
+        html = _ANSI_RE.sub("", html)
+        html = html.replace(_ABS_PREFIX, "")
     return html

@@ -26,9 +26,11 @@ jobs:
 
     steps:
     - uses: actions/checkout@v6
+      with:
+        submodules: recursive
     - uses: prefix-dev/setup-pixi@v0.9.4
       with:
-        pixi-version: v0.65.0
+        pixi-version: v0.66.0
         environments: ${{ matrix.environment }}
         activate-environment: ${{ matrix.environment }}
     - name: Run pixi

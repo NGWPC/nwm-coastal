@@ -21,7 +21,7 @@ ______________________________________________________________________
 1. [Logging](#logging)
 1. [Environment variables](#environment-variables)
 1. [ESMF regridding modules](#esmf-regridding-modules)
-1. [ESMF / esmpy compatibility](#esmf-esmpy-compatibility)
+1. [ESMF and esmpy compatibility](#esmf-and-esmpy-compatibility)
 1. [Parallel netCDF4 and MPI](#parallel-netcdf4-and-mpi)
 1. [SCHISM version compatibility](#schism-version-compatibility)
 1. [Hawaii example notebook](#hawaii-example-notebook)
@@ -82,8 +82,8 @@ The legacy bash and Python scripts have been moved to `tests/legacy_scripts/` as
 reference implementations for regression testing. The `scripts_path.py` module has been
 removed.
 
-Binaries are compiled from source by `scripts/ensure-schism.sh` during pixi environment
-activation and installed to `$CONDA_PREFIX/bin/`.
+Binaries are compiled from source by the `coastal_models/schism/` pixi-build package
+(rattler-build backend) and installed into the active pixi environment.
 
 ______________________________________________________________________
 
@@ -91,13 +91,13 @@ ______________________________________________________________________
 
 ### Binaries installed to `$CONDA_PREFIX/bin/`
 
-| Binary                | Source                                                                       | Build method                          |
-| --------------------- | ---------------------------------------------------------------------------- | ------------------------------------- |
-| `pschism`             | `schism/src/Driver/schism_driver.F90`                                        | CMake (`-DBLD_STANDALONE=ON`)         |
-| `combine_hotstart7`   | `schism/src/Utility/Combining_Scripts/`                                      | CMake (`BUILD_TOOLS=ON`)              |
-| `combine_sink_source` | `schism/src/Utility/Pre-Processing/NWM/NWM_coupling/combine_sink_source.F90` | Standalone `gfortran`                 |
-| `metis_prep`          | `schism/src/Utility/Grid_Scripts/metis_prep.f90`                             | Standalone `gfortran`                 |
-| `gpmetis`             | `schism/src/metis-5.1.0/`                                                    | `make config && make && make install` |
+| Binary                | Source                                                                                           | Build method                          |
+| --------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------- |
+| `pschism`             | `coastal_models/schism/repo/src/Driver/schism_driver.F90`                                        | CMake (`-DBLD_STANDALONE=ON`)         |
+| `combine_hotstart7`   | `coastal_models/schism/repo/src/Utility/Combining_Scripts/`                                      | CMake (`BUILD_TOOLS=ON`)              |
+| `combine_sink_source` | `coastal_models/schism/repo/src/Utility/Pre-Processing/NWM/NWM_coupling/combine_sink_source.F90` | Standalone `gfortran`                 |
+| `metis_prep`          | `coastal_models/schism/repo/src/Utility/Grid_Scripts/metis_prep.f90`                             | Standalone `gfortran`                 |
+| `gpmetis`             | `coastal_models/schism/repo/src/metis-5.1.0/`                                                    | `make config && make && make install` |
 
 ### CMake flags
 
@@ -111,36 +111,47 @@ ______________________________________________________________________
 | `CMAKE_Fortran_COMPILER` | mpifort | MPI Fortran wrapper from pixi openmpi                |
 | `CMAKE_C_COMPILER`       | mpicc   | MPI C wrapper                                        |
 
-### Activation script: `scripts/ensure-schism.sh`
+### Pixi-build package: `coastal_models/schism/`
 
-Runs on `pixi shell -e schism` activation. Uses a SHA256 fingerprint of key library
-packages (openmpi, netcdf-fortran, hdf5) to detect when a rebuild is needed. Subsequent
-activations (when binaries are current) complete instantly.
+SCHISM is built as a **pixi-build package** using the `rattler-build` backend. The
+recipe lives at `coastal_models/schism/` with three files:
+
+| File          | Purpose                                                                                 |
+| ------------- | --------------------------------------------------------------------------------------- |
+| `pixi.toml`   | Package metadata and build backend declaration                                          |
+| `recipe.yaml` | Conda recipe (source path, build/host/run dependencies, tests)                          |
+| `build.sh`    | Build script (CMake for pschism, standalone gfortran utilities, METIS, macOS SDK probe) |
+
+The recipe declares MPI-linked `hdf5` and `netcdf-fortran` as host dependencies
+(`* mpi_openmpi_*` build string) so the compiled binaries link against the same
+MPI-enabled libraries used by ESMF/esmpy at runtime.
+
+On first `pixi install`, the package is built and cached as a `.conda` archive.
+Subsequent runs reuse the cache (~0.3 s) unless the submodule source or recipe changes.
+
+The `build.sh` includes:
+
+- **macOS SDK probe** (`scripts/find_compatible_sdk.sh`): dynamically tests each
+    installed SDK and picks the newest one compatible with conda-forge's linker
+- **`--preprocess` fix**: on macOS, SCHISM's CMake detects GNU+Clang and sets
+    `C_PREPROCESS_FLAG=--preprocess`, but gfortran doesn't understand this flag. The
+    build script patches `flags.make` to replace `--preprocess` with `-cpp`
 
 ### Pixi feature: `[tool.pixi.feature.schism]`
 
 ```toml
-[tool.pixi.feature.schism.activation]
-scripts = ["scripts/ensure-schism.sh"]
-
 [tool.pixi.feature.schism.dependencies]
+schism = { path = "coastal_models/schism" }
 # Force MPI (OpenMPI) build variants so ESMF/esmpy runs with parallel support.
 mpi = { version = "*", build = "openmpi" }
 openmpi = "*"
 esmf = { version = "*", build = "mpi_openmpi_*" }
 esmpy = "*"
-hdf5 = { version = "*", build = "mpi_openmpi_*" }
-libnetcdf = { version = "*", build = "mpi_openmpi_*" }
-netcdf4 = { version = "*", build = "mpi_openmpi_*" }
-netcdf-fortran = { version = "*", build = "mpi_openmpi_*" }
 mpi4py = "*"
-c-compiler = "*"
-cxx-compiler = "*"
-fortran-compiler = "*"
-cmake = ">=3.12,<4"
-make = "*"
-pkg-config = "*"
 ```
+
+Build-time dependencies (compilers, cmake, ninja) are declared in `recipe.yaml` and
+resolved automatically by the rattler-build backend.
 
 ______________________________________________________________________
 
@@ -476,7 +487,7 @@ so callers can slice their data arrays to match the local ESMF partition.
 
 ______________________________________________________________________
 
-## ESMF / esmpy compatibility
+## ESMF and esmpy compatibility
 
 ### Problem
 
@@ -683,7 +694,11 @@ ______________________________________________________________________
 
 | Decision                                                            | Rationale                                                                               |
 | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| Use existing `schism/` submodule, not `nwm.v3.0.6_no_svn`           | Cleaner; NWM-specific settings are just CMake cache flags                               |
+| Migrate from activation scripts to pixi-build (rattler-build)       | Proper conda packages with dependency tracking; no hand-rolled fingerprinting           |
+| Move submodules under `coastal_models/` with `./repo` source paths  | In-tree `./` paths avoid pixi-build cache invalidation bug ([#4837][pixi4837])          |
+| Pin MPI variants for both SFINCS and SCHISM                         | All models share the same env; MPI-linked netcdf/hdf5 avoids runtime library conflicts  |
+| Dynamic macOS SDK probe instead of hardcoded version                | Newer macOS SDKs may have incompatible TBD stubs; probe tests each SDK at build time    |
+| Use existing SCHISM submodule, not `nwm.v3.0.6_no_svn`              | Cleaner; NWM-specific settings are just CMake cache flags                               |
 | Build `combine_sink_source` and `metis_prep` standalone             | Not wired into SCHISM's CMake; simple single-file Fortran programs                      |
 | Extract bash logic into `schism_prep.py` Python functions           | Testable; explicit parameters instead of env vars; removes script maintenance burden    |
 | Replace all Python-script subprocess calls with direct imports      | Eliminates env-var passing, subprocess overhead, and fragile path resolution            |
@@ -713,22 +728,23 @@ ______________________________________________________________________
 
 ### New files
 
-| File                                          | Description                                                                               |
-| --------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `scripts/ensure-schism.sh`                    | Pixi activation script that builds SCHISM binaries                                        |
-| `src/coastal_calibration/schism_prep.py`      | Pure-Python SCHISM pre/post-processing functions                                          |
-| `src/coastal_calibration/sflux.py`            | sflux atmospheric forcing generation (replaces makeAtmo.py)                               |
-| `src/coastal_calibration/regridding/`         | ESMF-based regridding (ESTOFS + NWM forcing) with MPI support                             |
-| `src/coastal_calibration/tides/`              | TPXO/ocean-tide boundary utilities (replaces tpxo_to_open_bnds_hgrid/ + makeOceanTide.py) |
-| `src/coastal_calibration/esmf_compat/ESMF.py` | `import ESMF` → `esmpy` compatibility shim                                                |
-| `tests/legacy_scripts/`                       | Legacy bash+Python scripts (reference implementations for regression tests)               |
-| `docs/examples/notebooks/schism-hawaii.py`    | Hawaii SCHISM tutorial notebook (jupytext)                                                |
+| File                                                     | Description                                                                               |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `coastal_models/schism/{pixi.toml,recipe.yaml,build.sh}` | Pixi-build package that compiles SCHISM binaries                                          |
+| `scripts/find_compatible_sdk.sh`                         | macOS SDK compatibility probe (shared by SFINCS and SCHISM builds)                        |
+| `src/coastal_calibration/schism_prep.py`                 | Pure-Python SCHISM pre/post-processing functions                                          |
+| `src/coastal_calibration/sflux.py`                       | sflux atmospheric forcing generation (replaces makeAtmo.py)                               |
+| `src/coastal_calibration/regridding/`                    | ESMF-based regridding (ESTOFS + NWM forcing) with MPI support                             |
+| `src/coastal_calibration/tides/`                         | TPXO/ocean-tide boundary utilities (replaces tpxo_to_open_bnds_hgrid/ + makeOceanTide.py) |
+| `src/coastal_calibration/esmf_compat/ESMF.py`            | `import ESMF` → `esmpy` compatibility shim                                                |
+| `tests/legacy_scripts/`                                  | Legacy bash+Python scripts (reference implementations for regression tests)               |
+| `docs/examples/notebooks/schism-hawaii.py`               | Hawaii SCHISM tutorial notebook (jupytext)                                                |
 
 ### Modified files
 
 | File                                             | What changed                                                                                                        |
 | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
-| `pyproject.toml`                                 | Schism feature deps (MPI variants), `netcdf4` MPI build for all envs, coverage/ruff/ty paths updated                |
+| `pyproject.toml`                                 | Schism feature uses pixi-build path dep, `netcdf4` MPI build for all envs, `preview = ["pixi-build"]`               |
 | `src/coastal_calibration/config/schema.py`       | `SchismModelConfig`: binary default → `pschism`, `singularity_image` dropped, MPI/OMP env vars only                 |
 | `src/coastal_calibration/stages/base.py`         | Removed PYTHON_GIL, removed scripts_path env vars, removed `run_singularity_command()`, kept ESMF compat PYTHONPATH |
 | `src/coastal_calibration/stages/forcing.py`      | Uses `regrid_forcings` via `mpiexec -m`; removed fecpp PYTHONPATH hack                                              |
@@ -839,3 +855,5 @@ sequentially, producing comparison plots at 7 NOAA stations. Run with:
 cd docs/examples/notebooks
 pixi run -e dev python schism-hawaii.py
 ```
+
+[pixi4837]: https://github.com/prefix-dev/pixi/issues/4837

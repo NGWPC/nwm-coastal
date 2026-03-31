@@ -1060,7 +1060,7 @@ class CoastalCalibConfig:
     simulation: SimulationConfig
     boundary: BoundaryConfig
     paths: PathConfig
-    model_config: ModelConfig
+    model_config: SchismModelConfig | SfincsModelConfig
     monitoring: MonitoringConfig = field(default_factory=MonitoringConfig)
     download: DownloadConfig = field(default_factory=DownloadConfig)
     _base_config: Path | None = field(default=None, repr=False)

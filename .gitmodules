@@ -1,8 +1,8 @@
-[submodule "schism"]
-	path = schism
-	url = https://github.com/schism-dev/schism.git
-	ignore = dirty
-[submodule "SFINCS"]
-	path = SFINCS
+[submodule "sfincs"]
+	path = coastal_models/sfincs/repo
 	url = https://github.com/Deltares/SFINCS.git
+	ignore = dirty
+[submodule "schism"]
+	path = coastal_models/schism/repo
+	url = https://github.com/schism-dev/schism.git
 	ignore = dirty
