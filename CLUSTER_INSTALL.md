@@ -170,11 +170,11 @@ nwm-coastal --help
 nwm-coastal --version
 ```
 
-Check that model binaries are accessible through the wrapper:
+Check that model binaries are accessible through the activated environment:
 
 ```bash
-# These should all print the binary path inside .pixi/envs/dev/bin/
-/ngen-test/coastal-calibration/nwm-coastal -c "import shutil; [print(shutil.which(b)) for b in ('sfincs','pschism','mpiexec','gpmetis')]"
+/ngen-test/coastal-calibration/.pixi/envs/dev/bin/python -c \
+  "import shutil; [print(shutil.which(b)) for b in ('sfincs','pschism','mpiexec','gpmetis')]"
 ```
 
 ## Uninstalling

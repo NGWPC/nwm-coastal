@@ -20,7 +20,9 @@ _probe_src="${TMPDIR:-/tmp}/sdk_probe_$$.c"
 echo 'int main(void){return 0;}' > "$_probe_src"
 _found_sdk=""
 
-for _sdk in "$_sdk_dir"/MacOSX*.sdk; do
+# Sort newest-first so we prefer the most recent compatible SDK.
+# Use sort -rV (reverse version sort) to handle e.g. 15.4 > 15 > 14.5.
+for _sdk in $(ls -d "$_sdk_dir"/MacOSX*.sdk 2>/dev/null | sort -rV); do
     [ -d "$_sdk" ] || continue
     # Skip the unversioned MacOSX.sdk symlink — it just mirrors the default
     _base="${_sdk##*/}"

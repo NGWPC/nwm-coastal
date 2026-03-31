@@ -377,7 +377,11 @@ class SchismModelConfig(ModelConfig):
                 if not (self.prebuilt_dir / fname).exists()
             )
 
-        if not self.geogrid_file.exists():
+        if self.geogrid_file is None:
+            errors.append(
+                "model_config.geogrid_file is required for atmospheric forcing regridding"
+            )
+        elif not self.geogrid_file.exists():
             errors.append(f"model_config.geogrid_file not found: {self.geogrid_file}")
 
         return errors

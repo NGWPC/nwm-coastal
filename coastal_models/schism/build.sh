@@ -59,7 +59,7 @@ COMBINE_SRC="$SRC_DIR/src/Utility/Pre-Processing/NWM/NWM_coupling/combine_sink_s
 # gfortran 14+ rejects stop('...') — needs stop '...'
 COMBINE_PATCHED="$BUILD_DIR/combine_sink_source_patched.F90"
 sed "s/stop('\(.*\)')/stop '\1'/g" "$COMBINE_SRC" > "$COMBINE_PATCHED"
-gfortran -O2 -cpp -o "$PREFIX/bin/combine_sink_source" "$COMBINE_PATCHED"
+"${FC:-gfortran}" -O2 -cpp -o "$PREFIX/bin/combine_sink_source" "$COMBINE_PATCHED"
 chmod +x "$PREFIX/bin/combine_sink_source"
 
 # ── 3. Build metis_prep (standalone Fortran, no deps) ────────────────
@@ -70,7 +70,7 @@ MCMODEL_FLAG=""
 if [ "$(uname -m)" = "x86_64" ]; then
     MCMODEL_FLAG="-mcmodel=medium"
 fi
-gfortran -O2 $MCMODEL_FLAG -o "$PREFIX/bin/metis_prep" "$METIS_PREP_SRC"
+"${FC:-gfortran}" -O2 $MCMODEL_FLAG -o "$PREFIX/bin/metis_prep" "$METIS_PREP_SRC"
 chmod +x "$PREFIX/bin/metis_prep"
 
 # ── 4. Build gpmetis from metis-5.1.0 ───────────────────────────────
