@@ -25,7 +25,7 @@ __all__ = ["LevelInfo", "SfincsGridInfo", "plot_mesh"]
 class LevelInfo(NamedTuple):
     """Cell count and resolution for one refinement level."""
 
-    count: int  # pyright: ignore[reportIncompatibleMethodOverride]
+    n_cells: int
     resolution: float
 
 
@@ -49,7 +49,7 @@ class SfincsGridInfo:
     """
 
     grid_type: str
-    crs: CRS
+    crs: CRS | None
     base_resolution: float
     levels: dict[int, LevelInfo]
     n_faces: int | None = None
@@ -91,7 +91,7 @@ class SfincsGridInfo:
 
         unique_levels, counts = np.unique(level_arr, return_counts=True)
         levels = {
-            int(lv): LevelInfo(int(cnt), base_resolution / 2.0 ** (lv - 1))
+            int(lv): LevelInfo(n_cells=int(cnt), resolution=base_resolution / 2.0 ** (lv - 1))
             for lv, cnt in zip(unique_levels, counts, strict=True)
         }
 
@@ -133,7 +133,7 @@ class SfincsGridInfo:
         y0 = float(grid.y0)
         extent = (x0, x0 + mmax * dx, y0, y0 + nmax * dy)
 
-        levels = {1: LevelInfo(int(mask.size), dx)}
+        levels = {1: LevelInfo(n_cells=int(mask.size), resolution=dx)}
 
         return cls(
             grid_type="regular",
@@ -188,14 +188,14 @@ class SfincsGridInfo:
     # ── display ──────────────────────────────────────────────────
 
     def __str__(self) -> str:
-        epsg = self.crs.to_epsg() if self.crs is not None else "?"  # pyright: ignore[reportUnnecessaryComparison]
+        epsg = self.crs.to_epsg() if self.crs is not None else "?"
         lines = [f"SfincsGridInfo({self.grid_type}, EPSG:{epsg})"]
 
         if self.grid_type == "quadtree":
             lines.append(f"  Faces:     {self.n_faces:>10,}")
             lines.append(f"  Edges:     {self.n_edges:>10,}")
             for lv, info in sorted(self.levels.items()):
-                lines.append(f"  Level {lv}:   {info.count:>10,} cells ({info.resolution:.0f} m)")
+                lines.append(f"  Level {lv}:   {info.n_cells:>10,} cells ({info.resolution:.0f} m)")
         elif self.shape is not None:
             lines.append(f"  Shape:      {self.shape[0]} x {self.shape[1]}")
             res = next(iter(self.levels.values())).resolution
@@ -271,7 +271,7 @@ def _plot_regular(info: SfincsGridInfo, ax: Axes) -> None:
 
 def _add_basemap(
     ax: Axes,
-    crs: CRS,
+    crs: CRS | None,
     source: Any | None,
     zoom: int,
 ) -> None:
