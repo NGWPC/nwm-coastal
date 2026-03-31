@@ -14,13 +14,13 @@ Design principles (from xESMF):
 from __future__ import annotations
 
 import warnings
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 import esmpy as ESMF
 
 # esmpy (>=8.4.0) requires Manager() before local_pet() returns the true MPI
 # rank.  Call it here so all modules that import esmf_utils get correct ranks.
-ESMF.Manager(debug=False)
+ESMF.Manager(debug=False)  # pyright: ignore[reportCallIssue]
 
 import numpy as np
 from mpi4py import MPI
@@ -89,9 +89,9 @@ def build_grid(
     nlon, nlat = lon.shape
     LON, LAT = 0, 1
 
-    stagger = [ESMF.StaggerLoc.CENTER]
+    stagger: list[int] = [ESMF.StaggerLoc.CENTER]
     if lon_corners is not None:
-        stagger.append(ESMF.StaggerLoc.CORNER)
+        stagger.append(ESMF.StaggerLoc.CORNER)  # pyright: ignore[reportArgumentType]
 
     grid = ESMF.Grid(
         np.array([nlon, nlat]),
@@ -100,21 +100,21 @@ def build_grid(
     )
 
     # Extract local partition bounds
-    x_lo = grid.lower_bounds[ESMF.StaggerLoc.CENTER][LON]
-    x_hi = grid.upper_bounds[ESMF.StaggerLoc.CENTER][LON]
-    y_lo = grid.lower_bounds[ESMF.StaggerLoc.CENTER][LAT]
-    y_hi = grid.upper_bounds[ESMF.StaggerLoc.CENTER][LAT]
+    x_lo = grid.lower_bounds[ESMF.StaggerLoc.CENTER][LON]  # pyright: ignore[reportOptionalSubscript]
+    x_hi = grid.upper_bounds[ESMF.StaggerLoc.CENTER][LON]  # pyright: ignore[reportOptionalSubscript]
+    y_lo = grid.lower_bounds[ESMF.StaggerLoc.CENTER][LAT]  # pyright: ignore[reportOptionalSubscript]
+    y_hi = grid.upper_bounds[ESMF.StaggerLoc.CENTER][LAT]  # pyright: ignore[reportOptionalSubscript]
 
     # Populate center coordinates for this partition
-    grid.get_coords(LON)[...] = lon[x_lo:x_hi, y_lo:y_hi]
-    grid.get_coords(LAT)[...] = lat[x_lo:x_hi, y_lo:y_hi]
+    grid.get_coords(LON)[...] = lon[x_lo:x_hi, y_lo:y_hi]  # pyright: ignore[reportOptionalSubscript]
+    grid.get_coords(LAT)[...] = lat[x_lo:x_hi, y_lo:y_hi]  # pyright: ignore[reportOptionalSubscript]
 
     # Populate corner coordinates if provided
     if lon_corners is not None and lat_corners is not None:
-        xc_lo = grid.lower_bounds[ESMF.StaggerLoc.CORNER][LON]
-        xc_hi = grid.upper_bounds[ESMF.StaggerLoc.CORNER][LON]
-        yc_lo = grid.lower_bounds[ESMF.StaggerLoc.CORNER][LAT]
-        yc_hi = grid.upper_bounds[ESMF.StaggerLoc.CORNER][LAT]
+        xc_lo = grid.lower_bounds[ESMF.StaggerLoc.CORNER][LON]  # pyright: ignore[reportCallIssue, reportArgumentType]
+        xc_hi = grid.upper_bounds[ESMF.StaggerLoc.CORNER][LON]  # pyright: ignore[reportCallIssue, reportArgumentType]
+        yc_lo = grid.lower_bounds[ESMF.StaggerLoc.CORNER][LAT]  # pyright: ignore[reportCallIssue, reportArgumentType]
+        yc_hi = grid.upper_bounds[ESMF.StaggerLoc.CORNER][LAT]  # pyright: ignore[reportCallIssue, reportArgumentType]
         grid.get_coords(LON, staggerloc=ESMF.StaggerLoc.CORNER)[...] = lon_corners[
             xc_lo:xc_hi, yc_lo:yc_hi
         ]
@@ -168,8 +168,8 @@ def build_locstream(lon: np.ndarray, lat: np.ndarray) -> ESMF.LocStream:
     locstream["ESMF:Lat"] = lat[local_start : local_start + local_count].astype(np.float64)
 
     # Store the global index range so callers can slice data arrays
-    locstream._global_lower = local_start  # ty: ignore[unresolved-attribute]
-    locstream._global_upper = local_start + local_count  # ty: ignore[unresolved-attribute]
+    locstream._global_lower = local_start  # pyright: ignore[reportAttributeAccessIssue]
+    locstream._global_upper = local_start + local_count  # pyright: ignore[reportAttributeAccessIssue]
     return locstream
 
 
@@ -205,19 +205,19 @@ class Regridder:
         self,
         src_field: ESMF.Field,
         dst_field: ESMF.Field,
-        method: ESMF.RegridMethod = ESMF.RegridMethod.BILINEAR,  # ty: ignore[invalid-parameter-default]
-        unmapped_action: ESMF.UnmappedAction = ESMF.UnmappedAction.IGNORE,  # ty: ignore[invalid-parameter-default]
+        method: ESMF.RegridMethod = ESMF.RegridMethod.BILINEAR,  # pyright: ignore[reportArgumentType]
+        unmapped_action: ESMF.UnmappedAction = ESMF.UnmappedAction.IGNORE,  # pyright: ignore[reportArgumentType]
         src_mask_values: list[int] | None = None,
         extrap_method: ESMF.ExtrapMethod | None = None,
     ):
-        kwargs = {
+        kwargs: dict[str, Any] = {
             "srcfield": src_field,
             "dstfield": dst_field,
             "regrid_method": method,
             "unmapped_action": unmapped_action,
         }
         if src_mask_values is not None:
-            kwargs["src_mask_values"] = src_mask_values  # ty: ignore[invalid-assignment]
+            kwargs["src_mask_values"] = src_mask_values
         if extrap_method is not None:
             kwargs["extrap_method"] = extrap_method
 
@@ -234,7 +234,7 @@ class Regridder:
         zero_region: ESMF.Region | None = None,
     ) -> ESMF.Field:
         """Apply pre-computed regridding weights."""
-        kwargs = {"srcfield": src_field, "dstfield": dst_field}
+        kwargs: dict[str, Any] = {"srcfield": src_field, "dstfield": dst_field}
         if zero_region is not None:
             kwargs["zero_region"] = zero_region
         return self._handle(**kwargs)
@@ -260,8 +260,8 @@ class MaskedRegridder:
 
     def __init__(
         self,
-        method: ESMF.RegridMethod = ESMF.RegridMethod.NEAREST_STOD,  # ty: ignore[invalid-parameter-default]
-        unmapped_action: ESMF.UnmappedAction = ESMF.UnmappedAction.IGNORE,  # ty: ignore[invalid-parameter-default]
+        method: ESMF.RegridMethod = ESMF.RegridMethod.NEAREST_STOD,  # pyright: ignore[reportArgumentType]
+        unmapped_action: ESMF.UnmappedAction = ESMF.UnmappedAction.IGNORE,  # pyright: ignore[reportArgumentType]
         src_mask_values: list[int] | None = None,
     ):
         self.method = method
@@ -274,7 +274,7 @@ class MaskedRegridder:
         dst_field: ESMF.Field,
     ) -> ESMF.Field:
         """Build a fresh regridder with the current mask state and apply it."""
-        kwargs = {
+        kwargs: dict[str, Any] = {
             "srcfield": src_field,
             "dstfield": dst_field,
             "regrid_method": self.method,
@@ -344,7 +344,7 @@ def gatherv_1d(
     all_counts = np.empty(comm.Get_size(), dtype="i") if comm.Get_rank() == root else None
     comm.Gather(count_arr, all_counts, root=root)
 
-    result = np.zeros(int(all_counts.sum())) if comm.Get_rank() == root else None  # ty: ignore[unresolved-attribute]
+    result = np.zeros(int(all_counts.sum())) if comm.Get_rank() == root else None  # pyright: ignore[reportOptionalMemberAccess]
 
     comm.Gatherv(sendbuf=local_data, recvbuf=(result, all_counts), root=root)
     return result
