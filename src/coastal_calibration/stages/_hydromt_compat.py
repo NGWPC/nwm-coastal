@@ -74,7 +74,7 @@ def patch_serialize_crs() -> None:
     except ImportError:
         return
 
-    _original = _crs_mod._serialize_crs
+    _original = _crs_mod._serialize_crs  # pyright: ignore[reportPrivateUsage]
 
     if getattr(_original, "_patched", False):
         return
@@ -89,7 +89,7 @@ def patch_serialize_crs() -> None:
         return crs.to_wkt()
 
     _original.__code__ = _safe_serialize_crs.__code__
-    _original._patched = True  # ty: ignore[unresolved-attribute]
+    _original._patched = True  # pyright: ignore[reportFunctionMemberAccess]
     _log.info("Patched hydromt _serialize_crs to handle CRS without an authority.")
 
 
@@ -113,7 +113,7 @@ def patch_boundary_conditions_index_dim() -> None:
     except ImportError:
         return
 
-    _original_validate = SfincsBoundaryBase._validate_and_prepare_gdf
+    _original_validate = SfincsBoundaryBase._validate_and_prepare_gdf  # pyright: ignore[reportPrivateUsage]
 
     if getattr(_original_validate, "_patched", False):
         return
@@ -124,8 +124,8 @@ def patch_boundary_conditions_index_dim() -> None:
             gdf.index.name = "index"
         return gdf
 
-    SfincsBoundaryBase._validate_and_prepare_gdf = _validate_and_normalize  # ty: ignore[invalid-assignment]
-    SfincsBoundaryBase._validate_and_prepare_gdf._patched = True  # ty: ignore[unresolved-attribute]
+    SfincsBoundaryBase._validate_and_prepare_gdf = _validate_and_normalize  # pyright: ignore[reportPrivateUsage]
+    SfincsBoundaryBase._validate_and_prepare_gdf._patched = True  # pyright: ignore[reportPrivateUsage, reportFunctionMemberAccess]
     _log.info("Patched hydromt-sfincs _validate_and_prepare_gdf to normalize index name.")
 
 
@@ -146,7 +146,7 @@ def patch_meteo_write_gridded() -> None:
     except ImportError:
         return
 
-    _original = SfincsMeteo.write_gridded
+    _original: Any = SfincsMeteo.write_gridded
     if getattr(_original, "_patched", False):
         return
 
@@ -188,7 +188,7 @@ def patch_meteo_write_gridded() -> None:
                     nc.createDimension(dim, ds.sizes[dim])
 
             # --- time variable ---
-            time_var = nc.createVariable("time", "f8", ("time",))
+            time_var: Any = nc.createVariable("time", "f8", ("time",))
             time_var.units = f"minutes since {tref_str}"
 
             # --- spatial coordinate variables ---
@@ -217,8 +217,8 @@ def patch_meteo_write_gridded() -> None:
         finally:
             nc.close()
 
-    SfincsMeteo.write_gridded = _write_gridded_lazy  # ty: ignore[invalid-assignment]
-    SfincsMeteo.write_gridded._patched = True  # ty: ignore[unresolved-attribute]
+    SfincsMeteo.write_gridded = _write_gridded_lazy  # pyright: ignore[reportAttributeAccessIssue]
+    SfincsMeteo.write_gridded._patched = True  # pyright: ignore[reportFunctionMemberAccess]
     _log.info("Patched hydromt-sfincs write_gridded to stream time-steps lazily.")
 
 
@@ -247,7 +247,7 @@ def patch_quadtree_subgrid_data_setter() -> None:
     def _set_data(self: Any, value: Any) -> None:
         self._data = value
 
-    SfincsQuadtreeSubgridTable.data = prop.setter(_set_data)
+    SfincsQuadtreeSubgridTable.data = prop.setter(_set_data)  # pyright: ignore[reportAttributeAccessIssue]
     _log.info("Patched SfincsQuadtreeSubgridTable.data to add missing setter.")
 
 
@@ -275,7 +275,7 @@ def patch_parse_river_list_geoms() -> None:
     except ImportError:
         return
 
-    _original = SfincsModel._parse_river_list
+    _original: Any = SfincsModel._parse_river_list  # pyright: ignore[reportPrivateUsage]
 
     if getattr(_original, "_patched", False):
         return
@@ -295,8 +295,8 @@ def patch_parse_river_list_geoms() -> None:
             if _injected:
                 self.__dict__.pop("geoms", None)
 
-    SfincsModel._parse_river_list = _parse_river_list_safe  # ty: ignore[invalid-assignment]
-    SfincsModel._parse_river_list._patched = True  # ty: ignore[unresolved-attribute]
+    SfincsModel._parse_river_list = _parse_river_list_safe  # pyright: ignore[reportPrivateUsage]
+    SfincsModel._parse_river_list._patched = True  # pyright: ignore[reportPrivateUsage, reportFunctionMemberAccess]
     _log.info("Patched SfincsModel._parse_river_list to handle missing 'geoms' component.")
 
 
@@ -319,7 +319,7 @@ def patch_quadtree_output_read() -> None:
     except ImportError:
         return
 
-    _original = SfincsOutput.read_map_file
+    _original: Any = SfincsOutput.read_map_file
 
     if getattr(_original, "_patched", False):
         return
@@ -406,8 +406,8 @@ def patch_quadtree_output_read() -> None:
 
         self.set(uds, split_dataset=True)
 
-    SfincsOutput.read_map_file = _read_map_file_safe  # ty: ignore[invalid-assignment]
-    SfincsOutput.read_map_file._patched = True  # ty: ignore[unresolved-attribute]
+    SfincsOutput.read_map_file = _read_map_file_safe
+    SfincsOutput.read_map_file._patched = True  # pyright: ignore[reportFunctionMemberAccess]
     _log.info("Patched SfincsOutput.read_map_file to re-grid quadtree map output to UGRID.")
 
 
@@ -436,7 +436,7 @@ def patch_quadtree_get_indices_at_points() -> None:  # noqa: PLR0915
     except ImportError:
         return
 
-    _original = SfincsQuadtreeGrid.get_indices_at_points
+    _original: Any = SfincsQuadtreeGrid.get_indices_at_points
 
     if getattr(_original, "_patched", False):
         return
@@ -479,11 +479,11 @@ def patch_quadtree_get_indices_at_points() -> None:  # noqa: PLR0915
 
         ifirst = self._ifirst_fixed
 
-        i0_lev = []
-        i1_lev = []
-        nmax_lev = []
-        mmax_lev = []
-        nm_lev = []
+        i0_lev: list[Any] = []
+        i1_lev: list[Any] = []
+        nmax_lev: list[Any] = []
+        mmax_lev: list[Any] = []
+        nm_lev: list[Any] = []
 
         for level in range(nr_refinement_levels):
             i0 = ifirst[level]
@@ -499,13 +499,13 @@ def patch_quadtree_get_indices_at_points() -> None:  # noqa: PLR0915
         result = np.full(np.shape(x), -999, dtype=np.int32)
 
         for ilev in range(nr_refinement_levels):
-            nmax = nmax_lev[ilev]
-            mmax = mmax_lev[ilev]
+            nmax: Any = nmax_lev[ilev]
+            mmax: Any = mmax_lev[ilev]
             dxr = dx / 2**ilev
             dyr = dy / 2**ilev
             iind = np.floor(xg / dxr).astype(int)
             jind = np.floor(yg / dyr).astype(int)
-            ind = iind * nmax + jind
+            ind: Any = iind * nmax + jind
             ind[iind < 0] = -999
             ind[jind < 0] = -999
             ind[iind >= mmax] = -999
@@ -516,7 +516,7 @@ def patch_quadtree_get_indices_at_points() -> None:  # noqa: PLR0915
 
             if incell[0].size > 0:
                 try:
-                    cell_indices = (
+                    cell_indices: Any = (
                         binary_search(nm_lev[ilev], ind[incell[0], incell[1]]) + i0_lev[ilev]
                     )
                     result[incell[0], incell[1]] = cell_indices
@@ -525,8 +525,8 @@ def patch_quadtree_get_indices_at_points() -> None:  # noqa: PLR0915
 
         return result
 
-    SfincsQuadtreeGrid.get_indices_at_points = _get_indices_at_points_fixed  # ty: ignore[invalid-assignment]
-    SfincsQuadtreeGrid.get_indices_at_points._patched = True  # ty: ignore[unresolved-attribute]
+    SfincsQuadtreeGrid.get_indices_at_points = _get_indices_at_points_fixed
+    SfincsQuadtreeGrid.get_indices_at_points._patched = True  # pyright: ignore[reportFunctionMemberAccess]
     _log.info(
         "Patched SfincsQuadtreeGrid.get_indices_at_points to fix broken ifirst line-continuation."
     )
@@ -570,10 +570,12 @@ def patch_make_index_cog() -> None:  # noqa: PLR0915
         nodata: int = 2147483647,
     ) -> None:
         with rasterio.open(topobathy_fn) as src:
-            dem_crs = src.crs
-            transform = src.transform
-            width = src.width
-            height = src.height
+            dem_crs: Any = src.crs
+            transform: Any = src.transform
+            width: Any = src.width
+            height: Any = src.height
+            n1: Any
+            m1: Any
             n1, m1 = src.shape
 
         nrcb = nrmax
@@ -589,7 +591,7 @@ def patch_make_index_cog() -> None:  # noqa: PLR0915
             nrbn -= 1
             merge_last_row = True
 
-        profile = {
+        profile: dict[str, Any] = {
             "driver": "GTiff",
             "height": height,
             "width": width,
@@ -617,30 +619,32 @@ def patch_make_index_cog() -> None:  # noqa: PLR0915
         # get_indices_at_points receives coordinates in the model's
         # projection.  When both CRSs are identical the transformer
         # is a no-op.
-        model_crs = model.crs
-        need_reproject = dem_crs != model_crs
+        model_crs: Any = model.crs
+        need_reproject = bool(dem_crs != model_crs)
         proj: Transformer | None = None
         if need_reproject:
             proj = Transformer.from_crs(dem_crs, model_crs, always_xy=True)
 
         for block_col in range(nrbm):
             bm0 = block_col * nrcb
-            bm1 = min(bm0 + nrcb, m1)
+            bm1 = min(bm0 + nrcb, int(m1))
             if merge_last_col and block_col == (nrbm - 1):
                 bm1 += 1
 
             for block_row in range(nrbn):
                 bn0 = block_row * nrcb
-                bn1 = min(bn0 + nrcb, n1)
+                bn1 = min(bn0 + nrcb, int(n1))
                 if merge_last_row and block_row == (nrbn - 1):
                     bn1 += 1
 
-                window = Window(bm0, bn0, bm1 - bm0, bn1 - bn0)  # ty: ignore[too-many-positional-arguments]
+                window = Window(bm0, bn0, bm1 - bm0, bn1 - bn0)  # pyright: ignore[reportCallIssue]
 
                 # FIX: use saved ``transform`` instead of closed ``src.transform``
-                x_coords = transform[2] + (np.arange(bm0, bm1) + 0.5) * transform[0]
-                y_coords = transform[5] + (np.arange(bn0, bn1) + 0.5) * transform[4]
+                x_coords: Any = transform[2] + (np.arange(bm0, bm1) + 0.5) * transform[0]
+                y_coords: Any = transform[5] + (np.arange(bn0, bn1) + 0.5) * transform[4]
 
+                xx: Any
+                yy: Any
                 xx, yy = np.meshgrid(x_coords, y_coords)
 
                 # FIX: reproject DEM coordinates → model CRS
@@ -656,8 +660,8 @@ def patch_make_index_cog() -> None:  # noqa: PLR0915
 
         build_overviews(fn=indices_fn, resample_method="nearest")
 
-    _ds_mod.make_index_cog = _make_index_cog_fixed  # ty: ignore[invalid-assignment]
-    _ds_mod.make_index_cog._patched = True  # ty: ignore[unresolved-attribute]
+    _ds_mod.make_index_cog = _make_index_cog_fixed
+    _ds_mod.make_index_cog._patched = True  # pyright: ignore[reportFunctionMemberAccess]
     _log.info(
         "Patched make_index_cog to fix component names, CRS reprojection,"
         " and closed-dataset access."

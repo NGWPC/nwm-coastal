@@ -10,7 +10,7 @@ import math
 import pandas as pd
 
 
-def _isclose(a: float, b: float, rel_tol: float = 1e-09, abs_tol: float = 0.0) -> bool:
+def _isclose(a: float, b: float, rel_tol: float = 1e-09, abs_tol: float = 0.0) -> bool:  # pyright: ignore[reportUnusedFunction]
     """Approximate equality (Python 2 style)."""
     if rel_tol < 0 or abs_tol < 0:
         msg = "tolerances must be non-negative"

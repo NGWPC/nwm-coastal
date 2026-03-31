@@ -15,7 +15,7 @@ class DownloadStage(WorkflowStage):
     name = "download"
 
     @property
-    def description(self) -> str:
+    def description(self) -> str:  # pyright: ignore[reportIncompatibleVariableOverride]
         """Build description from the actual configured data sources."""
         sources = ["NWM"]
         try:

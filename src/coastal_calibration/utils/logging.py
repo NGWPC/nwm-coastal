@@ -123,7 +123,7 @@ def _validate_level(level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICA
             raise ValueError(msg)
         return getattr(logging, level_upper)
 
-    if isinstance(level, int):
+    if isinstance(level, int):  # pyright: ignore[reportUnnecessaryIsInstance]
         if level not in (
             logging.DEBUG,
             logging.INFO,
@@ -237,7 +237,7 @@ def configure_logger(
         logger.addHandler(_file_handler)
 
         # Flush after each log message for immediate visibility (useful for tail -f)
-        if _file_handler.stream is not None:
+        if _file_handler.stream is not None:  # pyright: ignore[reportUnnecessaryComparison]
             _file_handler.stream.reconfigure(line_buffering=True)
 
         # Disable console logging if file_only is True

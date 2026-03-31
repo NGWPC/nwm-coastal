@@ -140,7 +140,7 @@ def _get_model(config: CoastalCalibConfig) -> SfincsModel:
     return model
 
 
-def _clear_model(config: CoastalCalibConfig) -> None:
+def _clear_model(config: CoastalCalibConfig) -> None:  # pyright: ignore[reportUnusedFunction]
     """Remove the SfincsModel instance for the given config."""
     _MODEL_REGISTRY.pop(id(config), None)
 
@@ -249,9 +249,10 @@ def _create_meteo_forcing(
     # (which returns essentially all of CONUS for NWM).
     fetch_buffer_cells = 30
 
+    model_bbox: Any = model.bbox
     data_or_none = model.data_catalog.get_rasterdataset(
         dataset_name,
-        bbox=model.bbox,  # WGS 84
+        bbox=model_bbox,  # WGS 84
         buffer=fetch_buffer_cells,
         time_range=model.get_model_time(),
         variables=variables,
@@ -265,6 +266,8 @@ def _create_meteo_forcing(
     # ------------------------------------------------------------------
     # 2. Validate spatial / temporal extent
     # ------------------------------------------------------------------
+    y_dim: str
+    x_dim: str
     y_dim, x_dim = data.raster.dims
     if data.coords[x_dim].size < 2 or data.coords[y_dim].size < 2:
         msg = (
@@ -280,17 +283,18 @@ def _create_meteo_forcing(
         )
         raise ValueError(msg)
 
-    time_interval_s: float = pd.to_timedelta(
-        np.diff(data.time).mean(),
-    ).total_seconds()
+    _time_diff: Any = np.diff(data.time).mean()
+    _td: Any = pd.to_timedelta(_time_diff)
+    time_interval_s: float = float(_td.total_seconds())
 
     # ------------------------------------------------------------------
     # 3. Clip in source CRS + constrained reproject
     # ------------------------------------------------------------------
     region = model.region.total_bounds  # (xmin, ymin, xmax, ymax)
+    _bounds = (float(region[0]), float(region[1]), float(region[2]), float(region[3]))
     data = clip_and_reproject(
         data,
-        dst_bounds=tuple(region),
+        dst_bounds=_bounds,
         dst_crs=model.crs,
         dst_res=dst_res,
         fill_value=fill_value,
@@ -711,16 +715,16 @@ class SfincsForcingStage(_SfincsStageBase):
         """
         import numpy as np
 
-        msk_var = model.mask.data["mask"]
-        bnd_mask = msk_var.values == 2
+        msk_var: Any = model.mask.data["mask"]
+        bnd_mask: NDArray[Any] = np.asarray(msk_var.values == 2)
         y_idx, x_idx = np.where(bnd_mask)
         if len(y_idx) == 0:
             return []
 
-        x_coords = msk_var.coords["x"].to_numpy()
-        y_coords = msk_var.coords["y"].to_numpy()
-        bnd_x = x_coords[x_idx]
-        bnd_y = y_coords[y_idx]
+        x_coords: NDArray[Any] = np.asarray(msk_var.coords["x"].to_numpy())
+        y_coords: NDArray[Any] = np.asarray(msk_var.coords["y"].to_numpy())
+        bnd_x: NDArray[Any] = x_coords[x_idx]
+        bnd_y: NDArray[Any] = y_coords[y_idx]
 
         # Sort bottom-left → top-right for a deterministic order
         order = np.lexsort((bnd_x, bnd_y))
@@ -933,7 +937,7 @@ class SfincsForcingStage(_SfincsStageBase):
         for key in ("bzsfile", "bzifile", "bndfile", "bcafile", "netbndbzsbzifile"):
             model.config.set(key, None)
 
-        _ = model.water_level.data  # force lazy init with empty data
+        _wl_init: Any = model.water_level.data
 
         # Anchor the forcing signal to the mesh datum.  For tidal-only
         # sources (e.g. TPXO) this places the mean water level at the
@@ -1007,7 +1011,9 @@ class SfincsForcingStage(_SfincsStageBase):
         )
 
         # 3. Transform to lon/lat
-        lonlats = gdf_bnd.to_crs(4326).get_coordinates().to_list()
+        lonlats = cast(
+            "list[tuple[float, float]]", gdf_bnd.to_crs(4326).get_coordinates().values.tolist()
+        )
 
         # 4. Generate OTPS input file
         tstart = model.config.data.tstart
@@ -1073,9 +1079,9 @@ class SfincsForcingStage(_SfincsStageBase):
 
         k = min(k, len(src_xy))
         tree = KDTree(src_xy)
-        dists, idxs = tree.query(target_xy, k=k)
-        dists = np.asarray(dists)
-        idxs = np.asarray(idxs)
+        _qresult: Any = tree.query(target_xy, k=k)
+        dists = np.asarray(_qresult[0])
+        idxs = np.asarray(_qresult[1])
 
         n_times, _ = values.shape
         n_targets = len(target_xy)
@@ -1278,7 +1284,8 @@ class SfincsDischargeStage(_SfincsStageBase):
 
             tree = KDTree(face_xy)
             for x, y, name in points:
-                _, idx = tree.query([x, y])
+                _qr: Any = tree.query([x, y])
+                idx: int = int(_qr[1])
                 if mask[idx] == 1:
                     kept.append((x, y, name))
                 else:
@@ -1903,7 +1910,7 @@ class SfincsPlotStage(_SfincsStageBase):
         model = _get_model(self.config)
 
         obs_gdf = model.observation_points.data
-        if obs_gdf is None or obs_gdf.empty:
+        if obs_gdf is None or obs_gdf.empty:  # pyright: ignore[reportUnnecessaryComparison]
             return [], []
 
         # Reproject observation points to WGS 84 for comparison with the
@@ -1932,12 +1939,14 @@ class SfincsPlotStage(_SfincsStageBase):
         tree = KDTree(sta_xy)
 
         # For each observation point, find the nearest NOAA station.
-        dists, idxs = tree.query(obs_xy)
+        _qresult: Any = tree.query(obs_xy)
+        dists_arr: NDArray[np.floating[Any]] = np.asarray(_qresult[0])
+        idxs_arr: NDArray[np.intp] = np.asarray(_qresult[1])
         radius = self._NOAA_MATCH_RADIUS_DEG
 
         # Collect (obs_index, station_id, distance) for matches within radius.
         candidates: dict[str, tuple[int, float]] = {}  # sid → (obs_idx, dist)
-        for obs_idx, (dist, sta_idx) in enumerate(zip(dists, idxs, strict=True)):
+        for obs_idx, (dist, sta_idx) in enumerate(zip(dists_arr, idxs_arr, strict=True)):
             if dist > radius:
                 continue
             sid = str(sta_ids[sta_idx])

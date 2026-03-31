@@ -9,6 +9,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import numpy as np
+import numpy.typing as npt
+
 from coastal_calibration.utils.logging import logger as _log
 
 if TYPE_CHECKING:
@@ -33,8 +36,8 @@ def _ensure_overviews(tif_path: Path, log: Any) -> None:
     # blockxsize, which for untiled GeoTIFFs equals the full width
     # and yields 0 levels.
     with rasterio.open(tif_path, "r+") as src:
-        min_dim = min(src.width, src.height)
-        levels = []
+        min_dim: int = min(int(src.width), int(src.height))
+        levels: list[int] = []
         factor = 2
         while min_dim // factor >= 256:
             levels.append(factor)
@@ -46,30 +49,33 @@ def _ensure_overviews(tif_path: Path, log: Any) -> None:
         src.update_tags(ns="rio_overview", resampling="average")
 
 
-def _reduce_zsmax(zsmax: Any) -> Any:
+def _reduce_zsmax(zsmax: Any) -> tuple[Any, npt.NDArray[np.float32]]:
     """Reduce zsmax to max over the time dimension and return a flat array.
 
     Returns ``(zsmax_reduced, zs_flat)`` where *zsmax_reduced* is the
     time-collapsed DataArray and *zs_flat* is a 1-D float32 numpy array
     suitable for index-based lookup.
     """
-    import numpy as np
     import xugrid as xu
 
     if isinstance(zsmax, xu.UgridDataArray):
-        timedim = set(zsmax.dims) - set(zsmax.ugrid.grid.dims)
+        grid_dims: Any = zsmax.ugrid.grid.dims
+        timedim: set[Any] = set(zsmax.dims) - set(grid_dims)  # pyright: ignore[reportArgumentType]
     else:
         timedim = set(zsmax.dims) - set(zsmax.raster.dims)
     if timedim:
-        zsmax = zsmax.max(timedim)
+        zsmax = zsmax.max(timedim)  # pyright: ignore[reportCallIssue, reportOptionalCall]
 
     if isinstance(zsmax, xu.UgridDataArray):
-        zs_flat = zsmax.to_numpy().astype("float32")
+        zs_flat: npt.NDArray[np.float32] = np.asarray(
+            zsmax.to_numpy(),  # pyright: ignore[reportCallIssue, reportOptionalCall]
+            dtype=np.float32,
+        )
     else:
         # Regular grid: flatten in Fortran (column-major) order so that
         # indices from ``SfincsGrid.get_indices_at_points`` (which computes
         # ``col * nmax + row``) map to the correct values.
-        zs_flat = zsmax.values.flatten(order="F").astype("float32")
+        zs_flat = np.asarray(zsmax.values, dtype=np.float32).flatten(order="F")
     zs_flat[~np.isfinite(zs_flat)] = np.nan
     return zsmax, zs_flat
 
@@ -78,8 +84,6 @@ def _depth_from_index(
     idx_src: Any, zs_flat: Any, dep_block: Any, window: Any, idx_nodata: int
 ) -> Any:
     """Compute flood depth for a DEM block using an index COG."""
-    import numpy as np
-
     idx_block = idx_src.read(1, window=window)
     nodata_mask = idx_block == idx_nodata
     safe_idx = idx_block.copy()
@@ -103,7 +107,6 @@ def _depth_from_rasterize(
     reproj_method: str,
 ) -> Any:
     """Compute flood depth for a DEM block by rasterizing zsmax."""
-    import numpy as np
     import xarray as xr
     import xugrid as xu
 
@@ -116,12 +119,13 @@ def _depth_from_rasterize(
     )
     dep_da.raster.set_crs(dem_crs.to_wkt())
 
+    zs_block: Any
     if isinstance(zsmax, xu.UgridDataArray):
         zs_block = zsmax.ugrid.rasterize_like(dep_da)
     else:
         zs_block = zsmax.raster.reproject_like(dep_da, method=reproj_method)
     zs_block = zs_block.raster.mask_nodata()
-    return (zs_block.values - dep_block).astype("float32")
+    return np.asarray(zs_block.values - dep_block, dtype=np.float32)
 
 
 def _write_floodmap_cog(
@@ -136,28 +140,29 @@ def _write_floodmap_cog(
 ) -> None:
     """Write a flood-depth COG at the full DEM resolution.
 
-    Reads the DEM (and optional index COG) at full resolution—avoiding
-    the upstream ``overview_level=0`` bug—and writes block-by-block.
+    Reads the DEM (and optional index COG) at full resolution---avoiding
+    the upstream ``overview_level=0`` bug---and writes block-by-block.
     """
-    import numpy as np
     import rasterio
     from rasterio.windows import Window
 
     zsmax, zs_flat = _reduce_zsmax(zsmax)
 
     with rasterio.open(dem_path) as src:
-        dem_crs = src.crs
-        dem_transform = src.transform
+        dem_crs: Any = src.crs
+        dem_transform: Any = src.transform
+        n1: int
+        m1: int
         n1, m1 = src.shape
 
-        idx_src = None
+        idx_src: Any = None
         idx_nodata: int = 2147483647
         if index_path is not None:
             idx_src = rasterio.open(index_path)
             idx_nodata = int(idx_src.nodata or 2147483647)
 
         try:
-            profile = {
+            profile: dict[str, Any] = {
                 "driver": "GTiff",
                 "width": m1,
                 "height": n1,
@@ -181,13 +186,13 @@ def _write_floodmap_cog(
 
                 for jj in range(nrbn):
                     bn0 = jj * nrcb
-                    bn1 = min(bn0 + nrcb, n1)
+                    bn1_val = min(bn0 + nrcb, n1)
                     for ii in range(nrbm):
                         bm0 = ii * nrcb
-                        bm1 = min(bm0 + nrcb, m1)
+                        bm1_val = min(bm0 + nrcb, m1)
 
-                        window = Window(bm0, bn0, bm1 - bm0, bn1 - bn0)  # ty: ignore[too-many-positional-arguments]
-                        dep_block = src.read(1, window=window).astype("float32")
+                        window = Window(bm0, bn0, bm1_val - bm0, bn1_val - bn0)  # pyright: ignore[reportCallIssue]
+                        dep_block: Any = src.read(1, window=window).astype("float32")
 
                         if np.all(np.isnan(dep_block)):
                             continue
@@ -201,9 +206,9 @@ def _write_floodmap_cog(
                                 dem_crs,
                                 dem_transform,
                                 bm0,
-                                bm1,
+                                bm1_val,
                                 bn0,
-                                bn1,
+                                bn1_val,
                                 reproj_method,
                             )
 
@@ -245,7 +250,7 @@ def create_flood_depth_map(
         Output flood depth COG path.  Defaults to
         ``<model_root>/floodmap_hmax.tif``.
     index_path : Path or str, optional
-        Path for the index COG (DEM pixels → SFINCS cell mapping).
+        Path for the index COG (DEM pixels -> SFINCS cell mapping).
         Defaults to ``<model_root>/floodmap_index.tif``.
     create_index : bool
         If True (default), (re)generate the index COG via
@@ -277,7 +282,7 @@ def create_flood_depth_map(
     KeyError
         If ``zsmax`` is not present in the SFINCS map output.
     """
-    # ── Ensure patches are applied before any hydromt-sfincs call ──
+    # -- Ensure patches are applied before any hydromt-sfincs call --
     from coastal_calibration.stages._hydromt_compat import apply_all_patches
     from coastal_calibration.utils.logging import suppress_hydromt_output
 
@@ -306,7 +311,7 @@ def create_flood_depth_map(
         else:
             _log.info(msg)
 
-    # ── Load model and read output ──────────────────────────────
+    # -- Load model and read output ---------------------------------
     if model is None:
         with suppress_hydromt_output():
             from hydromt_sfincs import SfincsModel as _Sfincs
@@ -327,7 +332,7 @@ def create_flood_depth_map(
     zsmax = model.output.data["zsmax"]
     _info(f"Loaded zsmax from {map_file}")
 
-    # ── (Re)create index COG ────────────────────────────────────
+    # -- (Re)create index COG ---------------------------------------
     # Always regenerate so the index stays consistent with the
     # current grid and the patched ``get_indices_at_points``.
     if create_index:
@@ -344,7 +349,7 @@ def create_flood_depth_map(
         _ensure_overviews(index_path, _info)
         _info(f"Index COG created ({index_path.stat().st_size / 1e6:.1f} MB)")
 
-    # ── Downscale ───────────────────────────────────────────────
+    # -- Downscale --------------------------------------------------
     # Read the DEM and index at full resolution.  The upstream
     # ``downscale_floodmap`` defaults to ``overview_level=0`` when
     # reading rasters from disk, which silently halves the resolution

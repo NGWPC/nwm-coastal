@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, timedelta
+from typing import Any
 
 import esmpy as ESMF
 import netCDF4
@@ -42,12 +43,12 @@ MISSING = -9999.0
 
 
 def _determine_time_range(
-    f_in,
+    f_in: netCDF4.Dataset,
     forecast_start: int,
     cycle_date: str,
     cycle_time: str,
     length_hrs: int,
-) -> tuple[int, int, np.ndarray, dict]:
+) -> tuple[int, int, np.ndarray, dict[str, Any]]:
     """Determine the time slice to extract from the ESTOFS input.
 
     Parameters
@@ -99,7 +100,7 @@ def _write_schism_output(
     nc_out: str,
     output: np.ndarray,
     times: np.ndarray,
-    time_atts: dict,
+    time_atts: dict[str, Any],
     n_bnd_nodes: int,
 ):
     """Write regridded data in SCHISM elev2D.th.nc format."""
@@ -183,30 +184,30 @@ def regrid_estofs(
         field_out = ESMF.Field(locstream_out, name="OpenBoundary")
 
         # Global index range for slicing data arrays
-        i_lo = locstream_in._global_lower  # ty: ignore[unresolved-attribute]
-        i_hi = locstream_in._global_upper  # ty: ignore[unresolved-attribute]
-        o_lo = locstream_out._global_lower  # ty: ignore[unresolved-attribute]
-        o_hi = locstream_out._global_upper  # ty: ignore[unresolved-attribute]
+        i_lo = locstream_in._global_lower  # pyright: ignore[reportAttributeAccessIssue]
+        i_hi = locstream_in._global_upper  # pyright: ignore[reportAttributeAccessIssue]
+        o_lo = locstream_out._global_lower  # pyright: ignore[reportAttributeAccessIssue]
+        o_hi = locstream_out._global_upper  # pyright: ignore[reportAttributeAccessIssue]
 
         regridder = MaskedRegridder(
-            method=ESMF.RegridMethod.NEAREST_STOD,  # ty: ignore[invalid-argument-type]
-            unmapped_action=ESMF.UnmappedAction.IGNORE,  # ty: ignore[invalid-argument-type]
+            method=ESMF.RegridMethod.NEAREST_STOD,  # pyright: ignore[reportArgumentType]
+            unmapped_action=ESMF.UnmappedAction.IGNORE,  # pyright: ignore[reportArgumentType]
             src_mask_values=[1],
         )
 
         output = np.zeros((nt, len(bnd_lons)))
         for t in range(start, start + nt):
             data = f_in[regrid_field][t][i_lo:i_hi]
-            field_in.data[...] = data
+            field_in.data[...] = data  # pyright: ignore[reportOptionalSubscript]
             locstream_in["ESMF:Mask"] = (
                 data.mask.astype("i4")
                 if hasattr(data, "mask") and np.ndim(data.mask) > 0
                 else np.zeros(len(data), dtype="i4")
             )
 
-            field_out.data[...] = MISSING
+            field_out.data[...] = MISSING  # pyright: ignore[reportOptionalSubscript]
             field_regridded = regridder(field_in, field_out)
-            output[t - start, o_lo:o_hi] = field_regridded.data[...]
+            output[t - start, o_lo:o_hi] = field_regridded.data[...]  # pyright: ignore[reportOptionalSubscript]
 
         field_in.destroy()
         field_out.destroy()

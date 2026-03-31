@@ -377,7 +377,7 @@ class SchismModelConfig(ModelConfig):
                 if not (self.prebuilt_dir / fname).exists()
             )
 
-        if self.geogrid_file is None:
+        if self.geogrid_file is None:  # pyright: ignore[reportUnnecessaryComparison]
             errors.append(
                 "model_config.geogrid_file is required for atmospheric forcing regridding"
             )
@@ -1139,7 +1139,7 @@ class CoastalCalibConfig:
             simulation=simulation,
             boundary=boundary,
             paths=paths,
-            model_config=model_config,
+            model_config=model_config,  # pyright: ignore[reportArgumentType]
             monitoring=monitoring,
             download=download,
             _base_config=base_config_path,

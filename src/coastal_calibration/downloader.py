@@ -354,7 +354,7 @@ def _build_nwm_retro_forcing_urls(
     return urls, paths
 
 
-def _build_nwm_retro_streamflow_urls(
+def _build_nwm_retro_streamflow_urls(  # pyright: ignore[reportUnusedFunction]
     start: datetime,
     end: datetime,
     output_dir: Path,

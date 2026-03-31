@@ -132,10 +132,10 @@ class CoastalForcingRegridder:
             self.total_elements = smesh.dimensions["elementCount"].size
 
         # Determine output lat/lon range from mesh node coords (MPI-aware)
-        node_lons = self.schism_mesh.coords[0][0]
-        node_lats = self.schism_mesh.coords[0][1]
-        lon_min, lon_max = allreduce_minmax(node_lons)
-        lat_min, lat_max = allreduce_minmax(node_lats)
+        node_lons = self.schism_mesh.coords[0][0]  # pyright: ignore[reportOptionalSubscript]
+        node_lats = self.schism_mesh.coords[0][1]  # pyright: ignore[reportOptionalSubscript]
+        lon_min, lon_max = allreduce_minmax(node_lons)  # pyright: ignore[reportArgumentType]
+        lat_min, lat_max = allreduce_minmax(node_lats)  # pyright: ignore[reportArgumentType]
 
         # Read source grid and height from geogrid file
         ds = Dataset(geo_em_path, "r")
@@ -200,7 +200,7 @@ class CoastalForcingRegridder:
         # Populate source field
         in_field = ESMF.Field(grid=self.in_grid, name="rainrate-in")
         b = self.in_bounds
-        in_field.data[...] = input_ds.variables["RAINRATE"][0, :].T[
+        in_field.data[...] = input_ds.variables["RAINRATE"][0, :].T[  # pyright: ignore[reportOptionalSubscript]
             b.x_lo : b.x_hi, b.y_lo : b.y_hi
         ]
 
@@ -209,7 +209,7 @@ class CoastalForcingRegridder:
             grid=self.schism_mesh, meshloc=ESMF.MeshLoc.ELEMENT, name="rainrate-out"
         )
         # Initialise to 0 so unmapped elements (IGNORE action) are left at 0.
-        out_field.data[...] = 0.0
+        out_field.data[...] = 0.0  # pyright: ignore[reportOptionalSubscript]
 
         # Build regridder once, reuse for subsequent files.
         # CONSERVE is required for Grid -> Mesh(ELEMENT) regridding;
@@ -218,13 +218,13 @@ class CoastalForcingRegridder:
             self._schism_regridder = Regridder(
                 in_field,
                 out_field,
-                method=ESMF.RegridMethod.CONSERVE,  # ty: ignore[invalid-argument-type]
-                unmapped_action=ESMF.UnmappedAction.IGNORE,  # ty: ignore[invalid-argument-type]
+                method=ESMF.RegridMethod.CONSERVE,  # pyright: ignore[reportArgumentType]
+                unmapped_action=ESMF.UnmappedAction.IGNORE,  # pyright: ignore[reportArgumentType]
             )
 
         out_field = self._schism_regridder(in_field, out_field)
         # Clamp any negative bilinear interpolation artefacts to zero.
-        np.clip(out_field.data, 0.0, None, out=out_field.data)
+        np.clip(out_field.data, 0.0, None, out=out_field.data)  # pyright: ignore[reportCallIssue, reportArgumentType]
 
         # Convert to volumetric flux (m^3/s)
         R0_SCHISM = 6378206.4  # earth radius in meters used by SCHISM
@@ -232,13 +232,13 @@ class CoastalForcingRegridder:
 
         unit_areas = ESMF.Field(self.schism_mesh, meshloc=ESMF.MeshLoc.ELEMENT, name="areafield")
         unit_areas.get_area()
-        areas_m2 = unit_areas.data[...] * (R0_SCHISM * R0_SCHISM)
-        out_field.data[...] *= areas_m2 / DENSITY_FACTOR
+        areas_m2 = unit_areas.data[...] * (R0_SCHISM * R0_SCHISM)  # pyright: ignore[reportOptionalSubscript]
+        out_field.data[...] *= areas_m2 / DENSITY_FACTOR  # pyright: ignore[reportOptionalSubscript]
         unit_areas.destroy()
 
         # Gather distributed data to root
-        local_count = self.schism_mesh.size[1]
-        all_elements = gatherv_1d(out_field.data, local_count)
+        local_count: int = self.schism_mesh.size[1]  # pyright: ignore[reportAssignmentType]
+        all_elements = gatherv_1d(out_field.data, local_count)  # pyright: ignore[reportArgumentType]
 
         if all_elements is not None and len(all_elements) != self.total_elements:
             msg = (
@@ -251,7 +251,7 @@ class CoastalForcingRegridder:
         # Write on root rank
         if self.root and vsource_ds is not None:
             step_time = self._read_start_time(input_ds)
-            output_ts = int(step_time - self.schism_first_timestep)  # ty: ignore[unsupported-operator]
+            output_ts = int(step_time - self.schism_first_timestep)  # pyright: ignore[reportOperatorIssue]
             output_idx = output_ts // 3600
             vsource_ds["time_vsource"][output_idx] = output_ts
             vsource_ds["vsource"][output_idx, :] = all_elements
@@ -345,30 +345,30 @@ class CoastalForcingRegridder:
             # Populate source field with local partition slice
             in_field = ESMF.Field(grid=self.in_grid, name=f"{variable}-in")
             b = self.in_bounds
-            in_field.data[...] = data[b.x_lo : b.x_hi, b.y_lo : b.y_hi]
+            in_field.data[...] = data[b.x_lo : b.x_hi, b.y_lo : b.y_hi]  # pyright: ignore[reportOptionalSubscript]
 
             out_field = ESMF.Field(grid=self.out_grid, name=f"{variable}-out")
-            out_field.data[...] = 0.0
+            out_field.data[...] = 0.0  # pyright: ignore[reportOptionalSubscript]
 
             # Build regridder once, reuse for subsequent variables/files
             if self._latlon_regridder is None:
                 self._latlon_regridder = Regridder(
                     in_field,
                     out_field,
-                    method=ESMF.RegridMethod.BILINEAR,  # ty: ignore[invalid-argument-type]
-                    unmapped_action=ESMF.UnmappedAction.IGNORE,  # ty: ignore[invalid-argument-type]
+                    method=ESMF.RegridMethod.BILINEAR,  # pyright: ignore[reportArgumentType]
+                    unmapped_action=ESMF.UnmappedAction.IGNORE,  # pyright: ignore[reportArgumentType]
                 )
             else:
                 self._latlon_regridder(
                     in_field,
                     out_field,
-                    zero_region=ESMF.constants.Region.SELECT,  # ty: ignore[invalid-argument-type]
+                    zero_region=ESMF.constants.Region.SELECT,  # pyright: ignore[reportArgumentType]
                 )
 
             # Assemble global output from all partitions
             global_output = np.zeros((nlons, nlats))
             ob = self.out_bounds
-            global_output[ob.x_lo : ob.x_hi, ob.y_lo : ob.y_hi] = out_field.data[...]
+            global_output[ob.x_lo : ob.x_hi, ob.y_lo : ob.y_hi] = out_field.data[...]  # pyright: ignore[reportOptionalSubscript]
 
             final_output = gather_reduce(global_output, global_shape=(nlons, nlats))
 
@@ -467,7 +467,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    ESMF.Manager(debug=False)
+    ESMF.Manager(debug=False)  # pyright: ignore[reportCallIssue]
 
     dir_date = args.forcing_end_date if args.length_hrs < 0 else args.forcing_begin_date
     if dir_date and len(dir_date) == 12:

@@ -15,9 +15,11 @@ import contextlib
 import json
 import math
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
+import numpy as np
 import shapely
+from shapely import Point
 
 from coastal_calibration.stages._hydromt_compat import apply_all_patches
 from coastal_calibration.utils.logging import suppress_hydromt_output
@@ -27,6 +29,7 @@ apply_all_patches()
 if TYPE_CHECKING:
     from pathlib import Path
 
+    import geopandas as gpd
     from hydromt_sfincs import SfincsModel
 
     from coastal_calibration.config.create_schema import SfincsCreateConfig
@@ -67,7 +70,7 @@ def _clear_model(config: SfincsCreateConfig) -> None:
     _MODEL_REGISTRY.pop(id(config), None)
 
 
-def _load_existing_model(config: SfincsCreateConfig) -> None:
+def _load_existing_model(config: SfincsCreateConfig) -> None:  # pyright: ignore[reportUnusedFunction]
     """Load an existing SfincsModel from *config.output_dir* into the registry.
 
     Used when resuming from a later stage (``--start-from``) where
@@ -189,17 +192,17 @@ class CreateGridStage(CreateStage):
             # the grid CRS first so we can reproject + buffer in meters.
             grid_crs_str = cfg.grid.crs
             if grid_crs_str == "utm":
-                aoi_gdf = gpd.read_file(str(cfg.aoi))
-                centroid = aoi_gdf.to_crs(4326).geometry.centroid.iloc[0]
+                aoi_gdf: gpd.GeoDataFrame = gpd.read_file(str(cfg.aoi))
+                centroid = cast("Point", aoi_gdf.to_crs(4326).geometry.centroid.iloc[0])
                 utm_zone = int((centroid.x + 180) / 6) + 1
                 grid_epsg = 32600 + utm_zone if centroid.y >= 0 else 32700 + utm_zone
                 target_crs = CRS.from_epsg(grid_epsg)
             else:
-                target_crs = CRS.from_user_input(grid_crs_str)
+                target_crs: CRS = CRS.from_user_input(grid_crs_str)
 
             parts: list[gpd.GeoDataFrame] = []
             for ref in cfg.grid.refinement:
-                gdf = gpd.read_file(ref.polygon)
+                gdf: gpd.GeoDataFrame = gpd.read_file(ref.polygon)
                 # Reproject to the grid CRS first (buffer is in meters).
                 if gdf.crs is not None and gdf.crs != target_crs:
                     gdf = gdf.to_crs(target_crs)
@@ -492,7 +495,7 @@ class CreateDischargeStage(_CreateStageBase):
         import geopandas as gpd
 
         try:
-            gdf = gpd.read_file(nd.flowlines, force_2d=True)
+            gdf: gpd.GeoDataFrame = gpd.read_file(nd.flowlines, force_2d=True)
         except Exception as exc:
             errors.append(f"Cannot read flowlines GeoJSON: {exc}")
             return errors
@@ -569,7 +572,9 @@ class CreateDischargeStage(_CreateStageBase):
 
         snapped: list[tuple[float, float, str]] = []
         for x, y, name in points:
-            dist_crs, active_pos = tree_active.query([x, y])
+            dist_crs_raw, active_pos_raw = tree_active.query([x, y])
+            dist_crs = float(dist_crs_raw)
+            active_pos = int(active_pos_raw)
             dist_m = dist_crs * unit_to_m
             if dist_m > max_snap_distance_m:
                 self._log(
@@ -595,7 +600,7 @@ class CreateDischargeStage(_CreateStageBase):
         and pick whichever is nearest to the AOI boundary.  In
         practice the outlet should sit on (or very near) the boundary.
         """
-        from shapely import MultiLineString, Point
+        from shapely import MultiLineString
 
         if geom is None or geom.is_empty:
             return None
@@ -606,9 +611,10 @@ class CreateDischargeStage(_CreateStageBase):
             first_coord = geom.coords[0][:2]
             last_coord = geom.coords[-1][:2]
 
-        d_first = aoi_boundary.distance(Point(first_coord))
-        d_last = aoi_boundary.distance(Point(last_coord))
-        return first_coord if d_first < d_last else last_coord
+        d_first = aoi_boundary.distance(shapely.Point(first_coord))
+        d_last = aoi_boundary.distance(shapely.Point(last_coord))
+        chosen = first_coord if d_first < d_last else last_coord
+        return (float(chosen[0]), float(chosen[1]))
 
     def run(self) -> dict[str, Any]:
         """Extract flowpath outlets from GeoJSON and add as discharge points."""
@@ -624,7 +630,7 @@ class CreateDischargeStage(_CreateStageBase):
 
         self._update_substep("Reading flowpath geometries from GeoJSON")
         id_col = nd.nwm_id_column
-        flowpaths_gdf = gpd.read_file(nd.flowlines, force_2d=True)
+        flowpaths_gdf: gpd.GeoDataFrame = gpd.read_file(nd.flowlines, force_2d=True)
         self._log(f"Read {len(flowpaths_gdf)} flowpath(s) from {nd.flowlines.name}")
 
         if flowpaths_gdf.empty:
@@ -641,13 +647,13 @@ class CreateDischargeStage(_CreateStageBase):
 
         # Determine model CRS from the SfincsModel grid
         grid_ds = model.quadtree_grid.data
-        model_crs = grid_ds.ugrid.grid.crs
+        model_crs: Any = grid_ds.ugrid.grid.crs
 
         # Reproject flowpaths and AOI to model CRS
         if flowpaths_gdf.crs is not None and flowpaths_gdf.crs != model_crs:
             flowpaths_gdf = flowpaths_gdf.to_crs(model_crs)
 
-        aoi_gdf = gpd.read_file(str(cfg.aoi))
+        aoi_gdf: gpd.GeoDataFrame = gpd.read_file(str(cfg.aoi))
         if aoi_gdf.crs is not None and aoi_gdf.crs != model_crs:
             aoi_gdf = aoi_gdf.to_crs(model_crs)
         aoi_boundary = aoi_gdf.union_all().boundary
@@ -766,8 +772,12 @@ class CreateObservationPointsStage(_CreateStageBase):
         existing_points: list[tuple[float, float]] = []
         try:
             gdf = model.observation_points.data
-            if gdf is not None and not gdf.empty:
-                existing_points = [(geom.x, geom.y) for geom in gdf.geometry if geom is not None]
+            if gdf is not None and not gdf.empty:  # pyright: ignore[reportUnnecessaryComparison]
+                existing_points = [
+                    (cast("Point", geom).x, cast("Point", geom).y)
+                    for geom in gdf.geometry
+                    if geom is not None  # pyright: ignore[reportUnnecessaryComparison]
+                ]
         except Exception:  # noqa: S110
             pass
 
@@ -802,23 +812,21 @@ class CreateObservationPointsStage(_CreateStageBase):
         to the center of the nearest active wet face, regardless of
         whether the current cell appears wet.
         """
-        import numpy as np
         from scipy.spatial import KDTree
-        from shapely import Point
 
         depth_threshold = self._SNAP_DEPTH_THRESHOLD
         search_radius = self._SNAP_SEARCH_RADIUS_M
 
         obs_gdf = model.observation_points.data
-        if obs_gdf is None or obs_gdf.empty:
+        if obs_gdf is None or obs_gdf.empty:  # pyright: ignore[reportUnnecessaryComparison]
             return 0
 
         grid_ds = model.quadtree_grid.data
-        ugrid = grid_ds.ugrid.grid
-        fx = np.asarray(ugrid.face_x)
-        fy = np.asarray(ugrid.face_y)
-        z_elev = grid_ds["z"].to_numpy()  # ty: ignore[not-subscriptable]
-        mask_arr = grid_ds["mask"].to_numpy()  # ty: ignore[not-subscriptable]
+        ugrid: Any = grid_ds.ugrid.grid
+        fx = np.asarray(ugrid.face_x, dtype=np.float64)
+        fy = np.asarray(ugrid.face_y, dtype=np.float64)
+        z_elev = np.asarray(grid_ds["z"].to_numpy(), dtype=np.float64)  # pyright: ignore[reportIndexIssue]
+        mask_arr = np.asarray(grid_ds["mask"].to_numpy(), dtype=np.float64)  # pyright: ignore[reportIndexIssue]
 
         # Build a KDTree of active wet face centers only.
         wet_active = (z_elev < depth_threshold) & (mask_arr > 0)
@@ -830,15 +838,17 @@ class CreateObservationPointsStage(_CreateStageBase):
 
         snapped = 0
         for i in range(len(obs_gdf)):
-            geom = obs_gdf.geometry.iloc[i]
-            if geom is None:
+            geom = cast("Point", obs_gdf.geometry.iloc[i])
+            if geom is None:  # pyright: ignore[reportUnnecessaryComparison]
                 continue
-            ox, oy = geom.x, geom.y
+            ox, oy = float(geom.x), float(geom.y)
             name = str(i)
             with contextlib.suppress(KeyError, IndexError):
                 name = obs_gdf["name"].iloc[i]
 
-            dist, pos = tree_wet.query([ox, oy])
+            dist_raw, pos_raw = tree_wet.query([ox, oy])
+            dist = float(dist_raw)
+            pos = int(pos_raw)
             if dist > search_radius:
                 self._log(
                     f"  {name}: no wet cell within {search_radius:.0f} m "
@@ -849,15 +859,15 @@ class CreateObservationPointsStage(_CreateStageBase):
 
             best = wet_idx[pos]
             new_x, new_y = float(fx[best]), float(fy[best])
-            new_z = z_elev[best]
-            obs_gdf.geometry.iloc[i] = Point(new_x, new_y)
+            new_z = float(z_elev[best])
+            obs_gdf.geometry.iloc[i] = Point(new_x, new_y)  # pyright: ignore[reportCallIssue, reportArgumentType]
             self._log(
                 f"  {name}: placed at face center z={new_z:.3f} m ({dist:.0f} m from original)"
             )
             snapped += 1
 
         if snapped > 0:
-            model.observation_points._data = obs_gdf
+            model.observation_points._data = obs_gdf  # pyright: ignore[reportPrivateUsage]
         return snapped
 
     # ------------------------------------------------------------------
@@ -867,7 +877,7 @@ class CreateObservationPointsStage(_CreateStageBase):
     def _write_obs_station_map(self, model: SfincsModel) -> None:
         """Write ``obs_station_map.json`` mapping obs indices to station IDs."""
         obs_gdf = model.observation_points.data
-        if obs_gdf is None or obs_gdf.empty:
+        if obs_gdf is None or obs_gdf.empty:  # pyright: ignore[reportUnnecessaryComparison]
             return
 
         station_map: list[dict[str, Any]] = []
@@ -883,7 +893,7 @@ class CreateObservationPointsStage(_CreateStageBase):
             if name.startswith("noaa_"):
                 station_id = name[len("noaa_") :]
 
-            geom = obs_gdf.geometry.iloc[idx]
+            geom = cast("Point", obs_gdf.geometry.iloc[idx])
             entry: dict[str, Any] = {
                 "index": idx,
                 "name": name,

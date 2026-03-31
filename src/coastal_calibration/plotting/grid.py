@@ -25,7 +25,7 @@ __all__ = ["LevelInfo", "SfincsGridInfo", "plot_mesh"]
 class LevelInfo(NamedTuple):
     """Cell count and resolution for one refinement level."""
 
-    count: int
+    n_cells: int
     resolution: float
 
 
@@ -49,7 +49,7 @@ class SfincsGridInfo:
     """
 
     grid_type: str
-    crs: CRS
+    crs: CRS | None
     base_resolution: float
     levels: dict[int, LevelInfo]
     n_faces: int | None = None
@@ -91,7 +91,7 @@ class SfincsGridInfo:
 
         unique_levels, counts = np.unique(level_arr, return_counts=True)
         levels = {
-            int(lv): LevelInfo(int(cnt), base_resolution / 2.0 ** (lv - 1))
+            int(lv): LevelInfo(n_cells=int(cnt), resolution=base_resolution / 2.0 ** (lv - 1))
             for lv, cnt in zip(unique_levels, counts, strict=True)
         }
 
@@ -133,7 +133,7 @@ class SfincsGridInfo:
         y0 = float(grid.y0)
         extent = (x0, x0 + mmax * dx, y0, y0 + nmax * dy)
 
-        levels = {1: LevelInfo(int(mask.size), dx)}
+        levels = {1: LevelInfo(n_cells=int(mask.size), resolution=dx)}
 
         return cls(
             grid_type="regular",
@@ -195,7 +195,7 @@ class SfincsGridInfo:
             lines.append(f"  Faces:     {self.n_faces:>10,}")
             lines.append(f"  Edges:     {self.n_edges:>10,}")
             for lv, info in sorted(self.levels.items()):
-                lines.append(f"  Level {lv}:   {info.count:>10,} cells ({info.resolution:.0f} m)")
+                lines.append(f"  Level {lv}:   {info.n_cells:>10,} cells ({info.resolution:.0f} m)")
         elif self.shape is not None:
             lines.append(f"  Shape:      {self.shape[0]} x {self.shape[1]}")
             res = next(iter(self.levels.values())).resolution
@@ -218,7 +218,9 @@ def _plot_quadtree(info: SfincsGridInfo, ax: Axes) -> None:
     from matplotlib.colors import BoundaryNorm, ListedColormap
     from matplotlib.patches import Patch
 
-    if info._verts is None or info._level_per_face is None:  # pragma: no cover
+    if (  # pragma: no cover
+        info._verts is None or info._level_per_face is None  # pyright: ignore[reportPrivateUsage]
+    ):
         msg = "SfincsGridInfo must be built with quadtree data"
         raise ValueError(msg)
 
@@ -229,8 +231,8 @@ def _plot_quadtree(info: SfincsGridInfo, ax: Axes) -> None:
     bounds = [lv - 0.5 for lv in sorted_levels] + [sorted_levels[-1] + 0.5]
     norm = BoundaryNorm(bounds, ncolors=n_levels)
 
-    pc = PolyCollection(list(info._verts), edgecolors="black", linewidths=0.1, alpha=0.4)
-    pc.set_array(info._level_per_face.astype(float))
+    pc = PolyCollection(list(info._verts), edgecolors="black", linewidths=0.1, alpha=0.4)  # pyright: ignore[reportPrivateUsage]
+    pc.set_array(info._level_per_face.astype(float))  # pyright: ignore[reportPrivateUsage]
     pc.set_cmap(cmap)
     pc.set_norm(norm)
     ax.add_collection(pc)
@@ -250,13 +252,15 @@ def _plot_quadtree(info: SfincsGridInfo, ax: Axes) -> None:
 
 
 def _plot_regular(info: SfincsGridInfo, ax: Axes) -> None:
-    if info._mask is None or info._grid_extent is None:  # pragma: no cover
+    if (  # pragma: no cover
+        info._mask is None or info._grid_extent is None  # pyright: ignore[reportPrivateUsage]
+    ):
         msg = "SfincsGridInfo must be built with regular grid data"
         raise ValueError(msg)
-    x0, x1, y0, y1 = info._grid_extent
+    x0, x1, y0, y1 = info._grid_extent  # pyright: ignore[reportPrivateUsage]
     extent = (x0, x1, y0, y1)
     ax.imshow(
-        np.where(info._mask > 0, info._mask, np.nan),
+        np.where(info._mask > 0, info._mask, np.nan),  # pyright: ignore[reportPrivateUsage]
         extent=extent,
         origin="lower",
         alpha=0.4,
@@ -267,15 +271,15 @@ def _plot_regular(info: SfincsGridInfo, ax: Axes) -> None:
 
 def _add_basemap(
     ax: Axes,
-    crs: CRS,
+    crs: CRS | None,
     source: Any | None,
     zoom: int,
 ) -> None:
     import contextily as cx
 
     if source is None:
-        source = cx.providers.Esri.WorldImagery  # ty: ignore[unresolved-attribute]
-    cx.add_basemap(ax, crs=crs, source=source, zoom=zoom)
+        source = cx.providers.Esri.WorldImagery  # pyright: ignore[reportAttributeAccessIssue]
+    cx.add_basemap(ax, crs=crs, source=source, zoom=zoom)  # pyright: ignore[reportArgumentType]
 
 
 def plot_mesh(
@@ -334,4 +338,4 @@ def plot_mesh(
     if basemap:
         _add_basemap(ax, info.crs, basemap_source, basemap_zoom)
 
-    return fig, ax  # ty: ignore[invalid-return-type]
+    return fig, ax  # pyright: ignore[reportReturnType]

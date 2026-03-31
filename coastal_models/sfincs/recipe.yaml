@@ -1,6 +1,6 @@
 package:
   name: sfincs
-  version: "0.1.0"
+  version: 0.1.0
 
 source:
   path: ./repo/source
@@ -11,20 +11,20 @@ build:
 
 requirements:
   build:
-    - ${{ compiler('fortran') }}
-    - ${{ compiler('c') }}
-    - autoconf
-    - automake
-    - libtool
-    - m4
-    - make
-    - pkg-config
+  - ${{ compiler('fortran') }}
+  - ${{ compiler('c') }}
+  - autoconf
+  - automake
+  - libtool
+  - m4
+  - make
+  - pkg-config
   host:
-    - libnetcdf * mpi_openmpi_*
-    - hdf5 * mpi_openmpi_*
-    - openmpi
-    - libgfortran
+  - libnetcdf * mpi_openmpi_*
+  - hdf5 * mpi_openmpi_*
+  - openmpi
+  - libgfortran
 
 tests:
-  - script:
-      - test -f $PREFIX/bin/sfincs
+- script:
+  - test -f $PREFIX/bin/sfincs
