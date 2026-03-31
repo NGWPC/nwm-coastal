@@ -48,7 +48,7 @@ dependencies = [
   "rioxarray>=0.17",
   "s3fs",
   "shapely>=2",
-  "tiny-retriever<0.2",
+  "tiny-retriever>=0.3",
   "xarray>=2024.1",
 ]
 optional-dependencies.docs = [
@@ -93,7 +93,9 @@ optional-dependencies.test = [
 optional-dependencies.typecheck = [
   "pandas-stubs",
   "pyright",
+  "types-geopandas",
   "types-pyyaml",
+  "types-shapely",
 ]
 urls.Documentation = "https://ngwpc.github.io/nwm-coastal"
 urls.Source = "https://github.com/NGWPC/nwm-coastal"
@@ -425,6 +427,11 @@ ignore = [
 typeCheckingMode = "strict"
 reportMissingSuperCall = false
 reportMissingTypeStubs = false
+reportUnknownMemberType = false
+reportUnknownVariableType = false
+reportUnknownArgumentType = false
+reportUnknownParameterType = false
+reportMissingTypeArgument = false
 reportUnnecessaryTypeIgnoreComment = true
 
 [tool.pytest]
