@@ -7,6 +7,38 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Changed
+
+- **Build system**: migrated SFINCS and SCHISM compilation from activation scripts
+    (`scripts/ensure-sfincs.sh`, `scripts/ensure-schism.sh`) to pixi-build packages
+    using the `rattler-build` backend. Build recipes live in `coastal_models/sfincs/` and
+    `coastal_models/schism/` with `recipe.yaml` + `build.sh`. Builds are cached as conda
+    packages and only recompile when the submodule source or recipe changes.
+- **Submodule layout**: moved git submodules from `SFINCS/` and `schism/` to
+    `coastal_models/sfincs/repo/` and `coastal_models/schism/repo/`. The in-tree `./repo`
+    source paths avoid a pixi-build cache invalidation bug with out-of-tree paths
+    ([prefix-dev/pixi#4837](https://github.com/prefix-dev/pixi/issues/4837)).
+- **MPI variant consistency**: both SFINCS and SCHISM recipes now pin `hdf5` and
+    `libnetcdf`/`netcdf-fortran` to `mpi_openmpi_*` build variants, matching ESMF/esmpy
+    runtime expectations and avoiding library conflicts in shared environments.
+- **macOS SDK probe**: replaced hardcoded `MacOSX15*` SDK fallback with a dynamic probe
+    (`scripts/find_compatible_sdk.sh`) that tests each installed SDK against the active
+    linker and picks the newest compatible one.
+- **Cluster install**: rewrote `CLUSTER_INSTALL.md` around full-repo clone with
+    pixi-build. The wrapper script (`nwm-coastal`) fully activates the environment so
+    pixi is not needed at runtime on compute nodes.
+- **mkdocs hooks**: `docs/hooks.py` now strips ANSI escape codes and absolute repo paths
+    from rendered notebook HTML at build time, complementing the existing
+    `scripts/clean_notebooks.py` pre-commit task.
+
+### Removed
+
+- `scripts/ensure-sfincs.sh` and `scripts/ensure-schism.sh` (replaced by pixi-build
+    recipes).
+- Build-tool dependencies (`c-compiler`, `fortran-compiler`, `cxx-compiler`, `cmake`,
+    `make`, `autoconf`, `automake`, `libtool`, `m4`) from pixi feature sections in
+    `pyproject.toml` (now declared in `recipe.yaml` and resolved by the build backend).
+
 ### Added
 
 - `coastal_calibration.plotting` module with reusable visualization utilities:
