@@ -1178,6 +1178,28 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#added" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#changed" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1200,7 +1222,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#added" class="md-nav__link">
+  <a href="#added_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -1222,7 +1244,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixed" class="md-nav__link">
+  <a href="#fixed_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fixed
@@ -1261,7 +1283,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added_1" class="md-nav__link">
+  <a href="#added_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -1283,7 +1305,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixed_1" class="md-nav__link">
+  <a href="#fixed_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fixed
@@ -1385,17 +1407,32 @@
 <p>The format is based on <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a>, and
 this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
 <h2 id="unreleased"><a href="https://github.com/NGWPC/nwm-coastal/compare/3.1.1.0.0...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
+<h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">#</a></h3>
+<ul>
+<li><strong>Type stubs</strong>: added <code>types-geopandas</code> and <code>types-shapely</code> to the typecheck
+    environment for better third-party type coverage.</li>
+</ul>
+<h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">#</a></h3>
+<ul>
+<li><strong>Type checking</strong>: resolved all 895 pyright strict-mode errors across 35 source files.
+    Real type issues (wrong argument types, unnecessary isinstance checks, missing
+    annotations, None-safety) were fixed in code; remaining noise from third-party
+    libraries without type stubs is suppressed via targeted pyright config rules.</li>
+<li><strong>Script permissions</strong>: marked <code>scripts/find_compatible_sdk.sh</code>,
+    <code>coastal_models/schism/build.sh</code>, and <code>coastal_models/sfincs/build.sh</code> as executable
+    to satisfy the pre-commit shebang check.</li>
+</ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">#</a></h3>
 <ul>
 <li><strong>Build system</strong>: migrated SFINCS and SCHISM compilation from activation scripts
     (<code>scripts/ensure-sfincs.sh</code>, <code>scripts/ensure-schism.sh</code>) to pixi-build packages
-    using the <code>rattler-build</code> backend. Build recipes live in <code>coastal_models/sfincs/</code> and
-    <code>coastal_models/schism/</code> with <code>recipe.yaml</code> + <code>build.sh</code>. Builds are cached as conda
-    packages and only recompile when the submodule source or recipe changes.</li>
+    using the <code>rattler-build</code> backend. Build recipes live in <code>coastal_models/sfincs/</code>
+    and <code>coastal_models/schism/</code> with <code>recipe.yaml</code> + <code>build.sh</code>. Builds are cached as
+    conda packages and only recompile when the submodule source or recipe changes.</li>
 <li><strong>Submodule layout</strong>: moved git submodules from <code>SFINCS/</code> and <code>schism/</code> to
-    <code>coastal_models/sfincs/repo/</code> and <code>coastal_models/schism/repo/</code>. The in-tree <code>./repo</code>
-    source paths avoid a pixi-build cache invalidation bug with out-of-tree paths
-    (<a href="https://github.com/prefix-dev/pixi/issues/4837">prefix-dev/pixi#4837</a>).</li>
+    <code>coastal_models/sfincs/repo/</code> and <code>coastal_models/schism/repo/</code>. The in-tree
+    <code>./repo</code> source paths avoid a pixi-build cache invalidation bug with out-of-tree
+    paths (<a href="https://github.com/prefix-dev/pixi/issues/4837">prefix-dev/pixi#4837</a>).</li>
 <li><strong>MPI variant consistency</strong>: both SFINCS and SCHISM recipes now pin <code>hdf5</code> and
     <code>libnetcdf</code>/<code>netcdf-fortran</code> to <code>mpi_openmpi_*</code> build variants, matching ESMF/esmpy
     runtime expectations and avoiding library conflicts in shared environments.</li>
@@ -1417,7 +1454,7 @@ this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic V
     <code>make</code>, <code>autoconf</code>, <code>automake</code>, <code>libtool</code>, <code>m4</code>) from pixi feature sections in
     <code>pyproject.toml</code> (now declared in <code>recipe.yaml</code> and resolved by the build backend).</li>
 </ul>
-<h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">#</a></h3>
+<h3 id="added_1">Added<a class="headerlink" href="#added_1" title="Permanent link">#</a></h3>
 <ul>
 <li><code>coastal_calibration.plotting</code> module with reusable visualization utilities:<ul>
 <li><code>SfincsGridInfo</code> dataclass with <code>from_model_root()</code> factory for loading and
@@ -1571,7 +1608,7 @@ this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic V
 <li>Pixi <code>netcdf4</code> dependency pinned to MPI-aware conda-forge build variant
     (<code>mpi_openmpi_*</code>) for parallel HDF5 support across all environments.</li>
 </ul>
-<h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">#</a></h3>
+<h3 id="fixed_1">Fixed<a class="headerlink" href="#fixed_1" title="Permanent link">#</a></h3>
 <ul>
 <li>Clean all generated files (discharge, boundary, sflux, partitioning, outputs, status)
     from the run directory at the start of a full workflow run via
@@ -1651,7 +1688,7 @@ this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic V
 <li><code>MPIConfig</code> class (fields absorbed into <code>SchismModelConfig</code>).</li>
 </ul>
 <h2 id="31100-2026-02-19"><a href="https://github.com/NGWPC/nwm-coastal/releases/tag/3.1.1.0.0">3.1.1.0.0</a> - 2026-02-19<a class="headerlink" href="#31100-2026-02-19" title="Permanent link">#</a></h2>
-<h3 id="added_1">Added<a class="headerlink" href="#added_1" title="Permanent link">#</a></h3>
+<h3 id="added_2">Added<a class="headerlink" href="#added_2" title="Permanent link">#</a></h3>
 <ul>
 <li>Initial release of NWM Coastal</li>
 <li>SCHISM coastal model workflow support</li>
@@ -1745,7 +1782,7 @@ this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic V
     <code>observation_points</code>, <code>obs_merge</code> -&gt; <code>merge_observations</code>, <code>src_locations</code> -&gt;
     <code>discharge_locations_file</code>, <code>src_merge</code> -&gt; <code>merge_discharge</code></li>
 </ul>
-<h3 id="fixed_1">Fixed<a class="headerlink" href="#fixed_1" title="Permanent link">#</a></h3>
+<h3 id="fixed_2">Fixed<a class="headerlink" href="#fixed_2" title="Permanent link">#</a></h3>
 <ul>
 <li>Call <code>expanduser()</code> before <code>resolve()</code> on all path config fields so that paths
     containing <code>~</code> are correctly expanded to the user's home directory.</li>
