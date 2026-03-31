@@ -92,7 +92,7 @@ optional-dependencies.test = [
 ]
 optional-dependencies.typecheck = [
   "pandas-stubs",
-  "ty",
+  "pyright",
   "types-pyyaml",
 ]
 urls.Documentation = "https://ngwpc.github.io/nwm-coastal"
@@ -107,6 +107,158 @@ build.targets.wheel.packages = [
   "src/coastal_calibration",
 ]
 version.source = "vcs"
+
+[tool.pixi.environments]
+test311-common = { features = [ "test", "test-common", "py311" ] }
+test311-sfincs = { features = [ "test", "test-sfincs", "sfincs", "plot", "py311" ] }
+test311-schism = { features = [ "test", "test-schism", "schism", "plot", "py311" ] }
+test313-common = { features = [ "test", "test-common", "py313" ] }
+test313-sfincs = { features = [ "test", "test-sfincs", "sfincs", "plot", "py313" ] }
+test313-schism = { features = [ "test", "test-schism", "schism", "plot", "py313" ] }
+test311 = { features = [ "test", "test311", "schism", "sfincs", "plot", "py311" ] }
+test313 = { features = [ "test", "test313", "schism", "sfincs", "plot", "py313" ] }
+dev = { features = [ "notebook", "schism", "sfincs", "plot", "test", "py313" ] }
+schism = { features = [ "notebook", "schism", "plot", "py313" ] }
+sfincs = { features = [ "notebook", "sfincs", "plot", "py313" ] }
+typecheck = { features = [ "typecheck", "schism", "sfincs", "plot", "test", "py313" ] }
+lint = { features = [ "lint", "py313" ], no-default-feature = true }
+docs = { features = [ "docs", "py313" ] }
+
+[tool.pixi.feature.docs.tasks]
+docs-build = "mkdocs build --strict"
+docs-serve = "mkdocs serve"
+docs-deploy = "mike deploy --push --update-aliases dev latest"
+docs-release = "mike deploy --push --update-aliases $(git describe --tags --abbrev=0) stable"
+
+[tool.pixi.feature.lint.tasks]
+lint = "pre-commit run --all-files"
+pcupdate = "pre-commit autoupdate"
+spell = "codespell -w"
+
+[tool.pixi.feature.notebook.tasks]
+# Sync all percent-format .py scripts → paired .ipynb files
+nb-sync = "jupytext --sync docs/examples/notebooks/*.py"
+# Execute all notebooks in-place (requires .ipynb to exist; run nb-sync first)
+nb-execute = "jupyter nbconvert --to notebook --execute --inplace docs/examples/notebooks/*.ipynb"
+# Strip ANSI codes and absolute paths from outputs — run after nb-execute before committing
+nb-clean = "python scripts/clean_notebooks.py"
+# Full workflow: sync .py → .ipynb, then execute and clean — use before building docs or committing
+nb-run = { depends-on = [ "nb-sync", "nb-execute", "nb-clean" ] }
+# Pair an existing .ipynb with a .py counterpart (one-time setup for imported notebooks)
+nb-pair = "jupytext --set-formats 'ipynb,py:percent' docs/examples/notebooks/*.ipynb"
+# Strip all cell outputs from .ipynb files (keeps repo diff clean)
+nb-clear = "jupyter nbconvert --ClearOutputPreprocessor.enabled=True --to notebook --inplace docs/examples/notebooks/*.ipynb"
+
+[tool.pixi.feature.plot.dependencies]
+proj = "*"
+libgdal-core = "*"
+hdf5 = "*"
+libnetcdf = "*"
+
+[tool.pixi.feature.py311.dependencies]
+python = "~=3.11.0"
+proj = "*"
+libgdal-core = "*"
+hdf5 = { version = "*", build = "mpi_openmpi_*" }
+libnetcdf = "*"
+netcdf4 = { version = "*", build = "mpi_openmpi_*" }
+netcdf-fortran = { version = "*", build = "mpi_openmpi_*" }
+
+[tool.pixi.feature.py313.dependencies]
+python = "~=3.13.0"
+proj = "*"
+libgdal-core = "*"
+hdf5 = { version = "*", build = "mpi_openmpi_*" }
+libnetcdf = "*"
+netcdf4 = { version = "*", build = "mpi_openmpi_*" }
+netcdf-fortran = { version = "*", build = "mpi_openmpi_*" }
+
+[tool.pixi.feature.schism.dependencies]
+schism = { path = "coastal_models/schism" }
+# Force MPI (OpenMPI) build variants so ESMF/esmpy runs with parallel support.
+# Without the build constraint, conda-forge resolves the nompi variants.
+mpi = { version = "*", build = "openmpi" }
+openmpi = "*"
+esmf = { version = "*", build = "mpi_openmpi_*" }
+esmpy = "*"
+mpi4py = "*"
+
+[tool.pixi.feature.sfincs.dependencies]
+sfincs = { path = "coastal_models/sfincs" }
+
+[tool.pixi.feature.sfincs.pypi-dependencies]
+hydromt-sfincs = { git = "https://github.com/Deltares/hydromt_sfincs", rev = "41aac0a3980fc2714ec28eafb0463d40abfc979a" }
+
+[tool.pixi.feature.test-common.tasks]
+test-common = { cmd = [
+  "pytest",
+  "tests/common",
+  "--cov",
+  "--cov-branch",
+  "--cov-report=xml",
+  "--junitxml=junit-common.xml",
+  "--durations=5",
+] }
+report = { cmd = [ "coverage", "report" ], depends-on = [ "test-common" ] }
+html = { cmd = [ "coverage", "html" ], depends-on = [ "report" ] }
+
+[tool.pixi.feature.test-schism.tasks]
+test-schism = { cmd = [
+  "pytest",
+  "tests/schism",
+  "--no-cov",
+  "--junitxml=junit-schism.xml",
+  "--durations=5",
+] }
+
+[tool.pixi.feature.test-sfincs.tasks]
+test-sfincs = { cmd = [
+  "pytest",
+  "tests/sfincs",
+  "--cov",
+  "--cov-branch",
+  "--cov-report=xml",
+  "--junitxml=junit-sfincs.xml",
+  "--durations=5",
+] }
+
+[tool.pixi.feature.test311.tasks]
+test = { cmd = [
+  "pytest",
+  "tests/",
+  "--ignore=tests/legacy_scripts",
+  "--no-cov",
+  "--junitxml=junit.xml",
+  "--durations=5",
+] }
+report = { cmd = [ "coverage", "report" ], depends-on = [ "test" ] }
+html = { cmd = [ "coverage", "html" ], depends-on = [ "report" ] }
+
+[tool.pixi.feature.test313.tasks]
+test = { cmd = [
+  "pytest",
+  "tests/",
+  "--ignore=tests/legacy_scripts",
+  "--no-cov",
+  "--junitxml=junit.xml",
+  "--durations=5",
+] }
+report = { cmd = [ "coverage", "report" ], depends-on = [ "test" ] }
+html = { cmd = [ "coverage", "html" ], depends-on = [ "report" ] }
+
+[tool.pixi.feature.typecheck.pypi-dependencies]
+hydromt-sfincs = { git = "https://github.com/Deltares/hydromt_sfincs", rev = "41aac0a3980fc2714ec28eafb0463d40abfc979a" }
+
+[tool.pixi.feature.typecheck.tasks]
+typecheck = "pyright"
+
+[tool.pixi.pypi-dependencies]
+coastal_calibration = { path = ".", editable = true }
+
+[tool.pixi.workspace]
+channels = [ "conda-forge" ]
+platforms = [ "linux-64", "osx-arm64" ]
+preview = [ "pixi-build" ]
 
 [tool.ruff]
 target-version = "py311"
@@ -264,15 +416,16 @@ ignore-words-list = "gages,parm,oce,gage,nd"
 [tool.pyproject-fmt]
 expand_tables = [ "tool.pixi" ]
 
-[tool.ty]
-environment.python-version = "3.11"
-environment.python = ".pixi/envs/typecheck"
-rules.all = "error"
-src.include = [ "src/coastal_calibration" ]
-src.exclude = [
-  "**/__pycache__",
-  "**/__init__.py",
+[tool.pyright]
+pythonVersion = "3.11"
+include = [ "src" ]
+ignore = [
+  "src/coastal_calibration/tides/pytides/*.py",
 ]
+typeCheckingMode = "strict"
+reportMissingSuperCall = false
+reportMissingTypeStubs = false
+reportUnnecessaryTypeIgnoreComment = true
 
 [tool.pytest]
 ini_options.addopts = [
@@ -324,172 +477,3 @@ report.omit = [
 notebook_metadata_filter = "kernelspec,jupytext"
 cell_metadata_filter = "-all"
 formats = "ipynb,py:percent"
-
-[tool.pixi.environments]
-test311-common = { features = [ "test", "test-common", "py311" ] }
-test311-sfincs = { features = [ "test", "test-sfincs", "sfincs", "plot", "py311" ] }
-test311-schism = { features = [ "test", "test-schism", "schism", "plot", "py311" ] }
-test313-common = { features = [ "test", "test-common", "py313" ] }
-test313-sfincs = { features = [ "test", "test-sfincs", "sfincs", "plot", "py313" ] }
-test313-schism = { features = [ "test", "test-schism", "schism", "plot", "py313" ] }
-test311 = { features = [ "test", "test311", "schism", "sfincs", "plot", "py311" ] }
-test313 = { features = [ "test", "test313", "schism", "sfincs", "plot", "py313" ] }
-dev = { features = [ "notebook", "schism", "sfincs", "plot", "test", "py313" ] }
-schism = { features = [ "notebook", "schism", "plot", "py313" ] }
-sfincs = { features = [ "notebook", "sfincs", "plot", "py313" ] }
-typecheck = { features = [ "typecheck", "schism", "sfincs", "plot", "test", "py313" ] }
-lint = { features = [ "lint", "py313" ], no-default-feature = true }
-docs = { features = [ "docs", "py313" ] }
-
-[tool.pixi.feature.docs.tasks]
-docs-build = "mkdocs build --strict"
-docs-serve = "mkdocs serve"
-docs-deploy = "mike deploy --push --update-aliases dev latest"
-docs-release = "mike deploy --push --update-aliases $(git describe --tags --abbrev=0) stable"
-
-[tool.pixi.feature.lint.tasks]
-lint = "pre-commit run --all-files"
-pcupdate = "pre-commit autoupdate"
-spell = "codespell -w"
-
-[tool.pixi.feature.notebook.tasks]
-# Sync all percent-format .py scripts → paired .ipynb files
-nb-sync = "jupytext --sync docs/examples/notebooks/*.py"
-# Execute all notebooks in-place (requires .ipynb to exist; run nb-sync first)
-nb-execute = "jupyter nbconvert --to notebook --execute --inplace docs/examples/notebooks/*.ipynb"
-# Strip ANSI codes and absolute paths from outputs — run after nb-execute before committing
-nb-clean = "python scripts/clean_notebooks.py"
-# Full workflow: sync .py → .ipynb, then execute and clean — use before building docs or committing
-nb-run = { depends-on = [ "nb-sync", "nb-execute", "nb-clean" ] }
-# Pair an existing .ipynb with a .py counterpart (one-time setup for imported notebooks)
-nb-pair = "jupytext --set-formats 'ipynb,py:percent' docs/examples/notebooks/*.ipynb"
-# Strip all cell outputs from .ipynb files (keeps repo diff clean)
-nb-clear = "jupyter nbconvert --ClearOutputPreprocessor.enabled=True --to notebook --inplace docs/examples/notebooks/*.ipynb"
-
-[tool.pixi.feature.plot.dependencies]
-proj = "*"
-libgdal-core = "*"
-hdf5 = "*"
-libnetcdf = "*"
-
-[tool.pixi.feature.py311.dependencies]
-python = "~=3.11.0"
-proj = "*"
-libgdal-core = "*"
-hdf5 = { version = "*", build = "mpi_openmpi_*" }
-libnetcdf = "*"
-netcdf4 = { version = "*", build = "mpi_openmpi_*" }
-netcdf-fortran = { version = "*", build = "mpi_openmpi_*" }
-c-compiler = "*"
-fortran-compiler = "*"
-make = "*"
-pkg-config = "*"
-
-[tool.pixi.feature.py313.dependencies]
-python = "~=3.13.0"
-proj = "*"
-libgdal-core = "*"
-hdf5 = { version = "*", build = "mpi_openmpi_*" }
-libnetcdf = "*"
-netcdf4 = { version = "*", build = "mpi_openmpi_*" }
-netcdf-fortran = { version = "*", build = "mpi_openmpi_*" }
-c-compiler = "*"
-fortran-compiler = "*"
-make = "*"
-pkg-config = "*"
-
-[tool.pixi.feature.schism.activation]
-scripts = [ "scripts/ensure-schism.sh" ]
-
-[tool.pixi.feature.schism.dependencies]
-# Force MPI (OpenMPI) build variants so ESMF/esmpy runs with parallel support.
-# Without the build constraint, conda-forge resolves the nompi variants.
-mpi = { version = "*", build = "openmpi" }
-openmpi = "*"
-esmf = { version = "*", build = "mpi_openmpi_*" }
-esmpy = "*"
-mpi4py = "*"
-cxx-compiler = "*"
-cmake = ">=3.12,<4"
-
-[tool.pixi.feature.sfincs.activation]
-scripts = [ "scripts/ensure-sfincs.sh" ]
-
-[tool.pixi.feature.sfincs.dependencies]
-autoconf = "*"
-automake = "*"
-libtool = "*"
-m4 = "*"
-
-[tool.pixi.feature.sfincs.pypi-dependencies]
-hydromt-sfincs = { git = "https://github.com/Deltares/hydromt_sfincs", rev = "41aac0a3980fc2714ec28eafb0463d40abfc979a" }
-
-[tool.pixi.feature.test-common.tasks]
-test-common = { cmd = [
-  "pytest",
-  "tests/common",
-  "--cov",
-  "--cov-branch",
-  "--cov-report=xml",
-  "--junitxml=junit-common.xml",
-  "--durations=5",
-] }
-report = { cmd = [ "coverage", "report" ], depends-on = [ "test-common" ] }
-html = { cmd = [ "coverage", "html" ], depends-on = [ "report" ] }
-
-[tool.pixi.feature.test-schism.tasks]
-test-schism = { cmd = [
-  "pytest",
-  "tests/schism",
-  "--no-cov",
-  "--junitxml=junit-schism.xml",
-  "--durations=5",
-] }
-
-[tool.pixi.feature.test-sfincs.tasks]
-test-sfincs = { cmd = [
-  "pytest",
-  "tests/sfincs",
-  "--cov",
-  "--cov-branch",
-  "--cov-report=xml",
-  "--junitxml=junit-sfincs.xml",
-  "--durations=5",
-] }
-
-[tool.pixi.feature.test311.tasks]
-test = { cmd = [
-  "pytest",
-  "tests/",
-  "--ignore=tests/legacy_scripts",
-  "--no-cov",
-  "--junitxml=junit.xml",
-  "--durations=5",
-] }
-report = { cmd = [ "coverage", "report" ], depends-on = [ "test" ] }
-html = { cmd = [ "coverage", "html" ], depends-on = [ "report" ] }
-
-[tool.pixi.feature.test313.tasks]
-test = { cmd = [
-  "pytest",
-  "tests/",
-  "--ignore=tests/legacy_scripts",
-  "--no-cov",
-  "--junitxml=junit.xml",
-  "--durations=5",
-] }
-report = { cmd = [ "coverage", "report" ], depends-on = [ "test" ] }
-html = { cmd = [ "coverage", "html" ], depends-on = [ "report" ] }
-
-[tool.pixi.feature.typecheck.pypi-dependencies]
-hydromt-sfincs = { git = "https://github.com/Deltares/hydromt_sfincs", rev = "41aac0a3980fc2714ec28eafb0463d40abfc979a" }
-
-[tool.pixi.feature.typecheck.tasks]
-typecheck = "ty check"
-
-[tool.pixi.pypi-dependencies]
-coastal_calibration = { path = ".", editable = true }
-
-[tool.pixi.workspace]
-channels = [ "conda-forge" ]
-platforms = [ "linux-64", "osx-arm64" ]
