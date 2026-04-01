@@ -1699,6 +1699,8 @@ class SfincsRunStage(_SfincsStageBase):
             )
         else:
             env = self.build_environment()
+            if self.sfincs.runtime_env:
+                env.update(self.sfincs.runtime_env)
         _run_and_log([str(exe)], model_root, env=env)
 
         self._log("SFINCS run completed")

@@ -472,11 +472,11 @@ class SCHISMRunStage(WorkflowStage):
             "  2. Set 'schism_exe' in the config to the path of an existing binary."
         )
 
-    def _build_mpi_command(self, exe: Path) -> list[str]:
+    def _build_mpi_command(self, exe: Path, env: dict[str, str] | None = None) -> list[str]:
         """Construct the ``mpiexec … pschism N`` command list."""
         from coastal_calibration.utils.mpi import build_mpi_cmd
 
-        cmd = build_mpi_cmd(self.model.total_tasks, oversubscribe=self.model.oversubscribe)
+        cmd = build_mpi_cmd(self.model.total_tasks, oversubscribe=self.model.oversubscribe, env=env)
         cmd.extend([str(exe), str(self.model.nscribes)])
         return cmd
 
@@ -496,6 +496,8 @@ class SCHISMRunStage(WorkflowStage):
             )
         else:
             env = self.build_environment()
+            if self.model.runtime_env:
+                env.update(self.model.runtime_env)
 
         self._log(
             f"Launching {exe.name} with {self.model.total_tasks} MPI tasks "
@@ -503,7 +505,7 @@ class SCHISMRunStage(WorkflowStage):
         )
         self._update_substep(f"Running pschism with {self.model.total_tasks} MPI tasks")
 
-        cmd = self._build_mpi_command(exe)
+        cmd = self._build_mpi_command(exe, env)
         self._log(f"Command: {' '.join(cmd)}")
 
         result = subprocess.run(
