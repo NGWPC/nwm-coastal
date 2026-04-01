@@ -208,12 +208,11 @@ class ModelConfig(ABC):
     """
 
     omp_num_threads: int
-
-    runtime_env: dict[str, str]
     """Number of OpenMP threads per process."""
-    """Extra environment variables applied when launching the model binary.
+    runtime_env: dict[str, str]
+    """Extra environment variables for the model run subprocess.
 
-    These are merged last, so they can override any auto-detected value.
+    Merged last so they can override any auto-detected value.
     Only used by model run stages (``schism_run``, ``sfincs_run``).
     """
 

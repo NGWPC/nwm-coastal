@@ -41,13 +41,26 @@ class MpiImpl(StrEnum):
     UNKNOWN = "unknown"
 
 
-_cached_impl: MpiImpl | None = None
+_cache: dict[str, MpiImpl] = {}
 
 
-def detect_mpi() -> MpiImpl:
+def _mpi_cache_key(env: dict[str, str] | None) -> str:
+    """Return a cache key derived from the PATH that will resolve ``mpiexec``."""
+    if env is not None:
+        return env.get("PATH", "")
+    return os.environ.get("PATH", "")
+
+
+def detect_mpi(env: dict[str, str] | None = None) -> MpiImpl:
     """Detect the active MPI implementation by parsing ``mpiexec --version``.
 
-    The result is cached for the lifetime of the process.
+    Parameters
+    ----------
+    env : dict[str, str], optional
+        Subprocess environment to use for the probe.  When *None*
+        (the default), the current process environment is used.  Pass
+        an isolated env dict to detect the MPI that a system-compiled
+        binary will actually see.
 
     Returns
     -------
@@ -55,9 +68,9 @@ def detect_mpi() -> MpiImpl:
         The detected implementation.  Returns :attr:`MpiImpl.UNKNOWN` when
         ``mpiexec`` is not found or produces unrecognised output.
     """
-    global _cached_impl  # noqa: PLW0603
-    if _cached_impl is not None:
-        return _cached_impl
+    key = _mpi_cache_key(env)
+    if key in _cache:
+        return _cache[key]
 
     try:
         result = subprocess.run(
@@ -65,30 +78,37 @@ def detect_mpi() -> MpiImpl:
             capture_output=True,
             text=True,
             check=False,
+            env=env,
         )
         output = (result.stdout + result.stderr).lower()
     except FileNotFoundError:
         log.warning("mpiexec not found on PATH — MPI implementation unknown")
-        _cached_impl = MpiImpl.UNKNOWN
-        return _cached_impl
+        _cache[key] = MpiImpl.UNKNOWN
+        return _cache[key]
 
     if "open mpi" in output or "openrte" in output:
-        _cached_impl = MpiImpl.OPENMPI
+        impl = MpiImpl.OPENMPI
     elif "hydra" in output or "mpich" in output:
-        _cached_impl = MpiImpl.MPICH
+        impl = MpiImpl.MPICH
     else:
         log.warning("Could not identify MPI from mpiexec --version output")
-        _cached_impl = MpiImpl.UNKNOWN
+        impl = MpiImpl.UNKNOWN
 
-    log.debug("Detected MPI implementation: %s", _cached_impl)
-    return _cached_impl
+    log.debug("Detected MPI implementation: %s", impl)
+    _cache[key] = impl
+    return impl
 
 
 def _has_efa() -> bool:
     """Return True when AWS EFA devices are present."""
-    return Path("/sys/class/infiniband").exists() and any(
-        p.name.startswith("efa") for p in Path("/sys/class/infiniband").iterdir()
-    )
+    sys_ib = Path("/sys/class/infiniband")
+    if not sys_ib.exists():
+        return False
+    try:
+        return any(p.name.startswith("efa") for p in sys_ib.iterdir())
+    except OSError:
+        log.debug("Unable to read %s; assuming no EFA", sys_ib)
+        return False
 
 
 def build_mpi_env(env: dict[str, str]) -> dict[str, str]:
@@ -113,7 +133,7 @@ def build_mpi_env(env: dict[str, str]) -> dict[str, str]:
     dict[str, str]
         The same *env* dict, updated in place.
     """
-    impl = detect_mpi()
+    impl = detect_mpi(env)
     efa = _has_efa()
 
     # ── General (all clusters) ────────────────────────────────────
@@ -150,6 +170,7 @@ def build_mpi_cmd(
     ntasks: int,
     *,
     oversubscribe: bool = False,
+    env: dict[str, str] | None = None,
 ) -> list[str]:
     """Build the ``mpiexec`` launcher prefix.
 
@@ -160,6 +181,9 @@ def build_mpi_cmd(
     oversubscribe : bool
         Allow more ranks than physical cores.  Only has effect with
         OpenMPI (``--oversubscribe``); silently ignored for MPICH.
+    env : dict[str, str], optional
+        Subprocess environment used to detect the MPI implementation.
+        Defaults to the current process environment.
 
     Returns
     -------
@@ -167,7 +191,7 @@ def build_mpi_cmd(
         Command prefix, e.g. ``["mpiexec", "-n", "36"]``.
     """
     cmd = ["mpiexec", "-n", str(ntasks)]
-    if oversubscribe and detect_mpi() is MpiImpl.OPENMPI:
+    if oversubscribe and detect_mpi(env) is MpiImpl.OPENMPI:
         cmd.append("--oversubscribe")
     return cmd
 

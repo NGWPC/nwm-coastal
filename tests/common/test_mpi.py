@@ -21,9 +21,9 @@ def _clear_mpi_cache():
     """Reset the cached MPI detection result between tests."""
     import coastal_calibration.utils.mpi as mod
 
-    mod._cached_impl = None
+    mod._cache.clear()
     yield
-    mod._cached_impl = None
+    mod._cache.clear()
 
 
 # ── detect_mpi ────────────────────────────────────────────────────────
