@@ -199,7 +199,7 @@ class TestPathConfig:
 class TestSchismModelConfig:
     def test_defaults(self):
         cfg = SchismModelConfig()
-        assert cfg.binary == "pschism"
+        assert cfg.schism_exe is None
         assert cfg.nodes == 2
         assert cfg.ntasks_per_node == 18
         assert cfg.exclusive is True
@@ -254,7 +254,7 @@ class TestSchismModelConfig:
         assert d["nodes"] == 2
         assert d["ntasks_per_node"] == 18
         assert d["nscribes"] == 2
-        assert "binary" in d
+        assert "schism_exe" in d
         assert d["include_noaa_gages"] is False
 
 

@@ -56,12 +56,18 @@ class TestWorkflowStageBase:
         stage = ConcreteStage(sample_config, None)
         env = stage.build_environment()
 
-        # Core runtime variables
+        # Core runtime variables set by WorkflowStage
         assert env["HDF5_USE_FILE_LOCKING"] == "FALSE"
+        assert "OMP_NUM_THREADS" in env
+        assert env["OMP_PLACES"] == "cores"
+        assert env["OMP_PROC_BIND"] == "close"
         assert "PATH" in env
 
-    def test_build_environment_schism_vars(self, sample_config):
-        """SchismModelConfig.build_environment() sets SCHISM-specific vars."""
+    def test_build_environment_schism_mpi_vars(self, sample_config):
+        """SchismModelConfig.build_environment() delegates to build_mpi_env."""
+        from unittest.mock import patch
+
+        from coastal_calibration.utils.mpi import MpiImpl
 
         class ConcreteStage(WorkflowStage):
             name = "test"
@@ -71,12 +77,13 @@ class TestWorkflowStageBase:
                 return {}
 
         stage = ConcreteStage(sample_config, None)
-        env = stage.build_environment()
 
-        # Model-specific vars delegated to SchismModelConfig.build_environment
-        assert "OMP_NUM_THREADS" in env
-        assert "OMP_PLACES" in env
-        assert "MPICH_OFI_STARTUP_CONNECT" in env
+        with (
+            patch("coastal_calibration.utils.mpi.detect_mpi", return_value=MpiImpl.MPICH),
+            patch("coastal_calibration.utils.mpi._has_efa", return_value=False),
+        ):
+            env = stage.build_environment()
+            assert env["MPICH_OFI_STARTUP_CONNECT"] == "1"
 
     def test_validate_default_returns_empty(self, sample_config):
         class ConcreteStage(WorkflowStage):
@@ -171,53 +178,82 @@ class TestSchismRunCommandConstruction:
     """Seam-based tests for SCHISMRunStage._build_mpi_command."""
 
     def test_default_command(self, sample_config):
+        from pathlib import Path
+
         stage = SCHISMRunStage(sample_config)
-        cmd = stage._build_mpi_command()
+        exe = Path("/usr/bin/pschism")
+        cmd = stage._build_mpi_command(exe)
         assert cmd[0] == "mpiexec"
         assert "-n" in cmd
         n_idx = cmd.index("-n")
         assert cmd[n_idx + 1] == str(sample_config.model_config.total_tasks)
-        assert cmd[-2] == "pschism"
+        assert cmd[-2] == str(exe)
         assert cmd[-1] == str(sample_config.model_config.nscribes)
 
-    def test_oversubscribe_flag(self, sample_config):
+    def test_oversubscribe_flag_openmpi(self, sample_config):
+        from pathlib import Path
+        from unittest.mock import patch
+
+        from coastal_calibration.utils.mpi import MpiImpl
+
         sample_config.model_config.oversubscribe = True
         stage = SCHISMRunStage(sample_config)
-        cmd = stage._build_mpi_command()
-        assert "--oversubscribe" in cmd
+        with patch("coastal_calibration.utils.mpi.detect_mpi", return_value=MpiImpl.OPENMPI):
+            cmd = stage._build_mpi_command(Path("/usr/bin/pschism"))
+            assert "--oversubscribe" in cmd
+
+    def test_oversubscribe_flag_mpich_ignored(self, sample_config):
+        from pathlib import Path
+        from unittest.mock import patch
+
+        from coastal_calibration.utils.mpi import MpiImpl
+
+        sample_config.model_config.oversubscribe = True
+        stage = SCHISMRunStage(sample_config)
+        with patch("coastal_calibration.utils.mpi.detect_mpi", return_value=MpiImpl.MPICH):
+            cmd = stage._build_mpi_command(Path("/usr/bin/pschism"))
+            assert "--oversubscribe" not in cmd
 
     def test_no_oversubscribe_by_default(self, sample_config):
+        from pathlib import Path
+
         stage = SCHISMRunStage(sample_config)
-        cmd = stage._build_mpi_command()
+        cmd = stage._build_mpi_command(Path("/usr/bin/pschism"))
         assert "--oversubscribe" not in cmd
 
-    def test_custom_binary(self, sample_config):
-        sample_config.model_config.binary = "pschism_custom"
+    def test_custom_exe(self, sample_config):
+        from pathlib import Path
+
+        exe = Path("/opt/wcoss2/bin/pschism_custom")
         stage = SCHISMRunStage(sample_config)
-        cmd = stage._build_mpi_command()
-        assert "pschism_custom" in cmd
+        cmd = stage._build_mpi_command(exe)
+        assert str(exe) in cmd
 
     def test_task_count_from_config(self, sample_config):
+        from pathlib import Path
+
         sample_config.model_config.nodes = 4
         sample_config.model_config.ntasks_per_node = 36
         stage = SCHISMRunStage(sample_config)
-        cmd = stage._build_mpi_command()
+        cmd = stage._build_mpi_command(Path("/usr/bin/pschism"))
         n_idx = cmd.index("-n")
         assert cmd[n_idx + 1] == "144"
 
     def test_nscribes_passed_as_argument(self, sample_config):
+        from pathlib import Path
+
         sample_config.model_config.nscribes = 4
         stage = SCHISMRunStage(sample_config)
-        cmd = stage._build_mpi_command()
+        cmd = stage._build_mpi_command(Path("/usr/bin/pschism"))
         assert cmd[-1] == "4"
 
 
 class TestSchismModelConfigDefaults:
     """Verify SchismModelConfig defaults after removing Singularity."""
 
-    def test_default_binary_is_pschism(self):
+    def test_default_schism_exe_is_none(self):
         config = SchismModelConfig()
-        assert config.binary == "pschism"
+        assert config.schism_exe is None
 
     def test_validate_no_singularity_check(self, sample_config):
         """validate() should not fail due to missing Singularity image."""
