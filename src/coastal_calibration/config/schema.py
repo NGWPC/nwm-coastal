@@ -208,9 +208,9 @@ class ModelConfig(ABC):
     """
 
     omp_num_threads: int
-    """Number of OpenMP threads per process."""
 
     runtime_env: dict[str, str]
+    """Number of OpenMP threads per process."""
     """Extra environment variables applied when launching the model binary.
 
     These are merged last, so they can override any auto-detected value.
@@ -992,7 +992,6 @@ def _interpolate_config(data: dict[str, Any]) -> dict[str, Any]:
             result[section] = _interpolate_value(values, context)
 
     return result
-
 
 
 # ---------------------------------------------------------------------------

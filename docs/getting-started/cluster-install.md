@@ -1,19 +1,19 @@
 # Cluster Installation
 
 This guide sets up `coastal-calibration` with compiled SFINCS and SCHISM model binaries
-on a shared HPC cluster using [pixi](https://pixi.sh). All dependencies (including system
-libraries like PROJ, GDAL, HDF5, NetCDF, MPI, and the Fortran compilers needed to build
-the models) are fully isolated and managed by pixi. Nothing is installed into the system
-Python or shared libraries.
+on a shared HPC cluster using [pixi](https://pixi.sh). All dependencies (including
+system libraries like PROJ, GDAL, HDF5, NetCDF, MPI, and the Fortran compilers needed to
+build the models) are fully isolated and managed by pixi. Nothing is installed into the
+system Python or shared libraries.
 
 Pixi is only needed at **install time** (compilation and dependency resolution). At
-**runtime**, the wrapper script activates the pre-built environment directly -- pixi does
-not need to be installed on compute nodes.
+**runtime**, the wrapper script activates the pre-built environment directly -- pixi
+does not need to be installed on compute nodes.
 
 !!! important
 
-    The install directory must be on the **shared filesystem** (e.g., NFS, Lustre) so
-    that compute nodes can access it when jobs are submitted via Slurm.
+    The install directory must be on the **shared filesystem** (e.g., NFS, Lustre) so that
+    compute nodes can access it when jobs are submitted via Slurm.
 
 ## Prerequisites
 
@@ -113,8 +113,8 @@ across nodes, so this single file makes the command available everywhere.
 !!! warning "Node-local symlinks don't work"
 
     Do **not** symlink into `/usr/local/bin/`. That directory is node-local and will only
-    exist on the node where the admin ran the command. Compute nodes launched by Slurm
-    will not have the symlink and jobs will fail with `command not found`.
+    exist on the node where the admin ran the command. Compute nodes launched by Slurm will
+    not have the symlink and jobs will fail with `command not found`.
 
 Alternatively, skip the profile drop-in and use the full path to the wrapper directly in
 `sbatch` scripts:
@@ -123,7 +123,7 @@ Alternatively, skip the profile drop-in and use the full path to the wrapper dir
 <SHARED_DIR>/coastal-calibration/nwm-coastal run "${CONFIG_FILE}"
 ```
 
----
+______________________________________________________________________
 
 ## Running
 
@@ -147,7 +147,7 @@ The wrapper ensures that `sfincs`, `pschism`, `mpiexec`, and all shared librarie
 `PATH` / `LD_LIBRARY_PATH`, so `coastal-calibration` can spawn model subprocesses
 directly.
 
----
+______________________________________________________________________
 
 ## Updating
 
@@ -162,9 +162,9 @@ pixi install -e dev
 
 `pixi clean` removes all cached environments and compiled packages (`.pixi/envs/` and
 `.pixi/build/`), forcing a clean rebuild. This avoids stale cache issues (e.g., model
-binaries linked against a previous MPI version, corrupted solver state, or recipe changes
-not being picked up). The full rebuild including SFINCS and SCHISM compilation takes only
-a few minutes.
+binaries linked against a previous MPI version, corrupted solver state, or recipe
+changes not being picked up). The full rebuild including SFINCS and SCHISM compilation
+takes only a few minutes.
 
 The wrapper script does not need updating -- it always points to the same environment
 directory.
@@ -189,14 +189,14 @@ rm -rf <SHARED_DIR>/coastal-calibration
 sudo rm -f /etc/profile.d/coastal-calibration.sh
 ```
 
----
+______________________________________________________________________
 
 ## Using system-compiled model binaries
 
 On clusters where SCHISM or SFINCS must be compiled against system MPI (e.g., WCOSS2
 with Cray MPICH), the pixi environment provides only the Python runtime and libraries.
-The model binaries are compiled separately using the system toolchain and referenced
-via config:
+The model binaries are compiled separately using the system toolchain and referenced via
+config:
 
 ```yaml
 model_config:
@@ -204,7 +204,7 @@ model_config:
   # or for SFINCS:
   sfincs_exe: /path/to/system/sfincs     # system-compiled SFINCS binary
   runtime_env:                            # optional: extra env vars for model run
-    MPICH_ENV_DISPLAY: "1"
+    MPICH_ENV_DISPLAY: '1'
 ```
 
 When `schism_exe` or `sfincs_exe` is set, the run stage automatically:
@@ -212,16 +212,16 @@ When `schism_exe` or `sfincs_exe` is set, the run stage automatically:
 1. **Strips conda library paths** (`$CONDA_PREFIX/lib`) from `PATH` and
     `LD_LIBRARY_PATH` so the system binary finds system MPI/HDF5/NetCDF instead of
     conda's versions.
-2. **Detects the MPI implementation** (`mpiexec --version`) and sets the correct tuning
+1. **Detects the MPI implementation** (`mpiexec --version`) and sets the correct tuning
     variables (MPICH `MPICH_OFI_STARTUP_CONNECT`, etc. for Cray MPICH; OpenMPI
     `OMPI_MCA_*` for OpenMPI).
-3. **Applies `runtime_env`** overrides last, so any auto-detected value can be
+1. **Applies `runtime_env`** overrides last, so any auto-detected value can be
     overridden.
 
-Python MPI stages (ESMF regridding via `mpi4py`) continue using conda's OpenMPI --
-they are not affected by this isolation.
+Python MPI stages (ESMF regridding via `mpi4py`) continue using conda's OpenMPI -- they
+are not affected by this isolation.
 
----
+______________________________________________________________________
 
 ## How it works
 
@@ -237,12 +237,12 @@ they are not affected by this isolation.
     `netcdf-fortran` (`mpi_openmpi_*` build variants), matching ESMF/esmpy's runtime
     expectations. On clusters with system MPI (e.g., WCOSS2 with Cray MPICH), use
     `schism_exe` / `sfincs_exe` config options for automatic environment isolation
-- **MPI runtime detection**: at launch, `mpiexec --version` is parsed to identify
-    the active MPI implementation (OpenMPI or MPICH/Cray MPICH). The correct tuning
+- **MPI runtime detection**: at launch, `mpiexec --version` is parsed to identify the
+    active MPI implementation (OpenMPI or MPICH/Cray MPICH). The correct tuning
     variables are set automatically. On AWS EFA instances, libfabric transport settings
     are added when `/sys/class/infiniband/efa*` devices are detected. On plain
-    NFS/Lustre clusters without EFA, only general settings are applied (shared-memory
-    on local `/tmp`, fork-warning suppression)
+    NFS/Lustre clusters without EFA, only general settings are applied (shared-memory on
+    local `/tmp`, fork-warning suppression)
 - **The wrapper script** activates the pre-built environment (`PATH`, `LD_LIBRARY_PATH`,
     conda activation scripts) and runs `coastal-calibration`. Pixi is not needed on
     compute nodes -- the wrapper is self-contained

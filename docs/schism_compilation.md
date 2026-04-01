@@ -394,8 +394,8 @@ settings are added only when AWS EFA devices are detected.
 **OpenMPI — general** (all clusters):
 
 ```python
-env["OMPI_MCA_mpi_warn_on_fork"] = "0"       # suppress NFS fork warnings
-env["OMPI_MCA_orte_tmpdir_base"] = "/tmp"     # shared-memory on local disk
+env["OMPI_MCA_mpi_warn_on_fork"] = "0"  # suppress NFS fork warnings
+env["OMPI_MCA_orte_tmpdir_base"] = "/tmp"  # shared-memory on local disk
 ```
 
 **OpenMPI — EFA only** (when `/sys/class/infiniband/efa*` detected):

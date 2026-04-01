@@ -150,13 +150,13 @@ paths:
   parm_dir: /path/to/coastal/parm
 ```
 
-| Parameter          | Type   | Default                      |
-| ------------------ | ------ | ---------------------------- |
-| `work_dir`         | path   | Auto-generated from template |
-| `raw_download_dir` | path   | Auto-generated from template |
-| `nwm_dir`          | path   | -                            |
-| `hot_start_file`   | path   | null                         |
-| `parm_dir`         | path   | -                            |
+| Parameter          | Type | Default                      |
+| ------------------ | ---- | ---------------------------- |
+| `work_dir`         | path | Auto-generated from template |
+| `raw_download_dir` | path | Auto-generated from template |
+| `nwm_dir`          | path | -                            |
+| `hot_start_file`   | path | null                         |
+| `parm_dir`         | path | -                            |
 
 ### Model Configuration
 
@@ -181,19 +181,19 @@ model_config:
   runtime_env: {}                 # Extra env vars for model run (optional)
 ```
 
-| Parameter            | Type   | Default   | Description                                         |
-| -------------------- | ------ | --------- | --------------------------------------------------- |
-| `prebuilt_dir`       | path   | -         | Path to pre-built SCHISM model directory            |
-| `geogrid_file`       | path   | -         | WRF geogrid file for atmospheric forcing regridding |
-| `nodes`              | int    | 2         | Number of compute nodes                             |
-| `ntasks_per_node`    | int    | 18        | MPI tasks per node                                  |
-| `exclusive`          | bool   | true      | Request exclusive node access                       |
-| `nscribes`           | int    | 2         | SCHISM I/O scribes                                  |
-| `omp_num_threads`    | int    | 2         | OpenMP threads                                      |
-| `oversubscribe`      | bool   | false     | Allow MPI oversubscription                          |
-| `schism_exe`         | path   | -         | Path to a system-compiled SCHISM executable         |
-| `include_noaa_gages` | bool   | false     | Enable NOAA station discovery and comparison        |
-| `runtime_env`        | dict   | `{}`      | Extra env vars for the model run subprocess         |
+| Parameter            | Type | Default | Description                                         |
+| -------------------- | ---- | ------- | --------------------------------------------------- |
+| `prebuilt_dir`       | path | -       | Path to pre-built SCHISM model directory            |
+| `geogrid_file`       | path | -       | WRF geogrid file for atmospheric forcing regridding |
+| `nodes`              | int  | 2       | Number of compute nodes                             |
+| `ntasks_per_node`    | int  | 18      | MPI tasks per node                                  |
+| `exclusive`          | bool | true    | Request exclusive node access                       |
+| `nscribes`           | int  | 2       | SCHISM I/O scribes                                  |
+| `omp_num_threads`    | int  | 2       | OpenMP threads                                      |
+| `oversubscribe`      | bool | false   | Allow MPI oversubscription                          |
+| `schism_exe`         | path | -       | Path to a system-compiled SCHISM executable         |
+| `include_noaa_gages` | bool | false   | Enable NOAA station discovery and comparison        |
+| `runtime_env`        | dict | `{}`    | Extra env vars for the model run subprocess         |
 
 #### NOAA Observation Stations (`include_noaa_gages`)
 

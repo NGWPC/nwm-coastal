@@ -121,7 +121,7 @@ def build_mpi_env(env: dict[str, str]) -> dict[str, str]:
         # Suppress noisy OpenMPI warnings on NFS home directories.
         env.setdefault("OMPI_MCA_mpi_warn_on_fork", "0")
         # Use local disk for shared-memory backing (avoids NFS).
-        env.setdefault("OMPI_MCA_orte_tmpdir_base", "/tmp")
+        env.setdefault("OMPI_MCA_orte_tmpdir_base", "/tmp")  # noqa: S108
     elif impl is MpiImpl.MPICH:
         # Cray MPICH / standard MPICH collective tuning — prevents
         # hangs during ESMF initialisation and MPI collectives on

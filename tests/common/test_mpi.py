@@ -29,13 +29,9 @@ def _clear_mpi_cache():
 # ── detect_mpi ────────────────────────────────────────────────────────
 
 
-OPENMPI_VERSION = (
-    "mpiexec (OpenRTE) 5.0.10\n\nReport bugs to http://www.open-mpi.org/\n"
-)
+OPENMPI_VERSION = "mpiexec (OpenRTE) 5.0.10\n\nReport bugs to http://www.open-mpi.org/\n"
 MPICH_VERSION = "HYDRA build details:\n    Version: 4.2.3\n"
-CRAY_MPICH_VERSION = (
-    "HYDRA build details:\n    Version: 8.1.9\n    Configure: --prefix=...\n"
-)
+CRAY_MPICH_VERSION = "HYDRA build details:\n    Version: 8.1.9\n    Configure: --prefix=...\n"
 
 
 class TestDetectMpi:
@@ -47,9 +43,7 @@ class TestDetectMpi:
             assert detect_mpi() is MpiImpl.OPENMPI
 
     def test_mpich(self):
-        result = subprocess.CompletedProcess(
-            args=[], returncode=0, stdout=MPICH_VERSION, stderr=""
-        )
+        result = subprocess.CompletedProcess(args=[], returncode=0, stdout=MPICH_VERSION, stderr="")
         with patch("subprocess.run", return_value=result):
             assert detect_mpi() is MpiImpl.MPICH
 
@@ -72,9 +66,7 @@ class TestDetectMpi:
             assert detect_mpi() is MpiImpl.UNKNOWN
 
     def test_result_is_cached(self):
-        result = subprocess.CompletedProcess(
-            args=[], returncode=0, stdout=MPICH_VERSION, stderr=""
-        )
+        result = subprocess.CompletedProcess(args=[], returncode=0, stdout=MPICH_VERSION, stderr="")
         with patch("subprocess.run", return_value=result) as mock:
             detect_mpi()
             detect_mpi()
