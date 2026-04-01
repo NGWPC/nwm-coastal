@@ -1059,12 +1059,6 @@ class CoastalCalibConfig:
         boundary = BoundaryConfig(**boundary_data)
 
         paths_data = data.get("paths", {})
-        # Remove deprecated keys that have moved elsewhere
-        paths_data.pop("singularity_image", None)
-        model_config_data.pop("singularity_image", None)
-        # Remove legacy cluster-specific keys
-        paths_data.pop("nfs_mount", None)
-        paths_data.pop("conda_env_name", None)
         paths = PathConfig(**paths_data)
 
         monitoring_data = data.get("monitoring", {})

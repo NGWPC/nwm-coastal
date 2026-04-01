@@ -661,7 +661,6 @@ CoastalCalibConfig.from_dict(
             "ntasks_per_node": 4,
             "nscribes": 2,
             "oversubscribe": True,
-            "binary": "pschism",
             "include_noaa_gages": True,
         },
     }

@@ -145,22 +145,18 @@ the full home directory path.
 paths:
   work_dir: /path/to/work         # Working directory (auto-generated if not set)
   raw_download_dir: /path/to/data # Download directory (auto-generated if not set)
-  nfs_mount: /ngen-test           # NFS mount point
-  nwm_dir: /ngen-app/nwm.v3.0.6
+  nwm_dir: /path/to/nwm.v3.0.6
   hot_start_file:                 # Hot restart file for warm start
-  conda_env_name: ngen_forcing_coastal
-  parm_dir: /ngen-test/coastal/ngwpc-coastal
+  parm_dir: /path/to/coastal/parm
 ```
 
-| Parameter          | Type   | Default                            |
-| ------------------ | ------ | ---------------------------------- |
-| `work_dir`         | path   | Auto-generated from template       |
-| `raw_download_dir` | path   | Auto-generated from template       |
-| `nfs_mount`        | path   | `/ngen-test`                       |
-| `nwm_dir`          | path   | `/ngen-app/nwm.v3.0.6`             |
-| `hot_start_file`   | path   | null                               |
-| `conda_env_name`   | string | `ngen_forcing_coastal`             |
-| `parm_dir`         | path   | `/ngen-test/coastal/ngwpc-coastal` |
+| Parameter          | Type   | Default                      |
+| ------------------ | ------ | ---------------------------- |
+| `work_dir`         | path   | Auto-generated from template |
+| `raw_download_dir` | path   | Auto-generated from template |
+| `nwm_dir`          | path   | -                            |
+| `hot_start_file`   | path   | null                         |
+| `parm_dir`         | path   | -                            |
 
 ### Model Configuration
 
@@ -172,16 +168,17 @@ Model-specific parameters live in the `model_config` section. The contents depen
 ```yaml
 # model: schism (default, can be omitted)
 model_config:
-  prebuilt_dir: /ngen-test/coastal/ngwpc-coastal/hawaii
-  geogrid_file: /ngen-test/coastal/ngwpc-coastal/hawaii/geo_em_HI.nc
+  prebuilt_dir: /path/to/coastal/hawaii
+  geogrid_file: /path/to/coastal/hawaii/geo_em_HI.nc
   nodes: 2                        # Number of compute nodes
   ntasks_per_node: 18             # MPI tasks per node
   exclusive: true                 # Request exclusive node access
   nscribes: 2                     # SCHISM I/O scribes
   omp_num_threads: 2              # OpenMP threads
   oversubscribe: false            # Allow MPI oversubscription
-  binary: pschism                 # SCHISM executable (must be on $PATH)
+  schism_exe:                     # System-compiled SCHISM executable (optional)
   include_noaa_gages: true        # Enable NOAA observation stations & comparison plots
+  runtime_env: {}                 # Extra env vars for model run (optional)
 ```
 
 | Parameter            | Type   | Default   | Description                                         |
