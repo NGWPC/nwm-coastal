@@ -994,64 +994,6 @@ def _interpolate_config(data: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-# ---------------------------------------------------------------------------
-# Backward compatibility migration helpers
-# ---------------------------------------------------------------------------
-
-# Maps old SfincsModelConfig field names to new names.
-_SFINCS_FIELD_MIGRATION: dict[str, str] = {
-    "model_dir": "prebuilt_dir",
-    "src_locations": "discharge_locations_file",
-    "src_merge": "merge_discharge",
-}
-
-# Maps old SchismModelConfig field names to new names.
-_SCHISM_FIELD_MIGRATION: dict[str, str] = {}
-
-
-def _migrate_model_config_data(
-    model_type: str,
-    data: dict[str, Any],
-) -> dict[str, Any]:
-    """Migrate old-style config keys into the new ``model_config`` dict.
-
-    Handles two legacy patterns:
-
-    1. **SCHISM** — fields lived in a top-level ``mpi`` section.
-       We pull all fields from ``mpi`` into the model config dict.
-    2. **SFINCS** — the model config lived under a top-level ``sfincs`` key
-       and used different field names.
-
-    In both cases the ``model_config`` key in *data* (if already present)
-    takes precedence over migrated values.
-    """
-    model_config_data: dict[str, Any] = {}
-
-    if model_type == "schism":
-        # Migrate old mpi section
-        mpi_data = data.pop("mpi", None)
-        if mpi_data is not None:
-            for old_key, new_key in _SCHISM_FIELD_MIGRATION.items():
-                if old_key in mpi_data:
-                    model_config_data[new_key] = mpi_data.pop(old_key)
-            # Remaining mpi fields map directly (nscribes, omp_num_threads, etc.)
-            model_config_data.update(mpi_data)
-
-    elif model_type == "sfincs":
-        # Migrate old top-level sfincs section
-        sfincs_data = data.pop("sfincs", None)
-        if sfincs_data is not None:
-            for old_key, new_key in _SFINCS_FIELD_MIGRATION.items():
-                if old_key in sfincs_data:
-                    model_config_data[new_key] = sfincs_data.pop(old_key)
-            model_config_data.update(sfincs_data)
-
-    # Explicit model_config in YAML takes precedence
-    explicit = data.pop("model_config", {}) or {}
-    model_config_data.update(explicit)
-
-    return model_config_data
-
 
 # ---------------------------------------------------------------------------
 # Main configuration class
@@ -1104,11 +1046,7 @@ class CoastalCalibConfig:
             raise ValueError("'model' is required (e.g., model: schism or model: sfincs)")
         model_type: str = data["model"]
 
-        # Migrate legacy keys into model_config
-        model_config_data = _migrate_model_config_data(model_type, data)
-
-        # Silently ignore legacy 'slurm' section for backward compat.
-        data.pop("slurm", None)
+        model_config_data = data.pop("model_config", {}) or {}
 
         sim_data = data.get("simulation", {})
         if "start_date" in sim_data:
