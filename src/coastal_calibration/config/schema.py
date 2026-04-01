@@ -205,13 +205,18 @@ class ModelConfig(ABC):
     This keeps model-specific concerns out of the shared configuration and
     makes adding new models straightforward: create a new subclass,
     implement the abstract methods, and register it in :data:`MODEL_REGISTRY`.
+
+    Attributes
+    ----------
+    omp_num_threads : int
+        Number of OpenMP threads per process.
+    runtime_env : dict[str, str]
+        Extra environment variables for the model run subprocess.
+        Merged last so they can override any auto-detected value.
+        Only used by model run stages (``schism_run``, ``sfincs_run``).
     """
 
-    #: Number of OpenMP threads per process.
     omp_num_threads: int
-    #: Extra environment variables for the model run subprocess.
-    #: Merged last so they can override any auto-detected value.
-    #: Only used by model run stages (``schism_run``, ``sfincs_run``).
     runtime_env: dict[str, str]
 
     @property
