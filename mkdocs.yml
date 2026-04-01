@@ -12,6 +12,7 @@ copyright: Copyright &copy; 2025 Raytheon Company. BSD-2-Clause License.
 theme:
   name: materialx
   custom_dir: docs/overrides
+  topbar_style: primary
   palette:
   - media: (prefers-color-scheme)
     toggle:
@@ -26,8 +27,8 @@ theme:
       name: Switch to dark mode
   - media: '(prefers-color-scheme: dark)'
     scheme: slate
-    primary: indigo
-    accent: indigo
+    primary: black
+    accent: black
     toggle:
       icon: material/brightness-4
       name: Switch to system preference
@@ -161,6 +162,7 @@ nav:
 - Home: index.md
 - Getting Started:
   - Installation: getting-started/installation.md
+  - Cluster Installation: getting-started/cluster-install.md
   - Quick Start: getting-started/quickstart.md
 - User Guide:
   - Configuration: user-guide/configuration.md

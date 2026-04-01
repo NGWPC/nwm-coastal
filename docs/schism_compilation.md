@@ -373,33 +373,45 @@ variables are for:
 
 ### Complete list of env vars set by the codebase
 
-#### `SchismModelConfig.build_environment()` (schema.py)
-
-These are the **only** model-specific env vars and they are all MPI/OpenMP runtime
-settings required for cluster execution:
-
-```python
-# OpenMP threading
-env["OMP_NUM_THREADS"] = str(self.omp_num_threads)
-env["OMP_PLACES"] = "cores"
-
-# MPI / AWS EFA fabric tuning, required for reliable MPI
-# on EFA-enabled instances (e.g. c5n-18xlarge). Without
-# these, MPI collectives can hang during ESMF initialization.
-env["MPICH_OFI_STARTUP_CONNECT"] = "1"
-env["MPICH_COLL_SYNC"] = "MPI_Bcast"
-env["MPICH_REDUCE_NO_SMP"] = "1"
-env["FI_OFI_RXM_SAR_LIMIT"] = "3145728"
-env["FI_MR_CACHE_MAX_COUNT"] = "0"
-env["FI_EFA_RECVWIN_SIZE"] = "65536"
-```
-
 #### `WorkflowStage.build_environment()` (base.py)
+
+Common variables set for **all** models:
 
 ```python
 env["HDF5_USE_FILE_LOCKING"] = "FALSE"  # NFS reliability
-env["PATH"] = f"{conda_bin}:..."  # binary discovery
-env["LD_LIBRARY_PATH"] = f"{conda_lib}:..."  # shared library discovery
+env["OMP_NUM_THREADS"] = str(model_config.omp_num_threads)
+env["OMP_PLACES"] = "cores"
+env["OMP_PROC_BIND"] = "close"
+```
+
+#### `SchismModelConfig.build_environment()` (schema.py)
+
+Delegates to `build_mpi_env()` from `coastal_calibration.utils.mpi`, which auto-detects
+the active MPI implementation (OpenMPI or MPICH) and sets the appropriate tuning
+variables:
+
+**OpenMPI** (default conda-forge build stack):
+
+```python
+env["OMPI_MCA_mtl"] = "ofi"
+env["OMPI_MCA_pml"] = "cm"
+env["OMPI_MCA_btl"] = "^openib"
+```
+
+**MPICH / Cray MPICH** (WCOSS2 via `schism_exe` + system MPI):
+
+```python
+env["MPICH_OFI_STARTUP_CONNECT"] = "1"
+env["MPICH_COLL_SYNC"] = "MPI_Bcast"
+env["MPICH_REDUCE_NO_SMP"] = "1"
+```
+
+**Common libfabric tuning** (both implementations):
+
+```python
+env["FI_OFI_RXM_SAR_LIMIT"] = "3145728"
+env["FI_MR_CACHE_MAX_COUNT"] = "0"
+env["FI_EFA_RECVWIN_SIZE"] = "65536"
 ```
 
 #### `NWMForcingStage.run()` (forcing.py)
