@@ -194,8 +194,9 @@ model_config:
 | `nscribes`           | int    | 2         | SCHISM I/O scribes                                  |
 | `omp_num_threads`    | int    | 2         | OpenMP threads                                      |
 | `oversubscribe`      | bool   | false     | Allow MPI oversubscription                          |
-| `binary`             | string | `pschism` | SCHISM executable name (must be on `$PATH`)         |
+| `schism_exe`         | path   | -         | Path to a system-compiled SCHISM executable         |
 | `include_noaa_gages` | bool   | false     | Enable NOAA station discovery and comparison        |
+| `runtime_env`        | dict   | `{}`      | Extra env vars for the model run subprocess         |
 
 #### NOAA Observation Stations (`include_noaa_gages`)
 
@@ -259,6 +260,7 @@ model_config:
 | `meteo_res`                  | float | null     | Meteo output resolution (m). Auto-derived from quadtree grid if null |
 | `sfincs_exe`                 | path  | null     | Explicit SFINCS executable path (overrides PATH lookup)              |
 | `omp_num_threads`            | int   | auto     | OpenMP threads (defaults to CPU count)                               |
+| `runtime_env`                | dict  | `{}`     | Extra env vars for the model run subprocess                          |
 | `floodmap_dem`               | path  | null     | High-resolution DEM GeoTIFF for flood depth downscaling              |
 | `floodmap_hmin`              | float | 0.05     | Minimum flood depth threshold (m); shallower cells are masked out    |
 | `floodmap_enabled`           | bool  | true     | Enable flood depth map generation after SFINCS run                   |

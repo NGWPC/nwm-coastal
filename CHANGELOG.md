@@ -15,10 +15,10 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     instances, libfabric transport and buffer tuning are applied automatically; on plain
     NFS/Lustre clusters only general settings (shared-memory on `/tmp`, fork-warning
     suppression) are used.
-- **`schism_exe` config option**: replaced the `binary` field on `SchismModelConfig`
-    with `schism_exe: Path | None` (default `None`), matching the existing `sfincs_exe`
-    pattern. When set, the `schism_run` stage uses the given binary and isolates the
-    subprocess environment from conda libraries for system MPI compatibility.
+- **`schism_exe` config option**: added `schism_exe: Path | None` (default `None`) to
+    `SchismModelConfig`, matching the existing `sfincs_exe` pattern. When set, the
+    `schism_run` stage uses the given executable and isolates the subprocess environment
+    from conda libraries for system MPI compatibility.
 - **`runtime_env` config option**: both `SchismModelConfig` and `SfincsModelConfig`
     accept a `runtime_env: dict[str, str]` for injecting extra environment variables
     into the model run subprocess. Applied last, so it can override auto-detected MPI

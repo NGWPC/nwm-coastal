@@ -1006,10 +1006,7 @@ _SFINCS_FIELD_MIGRATION: dict[str, str] = {
 }
 
 # Maps old SchismModelConfig field names to new names.
-_SCHISM_FIELD_MIGRATION: dict[str, str] = {
-    "schism_binary": "schism_exe",
-    "binary": "schism_exe",
-}
+_SCHISM_FIELD_MIGRATION: dict[str, str] = {}
 
 
 def _migrate_model_config_data(
