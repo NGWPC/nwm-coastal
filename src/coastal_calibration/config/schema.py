@@ -207,14 +207,12 @@ class ModelConfig(ABC):
     implement the abstract methods, and register it in :data:`MODEL_REGISTRY`.
     """
 
+    #: Number of OpenMP threads per process.
     omp_num_threads: int
-    """Number of OpenMP threads per process."""
+    #: Extra environment variables for the model run subprocess.
+    #: Merged last so they can override any auto-detected value.
+    #: Only used by model run stages (``schism_run``, ``sfincs_run``).
     runtime_env: dict[str, str]
-    """Extra environment variables for the model run subprocess.
-
-    Merged last so they can override any auto-detected value.
-    Only used by model run stages (``schism_run``, ``sfincs_run``).
-    """
 
     @property
     @abstractmethod
