@@ -157,7 +157,7 @@
     
     
     
-    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_2">
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="black"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_2">
     
       <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_0" hidden>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
@@ -471,6 +471,8 @@
       
         
       
+        
+      
     
     
     
@@ -531,6 +533,34 @@
     
   
     Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/cluster-install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cluster Installation
   
 
     
@@ -1189,6 +1219,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#fixed" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1200,7 +1241,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed" class="md-nav__link">
+  <a href="#changed_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -1233,7 +1274,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed_1" class="md-nav__link">
+  <a href="#changed_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -1294,7 +1335,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed_2" class="md-nav__link">
+  <a href="#changed_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -1409,8 +1450,40 @@ this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic V
 <h2 id="unreleased"><a href="https://github.com/NGWPC/nwm-coastal/compare/3.1.1.0.0...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">#</a></h3>
 <ul>
+<li><strong>MPI detection module</strong> (<code>utils/mpi.py</code>): auto-detects the active MPI implementation
+    (OpenMPI or MPICH/Cray MPICH) at runtime via <code>mpiexec --version</code> and sets the
+    correct tuning environment variables and launcher flags for each. On AWS EFA
+    instances, libfabric transport and buffer tuning are applied automatically; on plain
+    NFS/Lustre clusters only general settings (shared-memory on <code>/tmp</code>, fork-warning
+    suppression) are used.</li>
+<li><strong><code>schism_exe</code> config option</strong>: added <code>schism_exe: Path | None</code> (default <code>None</code>) to
+    <code>SchismModelConfig</code>, matching the existing <code>sfincs_exe</code> pattern. When set, the
+    <code>schism_run</code> stage uses the given executable and isolates the subprocess environment
+    from conda libraries for system MPI compatibility.</li>
+<li><strong><code>runtime_env</code> config option</strong>: both <code>SchismModelConfig</code> and <code>SfincsModelConfig</code>
+    accept a <code>runtime_env: dict[str, str]</code> for injecting extra environment variables
+    into the model run subprocess. Applied last, so it can override auto-detected MPI
+    tuning values.</li>
 <li><strong>Type stubs</strong>: added <code>types-geopandas</code> and <code>types-shapely</code> to the typecheck
     environment for better third-party type coverage.</li>
+</ul>
+<h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">#</a></h3>
+<ul>
+<li><strong>Lazy imports</strong>: converted <code>__init__.py</code> files (package root, <code>config/</code>, <code>utils/</code>)
+    and <code>cli.py</code> to use deferred imports via <code>__getattr__</code>. The CLI
+    (<code>coastal-calibration --version</code>) no longer pulls the full dependency tree at
+    startup, reducing cold-start time from ~12 s to under 1 s on NFS.</li>
+<li><strong>System MPI isolation</strong>: when <code>schism_exe</code> or <code>sfincs_exe</code> is set to a
+    system-compiled binary, the run stage strips conda library paths from the subprocess
+    environment so the binary finds system MPI/HDF5/NetCDF. A new <code>runtime_env</code> config
+    option allows injecting extra env vars for the model run. Python MPI stages (ESMF
+    regridding) continue using conda OpenMPI.</li>
+<li><strong>OpenMP tuning</strong>: moved common OpenMP variables (<code>OMP_NUM_THREADS</code>, <code>OMP_PLACES</code>,
+    <code>OMP_PROC_BIND</code>) from model-specific <code>build_environment()</code> methods to the shared
+    <code>WorkflowStage.build_environment()</code> in <code>stages/base.py</code>.</li>
+<li><strong>SFINCS run stage</strong>: <code>SfincsRunStage.run()</code> now uses <code>self.build_environment()</code>
+    instead of constructing an inline env dict, ensuring <code>HDF5_USE_FILE_LOCKING</code> and
+    OpenMP pinning are applied consistently.</li>
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">#</a></h3>
 <ul>
@@ -1421,8 +1494,11 @@ this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic V
 <li><strong>Script permissions</strong>: marked <code>scripts/find_compatible_sdk.sh</code>,
     <code>coastal_models/schism/build.sh</code>, and <code>coastal_models/sfincs/build.sh</code> as executable
     to satisfy the pre-commit shebang check.</li>
+<li><strong>Cluster install verification</strong>: replaced <code>shutil.which</code> check with <code>ls</code> in
+    <code>CLUSTER_INSTALL.md</code> — the old command returned <code>None</code> because running the Python
+    binary directly bypasses the wrapper's <code>PATH</code> setup.</li>
 </ul>
-<h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">#</a></h3>
+<h3 id="changed_1">Changed<a class="headerlink" href="#changed_1" title="Permanent link">#</a></h3>
 <ul>
 <li><strong>Build system</strong>: migrated SFINCS and SCHISM compilation from activation scripts
     (<code>scripts/ensure-sfincs.sh</code>, <code>scripts/ensure-schism.sh</code>) to pixi-build packages
@@ -1524,7 +1600,7 @@ this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic V
 <li>SCHISM compilation and unit tests in <code>tests/schism/</code> and regridding tests in
     <code>tests/regridding/</code> with synthetic grid generation.</li>
 </ul>
-<h3 id="changed_1">Changed<a class="headerlink" href="#changed_1" title="Permanent link">#</a></h3>
+<h3 id="changed_2">Changed<a class="headerlink" href="#changed_2" title="Permanent link">#</a></h3>
 <ul>
 <li>Centralize station comparison plotting into <code>coastal_calibration.plotting.stations</code>,
     removing duplicate <code>_plotable_stations</code> and <code>_plot_figures</code> code from
@@ -1759,7 +1835,7 @@ this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic V
 <li>Model-specific compute parameters (SCHISM: multi-node MPI; SFINCS: single-node OpenMP)</li>
 <li><code>${model}</code> variable in default path templates for model-aware directory naming</li>
 </ul>
-<h3 id="changed_2">Changed<a class="headerlink" href="#changed_2" title="Permanent link">#</a></h3>
+<h3 id="changed_3">Changed<a class="headerlink" href="#changed_3" title="Permanent link">#</a></h3>
 <ul>
 <li><code>DownloadStage.description</code> is now a property that derives its text from the
     configured data sources (e.g. "Download input data (NWM, TPXO)") instead of a static

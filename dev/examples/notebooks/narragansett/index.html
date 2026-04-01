@@ -157,7 +157,7 @@
     
     
     
-    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_2">
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="black"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_2">
     
       <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_0" hidden>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
@@ -471,6 +471,8 @@
       
         
       
+        
+      
     
     
     
@@ -531,6 +533,34 @@
     
   
     Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/cluster-install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cluster Installation
   
 
     
@@ -2535,11 +2565,11 @@ print(result)</div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
 <pre>========================================                                        
 Coastal Calibration Workflow                                                    
-Start Time: 2026-03-31 10:52:50                                                 
+Start Time: 2026-04-01 11:56:48                                                 
 ========================================                                        
 ----------------------------------------                                        
 Stage: create_grid                                                              
-Start Time: 2026-03-31 10:52:50                                                 
+Start Time: 2026-04-01 11:56:48                                                 
   Create SFINCS grid from AOI                                                   
   AOI:                                                                          
 docs/examples/narragansett-ri/aoi.geojson 
@@ -2549,7 +2579,7 @@ docs/examples/narragansett-ri/aoi.geojson
   [✓] COMPLETED (4s)                                                            
 ----------------------------------------                                        
 Stage: create_fetch_data                                                        
-Start Time: 2026-03-31 10:52:54                                                 
+Start Time: 2026-04-01 11:56:53                                                 
   Fetch elevation and land cover data for AOI                                   
   Reusing existing nws_30m.tif                                                  
   Reusing existing gebco_15arcs.tif                                             
@@ -2558,28 +2588,28 @@ Start Time: 2026-03-31 10:52:54
   [✓] COMPLETED (0s)                                                            
 ----------------------------------------                                        
 Stage: create_elevation                                                         
-Start Time: 2026-03-31 10:52:54                                                 
+Start Time: 2026-04-01 11:56:53                                                 
   Add elevation and bathymetry data                                             
   Elevation datasets: ['nws_30m', 'gebco_15arcs']                               
   Elevation created successfully                                                
   [✓] COMPLETED (2s)                                                            
 ----------------------------------------                                        
 Stage: create_mask                                                              
-Start Time: 2026-03-31 10:52:57                                                 
+Start Time: 2026-04-01 11:56:55                                                 
   Create active cell mask                                                       
   zmin=-50.0                                                                    
   Active mask created successfully                                              
   [✓] COMPLETED (0s)                                                            
 ----------------------------------------                                        
 Stage: create_boundary                                                          
-Start Time: 2026-03-31 10:52:57                                                 
+Start Time: 2026-04-01 11:56:55                                                 
   Create water level boundary cells                                             
   boundary_zmax=-1.0                                                            
   Boundary cells created successfully                                           
   [✓] COMPLETED (0s)                                                            
 ----------------------------------------                                        
 Stage: create_discharge                                                         
-Start Time: 2026-03-31 10:52:57                                                 
+Start Time: 2026-04-01 11:56:55                                                 
   Add river discharge source points                                             
   Read 7 flowpath(s) from discharge_nwm.geojson                                 
     167237333: snapped to active cell (57 m away)                               
@@ -2593,14 +2623,14 @@ Start Time: 2026-03-31 10:52:57
   [✓] COMPLETED (0s)                                                            
 ----------------------------------------                                        
 Stage: create_subgrid                                                           
-Start Time: 2026-03-31 10:52:57                                                 
+Start Time: 2026-04-01 11:56:55                                                 
   Create subgrid tables                                                         
   nr_subgrid_pixels=4                                                           
   Subgrid tables created successfully                                           
-  [✓] COMPLETED (1m 6s)                                                         
+  [✓] COMPLETED (1m 8s)                                                         
 ----------------------------------------                                        
 Stage: create_obs                                                               
-Start Time: 2026-03-31 10:54:03                                                 
+Start Time: 2026-04-01 11:58:04                                                 
   Add observation points                                                        
   Loading cached station metadata from cache/coops_stations_metadata.json       
   Fetching datum information for 4 station(s)                                   
@@ -2614,7 +2644,7 @@ Start Time: 2026-03-31 10:54:03
   [✓] COMPLETED (0s)                                                            
 ----------------------------------------                                        
 Stage: create_write                                                             
-Start Time: 2026-03-31 10:54:04                                                 
+Start Time: 2026-04-01 11:58:05                                                 
   Write SFINCS model to disk                                                    
   Output directory:                                                             
 docs/examples/narragansett-ri/output      
@@ -2622,7 +2652,7 @@ docs/examples/narragansett-ri/output
   [✓] COMPLETED (0s)                                                            
 ----------------------------------------                                        
 ========================================                                        
-Workflow COMPLETED | Total Duration: 0:01:14                                    
+Workflow COMPLETED | Total Duration: 0:01:16                                    
 ========================================                                        
                                                                                 
 Timing Summary:                                                                 
@@ -2633,7 +2663,7 @@ Timing Summary:
   [✓] create_mask: 0s                                                           
   [✓] create_boundary: 0s                                                       
   [✓] create_discharge: 0s                                                      
-  [✓] create_subgrid: 1m 6s                                                     
+  [✓] create_subgrid: 1m 8s                                                     
   [✓] create_obs: 0s                                                            
   [✓] create_write: 0s                                                          
 </pre>
@@ -2643,9 +2673,9 @@ Timing Summary:
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>WorkflowResult: SUCCESS
-  Start:     2026-03-31 10:52:50
-  End:       2026-03-31 10:54:04
-  Duration:  1m 14s
+  Start:     2026-04-01 11:56:48
+  End:       2026-04-01 11:58:05
+  Duration:  1m 16s
   Completed: create_grid, create_fetch_data, create_elevation, create_mask, create_boundary, create_discharge, create_subgrid, create_obs, create_write
 </pre>
 </div>
@@ -2901,11 +2931,11 @@ print(result)</div>
 docs/examples/narragansett-ri/run         
 ========================================                                        
 Coastal Calibration Workflow                                                    
-Start Time: 2026-03-31 10:54:04                                                 
+Start Time: 2026-04-01 11:58:05                                                 
 ========================================                                        
 ----------------------------------------                                        
 Stage: download                                                                 
-Start Time: 2026-03-31 10:54:04                                                 
+Start Time: 2026-04-01 11:58:05                                                 
   Download input data (NWM, STOFS)                                              
   meteo/nwm_ana: 61/61 [OK]                                                     
   hydro/nwm: 61/61 [OK]                                                         
@@ -2913,16 +2943,16 @@ Start Time: 2026-03-31 10:54:04
   Total: 123/123 (failed: 0)                                                    
   Download complete — raw files stored in                                       
 docs/examples/downloads                   
-  [✓] COMPLETED (8s)                                                            
+  [✓] COMPLETED (7s)                                                            
 ----------------------------------------                                        
 Stage: sfincs_symlinks                                                          
-Start Time: 2026-03-31 10:54:13                                                 
+Start Time: 2026-04-01 11:58:13                                                 
   Create .nc symlinks for NWM data                                              
   Skipped 213 meteo + 0 streamflow symlinks (already exist)                     
   [✓] COMPLETED (0s)                                                            
 ----------------------------------------                                        
 Stage: sfincs_data_catalog                                                      
-Start Time: 2026-03-31 10:54:13                                                 
+Start Time: 2026-04-01 11:58:13                                                 
   Generate HydroMT data catalog for SFINCS                                      
   Data catalog written to                                                       
 docs/examples/narragansett-ri/run/data_cat
@@ -2930,7 +2960,7 @@ alog.yml
   [✓] COMPLETED (0s)                                                            
 ----------------------------------------                                        
 Stage: sfincs_init                                                              
-Start Time: 2026-03-31 10:54:13                                                 
+Start Time: 2026-04-01 11:58:13                                                 
   Initialize SFINCS model (pre-built)                                           
   Copied pre-built model from                                                   
 docs/examples/narragansett-ri/output to   
@@ -2944,14 +2974,14 @@ odel
   [✓] COMPLETED (0s)                                                            
 ----------------------------------------                                        
 Stage: sfincs_timing                                                            
-Start Time: 2026-03-31 10:54:14                                                 
+Start Time: 2026-04-01 11:58:13                                                 
   Set SFINCS timing                                                             
   Spinup: 3600 s                                                                
   Timing set: 2024-01-09 00:00:00 to 2024-01-11 12:00:00                        
   [✓] COMPLETED (0s)                                                            
 ----------------------------------------                                        
 Stage: sfincs_forcing                                                           
-Start Time: 2026-03-31 10:54:14                                                 
+Start Time: 2026-04-01 11:58:13                                                 
   Add water level forcing                                                       
   Read 200 boundary point(s) from                                               
 docs/examples/narragansett-ri/run/sfincs_m
@@ -2963,34 +2993,34 @@ odel/sfincs.bnd
   [✓] COMPLETED (17s)                                                           
 ----------------------------------------                                        
 Stage: sfincs_discharge                                                         
-Start Time: 2026-03-31 10:54:31                                                 
+Start Time: 2026-04-01 11:58:31                                                 
   Add discharge sources                                                         
   Added 7 discharge source point(s) from                                        
 docs/examples/narragansett-ri/output/sfinc
 s_nwm.src                                                                       
   Assigned discharge timeseries to 7 point(s) (7 unique feature_id(s))          
-  [✓] COMPLETED (5s)                                                            
+  [✓] COMPLETED (4s)                                                            
 ----------------------------------------                                        
 Stage: sfincs_precip                                                            
-Start Time: 2026-03-31 10:54:36                                                 
+Start Time: 2026-04-01 11:58:36                                                 
   Add precipitation forcing                                                     
   Precipitation forcing added from nwm_ana_meteo (res=512 m)                    
   [✓] COMPLETED (2s)                                                            
 ----------------------------------------                                        
 Stage: sfincs_wind                                                              
-Start Time: 2026-03-31 10:54:39                                                 
+Start Time: 2026-04-01 11:58:38                                                 
   Add wind forcing                                                              
   Wind forcing added from nwm_ana_meteo (res=512 m)                             
   [✓] COMPLETED (2s)                                                            
 ----------------------------------------                                        
 Stage: sfincs_pressure                                                          
-Start Time: 2026-03-31 10:54:41                                                 
+Start Time: 2026-04-01 11:58:41                                                 
   Add atmospheric pressure forcing                                              
   Atmospheric pressure forcing added from nwm_ana_meteo (baro=1, res=512 m)     
-  [✓] COMPLETED (2s)                                                            
+  [✓] COMPLETED (1s)                                                            
 ----------------------------------------                                        
 Stage: sfincs_write                                                             
-Start Time: 2026-03-31 10:54:43                                                 
+Start Time: 2026-04-01 11:58:43                                                 
   Write SFINCS model                                                            
   Applied 1 sfincs.inp override(s): {'tspinup': 10800}                          
   SFINCS model written to                                                       
@@ -2999,15 +3029,15 @@ odel
   [✓] COMPLETED (0s)                                                            
 ----------------------------------------                                        
 Stage: sfincs_run                                                               
-Start Time: 2026-03-31 10:54:43                                                 
+Start Time: 2026-04-01 11:58:43                                                 
   Run SFINCS model                                                              
   Running SFINCS via native executable:                                         
 .pixi/envs/dev/bin/sfincs                 
   SFINCS run completed                                                          
-  [✓] COMPLETED (11m 32s)                                                       
+  [✓] COMPLETED (7m 48s)                                                        
 ----------------------------------------                                        
 Stage: sfincs_floodmap                                                          
-Start Time: 2026-03-31 11:06:16                                                 
+Start Time: 2026-04-01 12:06:32                                                 
   Downscale flood depth map                                                     
   Loaded zsmax from                                                             
 docs/examples/narragansett-ri/run/sfincs_m
@@ -3028,7 +3058,7 @@ odel/floodmap_hmax.tif
   [✓] COMPLETED (1s)                                                            
 ----------------------------------------                                        
 Stage: sfincs_plot                                                              
-Start Time: 2026-03-31 11:06:17                                                 
+Start Time: 2026-04-01 12:06:33                                                 
   Plot simulated vs observed water levels                                       
   Loading cached station metadata from cache/coops_stations_metadata.json       
   Fetching datum information for 4 station(s)                                   
@@ -3047,28 +3077,28 @@ Start Time: 2026-03-31 11:06:17
   Saved 1 comparison figure(s) to                                               
 docs/examples/narragansett-ri/run/sfincs_m
 odel/figs                                                                       
-  [✓] COMPLETED (3s)                                                            
+  [✓] COMPLETED (4s)                                                            
 ----------------------------------------                                        
 ========================================                                        
-Workflow COMPLETED | Total Duration: 0:12:17                                    
+Workflow COMPLETED | Total Duration: 0:08:32                                    
 ========================================                                        
                                                                                 
 Timing Summary:                                                                 
 ----------------------------------------                                        
-  [✓] download: 8s                                                              
+  [✓] download: 7s                                                              
   [✓] sfincs_symlinks: 0s                                                       
   [✓] sfincs_data_catalog: 0s                                                   
   [✓] sfincs_init: 0s                                                           
   [✓] sfincs_timing: 0s                                                         
   [✓] sfincs_forcing: 17s                                                       
-  [✓] sfincs_discharge: 5s                                                      
+  [✓] sfincs_discharge: 4s                                                      
   [✓] sfincs_precip: 2s                                                         
   [✓] sfincs_wind: 2s                                                           
-  [✓] sfincs_pressure: 2s                                                       
+  [✓] sfincs_pressure: 1s                                                       
   [✓] sfincs_write: 0s                                                          
-  [✓] sfincs_run: 11m 32s                                                       
+  [✓] sfincs_run: 7m 48s                                                        
   [✓] sfincs_floodmap: 1s                                                       
-  [✓] sfincs_plot: 3s                                                           
+  [✓] sfincs_plot: 4s                                                           
 </pre>
 </div>
 </div>
@@ -3076,9 +3106,9 @@ Timing Summary:
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>WorkflowResult: SUCCESS
-  Start:     2026-03-31 10:54:04
-  End:       2026-03-31 11:06:21
-  Duration:  12m 17s
+  Start:     2026-04-01 11:58:05
+  End:       2026-04-01 12:06:37
+  Duration:  8m 32s
   Completed: download, sfincs_symlinks, sfincs_data_catalog, sfincs_init, sfincs_timing, sfincs_forcing, sfincs_discharge, sfincs_precip, sfincs_wind, sfincs_pressure, sfincs_write, sfincs_run, sfincs_floodmap, sfincs_plot
 </pre>
 </div>

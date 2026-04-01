@@ -33,6 +33,10 @@
         <changefreq>daily</changefreq>
     </url>
     <url>
+        <loc>https://NGWPC.github.io/nwm-coastal/stable/getting-started/cluster-install/</loc>
+        <changefreq>daily</changefreq>
+    </url>
+    <url>
         <loc>https://NGWPC.github.io/nwm-coastal/stable/getting-started/installation/</loc>
         <changefreq>daily</changefreq>
     </url>

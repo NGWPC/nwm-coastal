@@ -157,7 +157,7 @@
     
     
     
-    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_2">
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="black"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_2">
     
       <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_0" hidden>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
@@ -471,6 +471,8 @@
       
         
       
+        
+      
     
     
     
@@ -531,6 +533,34 @@
     
   
     Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/cluster-install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cluster Installation
   
 
     
@@ -1676,11 +1706,9 @@ the full home directory path.</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">paths</span><span class="p">:</span>
 </span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">work_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/work</span><span class="w">         </span><span class="c1"># Working directory (auto-generated if not set)</span>
 </span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="nt">raw_download_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/data</span><span class="w"> </span><span class="c1"># Download directory (auto-generated if not set)</span>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span><span class="nt">nfs_mount</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/ngen-test</span><span class="w">           </span><span class="c1"># NFS mount point</span>
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span><span class="nt">nwm_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/ngen-app/nwm.v3.0.6</span>
-</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">  </span><span class="nt">hot_start_file</span><span class="p">:</span><span class="w">                 </span><span class="c1"># Hot restart file for warm start</span>
-</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">  </span><span class="nt">conda_env_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ngen_forcing_coastal</span>
-</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="w">  </span><span class="nt">parm_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/ngen-test/coastal/ngwpc-coastal</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span><span class="nt">nwm_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/nwm.v3.0.6</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span><span class="nt">hot_start_file</span><span class="p">:</span><span class="w">                 </span><span class="c1"># Hot restart file for warm start</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">  </span><span class="nt">parm_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/coastal/parm</span>
 </span></code></pre></div>
 <table>
 <thead>
@@ -1702,14 +1730,9 @@ the full home directory path.</p>
 <td>Auto-generated from template</td>
 </tr>
 <tr>
-<td><code>nfs_mount</code></td>
-<td>path</td>
-<td><code>/ngen-test</code></td>
-</tr>
-<tr>
 <td><code>nwm_dir</code></td>
 <td>path</td>
-<td><code>/ngen-app/nwm.v3.0.6</code></td>
+<td>-</td>
 </tr>
 <tr>
 <td><code>hot_start_file</code></td>
@@ -1717,14 +1740,9 @@ the full home directory path.</p>
 <td>null</td>
 </tr>
 <tr>
-<td><code>conda_env_name</code></td>
-<td>string</td>
-<td><code>ngen_forcing_coastal</code></td>
-</tr>
-<tr>
 <td><code>parm_dir</code></td>
 <td>path</td>
-<td><code>/ngen-test/coastal/ngwpc-coastal</code></td>
+<td>-</td>
 </tr>
 </tbody>
 </table>
@@ -1734,16 +1752,17 @@ the full home directory path.</p>
 <h4 id="schism-model-configuration">SCHISM Model Configuration<a class="headerlink" href="#schism-model-configuration" title="Permanent link">#</a></h4>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># model: schism (default, can be omitted)</span>
 </span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="nt">model_config</span><span class="p">:</span>
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="nt">prebuilt_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/ngen-test/coastal/ngwpc-coastal/hawaii</span>
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span><span class="nt">geogrid_file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/ngen-test/coastal/ngwpc-coastal/hawaii/geo_em_HI.nc</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="nt">prebuilt_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/coastal/hawaii</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span><span class="nt">geogrid_file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/coastal/hawaii/geo_em_HI.nc</span>
 </span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">  </span><span class="nt">nodes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span><span class="w">                        </span><span class="c1"># Number of compute nodes</span>
 </span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">  </span><span class="nt">ntasks_per_node</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">18</span><span class="w">             </span><span class="c1"># MPI tasks per node</span>
 </span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">  </span><span class="nt">exclusive</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">                 </span><span class="c1"># Request exclusive node access</span>
 </span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">  </span><span class="nt">nscribes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span><span class="w">                     </span><span class="c1"># SCHISM I/O scribes</span>
 </span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">  </span><span class="nt">omp_num_threads</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span><span class="w">              </span><span class="c1"># OpenMP threads</span>
 </span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="w">  </span><span class="nt">oversubscribe</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span><span class="w">            </span><span class="c1"># Allow MPI oversubscription</span>
-</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="w">  </span><span class="nt">binary</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pschism</span><span class="w">                 </span><span class="c1"># SCHISM executable (must be on $PATH)</span>
+</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="w">  </span><span class="nt">schism_exe</span><span class="p">:</span><span class="w">                     </span><span class="c1"># System-compiled SCHISM executable (optional)</span>
 </span><span id="__span-8-12"><a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="w">  </span><span class="nt">include_noaa_gages</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">        </span><span class="c1"># Enable NOAA observation stations &amp; comparison plots</span>
+</span><span id="__span-8-13"><a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a><span class="w">  </span><span class="nt">runtime_env</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{}</span><span class="w">                 </span><span class="c1"># Extra env vars for model run (optional)</span>
 </span></code></pre></div>
 <table>
 <thead>
@@ -1804,16 +1823,22 @@ the full home directory path.</p>
 <td>Allow MPI oversubscription</td>
 </tr>
 <tr>
-<td><code>binary</code></td>
-<td>string</td>
-<td><code>pschism</code></td>
-<td>SCHISM executable name (must be on <code>$PATH</code>)</td>
+<td><code>schism_exe</code></td>
+<td>path</td>
+<td>-</td>
+<td>Path to a system-compiled SCHISM executable</td>
 </tr>
 <tr>
 <td><code>include_noaa_gages</code></td>
 <td>bool</td>
 <td>false</td>
 <td>Enable NOAA station discovery and comparison</td>
+</tr>
+<tr>
+<td><code>runtime_env</code></td>
+<td>dict</td>
+<td><code>{}</code></td>
+<td>Extra env vars for the model run subprocess</td>
 </tr>
 </tbody>
 </table>
@@ -1961,6 +1986,12 @@ Python-only stages.</p>
 <td>int</td>
 <td>auto</td>
 <td>OpenMP threads (defaults to CPU count)</td>
+</tr>
+<tr>
+<td><code>runtime_env</code></td>
+<td>dict</td>
+<td><code>{}</code></td>
+<td>Extra env vars for the model run subprocess</td>
 </tr>
 <tr>
 <td><code>floodmap_dem</code></td>

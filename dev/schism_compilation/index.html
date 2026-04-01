@@ -153,7 +153,7 @@
     
     
     
-    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_2">
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="black"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_2">
     
       <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_0" hidden>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
@@ -465,6 +465,8 @@
       
         
       
+        
+      
     
     
     
@@ -525,6 +527,34 @@
     
   
     Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/cluster-install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cluster Installation
   
 
     
@@ -1830,27 +1860,36 @@ variables are for:</p>
 <li><strong>PATH / LD_LIBRARY_PATH</strong>: for subprocess binary discovery</li>
 </ol>
 <h3 id="complete-list-of-env-vars-set-by-the-codebase">Complete list of env vars set by the codebase<a class="headerlink" href="#complete-list-of-env-vars-set-by-the-codebase" title="Permanent link">#</a></h3>
-<h4 id="schismmodelconfigbuild_environment-schemapy"><code>SchismModelConfig.build_environment()</code> (schema.py)<a class="headerlink" href="#schismmodelconfigbuild_environment-schemapy" title="Permanent link">#</a></h4>
-<p>These are the <strong>only</strong> model-specific env vars and they are all MPI/OpenMP runtime
-settings required for cluster execution:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># OpenMP threading</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">env</span><span class="p">[</span><span class="s2">&quot;OMP_NUM_THREADS&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">omp_num_threads</span><span class="p">)</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">env</span><span class="p">[</span><span class="s2">&quot;OMP_PLACES&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;cores&quot;</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="c1"># MPI / AWS EFA fabric tuning, required for reliable MPI</span>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="c1"># on EFA-enabled instances (e.g. c5n-18xlarge). Without</span>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="c1"># these, MPI collectives can hang during ESMF initialization.</span>
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="n">env</span><span class="p">[</span><span class="s2">&quot;MPICH_OFI_STARTUP_CONNECT&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;1&quot;</span>
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="n">env</span><span class="p">[</span><span class="s2">&quot;MPICH_COLL_SYNC&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;MPI_Bcast&quot;</span>
-</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="n">env</span><span class="p">[</span><span class="s2">&quot;MPICH_REDUCE_NO_SMP&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;1&quot;</span>
-</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="n">env</span><span class="p">[</span><span class="s2">&quot;FI_OFI_RXM_SAR_LIMIT&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;3145728&quot;</span>
-</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="n">env</span><span class="p">[</span><span class="s2">&quot;FI_MR_CACHE_MAX_COUNT&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;0&quot;</span>
-</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="n">env</span><span class="p">[</span><span class="s2">&quot;FI_EFA_RECVWIN_SIZE&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;65536&quot;</span>
-</span></code></pre></div>
 <h4 id="workflowstagebuild_environment-basepy"><code>WorkflowStage.build_environment()</code> (base.py)<a class="headerlink" href="#workflowstagebuild_environment-basepy" title="Permanent link">#</a></h4>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">env</span><span class="p">[</span><span class="s2">&quot;HDF5_USE_FILE_LOCKING&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;FALSE&quot;</span>  <span class="c1"># NFS reliability</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">env</span><span class="p">[</span><span class="s2">&quot;PATH&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">conda_bin</span><span class="si">}</span><span class="s2">:...&quot;</span>  <span class="c1"># binary discovery</span>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">env</span><span class="p">[</span><span class="s2">&quot;LD_LIBRARY_PATH&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">conda_lib</span><span class="si">}</span><span class="s2">:...&quot;</span>  <span class="c1"># shared library discovery</span>
+<p>Common variables set for <strong>all</strong> models:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">env</span><span class="p">[</span><span class="s2">&quot;HDF5_USE_FILE_LOCKING&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;FALSE&quot;</span>  <span class="c1"># NFS reliability</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">env</span><span class="p">[</span><span class="s2">&quot;OMP_NUM_THREADS&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">model_config</span><span class="o">.</span><span class="n">omp_num_threads</span><span class="p">)</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">env</span><span class="p">[</span><span class="s2">&quot;OMP_PLACES&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;cores&quot;</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">env</span><span class="p">[</span><span class="s2">&quot;OMP_PROC_BIND&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;close&quot;</span>
+</span></code></pre></div>
+<h4 id="schismmodelconfigbuild_environment-schemapy"><code>SchismModelConfig.build_environment()</code> (schema.py)<a class="headerlink" href="#schismmodelconfigbuild_environment-schemapy" title="Permanent link">#</a></h4>
+<p>Delegates to <code>build_mpi_env()</code> from <code>coastal_calibration.utils.mpi</code>, which auto-detects
+the active MPI implementation (OpenMPI or MPICH) and sets the appropriate tuning
+variables. Settings are layered: general settings apply on all clusters, EFA-specific
+settings are added only when AWS EFA devices are detected.</p>
+<p><strong>OpenMPI — general</strong> (all clusters):</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">env</span><span class="p">[</span><span class="s2">&quot;OMPI_MCA_mpi_warn_on_fork&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;0&quot;</span>  <span class="c1"># suppress NFS fork warnings</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">env</span><span class="p">[</span><span class="s2">&quot;OMPI_MCA_orte_tmpdir_base&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;/tmp&quot;</span>  <span class="c1"># shared-memory on local disk</span>
+</span></code></pre></div>
+<p><strong>OpenMPI — EFA only</strong> (when <code>/sys/class/infiniband/efa*</code> detected):</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">env</span><span class="p">[</span><span class="s2">&quot;OMPI_MCA_mtl&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;ofi&quot;</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="n">env</span><span class="p">[</span><span class="s2">&quot;OMPI_MCA_pml&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;cm&quot;</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">env</span><span class="p">[</span><span class="s2">&quot;OMPI_MCA_btl&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;^openib&quot;</span>
+</span></code></pre></div>
+<p><strong>MPICH / Cray MPICH</strong> (all clusters, including WCOSS2 via <code>schism_exe</code>):</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">env</span><span class="p">[</span><span class="s2">&quot;MPICH_OFI_STARTUP_CONNECT&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;1&quot;</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="n">env</span><span class="p">[</span><span class="s2">&quot;MPICH_COLL_SYNC&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;MPI_Bcast&quot;</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="n">env</span><span class="p">[</span><span class="s2">&quot;MPICH_REDUCE_NO_SMP&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;1&quot;</span>
+</span></code></pre></div>
+<p><strong>Libfabric tuning — EFA only</strong> (when EFA devices detected, any MPI impl):</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">env</span><span class="p">[</span><span class="s2">&quot;FI_OFI_RXM_SAR_LIMIT&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;3145728&quot;</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="n">env</span><span class="p">[</span><span class="s2">&quot;FI_MR_CACHE_MAX_COUNT&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;0&quot;</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="n">env</span><span class="p">[</span><span class="s2">&quot;FI_EFA_RECVWIN_SIZE&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;65536&quot;</span>
 </span></code></pre></div>
 <h4 id="nwmforcingstagerun-forcingpy"><code>NWMForcingStage.run()</code> (forcing.py)<a class="headerlink" href="#nwmforcingstagerun-forcingpy" title="Permanent link">#</a></h4>
 <p>No environment variables. HPC job-array parallelism parameters (<code>--job-index</code>,
@@ -1902,10 +1941,10 @@ settings required for cluster execution:</p>
 <h3 id="srccoastal_calibrationregridding"><code>src/coastal_calibration/regridding/</code><a class="headerlink" href="#srccoastal_calibrationregridding" title="Permanent link">#</a></h3>
 <p>This package contains the ESMF-based regridding implementations that replaced the legacy
 subprocess scripts. All modules handle the ESMF/esmpy import fallback internally:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">try</span><span class="p">:</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    <span class="kn">import</span><span class="w"> </span><span class="nn">ESMF</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    <span class="kn">import</span><span class="w"> </span><span class="nn">esmpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ESMF</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="k">try</span><span class="p">:</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>    <span class="kn">import</span><span class="w"> </span><span class="nn">ESMF</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>    <span class="kn">import</span><span class="w"> </span><span class="nn">esmpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ESMF</span>
 </span></code></pre></div>
 <h4 id="esmf_utilspy-mpi-aware-esmf-utilities"><code>esmf_utils.py</code>: MPI-aware ESMF utilities<a class="headerlink" href="#esmf_utilspy-mpi-aware-esmf-utilities" title="Permanent link">#</a></h4>
 <p>Key abstractions:</p>
@@ -1936,11 +1975,11 @@ to volumetric flux (m³/s) on the SCHISM mesh.</p>
 passes the full global count, the total LocStream has <code>nranks × n</code> points (wrong).</p>
 <p><code>build_locstream()</code> handles this by computing a contiguous partition of the global array
 across MPI ranks:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">n_global</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">lon</span><span class="p">)</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="n">base</span><span class="p">,</span> <span class="n">remainder</span> <span class="o">=</span> <span class="nb">divmod</span><span class="p">(</span><span class="n">n_global</span><span class="p">,</span> <span class="n">size</span><span class="p">)</span>
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="c1"># rank i gets (base+1) points if i &lt; remainder, else base points</span>
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="n">locstream</span> <span class="o">=</span> <span class="n">ESMF</span><span class="o">.</span><span class="n">LocStream</span><span class="p">(</span><span class="n">local_count</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span>
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="n">locstream</span><span class="p">[</span><span class="s2">&quot;ESMF:Lon&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">lon</span><span class="p">[</span><span class="n">local_start</span> <span class="p">:</span> <span class="n">local_start</span> <span class="o">+</span> <span class="n">local_count</span><span class="p">]</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="n">n_global</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">lon</span><span class="p">)</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="n">base</span><span class="p">,</span> <span class="n">remainder</span> <span class="o">=</span> <span class="nb">divmod</span><span class="p">(</span><span class="n">n_global</span><span class="p">,</span> <span class="n">size</span><span class="p">)</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="c1"># rank i gets (base+1) points if i &lt; remainder, else base points</span>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="n">locstream</span> <span class="o">=</span> <span class="n">ESMF</span><span class="o">.</span><span class="n">LocStream</span><span class="p">(</span><span class="n">local_count</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="n">locstream</span><span class="p">[</span><span class="s2">&quot;ESMF:Lon&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">lon</span><span class="p">[</span><span class="n">local_start</span> <span class="p">:</span> <span class="n">local_start</span> <span class="o">+</span> <span class="n">local_count</span><span class="p">]</span>
 </span></code></pre></div>
 <p>The global index range is stored on the LocStream as <code>_global_lower</code> / <code>_global_upper</code>
 so callers can slice their data arrays to match the local ESMF partition.</p>
@@ -1953,10 +1992,10 @@ handle both names via try/except imports. The ESMF compatibility shim
 uses <code>import ESMF</code>.</p>
 <h3 id="solution-srccoastal_calibrationesmf_compatesmfpy">Solution: <code>src/coastal_calibration/esmf_compat/ESMF.py</code><a class="headerlink" href="#solution-srccoastal_calibrationesmf_compatesmfpy" title="Permanent link">#</a></h3>
 <p>A compatibility shim that re-exports <code>esmpy</code> as <code>ESMF</code>:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">esmpy</span><span class="w"> </span><span class="kn">import</span> <span class="o">*</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">esmpy</span><span class="w"> </span><span class="kn">import</span> <span class="n">constants</span>
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="n">Manager</span><span class="p">(</span><span class="n">debug</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>  <span class="c1"># auto-initialize (old ESMF did this implicitly)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">esmpy</span><span class="w"> </span><span class="kn">import</span> <span class="o">*</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">esmpy</span><span class="w"> </span><span class="kn">import</span> <span class="n">constants</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="n">Manager</span><span class="p">(</span><span class="n">debug</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>  <span class="c1"># auto-initialize (old ESMF did this implicitly)</span>
 </span></code></pre></div>
 <h3 id="why-auto-initialize-manager">Why auto-initialize Manager?<a class="headerlink" href="#why-auto-initialize-manager" title="Permanent link">#</a></h3>
 <p>The ESMF compat shim calls <code>Manager(debug=False)</code> because some legacy code (in
@@ -1974,12 +2013,12 @@ the 12.8M-node ESTOFS array correctly, but rank 1 received shape <code>(0,)</cod
 <h3 id="solution">Solution<a class="headerlink" href="#solution" title="Permanent link">#</a></h3>
 <p>Install <code>netcdf4</code> from <strong>conda-forge</strong> with the OpenMPI build variant instead of from
 PyPI. This is done at the base Python-version feature level so all environments get it:</p>
-<div class="language-toml highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="k">[tool.pixi.feature.py313.dependencies]</span>
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="n">netcdf4</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">version</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;*&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">build</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;mpi_openmpi_*&quot;</span><span class="w"> </span><span class="p">}</span>
+<div class="language-toml highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="k">[tool.pixi.feature.py313.dependencies]</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="n">netcdf4</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">version</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;*&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">build</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;mpi_openmpi_*&quot;</span><span class="w"> </span><span class="p">}</span>
 </span></code></pre></div>
 <p>The schism feature also pins it (redundantly but explicitly):</p>
-<div class="language-toml highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="k">[tool.pixi.feature.schism.dependencies]</span>
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="n">netcdf4</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">version</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;*&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">build</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;mpi_openmpi_*&quot;</span><span class="w"> </span><span class="p">}</span>
+<div class="language-toml highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="k">[tool.pixi.feature.schism.dependencies]</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="n">netcdf4</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">version</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;*&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">build</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;mpi_openmpi_*&quot;</span><span class="w"> </span><span class="p">}</span>
 </span></code></pre></div>
 <p>After this change, <code>netCDF4.__has_parallel4_support__ == 1</code> and all MPI ranks can read
 netCDF files independently.</p>
@@ -2021,8 +2060,8 @@ netCDF files independently.</p>
 </table>
 <p>The <code>update_params()</code> function in <code>schism_prep.py</code> strips these automatically using
 regex:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="k">for</span> <span class="n">deprecated</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;impose_net_flux&quot;</span><span class="p">,</span> <span class="s2">&quot;isconsv&quot;</span><span class="p">,</span> <span class="s2">&quot;isav&quot;</span><span class="p">,</span> <span class="s2">&quot;vclose_surf_frac&quot;</span><span class="p">):</span>
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>    <span class="n">text</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">rf</span><span class="s2">&quot;(?m)^\s*</span><span class="si">{</span><span class="n">deprecated</span><span class="si">}</span><span class="s2">\s*=.*\n&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">text</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="k">for</span> <span class="n">deprecated</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;impose_net_flux&quot;</span><span class="p">,</span> <span class="s2">&quot;isconsv&quot;</span><span class="p">,</span> <span class="s2">&quot;isav&quot;</span><span class="p">,</span> <span class="s2">&quot;vclose_surf_frac&quot;</span><span class="p">):</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>    <span class="n">text</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">rf</span><span class="s2">&quot;(?m)^\s*</span><span class="si">{</span><span class="n">deprecated</span><span class="si">}</span><span class="s2">\s*=.*\n&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">text</span><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="mandatory-parameters-must-be-added-to-paramnml">Mandatory parameters (must be added to param.nml)<a class="headerlink" href="#mandatory-parameters-must-be-added-to-paramnml" title="Permanent link">#</a></h3>
 <p>Since May 2024 (commit <code>0fec598</code>), SCHISM requires these parameters in the <code>&amp;CORE</code>
@@ -2074,33 +2113,32 @@ after generation.</p>
 <li>Shared downloads: <code>docs/examples/downloads/</code></li>
 </ul>
 <h3 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">#</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="n">CoastalCalibConfig</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span>
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>    <span class="p">{</span>
-</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>        <span class="s2">&quot;model&quot;</span><span class="p">:</span> <span class="s2">&quot;schism&quot;</span><span class="p">,</span>
-</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>        <span class="s2">&quot;simulation&quot;</span><span class="p">:</span> <span class="p">{</span>
-</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>            <span class="s2">&quot;start_date&quot;</span><span class="p">:</span> <span class="s2">&quot;2024-01-09&quot;</span><span class="p">,</span>
-</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>            <span class="s2">&quot;duration_hours&quot;</span><span class="p">:</span> <span class="mi">3</span><span class="p">,</span>
-</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>            <span class="s2">&quot;coastal_domain&quot;</span><span class="p">:</span> <span class="s2">&quot;hawaii&quot;</span><span class="p">,</span>
-</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>            <span class="s2">&quot;meteo_source&quot;</span><span class="p">:</span> <span class="s2">&quot;nwm_ana&quot;</span><span class="p">,</span>
-</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>            <span class="s2">&quot;timestep_seconds&quot;</span><span class="p">:</span> <span class="mi">200</span><span class="p">,</span>
-</span><span id="__span-13-10"><a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a>        <span class="p">},</span>
-</span><span id="__span-13-11"><a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>        <span class="s2">&quot;boundary&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="s2">&quot;stofs&quot;</span><span class="p">},</span>
-</span><span id="__span-13-12"><a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a>        <span class="s2">&quot;paths&quot;</span><span class="p">:</span> <span class="p">{</span>
-</span><span id="__span-13-13"><a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a>            <span class="s2">&quot;work_dir&quot;</span><span class="p">:</span> <span class="s2">&quot;./run&quot;</span><span class="p">,</span>
-</span><span id="__span-13-14"><a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a>            <span class="s2">&quot;raw_download_dir&quot;</span><span class="p">:</span> <span class="s2">&quot;../downloads&quot;</span><span class="p">,</span>
-</span><span id="__span-13-15"><a id="__codelineno-13-15" name="__codelineno-13-15" href="#__codelineno-13-15"></a>            <span class="s2">&quot;parm_dir&quot;</span><span class="p">:</span> <span class="s2">&quot;.&quot;</span><span class="p">,</span>
-</span><span id="__span-13-16"><a id="__codelineno-13-16" name="__codelineno-13-16" href="#__codelineno-13-16"></a>        <span class="p">},</span>
-</span><span id="__span-13-17"><a id="__codelineno-13-17" name="__codelineno-13-17" href="#__codelineno-13-17"></a>        <span class="s2">&quot;download&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;enabled&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span>
-</span><span id="__span-13-18"><a id="__codelineno-13-18" name="__codelineno-13-18" href="#__codelineno-13-18"></a>        <span class="s2">&quot;model_config&quot;</span><span class="p">:</span> <span class="p">{</span>
-</span><span id="__span-13-19"><a id="__codelineno-13-19" name="__codelineno-13-19" href="#__codelineno-13-19"></a>            <span class="s2">&quot;nodes&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
-</span><span id="__span-13-20"><a id="__codelineno-13-20" name="__codelineno-13-20" href="#__codelineno-13-20"></a>            <span class="s2">&quot;ntasks_per_node&quot;</span><span class="p">:</span> <span class="mi">4</span><span class="p">,</span>
-</span><span id="__span-13-21"><a id="__codelineno-13-21" name="__codelineno-13-21" href="#__codelineno-13-21"></a>            <span class="s2">&quot;nscribes&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
-</span><span id="__span-13-22"><a id="__codelineno-13-22" name="__codelineno-13-22" href="#__codelineno-13-22"></a>            <span class="s2">&quot;oversubscribe&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
-</span><span id="__span-13-23"><a id="__codelineno-13-23" name="__codelineno-13-23" href="#__codelineno-13-23"></a>            <span class="s2">&quot;binary&quot;</span><span class="p">:</span> <span class="s2">&quot;pschism&quot;</span><span class="p">,</span>
-</span><span id="__span-13-24"><a id="__codelineno-13-24" name="__codelineno-13-24" href="#__codelineno-13-24"></a>            <span class="s2">&quot;include_noaa_gages&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
-</span><span id="__span-13-25"><a id="__codelineno-13-25" name="__codelineno-13-25" href="#__codelineno-13-25"></a>        <span class="p">},</span>
-</span><span id="__span-13-26"><a id="__codelineno-13-26" name="__codelineno-13-26" href="#__codelineno-13-26"></a>    <span class="p">}</span>
-</span><span id="__span-13-27"><a id="__codelineno-13-27" name="__codelineno-13-27" href="#__codelineno-13-27"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="n">CoastalCalibConfig</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>    <span class="p">{</span>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>        <span class="s2">&quot;model&quot;</span><span class="p">:</span> <span class="s2">&quot;schism&quot;</span><span class="p">,</span>
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>        <span class="s2">&quot;simulation&quot;</span><span class="p">:</span> <span class="p">{</span>
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>            <span class="s2">&quot;start_date&quot;</span><span class="p">:</span> <span class="s2">&quot;2024-01-09&quot;</span><span class="p">,</span>
+</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>            <span class="s2">&quot;duration_hours&quot;</span><span class="p">:</span> <span class="mi">3</span><span class="p">,</span>
+</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>            <span class="s2">&quot;coastal_domain&quot;</span><span class="p">:</span> <span class="s2">&quot;hawaii&quot;</span><span class="p">,</span>
+</span><span id="__span-16-8"><a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>            <span class="s2">&quot;meteo_source&quot;</span><span class="p">:</span> <span class="s2">&quot;nwm_ana&quot;</span><span class="p">,</span>
+</span><span id="__span-16-9"><a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a>            <span class="s2">&quot;timestep_seconds&quot;</span><span class="p">:</span> <span class="mi">200</span><span class="p">,</span>
+</span><span id="__span-16-10"><a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a>        <span class="p">},</span>
+</span><span id="__span-16-11"><a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a>        <span class="s2">&quot;boundary&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="s2">&quot;stofs&quot;</span><span class="p">},</span>
+</span><span id="__span-16-12"><a id="__codelineno-16-12" name="__codelineno-16-12" href="#__codelineno-16-12"></a>        <span class="s2">&quot;paths&quot;</span><span class="p">:</span> <span class="p">{</span>
+</span><span id="__span-16-13"><a id="__codelineno-16-13" name="__codelineno-16-13" href="#__codelineno-16-13"></a>            <span class="s2">&quot;work_dir&quot;</span><span class="p">:</span> <span class="s2">&quot;./run&quot;</span><span class="p">,</span>
+</span><span id="__span-16-14"><a id="__codelineno-16-14" name="__codelineno-16-14" href="#__codelineno-16-14"></a>            <span class="s2">&quot;raw_download_dir&quot;</span><span class="p">:</span> <span class="s2">&quot;../downloads&quot;</span><span class="p">,</span>
+</span><span id="__span-16-15"><a id="__codelineno-16-15" name="__codelineno-16-15" href="#__codelineno-16-15"></a>            <span class="s2">&quot;parm_dir&quot;</span><span class="p">:</span> <span class="s2">&quot;.&quot;</span><span class="p">,</span>
+</span><span id="__span-16-16"><a id="__codelineno-16-16" name="__codelineno-16-16" href="#__codelineno-16-16"></a>        <span class="p">},</span>
+</span><span id="__span-16-17"><a id="__codelineno-16-17" name="__codelineno-16-17" href="#__codelineno-16-17"></a>        <span class="s2">&quot;download&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;enabled&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span>
+</span><span id="__span-16-18"><a id="__codelineno-16-18" name="__codelineno-16-18" href="#__codelineno-16-18"></a>        <span class="s2">&quot;model_config&quot;</span><span class="p">:</span> <span class="p">{</span>
+</span><span id="__span-16-19"><a id="__codelineno-16-19" name="__codelineno-16-19" href="#__codelineno-16-19"></a>            <span class="s2">&quot;nodes&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+</span><span id="__span-16-20"><a id="__codelineno-16-20" name="__codelineno-16-20" href="#__codelineno-16-20"></a>            <span class="s2">&quot;ntasks_per_node&quot;</span><span class="p">:</span> <span class="mi">4</span><span class="p">,</span>
+</span><span id="__span-16-21"><a id="__codelineno-16-21" name="__codelineno-16-21" href="#__codelineno-16-21"></a>            <span class="s2">&quot;nscribes&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+</span><span id="__span-16-22"><a id="__codelineno-16-22" name="__codelineno-16-22" href="#__codelineno-16-22"></a>            <span class="s2">&quot;oversubscribe&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-16-23"><a id="__codelineno-16-23" name="__codelineno-16-23" href="#__codelineno-16-23"></a>            <span class="s2">&quot;include_noaa_gages&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-16-24"><a id="__codelineno-16-24" name="__codelineno-16-24" href="#__codelineno-16-24"></a>        <span class="p">},</span>
+</span><span id="__span-16-25"><a id="__codelineno-16-25" name="__codelineno-16-25" href="#__codelineno-16-25"></a>    <span class="p">}</span>
+</span><span id="__span-16-26"><a id="__codelineno-16-26" name="__codelineno-16-26" href="#__codelineno-16-26"></a><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="hawaii-model-details">Hawaii model details<a class="headerlink" href="#hawaii-model-details" title="Permanent link">#</a></h3>
 <ul>
@@ -2505,8 +2543,8 @@ for this by fetching <code>tm02</code> files offset by +2 hours from the simulat
 <h3 id="integration-test">Integration test<a class="headerlink" href="#integration-test" title="Permanent link">#</a></h3>
 <p>The Hawaii example notebook serves as an end-to-end integration test: all 11 stages run
 sequentially, producing comparison plots at 7 NOAA stations. Run with:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="nb">cd</span><span class="w"> </span>docs/examples/notebooks
-</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>pixi<span class="w"> </span>run<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>python<span class="w"> </span>schism-hawaii.py
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="nb">cd</span><span class="w"> </span>docs/examples/notebooks
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>pixi<span class="w"> </span>run<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>python<span class="w"> </span>schism-hawaii.py
 </span></code></pre></div>
 
 
