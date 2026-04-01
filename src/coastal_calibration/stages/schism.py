@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 from datetime import timedelta
@@ -461,7 +462,14 @@ class SCHISMRunStage(WorkflowStage):
     def _resolve_exe(schism_cfg: SchismModelConfig) -> Path:
         """Return the SCHISM executable or raise with a helpful message."""
         if schism_cfg.schism_exe is not None:
-            return schism_cfg.schism_exe
+            exe = schism_cfg.schism_exe
+            if not exe.is_file():
+                msg = f"schism_exe not found: {exe}"
+                raise RuntimeError(msg)
+            if not os.access(exe, os.X_OK):
+                msg = f"schism_exe is not executable: {exe}"
+                raise RuntimeError(msg)
+            return exe
         found = shutil.which("pschism")
         if found is not None:
             return Path(found)
@@ -503,7 +511,7 @@ class SCHISMRunStage(WorkflowStage):
             f"Launching {exe.name} with {self.model.total_tasks} MPI tasks "
             f"({self.model.nodes} node(s), {self.model.nscribes} scribe(s))"
         )
-        self._update_substep(f"Running pschism with {self.model.total_tasks} MPI tasks")
+        self._update_substep(f"Running {exe.name} with {self.model.total_tasks} MPI tasks")
 
         cmd = self._build_mpi_command(exe, env)
         self._log(f"Command: {' '.join(cmd)}")

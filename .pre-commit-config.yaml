@@ -53,7 +53,7 @@ repos:
     entry: python scripts/clean_notebooks.py
     language: python
     files: ^docs/examples/notebooks/.*\.ipynb$
-    pass_filenames: false
+    pass_filenames: true
 
 - repo: https://github.com/astral-sh/ruff-pre-commit
   rev: v0.15.8
