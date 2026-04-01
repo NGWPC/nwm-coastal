@@ -6,12 +6,12 @@ import atexit
 import contextlib
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import rich_click as click
 
-from coastal_calibration.config.schema import CoastalCalibConfig, CoastalDomain, ModelType
-from coastal_calibration.runner import CoastalCalibRunner
-from coastal_calibration.utils.logging import configure_logger, logger
+if TYPE_CHECKING:
+    from coastal_calibration.config.schema import CoastalDomain
 
 
 # --- Suppress "Error in sys.excepthook" cascade at shutdown -----------
@@ -90,6 +90,10 @@ def run(
 
     CONFIG is the path to a YAML configuration file.
     """
+    from coastal_calibration.config.schema import CoastalCalibConfig
+    from coastal_calibration.runner import CoastalCalibRunner
+    from coastal_calibration.utils.logging import configure_logger, logger
+
     config_path = config.resolve()
 
     try:
@@ -148,6 +152,7 @@ def create(
     """
     from coastal_calibration.config.create_schema import SfincsCreateConfig
     from coastal_calibration.creator import SfincsCreator
+    from coastal_calibration.utils.logging import configure_logger, logger
 
     config_path = config.resolve()
 
@@ -187,6 +192,10 @@ def validate(config: Path) -> None:
 
     CONFIG is the path to a YAML configuration file.
     """
+    from coastal_calibration.config.schema import CoastalCalibConfig
+    from coastal_calibration.runner import CoastalCalibRunner
+    from coastal_calibration.utils.logging import logger
+
     config_path = config.resolve()
 
     try:
@@ -243,6 +252,7 @@ def prepare_topobathy(
     Requires AWS credentials (via environment or ~/.aws) and the
     ``icechunk`` Python package.
     """
+    from coastal_calibration.utils.logging import configure_logger
     from coastal_calibration.utils.topobathy_nws import fetch_topobathy
 
     if output_dir is None:
@@ -298,7 +308,7 @@ def prepare_topobathy(
     default="schism",
     help="Model type (default: schism).",
 )
-def init(output: Path, domain: CoastalDomain, force: bool, model: ModelType) -> None:
+def init(output: Path, domain: str, force: bool, model: str) -> None:
     """Create a minimal configuration file.
 
     OUTPUT is the path where the configuration will be written.
@@ -306,7 +316,10 @@ def init(output: Path, domain: CoastalDomain, force: bool, model: ModelType) -> 
     The generated config includes only required fields. Paths are auto-generated
     based on user, domain, and source settings.
     """
+    from typing import cast
+
     from coastal_calibration.downloader import get_default_sources
+    from coastal_calibration.utils.logging import logger
 
     output_path = output.resolve()
 
@@ -317,7 +330,7 @@ def init(output: Path, domain: CoastalDomain, force: bool, model: ModelType) -> 
     ):
         raise click.Abort()
 
-    meteo_source, boundary_source, start_date = get_default_sources(domain)
+    meteo_source, boundary_source, start_date = get_default_sources(cast("CoastalDomain", domain))
     start_date_str = start_date.strftime("%Y-%m-%d")
 
     if model == "sfincs":
@@ -402,6 +415,7 @@ def update_dem_index(output: Path | None, max_datasets: int | None) -> None:
     import importlib.resources
     import json
 
+    from coastal_calibration.utils.logging import configure_logger
     from coastal_calibration.utils.topobathy_noaa import build_index_from_s3
 
     configure_logger(level="INFO")
