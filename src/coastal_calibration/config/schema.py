@@ -207,6 +207,16 @@ class ModelConfig(ABC):
     implement the abstract methods, and register it in :data:`MODEL_REGISTRY`.
     """
 
+    omp_num_threads: int
+
+    runtime_env: dict[str, str]
+    """Number of OpenMP threads per process."""
+    """Extra environment variables applied when launching the model binary.
+
+    These are merged last, so they can override any auto-detected value.
+    Only used by model run stages (``schism_run``, ``sfincs_run``).
+    """
+
     @property
     @abstractmethod
     def model_name(self) -> str:
@@ -217,7 +227,7 @@ class ModelConfig(ABC):
         """Add model-specific environment variables to *env* (mutating).
 
         Called by :meth:`WorkflowStage.build_environment` after shared
-        variables have been populated.
+        variables (OpenMP pinning, HDF5 file locking) have been populated.
         """
 
     @abstractmethod
@@ -266,9 +276,14 @@ class SchismModelConfig(ModelConfig):
         OpenMP threads per MPI rank.
     oversubscribe : bool
         Allow MPI oversubscription.
-    binary : str
-        SCHISM executable name.  Must be on ``$PATH`` (pixi installs
-        it to ``$CONDA_PREFIX/bin/pschism``).
+    schism_exe : Path, optional
+        Path to a compiled SCHISM executable.  When set, the
+        ``schism_run`` stage uses this binary instead of discovering
+        ``pschism`` on ``PATH``.  Normally not needed -- SCHISM is
+        compiled automatically when activating a pixi environment
+        with the ``schism`` feature.  Set this to a system-compiled
+        binary on WCOSS2 or other clusters where the model is built
+        against system MPI/HDF5/NetCDF.
     include_noaa_gages : bool
         When True, automatically query NOAA CO-OPS for water level
         stations within the model domain (computed from the concave
@@ -286,12 +301,15 @@ class SchismModelConfig(ModelConfig):
     nscribes: int = 2
     omp_num_threads: int = 2
     oversubscribe: bool = False
-    binary: str = "pschism"
+    schism_exe: Path | None = None
     include_noaa_gages: bool = False
+    runtime_env: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self.prebuilt_dir = Path(self.prebuilt_dir).expanduser().resolve()
         self.geogrid_file = Path(self.geogrid_file).expanduser().resolve()
+        if self.schism_exe is not None:
+            self.schism_exe = Path(self.schism_exe).expanduser().resolve()
 
     @property
     def model_name(self) -> str:  # noqa: D102
@@ -331,19 +349,9 @@ class SchismModelConfig(ModelConfig):
     def build_environment(  # noqa: D102
         self, env: dict[str, str], config: CoastalCalibConfig
     ) -> dict[str, str]:
-        env["OMP_NUM_THREADS"] = str(self.omp_num_threads)
-        env["OMP_PLACES"] = "cores"
+        from coastal_calibration.utils.mpi import build_mpi_env
 
-        # MPI / AWS EFA fabric tuning — required for reliable MPI
-        # on EFA-enabled instances (e.g. c5n-18xlarge).  Without
-        # these, MPI collectives can hang during ESMF initialization.
-        env["MPICH_OFI_STARTUP_CONNECT"] = "1"
-        env["MPICH_COLL_SYNC"] = "MPI_Bcast"
-        env["MPICH_REDUCE_NO_SMP"] = "1"
-        env["FI_OFI_RXM_SAR_LIMIT"] = "3145728"
-        env["FI_MR_CACHE_MAX_COUNT"] = "0"
-        env["FI_EFA_RECVWIN_SIZE"] = "65536"
-
+        build_mpi_env(env)
         return env
 
     def validate(self, config: CoastalCalibConfig) -> list[str]:  # noqa: D102
@@ -357,6 +365,9 @@ class SchismModelConfig(ModelConfig):
 
         if self.nscribes >= self.total_tasks:
             errors.append("model_config.nscribes must be less than total MPI tasks")
+
+        if self.schism_exe and not self.schism_exe.exists():
+            errors.append(f"model_config.schism_exe not found: {self.schism_exe}")
 
         if config.paths.hot_start_file and not config.paths.hot_start_file.exists():
             errors.append(f"Hot start file not found: {config.paths.hot_start_file}")
@@ -431,8 +442,9 @@ class SchismModelConfig(ModelConfig):
             "nscribes": self.nscribes,
             "omp_num_threads": self.omp_num_threads,
             "oversubscribe": self.oversubscribe,
-            "binary": self.binary,
+            "schism_exe": (str(self.schism_exe) if self.schism_exe else None),
             "include_noaa_gages": self.include_noaa_gages,
+            "runtime_env": self.runtime_env,
         }
         return d
 
@@ -727,6 +739,7 @@ class SfincsModelConfig(ModelConfig):
     floodmap_dem: Path | None = None
     floodmap_hmin: float = 0.05
     floodmap_enabled: bool = True
+    runtime_env: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self.prebuilt_dir = Path(self.prebuilt_dir).expanduser().resolve()
@@ -771,7 +784,6 @@ class SfincsModelConfig(ModelConfig):
     def build_environment(  # noqa: D102
         self, env: dict[str, str], config: CoastalCalibConfig
     ) -> dict[str, str]:
-        env["OMP_NUM_THREADS"] = str(self.omp_num_threads)
         return env
 
     def validate(self, config: CoastalCalibConfig) -> list[str]:  # noqa: D102
@@ -861,6 +873,7 @@ class SfincsModelConfig(ModelConfig):
             "floodmap_dem": (str(self.floodmap_dem) if self.floodmap_dem else None),
             "floodmap_hmin": self.floodmap_hmin,
             "floodmap_enabled": self.floodmap_enabled,
+            "runtime_env": self.runtime_env,
         }
 
 
@@ -993,9 +1006,7 @@ _SFINCS_FIELD_MIGRATION: dict[str, str] = {
 }
 
 # Maps old SchismModelConfig field names to new names.
-_SCHISM_FIELD_MIGRATION: dict[str, str] = {
-    "schism_binary": "binary",
-}
+_SCHISM_FIELD_MIGRATION: dict[str, str] = {}
 
 
 def _migrate_model_config_data(

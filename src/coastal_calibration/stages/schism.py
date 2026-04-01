@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import re
+import shutil
 from datetime import timedelta
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
@@ -11,8 +13,6 @@ import numpy as np
 from coastal_calibration.stages.base import WorkflowStage
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from numpy.typing import NDArray
 
     from coastal_calibration.config.schema import CoastalCalibConfig, SchismModelConfig
@@ -457,28 +457,53 @@ class SCHISMRunStage(WorkflowStage):
         super().__init__(config, monitor)
         self.model: SchismModelConfig = cast("SchismModelConfig", config.model_config)
 
-    def _build_mpi_command(self) -> list[str]:
+    @staticmethod
+    def _resolve_exe(schism_cfg: SchismModelConfig) -> Path:
+        """Return the SCHISM executable or raise with a helpful message."""
+        if schism_cfg.schism_exe is not None:
+            return schism_cfg.schism_exe
+        found = shutil.which("pschism")
+        if found is not None:
+            return Path(found)
+        raise RuntimeError(
+            "SCHISM executable not found.  Either:\n"
+            "  1. Activate a pixi environment with the 'schism' feature"
+            " (builds automatically on first activation).\n"
+            "  2. Set 'schism_exe' in the config to the path of an existing binary."
+        )
+
+    def _build_mpi_command(self, exe: Path) -> list[str]:
         """Construct the ``mpiexec … pschism N`` command list."""
-        cmd = ["mpiexec", "-n", str(self.model.total_tasks)]
-        if self.model.oversubscribe:
-            cmd.append("--oversubscribe")
-        cmd.extend([self.model.binary, str(self.model.nscribes)])
+        from coastal_calibration.utils.mpi import build_mpi_cmd
+
+        cmd = build_mpi_cmd(self.model.total_tasks, oversubscribe=self.model.oversubscribe)
+        cmd.extend([str(exe), str(self.model.nscribes)])
         return cmd
 
     def run(self) -> dict[str, Any]:
         """Execute SCHISM model run."""
         import subprocess
 
+        exe = self._resolve_exe(self.model)
+
         self._update_substep("Building environment")
-        env = self.build_environment()
+        if self.model.schism_exe is not None:
+            from coastal_calibration.utils.mpi import build_isolated_env
+
+            env = build_isolated_env(
+                omp_num_threads=self.model.omp_num_threads,
+                runtime_env=self.model.runtime_env,
+            )
+        else:
+            env = self.build_environment()
 
         self._log(
-            f"Launching {self.model.binary} with {self.model.total_tasks} MPI tasks "
+            f"Launching {exe.name} with {self.model.total_tasks} MPI tasks "
             f"({self.model.nodes} node(s), {self.model.nscribes} scribe(s))"
         )
         self._update_substep(f"Running pschism with {self.model.total_tasks} MPI tasks")
 
-        cmd = self._build_mpi_command()
+        cmd = self._build_mpi_command(exe)
         self._log(f"Command: {' '.join(cmd)}")
 
         result = subprocess.run(

@@ -58,7 +58,12 @@ class WorkflowStage(ABC):
         # already set the variable.
         env.setdefault("HDF5_USE_FILE_LOCKING", "FALSE")
 
-        # Delegate model-specific variables (compute resources, mesh, etc.)
+        # OpenMP thread pinning — common to all models.
+        env["OMP_NUM_THREADS"] = str(self.config.model_config.omp_num_threads)
+        env["OMP_PLACES"] = "cores"
+        env["OMP_PROC_BIND"] = "close"
+
+        # Delegate model-specific variables (MPI tuning, etc.)
         self.config.model_config.build_environment(env, self.config)
 
         self._env = env

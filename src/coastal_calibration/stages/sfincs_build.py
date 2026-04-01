@@ -11,7 +11,6 @@ module-level registry keyed by config ``id``.
 
 from __future__ import annotations
 
-import os
 import shutil
 import subprocess
 from datetime import datetime, timedelta
@@ -1691,7 +1690,15 @@ class SfincsRunStage(_SfincsStageBase):
 
         self._log(f"Running SFINCS via native executable: {exe}")
         self._update_substep("Running SFINCS")
-        env = {**os.environ, "OMP_NUM_THREADS": str(self.sfincs.omp_num_threads)}
+        if self.sfincs.sfincs_exe is not None:
+            from coastal_calibration.utils.mpi import build_isolated_env
+
+            env = build_isolated_env(
+                omp_num_threads=self.sfincs.omp_num_threads,
+                runtime_env=self.sfincs.runtime_env,
+            )
+        else:
+            env = self.build_environment()
         _run_and_log([str(exe)], model_root, env=env)
 
         self._log("SFINCS run completed")
