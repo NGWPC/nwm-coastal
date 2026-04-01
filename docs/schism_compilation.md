@@ -388,9 +388,17 @@ env["OMP_PROC_BIND"] = "close"
 
 Delegates to `build_mpi_env()` from `coastal_calibration.utils.mpi`, which auto-detects
 the active MPI implementation (OpenMPI or MPICH) and sets the appropriate tuning
-variables:
+variables. Settings are layered: general settings apply on all clusters, EFA-specific
+settings are added only when AWS EFA devices are detected.
 
-**OpenMPI** (default conda-forge build stack):
+**OpenMPI — general** (all clusters):
+
+```python
+env["OMPI_MCA_mpi_warn_on_fork"] = "0"       # suppress NFS fork warnings
+env["OMPI_MCA_orte_tmpdir_base"] = "/tmp"     # shared-memory on local disk
+```
+
+**OpenMPI — EFA only** (when `/sys/class/infiniband/efa*` detected):
 
 ```python
 env["OMPI_MCA_mtl"] = "ofi"
@@ -398,7 +406,7 @@ env["OMPI_MCA_pml"] = "cm"
 env["OMPI_MCA_btl"] = "^openib"
 ```
 
-**MPICH / Cray MPICH** (WCOSS2 via `schism_exe` + system MPI):
+**MPICH / Cray MPICH** (all clusters, including WCOSS2 via `schism_exe`):
 
 ```python
 env["MPICH_OFI_STARTUP_CONNECT"] = "1"
@@ -406,7 +414,7 @@ env["MPICH_COLL_SYNC"] = "MPI_Bcast"
 env["MPICH_REDUCE_NO_SMP"] = "1"
 ```
 
-**Common libfabric tuning** (both implementations):
+**Libfabric tuning — EFA only** (when EFA devices detected, any MPI impl):
 
 ```python
 env["FI_OFI_RXM_SAR_LIMIT"] = "3145728"

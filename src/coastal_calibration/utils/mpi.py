@@ -11,7 +11,7 @@ Two environment-building modes are provided:
 * :func:`build_isolated_env` — builds a clean environment that strips
   conda library paths so system-compiled binaries find the correct
   system MPI, HDF5, and NetCDF.  Used when the user supplies a custom
-  ``binary`` or ``sfincs_exe`` path.
+  ``schism_exe`` or ``sfincs_exe`` path.
 """
 
 from __future__ import annotations

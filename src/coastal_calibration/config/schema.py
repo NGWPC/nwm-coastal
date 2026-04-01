@@ -208,9 +208,9 @@ class ModelConfig(ABC):
     """
 
     omp_num_threads: int
+    """Number of OpenMP threads per process."""
 
     runtime_env: dict[str, str]
-    """Number of OpenMP threads per process."""
     """Extra environment variables applied when launching the model binary.
 
     These are merged last, so they can override any auto-detected value.
@@ -1006,7 +1006,10 @@ _SFINCS_FIELD_MIGRATION: dict[str, str] = {
 }
 
 # Maps old SchismModelConfig field names to new names.
-_SCHISM_FIELD_MIGRATION: dict[str, str] = {}
+_SCHISM_FIELD_MIGRATION: dict[str, str] = {
+    "schism_binary": "schism_exe",
+    "binary": "schism_exe",
+}
 
 
 def _migrate_model_config_data(
