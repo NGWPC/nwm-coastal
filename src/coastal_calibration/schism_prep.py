@@ -929,10 +929,10 @@ def make_stofs_boundary(
     env = os.environ.copy()
     env.setdefault("HDF5_USE_FILE_LOCKING", "FALSE")
 
+    from coastal_calibration.utils.mpi import build_mpi_cmd
+
     cmd = [
-        "mpiexec",
-        "-n",
-        str(mpi_tasks),
+        *build_mpi_cmd(mpi_tasks),
         sys.executable,
         "-m",
         "coastal_calibration.regridding.regrid_estofs",

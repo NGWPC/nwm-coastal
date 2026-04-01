@@ -46,6 +46,15 @@ repos:
     entry: jupytext --sync
     files: ^docs/examples/notebooks/
 
+- repo: local
+  hooks:
+  - id: nb-clean
+    name: Strip ANSI codes and absolute paths from notebooks
+    entry: python scripts/clean_notebooks.py
+    language: python
+    files: ^docs/examples/notebooks/.*\.ipynb$
+    pass_filenames: true
+
 - repo: https://github.com/astral-sh/ruff-pre-commit
   rev: v0.15.8
   hooks:

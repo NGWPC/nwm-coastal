@@ -7,7 +7,7 @@ requires = [
 
 [project]
 name = "coastal-calibration"
-description = "A coastal model (SCHISM, SFINCS) workflow on HPC clusters"
+description = "A coastal model creation and run (SCHISM, SFINCS) workflow"
 readme = "README.md"
 keywords = [
   "calibration",
@@ -15,7 +15,6 @@ keywords = [
   "hpc",
   "schism",
   "sfincs",
-  "singularity",
   "slurm",
 ]
 license = { file = "LICENSE" }
@@ -55,8 +54,8 @@ optional-dependencies.docs = [
   "jupytext",
   "mike>=2",
   "mkdocs>=1.6",
-  "mkdocs-jupyter>=0.25,<0.26",
-  "mkdocs-materialx",
+  "mkdocs-jupyter>=0.26.1",
+  "mkdocs-materialx>=10.1.1",
   "mkdocstrings[python]>=0.27",
   "ruff",
 ]
@@ -179,6 +178,7 @@ netcdf-fortran = { version = "*", build = "mpi_openmpi_*" }
 schism = { path = "coastal_models/schism" }
 # Force MPI (OpenMPI) build variants so ESMF/esmpy runs with parallel support.
 # Without the build constraint, conda-forge resolves the nompi variants.
+# On WCOSS2, system Cray MPICH is used via schism_exe + build_isolated_env.
 mpi = { version = "*", build = "openmpi" }
 openmpi = "*"
 esmf = { version = "*", build = "mpi_openmpi_*" }

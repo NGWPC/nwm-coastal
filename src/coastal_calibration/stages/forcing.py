@@ -84,9 +84,9 @@ class NWMForcingStage(WorkflowStage):
         """
         import sys
 
-        cmd = ["mpiexec", "-n", str(self.model.total_tasks)]
-        if self.model.oversubscribe:
-            cmd.append("--oversubscribe")
+        from coastal_calibration.utils.mpi import build_mpi_cmd
+
+        cmd = build_mpi_cmd(self.model.total_tasks, oversubscribe=self.model.oversubscribe)
         cmd.extend(
             [
                 sys.executable,

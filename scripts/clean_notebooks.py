@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*[mGKHFABCDEFGHJKSTsu]")
@@ -44,9 +45,12 @@ def clean_notebook(path: Path, abs_prefix: str) -> None:
 def main() -> None:
     root = repo_root()
     abs_prefix = str(root) + "/"
-    notebooks = sorted((root / "docs/examples/notebooks").glob("*.ipynb"))
-    if not notebooks:
-        return
+
+    if len(sys.argv) > 1:
+        notebooks = [Path(f) for f in sys.argv[1:] if f.endswith(".ipynb")]
+    else:
+        notebooks = sorted((root / "docs/examples/notebooks").glob("*.ipynb"))
+
     for nb_path in notebooks:
         clean_notebook(nb_path, abs_prefix)
 

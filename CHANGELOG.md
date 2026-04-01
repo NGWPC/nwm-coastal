@@ -9,8 +9,40 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 
+- **MPI detection module** (`utils/mpi.py`): auto-detects the active MPI implementation
+    (OpenMPI or MPICH/Cray MPICH) at runtime via `mpiexec --version` and sets the
+    correct tuning environment variables and launcher flags for each. On AWS EFA
+    instances, libfabric transport and buffer tuning are applied automatically; on plain
+    NFS/Lustre clusters only general settings (shared-memory on `/tmp`, fork-warning
+    suppression) are used.
+- **`schism_exe` config option**: added `schism_exe: Path | None` (default `None`) to
+    `SchismModelConfig`, matching the existing `sfincs_exe` pattern. When set, the
+    `schism_run` stage uses the given executable and isolates the subprocess environment
+    from conda libraries for system MPI compatibility.
+- **`runtime_env` config option**: both `SchismModelConfig` and `SfincsModelConfig`
+    accept a `runtime_env: dict[str, str]` for injecting extra environment variables
+    into the model run subprocess. Applied last, so it can override auto-detected MPI
+    tuning values.
 - **Type stubs**: added `types-geopandas` and `types-shapely` to the typecheck
     environment for better third-party type coverage.
+
+### Changed
+
+- **Lazy imports**: converted `__init__.py` files (package root, `config/`, `utils/`)
+    and `cli.py` to use deferred imports via `__getattr__`. The CLI
+    (`coastal-calibration --version`) no longer pulls the full dependency tree at
+    startup, reducing cold-start time from ~12 s to under 1 s on NFS.
+- **System MPI isolation**: when `schism_exe` or `sfincs_exe` is set to a
+    system-compiled binary, the run stage strips conda library paths from the subprocess
+    environment so the binary finds system MPI/HDF5/NetCDF. A new `runtime_env` config
+    option allows injecting extra env vars for the model run. Python MPI stages (ESMF
+    regridding) continue using conda OpenMPI.
+- **OpenMP tuning**: moved common OpenMP variables (`OMP_NUM_THREADS`, `OMP_PLACES`,
+    `OMP_PROC_BIND`) from model-specific `build_environment()` methods to the shared
+    `WorkflowStage.build_environment()` in `stages/base.py`.
+- **SFINCS run stage**: `SfincsRunStage.run()` now uses `self.build_environment()`
+    instead of constructing an inline env dict, ensuring `HDF5_USE_FILE_LOCKING` and
+    OpenMP pinning are applied consistently.
 
 ### Fixed
 
@@ -21,6 +53,9 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - **Script permissions**: marked `scripts/find_compatible_sdk.sh`,
     `coastal_models/schism/build.sh`, and `coastal_models/sfincs/build.sh` as executable
     to satisfy the pre-commit shebang check.
+- **Cluster install verification**: replaced `shutil.which` check with `ls` in
+    `CLUSTER_INSTALL.md` — the old command returned `None` because running the Python
+    binary directly bypasses the wrapper's `PATH` setup.
 
 ### Changed
 
