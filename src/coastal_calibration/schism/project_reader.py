@@ -393,16 +393,49 @@ class NWMSCHISMProject:
             self._node_coordinates = self._get_node_coordinates()
         return self._node_coordinates
 
+    def _read_node_coords_from(self, path: Path) -> NDArray[np.float64]:
+        """Read node coordinates from a specific hgrid-format file."""
+        coords = np.zeros((self.n_nodes, 2), dtype=np.float64)
+        with path.open("r", buffering=self.buffer_size) as f:
+            f.readline()  # description
+            f.readline()  # header
+            for i in range(self.n_nodes):
+                parts = f.readline().split("!")[0].split()
+                coords[i, 0] = float(parts[1])
+                coords[i, 1] = float(parts[2])
+        return coords
+
+    def _get_geographic_coords(self) -> NDArray[np.float64]:
+        """Get node coordinates in geographic (lon/lat) space.
+
+        Uses ``hgrid.ll`` when the primary mesh is projected;
+        otherwise returns :attr:`nodes_coordinates` directly.
+        """
+        if self.is_geographic:
+            return self.nodes_coordinates
+        hgrid_ll = self.project_dir / SCHISMFiles.HGRID_LL
+        if hgrid_ll.exists():
+            return self._read_node_coords_from(hgrid_ll)
+        raise FileNotFoundError(
+            f"Projected mesh requires hgrid.ll for geodesic area computation, "
+            f"but {hgrid_ll} was not found. Provide either hgrid.ll or "
+            f"a pre-computed element_areas.txt."
+        )
+
     def _compute_element_areas(self) -> NDArray[np.float64]:
-        """Compute geodesic areas for all elements."""
+        """Compute geodesic areas for all elements.
+
+        Reads lon/lat coordinates from ``hgrid.ll`` when the primary
+        mesh (``hgrid.gr3``) uses projected coordinates.
+        """
+        geo_coords = self._get_geographic_coords()
         areas = np.zeros(self.n_elements, dtype=np.float64)
         idx = 0
         for elem_chunk in self.iter_elements(self.buffer_size):
             node_indices = elem_chunk[:, 1:5] - 1  # 0-indexed
             for i, node_ids in enumerate(node_indices):
-                # Filter out invalid nodes (quads have 4, tris have 3 + one zero)
                 valid_ids = node_ids[node_ids >= 0]
-                lons, lats = self.nodes_coordinates[valid_ids].T
+                lons, lats = geo_coords[valid_ids].T
                 areas[idx + i] = abs(geod.polygon_area_perimeter(lons, lats)[0])
             idx += len(elem_chunk)
         return areas
@@ -413,14 +446,12 @@ class NWMSCHISMProject:
 
         Prefers the pre-computed ``element_areas.txt`` file when present
         (faster and correct for both geographic and projected meshes).
-        Falls back to geodesic computation from ``hgrid.gr3`` when the
-        file is absent (assumes geographic coordinates).
+        Falls back to geodesic computation using ``hgrid.ll`` for
+        projected meshes or ``hgrid.gr3`` for geographic meshes.
         """
         if self._element_areas is None:
             if self.elem_area_file.exists():
-                self._element_areas = np.loadtxt(
-                    self.elem_area_file, dtype=np.float64
-                )
+                self._element_areas = np.loadtxt(self.elem_area_file, dtype=np.float64)
             else:
                 self._element_areas = self._compute_element_areas()
         return self._element_areas
