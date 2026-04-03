@@ -357,7 +357,7 @@ Configure logging for the workflow:
 
 ```python
 import logging
-from coastal_calibration.utils.logging import setup_logger
+from coastal_calibration.logging import setup_logger
 
 # Set up logging
 logger = setup_logger(log_level="DEBUG", log_file="workflow.log")

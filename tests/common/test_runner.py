@@ -101,6 +101,7 @@ class TestCoastalCalibRunner:
             "schism_params",
             "schism_obs",
             "schism_boundary",
+            "schism_discharge",
             "schism_prep",
             "schism_run",
             "schism_postprocess",

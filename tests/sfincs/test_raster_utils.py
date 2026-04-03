@@ -1,4 +1,4 @@
-"""Tests for :func:`coastal_calibration.utils.raster.clip_and_reproject`.
+"""Tests for :func:`coastal_calibration.data.transformation.clip_and_reproject`.
 
 Run with::
 
@@ -12,7 +12,7 @@ import pytest
 import xarray as xr
 from hydromt.gis import raster as _  # noqa: F401  — registers accessor
 
-from coastal_calibration.utils.raster import clip_and_reproject
+from coastal_calibration.data.transformation import clip_and_reproject
 
 
 def _make_raster(

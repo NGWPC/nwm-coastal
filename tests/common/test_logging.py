@@ -1,4 +1,4 @@
-"""Tests for coastal_calibration.utils.logging module."""
+"""Tests for coastal_calibration.logging module."""
 
 from __future__ import annotations
 
@@ -9,8 +9,7 @@ from datetime import datetime, timedelta
 import pytest
 
 from coastal_calibration.config.schema import MonitoringConfig
-from coastal_calibration.utils.logging import (
-    ProgressBar,
+from coastal_calibration.logging import (
     StageProgress,
     StageStatus,
     WorkflowMonitor,
@@ -237,30 +236,3 @@ class TestWorkflowMonitor:
         assert progress_file.exists()
         data = json.loads(progress_file.read_text())
         assert "stages" in data
-
-
-class TestProgressBar:
-    def test_basic(self):
-        pb = ProgressBar(total=10, description="Test")
-        assert pb.total == 10
-        assert pb.current == 0
-
-    def test_update(self, capsys):
-        pb = ProgressBar(total=3, description="Test")
-        pb.update(1)
-        assert pb.current == 1
-
-    def test_update_past_total(self, capsys):
-        pb = ProgressBar(total=2, description="Test")
-        pb.update(5)
-        assert pb.current == 2  # clamped to total
-
-    def test_zero_total(self, capsys):
-        pb = ProgressBar(total=0)
-        pb.update(0)
-        # Should not raise
-
-    def test_context_manager(self, capsys):
-        with ProgressBar(total=2) as pb:
-            pb.update(2)
-        # Should not raise

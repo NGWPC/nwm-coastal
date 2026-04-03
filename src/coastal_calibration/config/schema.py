@@ -9,9 +9,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, ClassVar, Literal
 
+import pandas as pd
 import yaml
-
-from coastal_calibration.utils.time import parse_datetime as _parse_datetime
 
 MeteoSource = Literal["nwm_retro", "nwm_ana"]
 CoastalDomain = Literal["prvi", "hawaii", "atlgulf", "pacific"]
@@ -293,6 +292,10 @@ class SchismModelConfig(ModelConfig):
         ``station.in`` file, set ``iout_sta = 1`` in ``param.nml``,
         and generate sim-vs-obs comparison plots after the run.
         Requires the ``plot`` optional dependencies.
+    discharge_file : Path, optional
+        Path to a ``nwmReaches.csv`` file mapping NWM reach feature IDs
+        to SCHISM source/sink elements.  When ``None`` (default), the
+        discharge stage is skipped and no river forcing is generated.
     """
 
     prebuilt_dir: Path = field(default_factory=Path)
@@ -305,6 +308,7 @@ class SchismModelConfig(ModelConfig):
     oversubscribe: bool = False
     schism_exe: Path | None = None
     include_noaa_gages: bool = False
+    discharge_file: Path | None = None
     runtime_env: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -312,6 +316,8 @@ class SchismModelConfig(ModelConfig):
         self.geogrid_file = Path(self.geogrid_file).expanduser().resolve()
         if self.schism_exe is not None:
             self.schism_exe = Path(self.schism_exe).expanduser().resolve()
+        if self.discharge_file is not None:
+            self.discharge_file = Path(self.discharge_file).expanduser().resolve()
 
     @property
     def model_name(self) -> str:  # noqa: D102
@@ -342,6 +348,7 @@ class SchismModelConfig(ModelConfig):
             "schism_params",
             "schism_obs",
             "schism_boundary",
+            "schism_discharge",
             "schism_prep",
             "schism_run",
             "schism_postprocess",
@@ -351,7 +358,7 @@ class SchismModelConfig(ModelConfig):
     def build_environment(  # noqa: D102
         self, env: dict[str, str], config: CoastalCalibConfig
     ) -> dict[str, str]:
-        from coastal_calibration.utils.mpi import build_mpi_env
+        from coastal_calibration.utils import build_mpi_env
 
         build_mpi_env(env)
         return env
@@ -381,7 +388,6 @@ class SchismModelConfig(ModelConfig):
                 "hgrid.gr3",
                 "vgrid.in",
                 "param.nml",
-                "nwmReaches.csv",
                 "bctides.in",
             ]
             errors.extend(
@@ -389,6 +395,9 @@ class SchismModelConfig(ModelConfig):
                 for fname in required
                 if not (self.prebuilt_dir / fname).exists()
             )
+
+        if self.discharge_file and not self.discharge_file.exists():
+            errors.append(f"model_config.discharge_file not found: {self.discharge_file}")
 
         if self.geogrid_file is None:  # pyright: ignore[reportUnnecessaryComparison]
             errors.append(
@@ -402,19 +411,20 @@ class SchismModelConfig(ModelConfig):
     def create_stages(  # noqa: D102
         self, config: CoastalCalibConfig, monitor: Any
     ) -> dict[str, Any]:
-        from coastal_calibration.stages.boundary import (
+        from coastal_calibration.data.download_stage import DownloadStage
+        from coastal_calibration.schism.boundary import (
             BoundaryConditionStage,
             UpdateParamsStage,
         )
-        from coastal_calibration.stages.download import DownloadStage
-        from coastal_calibration.stages.forcing import (
+        from coastal_calibration.schism.forcing import (
             NWMForcingStage,
             PostForcingStage,
             PreForcingStage,
         )
-        from coastal_calibration.stages.schism import (
+        from coastal_calibration.schism.stages import (
             PostSCHISMStage,
             PreSCHISMStage,
+            SchismDischargeStage,
             SchismObservationStage,
             SchismPlotStage,
             SCHISMRunStage,
@@ -428,6 +438,7 @@ class SchismModelConfig(ModelConfig):
             "schism_params": UpdateParamsStage(config, monitor),
             "schism_obs": SchismObservationStage(config, monitor),
             "schism_boundary": BoundaryConditionStage(config, monitor),
+            "schism_discharge": SchismDischargeStage(config, monitor),
             "schism_prep": PreSCHISMStage(config, monitor),
             "schism_run": SCHISMRunStage(config, monitor),
             "schism_postprocess": PostSCHISMStage(config, monitor),
@@ -446,6 +457,7 @@ class SchismModelConfig(ModelConfig):
             "oversubscribe": self.oversubscribe,
             "schism_exe": (str(self.schism_exe) if self.schism_exe else None),
             "include_noaa_gages": self.include_noaa_gages,
+            "discharge_file": (str(self.discharge_file) if self.discharge_file else None),
             "runtime_env": self.runtime_env,
         }
         return d
@@ -527,7 +539,7 @@ class SfincsModelConfig(ModelConfig):
         with the ``sfincs`` feature.
     omp_num_threads : int
         Number of OpenMP threads.  Defaults to the number of physical CPU
-        cores on the current machine (see :func:`~coastal_calibration.utils.system.get_cpu_count`).
+        cores on the current machine (see :func:`~coastal_calibration.utils.get_cpu_count`).
         On HPC nodes this auto-detects correctly; on a local laptop it
         avoids over-subscribing the system.
     inp_overrides : dict
@@ -756,7 +768,7 @@ class SfincsModelConfig(ModelConfig):
         if self.floodmap_dem is not None:
             self.floodmap_dem = Path(self.floodmap_dem).expanduser().resolve()
         if self.omp_num_threads <= 0:
-            from coastal_calibration.utils.system import get_cpu_count
+            from coastal_calibration.utils import get_cpu_count
 
             self.omp_num_threads = get_cpu_count()
 
@@ -822,8 +834,8 @@ class SfincsModelConfig(ModelConfig):
     def create_stages(  # noqa: D102
         self, config: CoastalCalibConfig, monitor: Any
     ) -> dict[str, Any]:
-        from coastal_calibration.stages.download import DownloadStage
-        from coastal_calibration.stages.sfincs_build import (
+        from coastal_calibration.data.download_stage import DownloadStage
+        from coastal_calibration.sfincs.stages import (
             SfincsDataCatalogStage,
             SfincsDischargeStage,
             SfincsFloodMapStage,
@@ -1051,7 +1063,7 @@ class CoastalCalibConfig:
 
         sim_data = data.get("simulation", {})
         if "start_date" in sim_data:
-            sim_data["start_date"] = _parse_datetime(sim_data["start_date"])
+            sim_data["start_date"] = pd.to_datetime(sim_data["start_date"]).to_pydatetime()
         simulation = SimulationConfig(**sim_data)
 
         boundary_data = data.get("boundary", {})
@@ -1231,7 +1243,7 @@ class CoastalCalibConfig:
 
     def validate(self) -> list[str]:
         """Validate configuration and return list of errors."""
-        from coastal_calibration.downloader import validate_date_ranges
+        from coastal_calibration.data.downloader import validate_date_ranges
 
         errors: list[str] = []
 

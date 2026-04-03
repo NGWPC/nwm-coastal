@@ -1,4 +1,4 @@
-"""Tests for coastal_calibration.coops_api module."""
+"""Tests for coastal_calibration.data.coops_api module."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ import pytest
 import shapely
 import xarray as xr
 
-from coastal_calibration.coops_api import (
+from coastal_calibration.data.coops_api import (
     COOPSAPIClient,
     DatumValue,
     StationDatum,
@@ -510,7 +510,7 @@ class TestGetStationsMetadata:
                 }
             ]
         }
-        with patch("coastal_calibration.coops_api.fetch", return_value=mock_response):
+        with patch("coastal_calibration.data.coops_api.fetch", return_value=mock_response):
             client = COOPSAPIClient.__new__(COOPSAPIClient)
             client.timeout = 30
             gdf = client._get_stations_metadata()
@@ -519,7 +519,7 @@ class TestGetStationsMetadata:
 
     def test_raises_on_empty_response(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
-        with patch("coastal_calibration.coops_api.fetch", return_value=None):
+        with patch("coastal_calibration.data.coops_api.fetch", return_value=None):
             client = COOPSAPIClient.__new__(COOPSAPIClient)
             client.timeout = 30
             with pytest.raises(ValueError, match="No station data returned"):
@@ -767,7 +767,7 @@ class TestQueryCoopsByGeometry:
         geom = shapely.box(-95.0, 29.0, -94.5, 29.5)
         with (
             patch.object(COOPSAPIClient, "_get_stations_metadata", return_value=mock_stations_gdf),
-            patch("coastal_calibration.coops_api.query_coops_byids") as mock_byids,
+            patch("coastal_calibration.data.coops_api.query_coops_byids") as mock_byids,
         ):
             mock_byids.return_value = xr.Dataset()
             query_coops_bygeometry(geom, "20230101", "20230102")

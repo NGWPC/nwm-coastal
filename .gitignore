@@ -192,6 +192,7 @@ site/
 
 ### Data Folder ###
 data/
+!src/coastal_calibration/data/
 
 ### Test Reports ###
 junit*.xml

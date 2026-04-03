@@ -31,7 +31,7 @@ import netCDF4
 import numpy as np
 from cftime import num2date
 
-from coastal_calibration.utils.logging import logger
+from coastal_calibration.logging import logger
 
 from .esmf_utils import MaskedRegridder, build_locstream, gather_reduce
 

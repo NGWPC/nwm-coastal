@@ -1,4 +1,4 @@
-"""Tests for coastal_calibration.schism_prep module.
+"""Tests for coastal_calibration.schism.prep module.
 
 Unit tests for the pure-Python SCHISM pre/post processing functions
 that replaced the former bash scripts.
@@ -12,7 +12,7 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 
-from coastal_calibration.schism_prep import (
+from coastal_calibration.schism.prep import (
     _write_th_file,
     partition_mesh,
     run_combine_sink_source,
@@ -32,9 +32,6 @@ class TestStageChrtoutFiles:
     def test_creates_staging_dirs(self, tmp_path):
         streamflow = tmp_path / "streamflow"
         streamflow.mkdir()
-        prebuilt = tmp_path / "prebuilt"
-        prebuilt.mkdir()
-        (prebuilt / "nwmReaches.csv").write_text("0\n\n0\n")
 
         # Create a dummy CHRTOUT file
         dt = datetime(2021, 6, 11, tzinfo=UTC)
@@ -47,38 +44,13 @@ class TestStageChrtoutFiles:
             duration_hours=1,
             coastal_domain="atlgulf",
             streamflow_dir=streamflow,
-            prebuilt_dir=prebuilt,
         )
         assert nwm_out.exists()
         assert nwm_ana.exists()
 
-    def test_copies_nwm_reaches(self, tmp_path):
-        streamflow = tmp_path / "streamflow"
-        streamflow.mkdir()
-        prebuilt = tmp_path / "prebuilt"
-        prebuilt.mkdir()
-        (prebuilt / "nwmReaches.csv").write_text("test")
-
-        dt = datetime(2021, 6, 11, tzinfo=UTC)
-        fname = "202106110000.CHRTOUT_DOMAIN1"
-        (streamflow / fname).write_text("dummy")
-
-        stage_chrtout_files(
-            work_dir=tmp_path,
-            start_date=dt,
-            duration_hours=1,
-            coastal_domain="pacific",
-            streamflow_dir=streamflow,
-            prebuilt_dir=prebuilt,
-        )
-        assert (tmp_path / "nwmReaches.csv").read_text() == "test"
-
     def test_hawaii_creates_subhourly_links(self, tmp_path):
         streamflow = tmp_path / "streamflow"
         streamflow.mkdir()
-        prebuilt = tmp_path / "prebuilt"
-        prebuilt.mkdir()
-        (prebuilt / "nwmReaches.csv").write_text("0\n\n0\n")
 
         dt = datetime(2021, 6, 11, tzinfo=UTC)
         # Create sub-hourly CHRTOUT files
@@ -95,7 +67,6 @@ class TestStageChrtoutFiles:
             duration_hours=1,
             coastal_domain="hawaii",
             streamflow_dir=streamflow,
-            prebuilt_dir=prebuilt,
         )
         # Ana dir should have the first 00 file
         assert any(nwm_ana.iterdir())
@@ -134,7 +105,7 @@ class TestWriteThFile:
 class TestRunCombineSinkSource:
     def test_raises_on_missing_binary(self, tmp_path):
         """Should raise when binary is not on PATH."""
-        with patch("coastal_calibration.schism_prep.subprocess.run") as mock_run:
+        with patch("coastal_calibration.schism.prep.subprocess.run") as mock_run:
             mock_run.return_value.returncode = 127
             mock_run.return_value.stderr = "combine_sink_source: not found"
             with pytest.raises(RuntimeError, match="combine_sink_source failed"):
@@ -142,7 +113,7 @@ class TestRunCombineSinkSource:
 
     def test_passes_correct_stdin(self, tmp_path):
         r"""Should pass '1\\n2\\n' as stdin to the binary."""
-        with patch("coastal_calibration.schism_prep.subprocess.run") as mock_run:
+        with patch("coastal_calibration.schism.prep.subprocess.run") as mock_run:
             mock_run.return_value.returncode = 0
             run_combine_sink_source(tmp_path)
             call_kwargs = mock_run.call_args
@@ -163,7 +134,7 @@ class TestPartitionMesh:
         part_file = tmp_path / f"graphinfo.part.{n_compute}"
         part_file.write_text("\n".join(str(i % 4) for i in range(100)))
 
-        with patch("coastal_calibration.schism_prep.subprocess.run") as mock_run:
+        with patch("coastal_calibration.schism.prep.subprocess.run") as mock_run:
             mock_run.return_value.returncode = 0
             result = partition_mesh(
                 work_dir=tmp_path,
@@ -187,7 +158,7 @@ class TestPartitionMesh:
         assert lines[99].startswith("100 ")
 
     def test_raises_on_metis_prep_failure(self, tmp_path):
-        with patch("coastal_calibration.schism_prep.subprocess.run") as mock_run:
+        with patch("coastal_calibration.schism.prep.subprocess.run") as mock_run:
             mock_run.return_value.returncode = 1
             mock_run.return_value.stderr = "error"
             with pytest.raises(RuntimeError, match="metis_prep failed"):

@@ -9,6 +9,53 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 
+- **`SchismDischargeStage`**: new dedicated stage for river discharge generation,
+    extracted from `PreSCHISMStage`. Encapsulates CHRTOUT staging, `nwmReaches.csv`
+    handling, `make_discharge`, `combine_sink_source`, and `merge_source_sink`. Skipped
+    when `discharge_file` is not configured (matching the SFINCS `SfincsDischargeStage`
+    pattern).
+- **`discharge_file` config option**: added `discharge_file: Path | None` (default
+    `None`) to `SchismModelConfig`. Points to a `nwmReaches.csv` file mapping NWM reach
+    feature IDs to SCHISM source/sink elements. When `None`, the discharge stage is
+    skipped and no river forcing is generated.
+
+### Changed
+
+- **Elevation correction is now explicit**: `make_tpxo_boundary` and
+    `make_stofs_boundary` accept an optional `correction_file` parameter instead of
+    implicitly checking for `elevation_correction.csv` in the work directory. Boundary
+    stages resolve the correction file from `prebuilt_dir`. Node-count validation is
+    performed when applying the correction.
+- **`PreSCHISMStage` slimmed down**: now only handles mesh partitioning and `param.nml`
+    patching. Discharge operations moved to `SchismDischargeStage`.
+- **`merge_source_sink` accepts element areas array**: the `root_dir`/`element_area_dir`
+    parameter replaced with `element_areas: ndarray`, computed at runtime from the mesh
+    via `NWMSCHISMProject.element_areas`. Eliminates dependency on `element_areas.txt`
+    for the discharge pipeline.
+- **`SchismObservationStage` uses `NWMSCHISMProject`**: replaced ~90 lines of standalone
+    hgrid.gr3 parsing helpers (`_read_hgrid_header`, `_read_node_coordinates`,
+    `_read_open_boundary_nodes`) with the `NWMSCHISMProject` class from the new
+    `schism/` module.
+- **`stage_chrtout_files` simplified**: removed `prebuilt_dir` parameter and
+    `nwmReaches.csv` copy (now handled by `SchismDischargeStage`).
+- **`update_params` no longer symlinks discharge/correction files**: `element_areas.txt`
+    and `elevation_correction.csv` removed from the symlink lists since they are now
+    handled by their respective stages.
+- **`nwmReaches.csv` removed from required validation**: no longer checked in
+    `SchismModelConfig.validate()`; the `discharge_file` config option replaces it.
+- **Package reorganization**: moved all model-specific code into dedicated packages:
+    - SCHISM workflow: `coastal_calibration.schism.{prep,sflux,stages,boundary,forcing}`
+    - SFINCS workflow:
+        `coastal_calibration.sfincs.{stages,create,data_catalog,plotting,floodmap,_hydromt_compat}`
+    - Data acquisition:
+        `coastal_calibration.data.{downloader,coops_api,download_stage,   streamflow,copdem,esa_worldcover,gebco_wms,topobathy_noaa,topobathy_nws,transformation}`
+    - `WorkflowStage` base class moved to `coastal_calibration.base`
+    - `stages/` directory dissolved; `utils/` retains only general utilities (logging,
+        system, time, mpi, workflow)
+    - HydroMT compatibility patch log messages downgraded from INFO to DEBUG.
+
+### Added (continued)
+
 - **MPI detection module** (`utils/mpi.py`): auto-detects the active MPI implementation
     (OpenMPI or MPICH/Cray MPICH) at runtime via `mpiexec --version` and sets the
     correct tuning environment variables and launcher flags for each. On AWS EFA

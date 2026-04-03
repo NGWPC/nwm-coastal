@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from coastal_calibration.config.schema import CoastalCalibConfig
-from coastal_calibration.utils.logging import (
+from coastal_calibration.logging import (
     WorkflowMonitor,
     configure_logger,
     generate_log_path,
@@ -17,7 +17,7 @@ from coastal_calibration.utils.logging import (
 )
 
 if TYPE_CHECKING:
-    from coastal_calibration.stages.base import WorkflowStage
+    from coastal_calibration.base import WorkflowStage
 
 
 @dataclass
@@ -301,16 +301,16 @@ class CoastalCalibRunner:
                 errors=[],
             )
 
-        # Clean generated files from previous runs when starting fresh.
-        # When resuming (start_from is set), preserve existing outputs.
-        if not start_from:
-            from coastal_calibration.schism_prep import clean_run_directory
-
-            clean_run_directory(self.config.paths.work_dir)
-
         self.monitor.register_stages(self.STAGE_ORDER)
         self.monitor.start_workflow()
         self.monitor.info("-" * 40)
+
+        # Clean generated files from previous runs when starting fresh.
+        # When resuming (start_from is set), preserve existing outputs.
+        if not start_from:
+            from coastal_calibration.schism.prep import clean_run_directory
+
+            clean_run_directory(self.config.paths.work_dir)
 
         stages_to_run = self._get_stages_to_run(start_from, stop_after)
 

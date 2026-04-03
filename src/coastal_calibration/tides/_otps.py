@@ -15,8 +15,8 @@ from typing import TYPE_CHECKING
 import netCDF4
 import numpy as np
 
+from coastal_calibration.logging import logger
 from coastal_calibration.tides._tpxo_out import TPXOOut
-from coastal_calibration.utils.logging import logger
 
 if TYPE_CHECKING:
     from pathlib import Path

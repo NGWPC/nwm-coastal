@@ -31,7 +31,7 @@ import esmpy as ESMF
 import numpy as np
 from netCDF4 import Dataset
 
-from coastal_calibration.utils.logging import logger
+from coastal_calibration.logging import logger
 
 from .esmf_utils import (
     Regridder,

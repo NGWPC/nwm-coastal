@@ -376,6 +376,11 @@ lint.per-file-ignores."src/coastal_calibration/regridding/*.py" = [
   # ESMF convention: import esmpy as ESMF
   "N812",
 ]
+lint.per-file-ignores."src/coastal_calibration/schism/subsetter.py" = [
+  # complex mesh operations with many sequential steps
+  "PLR0912",
+  "PLR0915",
+]
 lint.per-file-ignores."src/coastal_calibration/tides/pytides/*.py" = [
   # scientific naming conventions (tidal constituents: f_M2, u_K1, etc.)
   "N802",
@@ -432,6 +437,7 @@ reportUnknownVariableType = false
 reportUnknownArgumentType = false
 reportUnknownParameterType = false
 reportMissingTypeArgument = false
+reportUnnecessaryIsInstance = false
 reportUnnecessaryTypeIgnoreComment = true
 
 [tool.pytest]
