@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from pathlib import Path
 
+import pandas as pd
 import pytest
 import yaml
 
@@ -22,8 +23,7 @@ from coastal_calibration.config.schema import (
     _interpolate_config,
     _interpolate_value,
 )
-from coastal_calibration.utils.system import get_cpu_count
-from coastal_calibration.utils.time import parse_datetime as _parse_datetime
+from coastal_calibration.utils import get_cpu_count
 
 
 class TestSimulationConfig:
@@ -226,6 +226,7 @@ class TestSchismModelConfig:
             "schism_params",
             "schism_obs",
             "schism_boundary",
+            "schism_discharge",
             "schism_prep",
             "schism_run",
             "schism_postprocess",
@@ -366,25 +367,25 @@ class TestDeepMerge:
 class TestParseDatetime:
     def test_datetime_passthrough(self):
         dt = datetime(2021, 6, 11, 12, 0, 0)
-        assert _parse_datetime(dt) == dt
+        assert pd.to_datetime(dt).to_pydatetime() == dt
 
     def test_date_to_datetime(self):
         d = date(2021, 6, 11)
-        result = _parse_datetime(d)
+        result = pd.to_datetime(d).to_pydatetime()
         assert result == datetime(2021, 6, 11)
 
     def test_iso_format_date(self):
-        assert _parse_datetime("2021-06-11") == datetime(2021, 6, 11)
+        assert pd.to_datetime("2021-06-11").to_pydatetime() == datetime(2021, 6, 11)
 
     def test_iso_format_datetime(self):
-        assert _parse_datetime("2021-06-11T12:00:00") == datetime(2021, 6, 11, 12)
+        assert pd.to_datetime("2021-06-11T12:00:00").to_pydatetime() == datetime(2021, 6, 11, 12)
 
     def test_compact_date(self):
-        assert _parse_datetime("20210611") == datetime(2021, 6, 11)
+        assert pd.to_datetime("20210611").to_pydatetime() == datetime(2021, 6, 11)
 
     def test_invalid_format(self):
-        with pytest.raises(ValueError, match="Cannot parse datetime"):
-            _parse_datetime("not-a-date")
+        with pytest.raises(ValueError, match="not-a-date"):
+            pd.to_datetime("not-a-date", format="mixed")
 
 
 class TestInterpolation:
@@ -613,7 +614,7 @@ class TestCoastalCalibConfig:
         ``prebuilt_dir: ./texas`` in YAML, all derived paths (model root,
         etc.) must be absolute.
         """
-        from coastal_calibration.stages.sfincs_build import get_model_root
+        from coastal_calibration.sfincs.stages import get_model_root
 
         # Simulate running from a subdirectory with relative paths in YAML
         run_dir = tmp_path / "project" / "examples"

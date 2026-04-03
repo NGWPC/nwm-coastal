@@ -371,7 +371,7 @@ class TestSfincsInitStage:
     """Test the sfincs_init stage on the real pre-built model."""
 
     def test_init_copies_prebuilt_and_reads_model(self, sfincs_workflow_config):
-        from coastal_calibration.stages.sfincs_build import SfincsInitStage
+        from coastal_calibration.sfincs.stages import SfincsInitStage
 
         stage = SfincsInitStage(sfincs_workflow_config)
         result = stage.run()
@@ -384,7 +384,7 @@ class TestSfincsInitStage:
 
     def test_init_is_idempotent(self, sfincs_workflow_config):
         """Running init twice should not fail (existing files are kept)."""
-        from coastal_calibration.stages.sfincs_build import SfincsInitStage
+        from coastal_calibration.sfincs.stages import SfincsInitStage
 
         stage = SfincsInitStage(sfincs_workflow_config)
         result1 = stage.run()
@@ -400,7 +400,7 @@ class TestSfincsTimingStage:
     """Test the sfincs_timing stage."""
 
     def test_timing_sets_start_stop(self, sfincs_workflow_config):
-        from coastal_calibration.stages.sfincs_build import (
+        from coastal_calibration.sfincs.stages import (
             SfincsInitStage,
             SfincsTimingStage,
             _get_model,
@@ -423,7 +423,7 @@ class TestSfincsSymlinksAndCatalog:
     """Test the symlinks and data catalog stages."""
 
     def test_symlinks_stage(self, sfincs_workflow_config):
-        from coastal_calibration.stages.sfincs_build import SfincsSymlinksStage
+        from coastal_calibration.sfincs.stages import SfincsSymlinksStage
 
         stage = SfincsSymlinksStage(sfincs_workflow_config)
         result = stage.run()
@@ -434,7 +434,7 @@ class TestSfincsSymlinksAndCatalog:
             assert result["streamflow_symlinks"] >= 0
 
     def test_data_catalog_stage(self, sfincs_workflow_config):
-        from coastal_calibration.stages.sfincs_build import SfincsDataCatalogStage
+        from coastal_calibration.sfincs.stages import SfincsDataCatalogStage
 
         stage = SfincsDataCatalogStage(sfincs_workflow_config)
         result = stage.run()
@@ -450,7 +450,7 @@ class TestSfincsForcingStage:
     """Test the water level boundary forcing stage with synthetic STOFS data."""
 
     def test_forcing_with_stofs(self, sfincs_workflow_config):
-        from coastal_calibration.stages.sfincs_build import (
+        from coastal_calibration.sfincs.stages import (
             SfincsDataCatalogStage,
             SfincsForcingStage,
             SfincsInitStage,
@@ -480,7 +480,7 @@ class TestSfincsForcingStage:
         ``cannot reindex or align along dimension 'nbou' because of
         conflicting dimension sizes: {2530, 262}``
         """
-        from coastal_calibration.stages.sfincs_build import (
+        from coastal_calibration.sfincs.stages import (
             SfincsDataCatalogStage,
             SfincsForcingStage,
             SfincsInitStage,
@@ -526,7 +526,7 @@ class TestSfincsDischargeStage:
     """Test the discharge source points stage."""
 
     def test_discharge_from_src_file(self, sfincs_workflow_config):
-        from coastal_calibration.stages.sfincs_build import (
+        from coastal_calibration.sfincs.stages import (
             SfincsDischargeStage,
             SfincsInitStage,
         )
@@ -543,7 +543,7 @@ class TestSfincsDischargeStage:
         overlap with the ``.src`` file, the discharge stage should populate
         the discharge timeseries with non-zero values.
         """
-        from coastal_calibration.stages.sfincs_build import (
+        from coastal_calibration.sfincs.stages import (
             SfincsDataCatalogStage,
             SfincsDischargeStage,
             SfincsInitStage,
@@ -576,7 +576,7 @@ class TestSfincsMeteoStages:
     """Test the meteo forcing stages (precip, wind, pressure) with synthetic NWM data."""
 
     def _run_prerequisites(self, config: CoastalCalibConfig) -> None:
-        from coastal_calibration.stages.sfincs_build import (
+        from coastal_calibration.sfincs.stages import (
             SfincsDataCatalogStage,
             SfincsInitStage,
             SfincsSymlinksStage,
@@ -589,7 +589,7 @@ class TestSfincsMeteoStages:
         SfincsTimingStage(config).run()
 
     def test_precipitation_stage(self, sfincs_workflow_config):
-        from coastal_calibration.stages.sfincs_build import SfincsPrecipitationStage
+        from coastal_calibration.sfincs.stages import SfincsPrecipitationStage
 
         self._run_prerequisites(sfincs_workflow_config)
 
@@ -597,7 +597,7 @@ class TestSfincsMeteoStages:
         assert result["status"] == "completed"
 
     def test_wind_stage(self, sfincs_workflow_config):
-        from coastal_calibration.stages.sfincs_build import SfincsWindStage
+        from coastal_calibration.sfincs.stages import SfincsWindStage
 
         self._run_prerequisites(sfincs_workflow_config)
 
@@ -605,7 +605,7 @@ class TestSfincsMeteoStages:
         assert result["status"] == "completed"
 
     def test_pressure_stage(self, sfincs_workflow_config):
-        from coastal_calibration.stages.sfincs_build import SfincsPressureStage
+        from coastal_calibration.sfincs.stages import SfincsPressureStage
 
         self._run_prerequisites(sfincs_workflow_config)
 
@@ -613,7 +613,7 @@ class TestSfincsMeteoStages:
         assert result["status"] == "completed"
 
     def test_skip_when_disabled(self, sfincs_workflow_config):
-        from coastal_calibration.stages.sfincs_build import (
+        from coastal_calibration.sfincs.stages import (
             SfincsPrecipitationStage,
             SfincsPressureStage,
             SfincsWindStage,
@@ -634,7 +634,7 @@ class TestSfincsWriteStage:
     """Test the write stage."""
 
     def test_write_model(self, sfincs_workflow_config):
-        from coastal_calibration.stages.sfincs_build import (
+        from coastal_calibration.sfincs.stages import (
             SfincsInitStage,
             SfincsTimingStage,
             SfincsWriteStage,
@@ -652,7 +652,7 @@ class TestSfincsRunStage:
     """Test the run stage with a dummy executable."""
 
     def test_run_native_exe(self, sfincs_workflow_config):
-        from coastal_calibration.stages.sfincs_build import (
+        from coastal_calibration.sfincs.stages import (
             SfincsInitStage,
             SfincsRunStage,
             SfincsTimingStage,
@@ -673,7 +673,7 @@ class TestSfincsPlotStage:
 
     def test_plot_skips_without_output(self, sfincs_workflow_config):
         """When sfincs_his.nc is missing, the plot stage skips."""
-        from coastal_calibration.stages.sfincs_build import (
+        from coastal_calibration.sfincs.stages import (
             SfincsInitStage,
             SfincsPlotStage,
         )
@@ -694,7 +694,7 @@ class TestSfincsPlotStage:
 
         import pandas as pd
 
-        from coastal_calibration.stages.sfincs_build import (
+        from coastal_calibration.sfincs.stages import (
             SfincsInitStage,
             SfincsPlotStage,
             SfincsTimingStage,
@@ -758,11 +758,11 @@ class TestSfincsPlotStage:
 
         with (
             patch(
-                "coastal_calibration.coops_api.query_coops_byids",
+                "coastal_calibration.data.coops_api.query_coops_byids",
                 return_value=mock_obs_ds,
             ),
             patch(
-                "coastal_calibration.coops_api.COOPSAPIClient",
+                "coastal_calibration.data.coops_api.COOPSAPIClient",
             ) as mock_cls2,
         ):
             mock_cls2.return_value = mock_client
@@ -790,11 +790,11 @@ class TestSfincsWorkflowRunner:
 
         with (
             patch(
-                "coastal_calibration.coops_api.query_coops_byids",
+                "coastal_calibration.data.coops_api.query_coops_byids",
                 return_value=mock_obs_ds,
             ),
             patch(
-                "coastal_calibration.coops_api.COOPSAPIClient",
+                "coastal_calibration.data.coops_api.COOPSAPIClient",
             ) as mock_cls,
         ):
             mock_cls.return_value = _mock_coops_client()

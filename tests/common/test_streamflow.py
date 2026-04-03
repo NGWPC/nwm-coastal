@@ -1,4 +1,4 @@
-"""Tests for coastal_calibration.utils.streamflow module."""
+"""Tests for coastal_calibration.data.streamflow module."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from coastal_calibration.utils.streamflow import (
+from coastal_calibration.data.streamflow import (
     _read_from_chrtout,
     read_streamflow,
 )

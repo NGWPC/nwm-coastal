@@ -1,12 +1,13 @@
-"""Tests for coastal_calibration.downloader module."""
+"""Tests for coastal_calibration.data.downloader module."""
 
 from __future__ import annotations
 
 from datetime import datetime
 
+import pandas as pd
 import pytest
 
-from coastal_calibration.downloader import (
+from coastal_calibration.data.downloader import (
     DateRange,
     DownloadResult,
     DownloadResults,
@@ -16,13 +17,12 @@ from coastal_calibration.downloader import (
     _build_nwm_retro_forcing_urls,
     _build_nwm_retro_streamflow_urls,
     _build_stofs_urls,
+    _hour_range,
     get_date_range,
     get_default_sources,
     get_overlapping_range,
     validate_date_ranges,
 )
-from coastal_calibration.utils.time import iter_hours as _iter_hours
-from coastal_calibration.utils.time import parse_datetime as _parse_datetime
 
 
 class TestDateRange:
@@ -220,31 +220,28 @@ class TestDownloadResults:
         assert len(items) == 3
 
 
-class TestIterHours:
+class TestHourRange:
     def test_basic(self):
         start = datetime(2024, 1, 1, 0)
         end = datetime(2024, 1, 1, 3)
-        hours = list(_iter_hours(start, end))
-        assert len(hours) == 3
-        assert hours[0] == start
-        assert hours[-1] == datetime(2024, 1, 1, 2)
+        assert list(_hour_range(start, end)) == [0, 1, 2]
 
     def test_empty_range(self):
         dt = datetime(2024, 1, 1)
-        assert list(_iter_hours(dt, dt)) == []
+        assert list(_hour_range(dt, dt)) == []
 
 
 class TestParseDatetime:
     def test_datetime_passthrough(self):
         dt = datetime(2021, 6, 11)
-        assert _parse_datetime(dt) == dt
+        assert pd.to_datetime(dt).to_pydatetime() == dt
 
     def test_iso_string(self):
-        assert _parse_datetime("2021-06-11") == datetime(2021, 6, 11)
+        assert pd.to_datetime("2021-06-11").to_pydatetime() == datetime(2021, 6, 11)
 
     def test_invalid(self):
-        with pytest.raises(ValueError, match="Cannot parse datetime"):
-            _parse_datetime("bad")
+        with pytest.raises(ValueError, match="bad"):
+            pd.to_datetime("bad", format="mixed")
 
 
 class TestBuildUrls:

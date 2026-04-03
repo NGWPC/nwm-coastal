@@ -250,7 +250,7 @@ uses a separate `SfincsCreateConfig` configuration schema.
 
 ```python
 from coastal_calibration import SfincsCreateConfig
-from coastal_calibration.creator import SfincsCreator
+from coastal_calibration.sfincs.create import SfincsCreator
 
 # Load from YAML
 config = SfincsCreateConfig.from_yaml("create_config.yaml")
@@ -327,7 +327,7 @@ fig_paths = plot_station_comparison(
 ### Check Available Date Ranges
 
 ```python
-from coastal_calibration.downloader import validate_date_ranges
+from coastal_calibration.data.downloader import validate_date_ranges
 
 # Validate dates for your configuration
 errors = validate_date_ranges(
@@ -357,10 +357,10 @@ Configure logging for the workflow:
 
 ```python
 import logging
-from coastal_calibration.utils.logging import setup_logger
+from coastal_calibration.logging import configure_logger, logger
 
 # Set up logging
-logger = setup_logger(log_level="DEBUG", log_file="workflow.log")
+configure_logger(log_level="DEBUG", log_file="workflow.log")
 
 # Now run your workflow
 config = CoastalCalibConfig.from_yaml("config.yaml")

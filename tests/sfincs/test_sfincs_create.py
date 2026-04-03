@@ -28,8 +28,7 @@ from coastal_calibration.config.create_schema import (
     SfincsCreateConfig,
     SubgridConfig,
 )
-from coastal_calibration.creator import SfincsCreator
-from coastal_calibration.stages.sfincs_create import (
+from coastal_calibration.sfincs.create import (
     CreateBoundaryStage,
     CreateDischargeStage,
     CreateElevationStage,
@@ -40,6 +39,7 @@ from coastal_calibration.stages.sfincs_create import (
     CreateStage,
     CreateSubgridStage,
     CreateWriteStage,
+    SfincsCreator,
     _clear_model,
     _get_model,
     _set_model,
@@ -456,7 +456,7 @@ class TestCreateStages:
                 return_value=mock_sfincs_model,
             ),
             patch(
-                "coastal_calibration.stages.sfincs_create.suppress_hydromt_output",
+                "coastal_calibration.sfincs.create.suppress_hydromt_output",
                 return_value=MagicMock(
                     __enter__=MagicMock(), __exit__=MagicMock(return_value=False)
                 ),
@@ -569,7 +569,7 @@ class TestCreateStages:
             cat.write_text("meta: {}")
             return tif, cat, "noaa_tb"
 
-        with patch("coastal_calibration.utils.topobathy_noaa.fetch_noaa_dem") as mock_fetch:
+        with patch("coastal_calibration.data.topobathy_noaa.fetch_noaa_dem") as mock_fetch:
             mock_fetch.side_effect = _fake_fetch
 
             stage = CreateFetchDataStage(cfg)
@@ -605,7 +605,7 @@ class TestCreateStages:
             cat.write_text("meta: {}")
             return dl_dir / "copdem_30m.tif", cat, "copdem_30m"
 
-        with patch("coastal_calibration.utils.copdem.fetch_copdem30") as mock_fetch:
+        with patch("coastal_calibration.data.copdem.fetch_copdem30") as mock_fetch:
             mock_fetch.side_effect = _fake_fetch
             stage = CreateFetchDataStage(cfg)
             result = stage.run()
@@ -640,7 +640,7 @@ class TestCreateStages:
             cat.write_text("meta: {}")
             return dl_dir / "gebco_15arcs.tif", cat, "gebco_15arcs"
 
-        with patch("coastal_calibration.utils.gebco_wms.fetch_gebco") as mock_fetch:
+        with patch("coastal_calibration.data.gebco_wms.fetch_gebco") as mock_fetch:
             mock_fetch.side_effect = _fake_fetch
             stage = CreateFetchDataStage(cfg)
             result = stage.run()
@@ -674,7 +674,7 @@ class TestCreateStages:
             cat.write_text("meta: {}")
             return dl_dir / "esa_worldcover.tif", cat, "esa_worldcover"
 
-        with patch("coastal_calibration.utils.esa_worldcover.fetch_esa_worldcover") as mock_fetch:
+        with patch("coastal_calibration.data.esa_worldcover.fetch_esa_worldcover") as mock_fetch:
             mock_fetch.side_effect = _fake_fetch
             stage = CreateFetchDataStage(cfg)
             result = stage.run()
@@ -706,7 +706,7 @@ class TestCreateStages:
         (dl_dir / "noaa_tb.tif").write_bytes(b"\x00")
         (dl_dir / "noaa_tb_catalog.yml").write_text("meta: {}")
 
-        with patch("coastal_calibration.utils.topobathy_noaa.fetch_noaa_dem") as mock_fetch:
+        with patch("coastal_calibration.data.topobathy_noaa.fetch_noaa_dem") as mock_fetch:
             stage = CreateFetchDataStage(cfg)
             result = stage.run()
 

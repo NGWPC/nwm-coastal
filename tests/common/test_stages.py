@@ -1,4 +1,4 @@
-"""Tests for coastal_calibration.stages module."""
+"""Tests for coastal_calibration.base and coastal_calibration.data.download_stage modules."""
 
 from __future__ import annotations
 
@@ -8,36 +8,36 @@ import pytest
 
 _has_matplotlib = importlib.util.find_spec("matplotlib") is not None
 
+from coastal_calibration.base import WorkflowStage
 from coastal_calibration.config.schema import (
     BoundaryConfig,
     MonitoringConfig,
     SchismModelConfig,
 )
+from coastal_calibration.data.download_stage import DownloadStage
+from coastal_calibration.logging import WorkflowMonitor
 from coastal_calibration.plotting.stations import (
     plot_station_comparison,
 )
 from coastal_calibration.plotting.stations import (
     plotable_stations as _plotable_stations,
 )
-from coastal_calibration.stages.base import WorkflowStage
-from coastal_calibration.stages.boundary import (
+from coastal_calibration.schism.boundary import (
     BoundaryConditionStage,
     STOFSBoundaryStage,
     UpdateParamsStage,
 )
-from coastal_calibration.stages.download import DownloadStage
-from coastal_calibration.stages.forcing import (
+from coastal_calibration.schism.forcing import (
     NWMForcingStage,
     PostForcingStage,
     PreForcingStage,
 )
-from coastal_calibration.stages.schism import (
+from coastal_calibration.schism.stages import (
     PostSCHISMStage,
     PreSCHISMStage,
     SCHISMRunStage,
     _patch_param_nml,
 )
-from coastal_calibration.utils.logging import WorkflowMonitor
 
 
 class TestWorkflowStageBase:
@@ -67,7 +67,7 @@ class TestWorkflowStageBase:
         """SchismModelConfig.build_environment() delegates to build_mpi_env."""
         from unittest.mock import patch
 
-        from coastal_calibration.utils.mpi import MpiImpl
+        from coastal_calibration.utils import MpiImpl
 
         class ConcreteStage(WorkflowStage):
             name = "test"
@@ -79,8 +79,8 @@ class TestWorkflowStageBase:
         stage = ConcreteStage(sample_config, None)
 
         with (
-            patch("coastal_calibration.utils.mpi.detect_mpi", return_value=MpiImpl.MPICH),
-            patch("coastal_calibration.utils.mpi._has_efa", return_value=False),
+            patch("coastal_calibration.utils.detect_mpi", return_value=MpiImpl.MPICH),
+            patch("coastal_calibration.utils._has_efa", return_value=False),
         ):
             env = stage.build_environment()
             assert env["MPICH_OFI_STARTUP_CONNECT"] == "1"
@@ -194,11 +194,11 @@ class TestSchismRunCommandConstruction:
         from pathlib import Path
         from unittest.mock import patch
 
-        from coastal_calibration.utils.mpi import MpiImpl
+        from coastal_calibration.utils import MpiImpl
 
         sample_config.model_config.oversubscribe = True
         stage = SCHISMRunStage(sample_config)
-        with patch("coastal_calibration.utils.mpi.detect_mpi", return_value=MpiImpl.OPENMPI):
+        with patch("coastal_calibration.utils.detect_mpi", return_value=MpiImpl.OPENMPI):
             cmd = stage._build_mpi_command(Path("/usr/bin/pschism"))
             assert "--oversubscribe" in cmd
 
@@ -206,11 +206,11 @@ class TestSchismRunCommandConstruction:
         from pathlib import Path
         from unittest.mock import patch
 
-        from coastal_calibration.utils.mpi import MpiImpl
+        from coastal_calibration.utils import MpiImpl
 
         sample_config.model_config.oversubscribe = True
         stage = SCHISMRunStage(sample_config)
-        with patch("coastal_calibration.utils.mpi.detect_mpi", return_value=MpiImpl.MPICH):
+        with patch("coastal_calibration.utils.detect_mpi", return_value=MpiImpl.MPICH):
             cmd = stage._build_mpi_command(Path("/usr/bin/pschism"))
             assert "--oversubscribe" not in cmd
 

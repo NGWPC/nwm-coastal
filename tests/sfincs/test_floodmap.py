@@ -9,7 +9,7 @@ import xarray as xr
 import xugrid as xu
 from rasterio.transform import from_bounds
 
-from coastal_calibration.utils.floodmap import (
+from coastal_calibration.sfincs.floodmap import (
     _ensure_overviews,
     _reduce_zsmax,
     _write_floodmap_cog,
@@ -433,7 +433,7 @@ class TestCreateFloodDepthMapIntegration:
 
         from hydromt_sfincs import SfincsModel
 
-        from coastal_calibration.stages._hydromt_compat import apply_all_patches
+        from coastal_calibration.sfincs._hydromt_compat import apply_all_patches
 
         apply_all_patches()
 

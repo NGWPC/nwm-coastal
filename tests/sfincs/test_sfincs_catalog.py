@@ -1,4 +1,4 @@
-"""Tests for SFINCS data catalog functionality in coastal_calibration.stages.sfincs.
+"""Tests for SFINCS data catalog functionality in coastal_calibration.sfincs.data_catalog.
 
 Note: These tests cover the data catalog and symlink functionality,
 NOT the SFINCS model build/run stages which require hydromt-sfincs.
@@ -19,7 +19,7 @@ from coastal_calibration.config.schema import (
     SchismModelConfig,
     SimulationConfig,
 )
-from coastal_calibration.stages.sfincs import (
+from coastal_calibration.sfincs.data_catalog import (
     CatalogEntry,
     CatalogMetadata,
     DataAdapter,
@@ -30,7 +30,7 @@ from coastal_calibration.stages.sfincs import (
     generate_data_catalog,
     remove_nc_symlinks,
 )
-from coastal_calibration.stages.sfincs_build import SfincsDataCatalogStage
+from coastal_calibration.sfincs.stages import SfincsDataCatalogStage
 
 
 class TestDataAdapter:
@@ -442,7 +442,7 @@ class TestStofsUri:
         """URI must match the layout produced by ``get_stofs_path``."""
         from pathlib import Path
 
-        from coastal_calibration.downloader import get_stofs_path
+        from coastal_calibration.data.downloader import get_stofs_path
 
         for start_date in [
             datetime(2022, 3, 15),

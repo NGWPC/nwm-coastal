@@ -91,8 +91,8 @@ def run(
     CONFIG is the path to a YAML configuration file.
     """
     from coastal_calibration.config.schema import CoastalCalibConfig
+    from coastal_calibration.logging import configure_logger, logger
     from coastal_calibration.runner import CoastalCalibRunner
-    from coastal_calibration.utils.logging import configure_logger, logger
 
     config_path = config.resolve()
 
@@ -151,8 +151,8 @@ def create(
     CONFIG is the path to a YAML configuration file.
     """
     from coastal_calibration.config.create_schema import SfincsCreateConfig
-    from coastal_calibration.creator import SfincsCreator
-    from coastal_calibration.utils.logging import configure_logger, logger
+    from coastal_calibration.logging import configure_logger, logger
+    from coastal_calibration.sfincs.create import SfincsCreator
 
     config_path = config.resolve()
 
@@ -193,8 +193,8 @@ def validate(config: Path) -> None:
     CONFIG is the path to a YAML configuration file.
     """
     from coastal_calibration.config.schema import CoastalCalibConfig
+    from coastal_calibration.logging import logger
     from coastal_calibration.runner import CoastalCalibRunner
-    from coastal_calibration.utils.logging import logger
 
     config_path = config.resolve()
 
@@ -252,8 +252,8 @@ def prepare_topobathy(
     Requires AWS credentials (via environment or ~/.aws) and the
     ``icechunk`` Python package.
     """
-    from coastal_calibration.utils.logging import configure_logger
-    from coastal_calibration.utils.topobathy_nws import fetch_topobathy
+    from coastal_calibration.data.topobathy_nws import fetch_topobathy
+    from coastal_calibration.logging import configure_logger
 
     if output_dir is None:
         output_dir = aoi.resolve().parent
@@ -318,8 +318,8 @@ def init(output: Path, domain: str, force: bool, model: str) -> None:
     """
     from typing import cast
 
-    from coastal_calibration.downloader import get_default_sources
-    from coastal_calibration.utils.logging import logger
+    from coastal_calibration.data.downloader import get_default_sources
+    from coastal_calibration.logging import logger
 
     output_path = output.resolve()
 
@@ -415,8 +415,8 @@ def update_dem_index(output: Path | None, max_datasets: int | None) -> None:
     import importlib.resources
     import json
 
-    from coastal_calibration.utils.logging import configure_logger
-    from coastal_calibration.utils.topobathy_noaa import build_index_from_s3
+    from coastal_calibration.data.topobathy_noaa import build_index_from_s3
+    from coastal_calibration.logging import configure_logger
 
     configure_logger(level="INFO")
 
@@ -425,9 +425,7 @@ def update_dem_index(output: Path | None, max_datasets: int | None) -> None:
         _raise_cli_error("No DEM entries found on S3")
 
     if output is None:
-        ref = importlib.resources.files("coastal_calibration.data_catalog").joinpath(
-            "noaa_dem_index.json"
-        )
+        ref = importlib.resources.files("coastal_calibration.data").joinpath("noaa_dem_index.json")
         output = Path(str(ref))
 
     output.write_text(json.dumps(entries, indent=2) + "\n")

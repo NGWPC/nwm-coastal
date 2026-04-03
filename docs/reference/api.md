@@ -97,7 +97,7 @@ This page provides detailed documentation for the NWM Coastal Python API.
 
 ### SfincsCreator
 
-::: coastal_calibration.creator.SfincsCreator
+::: coastal_calibration.sfincs.create.SfincsCreator
     options:
       show_source: true
       members:
@@ -111,7 +111,7 @@ This page provides detailed documentation for the NWM Coastal Python API.
 
 ### SfincsGridInfo
 
-::: coastal_calibration.plotting.grid.SfincsGridInfo
+::: coastal_calibration.sfincs.plotting.SfincsGridInfo
     options:
       show_source: true
       members:
@@ -119,11 +119,11 @@ This page provides detailed documentation for the NWM Coastal Python API.
 
 ### plot_mesh
 
-::: coastal_calibration.plotting.grid.plot_mesh
+::: coastal_calibration.sfincs.plotting.plot_mesh
 
 ### plot_floodmap
 
-::: coastal_calibration.plotting.floodmap.plot_floodmap
+::: coastal_calibration.sfincs.plotting.plot_floodmap
 
 ### plot_station_comparison
 
@@ -137,19 +137,19 @@ This page provides detailed documentation for the NWM Coastal Python API.
 
 ### create_flood_depth_map
 
-::: coastal_calibration.utils.floodmap.create_flood_depth_map
+::: coastal_calibration.sfincs.floodmap.create_flood_depth_map
 
 ## Downloader
 
 ### validate_date_ranges
 
-::: coastal_calibration.downloader.validate_date_ranges
+::: coastal_calibration.data.downloader.validate_date_ranges
 
 ## NOAA CO-OPS API
 
 ### COOPSAPIClient
 
-::: coastal_calibration.coops_api.COOPSAPIClient
+::: coastal_calibration.data.coops_api.COOPSAPIClient
     options:
       show_source: true
       members:
@@ -161,11 +161,11 @@ This page provides detailed documentation for the NWM Coastal Python API.
 
 ### query_coops_byids
 
-::: coastal_calibration.coops_api.query_coops_byids
+::: coastal_calibration.data.coops_api.query_coops_byids
 
 ### query_coops_bygeometry
 
-::: coastal_calibration.coops_api.query_coops_bygeometry
+::: coastal_calibration.data.coops_api.query_coops_bygeometry
 
 ## Type Aliases
 

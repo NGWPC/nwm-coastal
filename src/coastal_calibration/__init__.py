@@ -22,8 +22,7 @@ if TYPE_CHECKING:
         SfincsModelConfig,
         SimulationConfig,
     )
-    from coastal_calibration.creator import SfincsCreator
-    from coastal_calibration.downloader import (
+    from coastal_calibration.data.downloader import (
         DATA_SOURCE_DATE_RANGES,
         CoastalSource,
         DateRange,
@@ -37,6 +36,7 @@ if TYPE_CHECKING:
         get_default_sources,
         get_overlapping_range,
     )
+    from coastal_calibration.logging import configure_logger
     from coastal_calibration.plotting import (
         SfincsGridInfo,
         plot_floodmap,
@@ -49,7 +49,8 @@ if TYPE_CHECKING:
         WorkflowResult,
         run_workflow,
     )
-    from coastal_calibration.stages.sfincs import (
+    from coastal_calibration.sfincs.create import SfincsCreator
+    from coastal_calibration.sfincs.data_catalog import (
         CatalogEntry,
         CatalogMetadata,
         DataAdapter,
@@ -57,13 +58,6 @@ if TYPE_CHECKING:
         create_nc_symlinks,
         generate_data_catalog,
         remove_nc_symlinks,
-    )
-    from coastal_calibration.utils.logging import configure_logger
-    from coastal_calibration.utils.workflow import (
-        nwm_coastal_merge_source_sink,
-        post_nwm_coastal,
-        post_nwm_forcing_coastal,
-        pre_nwm_forcing_coastal,
     )
 
 try:
@@ -96,20 +90,20 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "SimulationConfig": ("coastal_calibration.config.schema", "SimulationConfig"),
     # SFINCS creation
     "SfincsCreateConfig": ("coastal_calibration.config.create_schema", "SfincsCreateConfig"),
-    "SfincsCreator": ("coastal_calibration.creator", "SfincsCreator"),
+    "SfincsCreator": ("coastal_calibration.sfincs.create", "SfincsCreator"),
     # Downloader
-    "DATA_SOURCE_DATE_RANGES": ("coastal_calibration.downloader", "DATA_SOURCE_DATE_RANGES"),
-    "CoastalSource": ("coastal_calibration.downloader", "CoastalSource"),
-    "DateRange": ("coastal_calibration.downloader", "DateRange"),
-    "Domain": ("coastal_calibration.downloader", "Domain"),
-    "DownloadResult": ("coastal_calibration.downloader", "DownloadResult"),
-    "DownloadResults": ("coastal_calibration.downloader", "DownloadResults"),
-    "GLOFSModel": ("coastal_calibration.downloader", "GLOFSModel"),
-    "HydroSource": ("coastal_calibration.downloader", "HydroSource"),
-    "download_data": ("coastal_calibration.downloader", "download_data"),
-    "get_date_range": ("coastal_calibration.downloader", "get_date_range"),
-    "get_default_sources": ("coastal_calibration.downloader", "get_default_sources"),
-    "get_overlapping_range": ("coastal_calibration.downloader", "get_overlapping_range"),
+    "DATA_SOURCE_DATE_RANGES": ("coastal_calibration.data.downloader", "DATA_SOURCE_DATE_RANGES"),
+    "CoastalSource": ("coastal_calibration.data.downloader", "CoastalSource"),
+    "DateRange": ("coastal_calibration.data.downloader", "DateRange"),
+    "Domain": ("coastal_calibration.data.downloader", "Domain"),
+    "DownloadResult": ("coastal_calibration.data.downloader", "DownloadResult"),
+    "DownloadResults": ("coastal_calibration.data.downloader", "DownloadResults"),
+    "GLOFSModel": ("coastal_calibration.data.downloader", "GLOFSModel"),
+    "HydroSource": ("coastal_calibration.data.downloader", "HydroSource"),
+    "download_data": ("coastal_calibration.data.downloader", "download_data"),
+    "get_date_range": ("coastal_calibration.data.downloader", "get_date_range"),
+    "get_default_sources": ("coastal_calibration.data.downloader", "get_default_sources"),
+    "get_overlapping_range": ("coastal_calibration.data.downloader", "get_overlapping_range"),
     # Plotting
     "SfincsGridInfo": ("coastal_calibration.plotting", "SfincsGridInfo"),
     "plot_floodmap": ("coastal_calibration.plotting", "plot_floodmap"),
@@ -121,29 +115,15 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "WorkflowResult": ("coastal_calibration.runner", "WorkflowResult"),
     "run_workflow": ("coastal_calibration.runner", "run_workflow"),
     # Data Catalog (SFINCS)
-    "CatalogEntry": ("coastal_calibration.stages.sfincs", "CatalogEntry"),
-    "CatalogMetadata": ("coastal_calibration.stages.sfincs", "CatalogMetadata"),
-    "DataAdapter": ("coastal_calibration.stages.sfincs", "DataAdapter"),
-    "DataCatalog": ("coastal_calibration.stages.sfincs", "DataCatalog"),
-    "create_nc_symlinks": ("coastal_calibration.stages.sfincs", "create_nc_symlinks"),
-    "generate_data_catalog": ("coastal_calibration.stages.sfincs", "generate_data_catalog"),
-    "remove_nc_symlinks": ("coastal_calibration.stages.sfincs", "remove_nc_symlinks"),
+    "CatalogEntry": ("coastal_calibration.sfincs.data_catalog", "CatalogEntry"),
+    "CatalogMetadata": ("coastal_calibration.sfincs.data_catalog", "CatalogMetadata"),
+    "DataAdapter": ("coastal_calibration.sfincs.data_catalog", "DataAdapter"),
+    "DataCatalog": ("coastal_calibration.sfincs.data_catalog", "DataCatalog"),
+    "create_nc_symlinks": ("coastal_calibration.sfincs.data_catalog", "create_nc_symlinks"),
+    "generate_data_catalog": ("coastal_calibration.sfincs.data_catalog", "generate_data_catalog"),
+    "remove_nc_symlinks": ("coastal_calibration.sfincs.data_catalog", "remove_nc_symlinks"),
     # Logging
-    "configure_logger": ("coastal_calibration.utils.logging", "configure_logger"),
-    # Workflow utilities
-    "nwm_coastal_merge_source_sink": (
-        "coastal_calibration.utils.workflow",
-        "nwm_coastal_merge_source_sink",
-    ),
-    "post_nwm_coastal": ("coastal_calibration.utils.workflow", "post_nwm_coastal"),
-    "post_nwm_forcing_coastal": (
-        "coastal_calibration.utils.workflow",
-        "post_nwm_forcing_coastal",
-    ),
-    "pre_nwm_forcing_coastal": (
-        "coastal_calibration.utils.workflow",
-        "pre_nwm_forcing_coastal",
-    ),
+    "configure_logger": ("coastal_calibration.logging", "configure_logger"),
 }
 
 
@@ -200,14 +180,10 @@ __all__ = [
     "get_date_range",
     "get_default_sources",
     "get_overlapping_range",
-    "nwm_coastal_merge_source_sink",
     "plot_floodmap",
     "plot_mesh",
     "plot_station_comparison",
     "plotable_stations",
-    "post_nwm_coastal",
-    "post_nwm_forcing_coastal",
-    "pre_nwm_forcing_coastal",
     "remove_nc_symlinks",
     "run_workflow",
 ]

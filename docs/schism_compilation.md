@@ -308,10 +308,10 @@ ______________________________________________________________________
 ## Logging
 
 All new SCHISM modules use the central package logger from
-`coastal_calibration.utils.logging`:
+`coastal_calibration.logging`:
 
 ```python
-from coastal_calibration.utils.logging import logger
+from coastal_calibration.logging import logger
 ```
 
 The central logger is `logging.getLogger("coastal_calibration")` and is configured with
@@ -319,14 +319,14 @@ The central logger is `logging.getLogger("coastal_calibration")` and is configur
 
 **Modules using the central logger:**
 
-| Module                                                                          | Logger source                                          |
-| ------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| `stages/base.py`, `stages/schism.py`, `stages/boundary.py`, `stages/forcing.py` | `WorkflowMonitor` (wraps central logger)               |
-| `schism_prep.py`                                                                | `from coastal_calibration.utils.logging import logger` |
-| `sflux.py`                                                                      | `from coastal_calibration.utils.logging import logger` |
-| `tides/_otps.py`, `tides/_ocean_tide.py`                                        | `from coastal_calibration.utils.logging import logger` |
-| `regridding/regrid_estofs.py`, `regrid_forcings.py`, `esmf_utils.py`            | `from coastal_calibration.utils.logging import logger` |
-| `utils/floodmap.py`                                                             | `from coastal_calibration.utils.logging import logger` |
+| Module                                                                          | Logger source                                    |
+| ------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `stages/base.py`, `stages/schism.py`, `stages/boundary.py`, `stages/forcing.py` | `WorkflowMonitor` (wraps central logger)         |
+| `schism_prep.py`                                                                | `from coastal_calibration.logging import logger` |
+| `sflux.py`                                                                      | `from coastal_calibration.logging import logger` |
+| `tides/_otps.py`, `tides/_ocean_tide.py`                                        | `from coastal_calibration.logging import logger` |
+| `regridding/regrid_estofs.py`, `regrid_forcings.py`, `esmf_utils.py`            | `from coastal_calibration.logging import logger` |
+| `utils/floodmap.py`                                                             | `from coastal_calibration.logging import logger` |
 
 No module creates its own `logging.getLogger(__name__)` logger; all go through the
 central `coastal_calibration` logger hierarchy, ensuring consistent formatting, levels,
@@ -386,10 +386,10 @@ env["OMP_PROC_BIND"] = "close"
 
 #### `SchismModelConfig.build_environment()` (schema.py)
 
-Delegates to `build_mpi_env()` from `coastal_calibration.utils.mpi`, which auto-detects
-the active MPI implementation (OpenMPI or MPICH) and sets the appropriate tuning
-variables. Settings are layered: general settings apply on all clusters, EFA-specific
-settings are added only when AWS EFA devices are detected.
+Delegates to `build_mpi_env()` from `coastal_calibration.utils`, which auto-detects the
+active MPI implementation (OpenMPI or MPICH) and sets the appropriate tuning variables.
+Settings are layered: general settings apply on all clusters, EFA-specific settings are
+added only when AWS EFA devices are detected.
 
 **OpenMPI — general** (all clusters):
 
@@ -815,7 +815,7 @@ Phase 5 was a deep cleanup pass performed after the initial de-containerization 
 
 - All modules (`schism_prep.py`, `sflux.py`, `tides/`, `regridding/`,
     `utils/floodmap.py`) switched from `logging.getLogger(__name__)` to the central
-    package logger: `from coastal_calibration.utils.logging import logger`
+    package logger: `from coastal_calibration.logging import logger`
 - No `logging.getLogger(__name__)` calls remain in `src/coastal_calibration/`
 - Stage classes use `WorkflowMonitor` which wraps the same central logger
 - Function-level logs use 4-space indent (`"    "`) for proper alignment with

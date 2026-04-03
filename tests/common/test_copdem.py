@@ -16,7 +16,7 @@ from unittest.mock import patch
 import pytest
 import yaml
 
-from coastal_calibration.utils.copdem import (
+from coastal_calibration.data.copdem import (
     _tile_indices,
     _tile_url,
     _write_catalog,
@@ -156,14 +156,14 @@ class TestFetchCopdem30:
         with (
             patch("tiny_retriever.download", side_effect=mock_download) as mock_dl,
             patch(
-                "coastal_calibration.utils._gdal.build_vrt",
+                "coastal_calibration.data.transformation.build_vrt",
             ) as mock_vrt,
             patch(
-                "coastal_calibration.utils._gdal.clip_to_aoi",
+                "coastal_calibration.data.transformation.clip_to_aoi",
                 side_effect=mock_clip,
             ) as mock_clip_fn,
         ):
-            from coastal_calibration.utils.copdem import fetch_copdem30
+            from coastal_calibration.data.copdem import fetch_copdem30
 
             log_messages: list[str] = []
             geotiff, catalog, name = fetch_copdem30(

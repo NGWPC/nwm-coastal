@@ -75,7 +75,7 @@ class TestSchismRun:
 
     def test_tidal_amplitude(self, schism_test_case):
         """Generate a tidal test case, run pschism, and verify ~1m amplitude."""
-        from coastal_calibration.utils.mpi import MpiImpl, detect_mpi
+        from coastal_calibration.utils import MpiImpl, detect_mpi
 
         mpi_args = ["--oversubscribe"] if detect_mpi() is MpiImpl.OPENMPI else []
         run_schism(

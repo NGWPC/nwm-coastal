@@ -19,7 +19,7 @@ import rasterio
 import shapely
 from rasterio.transform import from_bounds
 
-from coastal_calibration.utils._gdal import compute_aoi_coverage
+from coastal_calibration.data.transformation import compute_aoi_coverage
 
 if TYPE_CHECKING:
     from pathlib import Path

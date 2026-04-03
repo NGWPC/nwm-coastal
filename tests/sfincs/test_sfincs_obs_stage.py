@@ -9,7 +9,7 @@ import pytest
 import shapely
 
 from coastal_calibration.config.create_schema import SfincsCreateConfig
-from coastal_calibration.stages.sfincs_create import (
+from coastal_calibration.sfincs.create import (
     CreateObservationPointsStage,
     _set_model,
 )
@@ -122,7 +122,7 @@ class TestCreateObservationPointsStageNOAA:
         create_config.add_noaa_gages = True
         _set_model(create_config, mock_model)
 
-        with patch("coastal_calibration.coops_api.COOPSAPIClient") as mock_cls:
+        with patch("coastal_calibration.data.coops_api.COOPSAPIClient") as mock_cls:
             mock_client = mock_cls.return_value
             mock_client.stations_metadata = noaa_stations_gdf
 
@@ -148,7 +148,7 @@ class TestCreateObservationPointsStageNOAA:
             crs=4326,
         )
 
-        with patch("coastal_calibration.coops_api.COOPSAPIClient") as mock_cls:
+        with patch("coastal_calibration.data.coops_api.COOPSAPIClient") as mock_cls:
             mock_client = mock_cls.return_value
             mock_client.stations_metadata = empty_gdf
 
@@ -166,7 +166,7 @@ class TestCreateObservationPointsStageNOAA:
         ]
         _set_model(create_config, mock_model)
 
-        with patch("coastal_calibration.coops_api.COOPSAPIClient") as mock_cls:
+        with patch("coastal_calibration.data.coops_api.COOPSAPIClient") as mock_cls:
             mock_client = mock_cls.return_value
             mock_client.stations_metadata = noaa_stations_gdf
 
@@ -190,7 +190,7 @@ class TestCreateObservationPointsStageNOAA:
         create_config.add_noaa_gages = True
         _set_model(create_config, mock_model)
 
-        with patch("coastal_calibration.coops_api.COOPSAPIClient") as mock_cls:
+        with patch("coastal_calibration.data.coops_api.COOPSAPIClient") as mock_cls:
             mock_client = mock_cls.return_value
             mock_client.stations_metadata = noaa_stations_gdf
 

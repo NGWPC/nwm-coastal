@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from coastal_calibration.utils.mpi import (
+from coastal_calibration.utils import (
     MpiImpl,
     build_isolated_env,
     build_mpi_cmd,
@@ -19,7 +19,7 @@ from coastal_calibration.utils.mpi import (
 @pytest.fixture(autouse=True)
 def _clear_mpi_cache():
     """Reset the cached MPI detection result between tests."""
-    import coastal_calibration.utils.mpi as mod
+    import coastal_calibration.utils as mod
 
     mod._cache.clear()
     yield
@@ -80,8 +80,8 @@ class TestBuildMpiEnv:
     def test_openmpi_general(self):
         """OpenMPI sets general NFS-safe vars without EFA."""
         with (
-            patch("coastal_calibration.utils.mpi.detect_mpi", return_value=MpiImpl.OPENMPI),
-            patch("coastal_calibration.utils.mpi._has_efa", return_value=False),
+            patch("coastal_calibration.utils.detect_mpi", return_value=MpiImpl.OPENMPI),
+            patch("coastal_calibration.utils._has_efa", return_value=False),
         ):
             env: dict[str, str] = {}
             build_mpi_env(env)
@@ -95,8 +95,8 @@ class TestBuildMpiEnv:
     def test_openmpi_with_efa(self):
         """OpenMPI + EFA sets OFI transport and libfabric tuning."""
         with (
-            patch("coastal_calibration.utils.mpi.detect_mpi", return_value=MpiImpl.OPENMPI),
-            patch("coastal_calibration.utils.mpi._has_efa", return_value=True),
+            patch("coastal_calibration.utils.detect_mpi", return_value=MpiImpl.OPENMPI),
+            patch("coastal_calibration.utils._has_efa", return_value=True),
         ):
             env: dict[str, str] = {}
             build_mpi_env(env)
@@ -109,8 +109,8 @@ class TestBuildMpiEnv:
     def test_mpich_vars(self):
         """MPICH always sets collective tuning (any fabric)."""
         with (
-            patch("coastal_calibration.utils.mpi.detect_mpi", return_value=MpiImpl.MPICH),
-            patch("coastal_calibration.utils.mpi._has_efa", return_value=False),
+            patch("coastal_calibration.utils.detect_mpi", return_value=MpiImpl.MPICH),
+            patch("coastal_calibration.utils._has_efa", return_value=False),
         ):
             env: dict[str, str] = {}
             build_mpi_env(env)
@@ -123,8 +123,8 @@ class TestBuildMpiEnv:
         """EFA detection sets libfabric tuning regardless of MPI impl."""
         for impl in (MpiImpl.OPENMPI, MpiImpl.MPICH):
             with (
-                patch("coastal_calibration.utils.mpi.detect_mpi", return_value=impl),
-                patch("coastal_calibration.utils.mpi._has_efa", return_value=True),
+                patch("coastal_calibration.utils.detect_mpi", return_value=impl),
+                patch("coastal_calibration.utils._has_efa", return_value=True),
             ):
                 env: dict[str, str] = {}
                 build_mpi_env(env)
@@ -135,8 +135,8 @@ class TestBuildMpiEnv:
     def test_no_efa_no_libfabric_vars(self):
         """Without EFA, no libfabric tuning vars are set."""
         with (
-            patch("coastal_calibration.utils.mpi.detect_mpi", return_value=MpiImpl.OPENMPI),
-            patch("coastal_calibration.utils.mpi._has_efa", return_value=False),
+            patch("coastal_calibration.utils.detect_mpi", return_value=MpiImpl.OPENMPI),
+            patch("coastal_calibration.utils._has_efa", return_value=False),
         ):
             env: dict[str, str] = {}
             build_mpi_env(env)
@@ -148,17 +148,17 @@ class TestBuildMpiEnv:
 
 class TestBuildMpiCmd:
     def test_basic(self):
-        with patch("coastal_calibration.utils.mpi.detect_mpi", return_value=MpiImpl.MPICH):
+        with patch("coastal_calibration.utils.detect_mpi", return_value=MpiImpl.MPICH):
             cmd = build_mpi_cmd(36)
             assert cmd == ["mpiexec", "-n", "36"]
 
     def test_oversubscribe_openmpi(self):
-        with patch("coastal_calibration.utils.mpi.detect_mpi", return_value=MpiImpl.OPENMPI):
+        with patch("coastal_calibration.utils.detect_mpi", return_value=MpiImpl.OPENMPI):
             cmd = build_mpi_cmd(36, oversubscribe=True)
             assert "--oversubscribe" in cmd
 
     def test_oversubscribe_mpich_ignored(self):
-        with patch("coastal_calibration.utils.mpi.detect_mpi", return_value=MpiImpl.MPICH):
+        with patch("coastal_calibration.utils.detect_mpi", return_value=MpiImpl.MPICH):
             cmd = build_mpi_cmd(36, oversubscribe=True)
             assert "--oversubscribe" not in cmd
 
@@ -174,8 +174,8 @@ class TestBuildIsolatedEnv:
         monkeypatch.setenv("LD_LIBRARY_PATH", f"{conda}/lib:/usr/lib")
 
         with (
-            patch("coastal_calibration.utils.mpi.detect_mpi", return_value=MpiImpl.MPICH),
-            patch("coastal_calibration.utils.mpi._has_efa", return_value=False),
+            patch("coastal_calibration.utils.detect_mpi", return_value=MpiImpl.MPICH),
+            patch("coastal_calibration.utils._has_efa", return_value=False),
         ):
             env = build_isolated_env(omp_num_threads=4)
 
@@ -186,8 +186,8 @@ class TestBuildIsolatedEnv:
 
     def test_sets_omp_and_hdf5(self):
         with (
-            patch("coastal_calibration.utils.mpi.detect_mpi", return_value=MpiImpl.MPICH),
-            patch("coastal_calibration.utils.mpi._has_efa", return_value=False),
+            patch("coastal_calibration.utils.detect_mpi", return_value=MpiImpl.MPICH),
+            patch("coastal_calibration.utils._has_efa", return_value=False),
         ):
             env = build_isolated_env(omp_num_threads=8)
 
@@ -198,8 +198,8 @@ class TestBuildIsolatedEnv:
 
     def test_sets_mpi_tuning(self):
         with (
-            patch("coastal_calibration.utils.mpi.detect_mpi", return_value=MpiImpl.MPICH),
-            patch("coastal_calibration.utils.mpi._has_efa", return_value=False),
+            patch("coastal_calibration.utils.detect_mpi", return_value=MpiImpl.MPICH),
+            patch("coastal_calibration.utils._has_efa", return_value=False),
         ):
             env = build_isolated_env(omp_num_threads=4)
 
@@ -207,8 +207,8 @@ class TestBuildIsolatedEnv:
 
     def test_runtime_env_overrides(self):
         with (
-            patch("coastal_calibration.utils.mpi.detect_mpi", return_value=MpiImpl.MPICH),
-            patch("coastal_calibration.utils.mpi._has_efa", return_value=False),
+            patch("coastal_calibration.utils.detect_mpi", return_value=MpiImpl.MPICH),
+            patch("coastal_calibration.utils._has_efa", return_value=False),
         ):
             env = build_isolated_env(
                 omp_num_threads=4,
@@ -223,8 +223,8 @@ class TestBuildIsolatedEnv:
         monkeypatch.setenv("PATH", "/usr/bin:/usr/local/bin")
 
         with (
-            patch("coastal_calibration.utils.mpi.detect_mpi", return_value=MpiImpl.MPICH),
-            patch("coastal_calibration.utils.mpi._has_efa", return_value=False),
+            patch("coastal_calibration.utils.detect_mpi", return_value=MpiImpl.MPICH),
+            patch("coastal_calibration.utils._has_efa", return_value=False),
         ):
             env = build_isolated_env(omp_num_threads=4)
 

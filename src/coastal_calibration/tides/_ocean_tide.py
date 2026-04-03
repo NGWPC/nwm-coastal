@@ -15,8 +15,8 @@ import numpy as np
 from scipy.interpolate import griddata
 
 import coastal_calibration.tides.pytides.constituent as con
+from coastal_calibration.logging import logger
 from coastal_calibration.tides.pytides.tide import Tide
-from coastal_calibration.utils.logging import logger
 
 
 def _generate_tidal_levels(  # noqa: PLR0915
