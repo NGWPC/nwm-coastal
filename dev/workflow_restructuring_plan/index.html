@@ -1,0 +1,1780 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Coastal model (SCHISM, SFINCS) workflow on HPC clusters">
+      
+      
+        <meta name="author" content="Taher Chegini">
+      
+      
+        <link rel="canonical" href="https://NGWPC.github.io/nwm-coastal/stable/workflow_restructuring_plan/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>SCHISM/SFINCS Workflow Restructuring Plan - NWM Coastal</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#schismsfincs-workflow-restructuring-plan" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="NWM Coastal" class="md-header__button md-logo" aria-label="NWM Coastal" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NWM Coastal
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              SCHISM/SFINCS Workflow Restructuring Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="black"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/NGWPC/nwm-coastal" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    NGWPC/nwm-coastal
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../getting-started/installation/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../user-guide/configuration/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  User Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../examples/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Examples
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../DESIGN/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Design
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../reference/api/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../CONTRIBUTING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../CHANGELOG/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Changelog
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../LICENSE/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  License
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="NWM Coastal" class="md-nav__button md-logo" aria-label="NWM Coastal" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NWM Coastal
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/NGWPC/nwm-coastal" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    NGWPC/nwm-coastal
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/cluster-install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cluster Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/python-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/qgis-plugin/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    QGIS Plugin
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/workflow-stages/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow Stages
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../examples/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Examples
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/notebooks/lavaca/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lavaca Bay SFINCS Tutorial
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/notebooks/narragansett/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Narragansett Bay: SFINCS Demo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/notebooks/schism-hawaii/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hawaii: SCHISM Demo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../DESIGN/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CONTRIBUTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CHANGELOG/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../LICENSE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    License
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+              
+              <article class="md-content__inner md-typeset">
+                
+
+
+
+                  
+
+
+  
+    <a href="https://github.com/NGWPC/nwm-coastal/edit/development/docs/workflow_restructuring_plan.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="schismsfincs-workflow-restructuring-plan">SCHISM/SFINCS Workflow Restructuring Plan<a class="headerlink" href="#schismsfincs-workflow-restructuring-plan" title="Permanent link">#</a></h1>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">#</a></h2>
+<p>The coastal-calibration codebase currently mixes SCHISM-specific and SFINCS-specific
+code under a flat <code>stages/</code> module and scattered root-level files (<code>schism_prep.py</code>,
+<code>sflux.py</code>, <code>creator.py</code>). A new <code>src/coastal_calibration/schism/</code> module
+(<code>project_reader.py</code>, <code>subsetter.py</code>, <code>constants.py</code>) has been added but is not yet
+integrated with the main workflow.</p>
+<p>Three files -- <code>nwmReaches.csv</code>, <code>element_areas.txt</code>, <code>elevation_correction.csv</code> -- are
+tightly coupled into the core SCHISM workflow even though they only serve discharge
+generation and boundary datum correction. The goal is to:</p>
+<ol>
+<li>Decouple these files from the core workflow into dedicated stages</li>
+<li>Integrate the new <code>schism/</code> module to replace duplicated hgrid parsing logic</li>
+<li>Reorganize the package so each model has its own self-contained package</li>
+</ol>
+<p>This is a three-phase effort. Each phase delivers standalone value and keeps the
+codebase runnable.</p>
+<h3 id="file-trace-summary">File Trace Summary<a class="headerlink" href="#file-trace-summary" title="Permanent link">#</a></h3>
+<p><strong><code>nwmReaches.csv</code></strong> -- Maps NWM river reach IDs to SCHISM source/sink element IDs.</p>
+<ul>
+<li><code>config/schema.py:384</code> -- Listed as a <strong>required</strong> file in
+    <code>SchismModelConfig.validate()</code> for <code>prebuilt_dir</code> (main coupling point).</li>
+<li><code>stages/schism.py:360-366</code> (<code>PreSCHISMStage.run</code>) -- Copies it from <code>prebuilt_dir</code> to
+    <code>work_dir</code> (both <code>nwm_retro</code> and <code>nwm_ana</code> paths).</li>
+<li><code>schism_prep.py:134-136</code> (<code>stage_chrtout_files</code>) -- Also copies it during CHRTOUT
+    staging.</li>
+<li><code>schism_prep.py:179-194</code> (<code>make_discharge</code>) -- <strong>Only consumer</strong>: reads it to build
+    source/sink element lists and NWM feature IDs.</li>
+<li><code>schism_prep.py:50</code> (<code>clean_run_directory</code>) -- Deletes it during cleanup.</li>
+<li><code>schism/project_reader.py:327,342</code> -- Stored as <code>optional_files</code> in
+    <code>NWMSCHISMProject</code>.</li>
+</ul>
+<p><strong><code>element_areas.txt</code></strong> -- Per-element geodesic area values used as minimum thresholds
+when merging river discharge into precipitation sources.</p>
+<ul>
+<li><code>schism_prep.py:732</code> (<code>update_params</code>) -- Symlinked from <code>prebuilt_dir</code> as a static
+    mesh file alongside <code>hgrid.gr3</code>, <code>manning.gr3</code>, etc.</li>
+<li><code>schism_prep.py:369</code> (<code>merge_source_sink</code>) -- <strong>Only consumer</strong>:
+    <code>np.genfromtxt(root_dir / "element_areas.txt")</code> to filter negligible sources.</li>
+<li><code>schism/project_reader.py:396-415</code> -- <code>NWMSCHISMProject</code> can compute areas from mesh
+    (geodesic calculation). The <code>subsetter.py:1679-1686</code> uses this for subsetting.</li>
+</ul>
+<p><strong><code>elevation_correction.csv</code></strong> -- Per-node datum corrections (6<sup>th</sup> CSV column),
+subtracted from <code>elev2D.th.nc</code> tidal boundary forcing.</p>
+<ul>
+<li><code>schism_prep.py:742</code> (<code>update_params</code>) -- Symlinked as an optional file from
+    <code>prebuilt_dir</code>.</li>
+<li><code>schism_prep.py:874-877</code> (<code>make_tpxo_boundary</code>) -- If it exists, calls
+    <code>correct_elevation()</code>.</li>
+<li><code>schism_prep.py:981-986</code> (<code>make_stofs_boundary</code>) -- Same pattern.</li>
+<li><code>schism_prep.py:766-785</code> (<code>correct_elevation</code>) -- Reads CSV column 5, subtracts from
+    each time step of <code>time_series</code> in the netCDF.</li>
+</ul>
+<hr />
+<h2 id="phase-1-discharge-elevation-correction-decoupling">Phase 1: Discharge &amp; Elevation Correction Decoupling<a class="headerlink" href="#phase-1-discharge-elevation-correction-decoupling" title="Permanent link">#</a></h2>
+<p><strong>Goal:</strong> Extract discharge operations into a dedicated <code>SchismDischargeStage</code> and make
+elevation correction an explicit optional parameter rather than an implicit file
+existence check. Remove <code>nwmReaches.csv</code> from the required files list and
+<code>element_areas.txt</code> from the static symlink list.</p>
+<h3 id="11-create-schismdischargestage">1.1 Create <code>SchismDischargeStage</code><a class="headerlink" href="#11-create-schismdischargestage" title="Permanent link">#</a></h3>
+<p>Extract steps 1-3 from <code>PreSCHISMStage.run()</code> into a new stage class.</p>
+<p><strong>File:</strong> <code>src/coastal_calibration/stages/schism.py</code> (add new class)</p>
+<p>The new stage encapsulates:</p>
+<ul>
+<li>Staging CHRTOUT files + copying <code>nwmReaches.csv</code> (current step 1)</li>
+<li><code>make_discharge()</code> (current step 1 continued)</li>
+<li><code>run_combine_sink_source()</code> (current step 2)</li>
+<li><code>merge_source_sink()</code> (current step 3)</li>
+</ul>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">SchismDischargeStage</span><span class="p">(</span><span class="n">WorkflowStage</span><span class="p">):</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;schism_discharge&quot;</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">description</span> <span class="o">=</span> <span class="s2">&quot;Generate river discharge forcing&quot;</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>        <span class="c1"># 1. Copy nwmReaches.csv from prebuilt_dir (only if it exists)</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>        <span class="c1"># 2. Stage CHRTOUT files (for nwm_ana) or skip (for nwm_retro)</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>        <span class="c1"># 3. make_discharge(...)</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>        <span class="c1"># 4. run_combine_sink_source(...)</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>        <span class="c1"># 5. merge_source_sink(...) -- read element_areas.txt from prebuilt_dir</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>        <span class="c1"># 6. Verify source.nc was produced</span>
+</span></code></pre></div>
+<p><strong>Validation:</strong> The stage itself checks for <code>nwmReaches.csv</code> in <code>prebuilt_dir</code> at the
+start of <code>run()</code> and raises a clear error if missing. This replaces the upfront
+validation in <code>SchismModelConfig.validate()</code>.</p>
+<h3 id="12-slim-down-preschismstage">1.2 Slim down <code>PreSCHISMStage</code><a class="headerlink" href="#12-slim-down-preschismstage" title="Permanent link">#</a></h3>
+<p><strong>File:</strong> <code>src/coastal_calibration/stages/schism.py</code></p>
+<p>After extraction, <code>PreSCHISMStage</code> retains only:</p>
+<ul>
+<li>Mesh partitioning (<code>partition_mesh</code>)</li>
+<li><code>param.nml</code> patching for station output</li>
+<li>Critical file verification (<code>source.nc</code>, <code>param.nml</code>, <code>hgrid.gr3</code>)</li>
+</ul>
+<p>Rename to better reflect its reduced scope (or keep name for backward compat but update
+description to "Partition mesh and finalize inputs").</p>
+<h3 id="13-remove-nwmreachescsv-from-required-validation">1.3 Remove <code>nwmReaches.csv</code> from required validation<a class="headerlink" href="#13-remove-nwmreachescsv-from-required-validation" title="Permanent link">#</a></h3>
+<p><strong>File:</strong> <code>src/coastal_calibration/config/schema.py</code> (line ~384)</p>
+<p>Move <code>"nwmReaches.csv"</code> out of the <code>required</code> list in <code>SchismModelConfig.validate()</code>.
+The discharge stage handles its own validation.</p>
+<h3 id="14-remove-element_areastxt-from-static-symlink-list">1.4 Remove <code>element_areas.txt</code> from static symlink list<a class="headerlink" href="#14-remove-element_areastxt-from-static-symlink-list" title="Permanent link">#</a></h3>
+<p><strong>File:</strong> <code>src/coastal_calibration/schism_prep.py</code> -- <code>update_params()</code> (line ~732)</p>
+<p>Remove <code>"element_areas.txt"</code> from the <code>static_files</code> list. The discharge stage
+(<code>merge_source_sink</code>) reads it directly from <code>prebuilt_dir</code> (passed as <code>root_dir</code>
+parameter). Confirm that <code>merge_source_sink</code>'s <code>root_dir</code> parameter can be pointed at
+<code>prebuilt_dir</code> instead of <code>work_dir</code>.</p>
+<p>Current call in <code>PreSCHISMStage</code>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">merge_source_sink</span><span class="p">(</span><span class="n">work_dir</span><span class="o">=</span><span class="n">work_dir</span><span class="p">,</span> <span class="n">root_dir</span><span class="o">=</span><span class="n">work_dir</span><span class="p">,</span> <span class="n">prebuilt_dir</span><span class="o">=</span><span class="n">prebuilt_dir</span><span class="p">)</span>
+</span></code></pre></div>
+<p>The <code>root_dir</code> is used solely for reading <code>element_areas.txt</code> (line 369). Change to:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">merge_source_sink</span><span class="p">(</span><span class="n">work_dir</span><span class="o">=</span><span class="n">work_dir</span><span class="p">,</span> <span class="n">root_dir</span><span class="o">=</span><span class="n">prebuilt_dir</span><span class="p">,</span> <span class="n">prebuilt_dir</span><span class="o">=</span><span class="n">prebuilt_dir</span><span class="p">)</span>
+</span></code></pre></div>
+<p>Or better: rename <code>root_dir</code> to <code>element_area_dir</code> for clarity, or add an explicit
+<code>element_area_file: Path</code> parameter.</p>
+<h3 id="15-make-elevation-correction-an-explicit-parameter">1.5 Make elevation correction an explicit parameter<a class="headerlink" href="#15-make-elevation-correction-an-explicit-parameter" title="Permanent link">#</a></h3>
+<p><strong>Files:</strong></p>
+<ul>
+<li><code>src/coastal_calibration/schism_prep.py</code> -- <code>make_tpxo_boundary()</code> and
+    <code>make_stofs_boundary()</code></li>
+<li><code>src/coastal_calibration/stages/boundary.py</code> -- <code>TPXOBoundaryStage</code> and
+    <code>STOFSBoundaryStage</code></li>
+</ul>
+<p>Current pattern (implicit):</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Inside make_tpxo_boundary / make_stofs_boundary</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">correction_file</span> <span class="o">=</span> <span class="n">work_dir</span> <span class="o">/</span> <span class="s2">&quot;elevation_correction.csv&quot;</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="k">if</span> <span class="n">correction_file</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">correct_elevation</span><span class="p">(</span><span class="n">output_file</span><span class="p">,</span> <span class="n">correction_file</span><span class="p">)</span>
+</span></code></pre></div>
+<p>New pattern (explicit):</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Function signature adds optional parameter</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">make_tpxo_boundary</span><span class="p">(</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="o">...</span><span class="p">,</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="n">correction_file</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># NEW</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="o">...</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    <span class="k">if</span> <span class="n">correction_file</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">correction_file</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>        <span class="n">correct_elevation</span><span class="p">(</span><span class="n">output_file</span><span class="p">,</span> <span class="n">correction_file</span><span class="p">)</span>
+</span></code></pre></div>
+<p>The stage classes resolve the path:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># In TPXOBoundaryStage.run() / STOFSBoundaryStage.run()</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">correction_file</span> <span class="o">=</span> <span class="n">prebuilt_dir</span> <span class="o">/</span> <span class="s2">&quot;elevation_correction.csv&quot;</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">make_tpxo_boundary</span><span class="p">(</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="o">...</span><span class="p">,</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="n">correction_file</span><span class="o">=</span><span class="n">correction_file</span> <span class="k">if</span> <span class="n">correction_file</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="p">)</span>
+</span></code></pre></div>
+<p>Also remove <code>"elevation_correction.csv"</code> from the optional symlink list in
+<code>update_params()</code> (line ~742) since it no longer needs to be in <code>work_dir</code>.</p>
+<h3 id="16-update-stage-ordering">1.6 Update stage ordering<a class="headerlink" href="#16-update-stage-ordering" title="Permanent link">#</a></h3>
+<p><strong>File:</strong> <code>src/coastal_calibration/config/schema.py</code> -- <code>SchismModelConfig.stage_order</code></p>
+<p>Current order (11 stages):</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>download -&gt; forcing_prep -&gt; forcing -&gt; sflux -&gt; params -&gt; obs -&gt; boundary -&gt; prep -&gt; run -&gt; postprocess -&gt; plot
+</span></code></pre></div>
+<p>New order (12 stages):</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>download -&gt; forcing_prep -&gt; forcing -&gt; sflux -&gt; params -&gt; obs -&gt; boundary -&gt; discharge -&gt; prep -&gt; run -&gt; postprocess -&gt; plot
+</span></code></pre></div>
+<p>Insert <code>"schism_discharge"</code> between <code>"schism_boundary"</code> and <code>"schism_prep"</code>.</p>
+<p><strong>File:</strong> <code>src/coastal_calibration/config/schema.py</code> --
+<code>SchismModelConfig.create_stages()</code></p>
+<p>Add the new stage instantiation:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">coastal_calibration.stages</span><span class="w"> </span><span class="kn">import</span> <span class="n">SchismDischargeStage</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="n">stages</span><span class="p">[</span><span class="s2">&quot;schism_discharge&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">SchismDischargeStage</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">monitor</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="17-update-clean_run_directory">1.7 Update <code>clean_run_directory</code><a class="headerlink" href="#17-update-clean_run_directory" title="Permanent link">#</a></h3>
+<p><strong>File:</strong> <code>src/coastal_calibration/schism_prep.py</code> (line ~50)</p>
+<p>Keep <code>nwmReaches.csv</code> in the cleanup list -- it is a generated (copied) file in
+<code>work_dir</code> that should be cleaned between runs.</p>
+<h3 id="18-update-exports">1.8 Update exports<a class="headerlink" href="#18-update-exports" title="Permanent link">#</a></h3>
+<p><strong>File:</strong> <code>src/coastal_calibration/stages/__init__.py</code></p>
+<p>Add <code>SchismDischargeStage</code> to exports.</p>
+<h3 id="19-update-tests">1.9 Update tests<a class="headerlink" href="#19-update-tests" title="Permanent link">#</a></h3>
+<p><strong>File:</strong> <code>tests/common/test_schism_prep.py</code></p>
+<ul>
+<li>Update <code>test_stage_chrtout_files</code> -- <code>nwmReaches.csv</code> copy is now in the discharge
+    stage, not in <code>stage_chrtout_files</code> (or keep it there and have the stage call it).</li>
+<li>Add test for <code>SchismDischargeStage</code> that verifies it produces <code>source.nc</code>.</li>
+<li>Update <code>test_update_params</code> to verify <code>element_areas.txt</code> is NOT in the symlink list.</li>
+</ul>
+<h3 id="110-update-changelogmd">1.10 Update CHANGELOG.md<a class="headerlink" href="#110-update-changelogmd" title="Permanent link">#</a></h3>
+<p>Add under <code>[Unreleased]</code> -&gt; <code>Changed</code>:</p>
+<ul>
+<li>Extract discharge operations into dedicated <code>SchismDischargeStage</code></li>
+<li>Make elevation correction an explicit parameter in boundary functions</li>
+</ul>
+<hr />
+<h2 id="phase-2-integrate-schism-module-into-workflow">Phase 2: Integrate <code>schism/</code> Module into Workflow<a class="headerlink" href="#phase-2-integrate-schism-module-into-workflow" title="Permanent link">#</a></h2>
+<p><strong>Goal:</strong> Replace duplicated hgrid parsing in <code>stages/schism.py</code> with <code>NWMSCHISMProject</code>
+from <code>schism/project_reader.py</code>. Optionally compute element areas from mesh instead of
+reading the file.</p>
+<h3 id="21-replace-hgrid-helpers-in-schismobservationstage">2.1 Replace hgrid helpers in <code>SchismObservationStage</code><a class="headerlink" href="#21-replace-hgrid-helpers-in-schismobservationstage" title="Permanent link">#</a></h3>
+<p><strong>File:</strong> <code>src/coastal_calibration/stages/schism.py</code></p>
+<p>Current standalone helpers (~130 lines):</p>
+<ul>
+<li><code>_read_hgrid_header(hgrid_path)</code> -- lines 31-36</li>
+<li><code>_read_node_coordinates(hgrid_path, n_nodes)</code> -- lines 39-49</li>
+<li><code>_read_open_boundary_nodes(hgrid_path, n_nodes, n_elements)</code> -- ~80 lines</li>
+</ul>
+<p>Replace with:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">coastal_calibration.schism</span><span class="w"> </span><span class="kn">import</span> <span class="n">NWMSCHISMProject</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="n">project</span> <span class="o">=</span> <span class="n">NWMSCHISMProject</span><span class="p">(</span><span class="n">prebuilt_dir</span><span class="p">,</span> <span class="n">validate</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="n">n_nodes</span> <span class="o">=</span> <span class="n">project</span><span class="o">.</span><span class="n">n_nodes</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="n">coords</span> <span class="o">=</span> <span class="n">project</span><span class="o">.</span><span class="n">nodes_coordinates</span>  <span class="c1"># (N, 2) array</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="n">boundaries</span> <span class="o">=</span> <span class="n">project</span><span class="o">.</span><span class="n">read_boundaries</span><span class="p">()</span>  <span class="c1"># BoundarySet</span>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="n">open_bnd_nodes</span> <span class="o">=</span> <span class="n">boundaries</span><span class="o">.</span><span class="n">open_boundaries</span>  <span class="c1"># list[list[int]]</span>
+</span></code></pre></div>
+<p>Delete <code>_read_hgrid_header</code>, <code>_read_node_coordinates</code>, <code>_read_open_boundary_nodes</code>.</p>
+<h3 id="22-optional-compute-element-areas-from-mesh">2.2 Optional: Compute element areas from mesh<a class="headerlink" href="#22-optional-compute-element-areas-from-mesh" title="Permanent link">#</a></h3>
+<p><strong>File:</strong> <code>src/coastal_calibration/schism_prep.py</code> -- <code>merge_source_sink()</code> (line ~369)</p>
+<p>Current:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">threshold</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">genfromtxt</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">root_dir</span> <span class="o">/</span> <span class="s2">&quot;element_areas.txt&quot;</span><span class="p">))</span>
+</span></code></pre></div>
+<p>Alternative using the new module:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">coastal_calibration.schism</span><span class="w"> </span><span class="kn">import</span> <span class="n">NWMSCHISMProject</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="n">project</span> <span class="o">=</span> <span class="n">NWMSCHISMProject</span><span class="p">(</span><span class="n">prebuilt_dir</span><span class="p">,</span> <span class="n">validate</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="n">threshold</span> <span class="o">=</span> <span class="n">project</span><span class="o">.</span><span class="n">element_areas</span>
+</span></code></pre></div>
+<p>This eliminates the need for the pre-computed <code>element_areas.txt</code> file entirely for the
+discharge pipeline. The file would only be needed by the subsetter.</p>
+<p><strong>Trade-off:</strong> Computing element areas from hgrid.gr3 takes time for large meshes. For
+operational runs, reading the pre-computed file is faster. Consider:</p>
+<ul>
+<li>Accept both: try file first, fall back to computation</li>
+<li>Or keep the file approach for now and revisit when performance is measured</li>
+</ul>
+<h3 id="23-add-node-count-validation-to-correct_elevation">2.3 Add node-count validation to <code>correct_elevation</code><a class="headerlink" href="#23-add-node-count-validation-to-correct_elevation" title="Permanent link">#</a></h3>
+<p><strong>File:</strong> <code>src/coastal_calibration/schism_prep.py</code> -- <code>correct_elevation()</code> (line ~766)</p>
+<p>Optionally accept an <code>n_open_boundary_nodes</code> count to validate that the CSV row count
+matches the total open boundary node count:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="n">boundaries</span> <span class="o">=</span> <span class="n">project</span><span class="o">.</span><span class="n">read_boundaries</span><span class="p">()</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="n">expected</span> <span class="o">=</span> <span class="n">boundaries</span><span class="o">.</span><span class="n">total_open_nodes</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">elev_correct</span><span class="p">)</span> <span class="o">!=</span> <span class="n">expected</span><span class="p">:</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>        <span class="sa">f</span><span class="s2">&quot;elevation_correction.csv has </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">elev_correct</span><span class="p">)</span><span class="si">}</span><span class="s2"> rows, &quot;</span>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>        <span class="sa">f</span><span class="s2">&quot;expected </span><span class="si">{</span><span class="n">expected</span><span class="si">}</span><span class="s2"> open boundary nodes&quot;</span>
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>    <span class="p">)</span>
+</span></code></pre></div>
+<h3 id="24-update-tests">2.4 Update tests<a class="headerlink" href="#24-update-tests" title="Permanent link">#</a></h3>
+<ul>
+<li>Update <code>tests/common/test_stages.py</code> if it tests hgrid parsing helpers.</li>
+<li>Ensure <code>tests/schism/</code> tests cover <code>NWMSCHISMProject</code> integration.</li>
+</ul>
+<hr />
+<h2 id="phase-3-package-reorganization">Phase 3: Package Reorganization<a class="headerlink" href="#phase-3-package-reorganization" title="Permanent link">#</a></h2>
+<p><strong>Goal:</strong> Move model-specific code into <code>schism/</code> and <code>sfincs/</code> packages. Shared
+infrastructure stays at the root level.</p>
+<h3 id="31-target-structure">3.1 Target structure<a class="headerlink" href="#31-target-structure" title="Permanent link">#</a></h3>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>src/coastal_calibration/
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>  __init__.py              # Keep lazy imports for backward compat
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>  cli.py                   # Shared
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>  runner.py                # Shared (model-agnostic orchestrator)
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>  downloader.py            # Shared
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>  coops_api.py             # Shared
+</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>
+</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>  config/                  # Shared (ModelConfig ABC + subclasses)
+</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>    schema.py
+</span><span id="__span-13-10"><a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a>    ...
+</span><span id="__span-13-11"><a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>
+</span><span id="__span-13-12"><a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a>  utils/                   # Shared (15 modules)
+</span><span id="__span-13-13"><a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a>    logging.py, system.py, time.py, mpi.py, streamflow.py,
+</span><span id="__span-13-14"><a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a>    workflow.py, raster.py, floodmap.py, copdem.py,
+</span><span id="__span-13-15"><a id="__codelineno-13-15" name="__codelineno-13-15" href="#__codelineno-13-15"></a>    esa_worldcover.py, gebco_wms.py, topobathy_noaa.py,
+</span><span id="__span-13-16"><a id="__codelineno-13-16" name="__codelineno-13-16" href="#__codelineno-13-16"></a>    topobathy_nws.py, _gdal.py
+</span><span id="__span-13-17"><a id="__codelineno-13-17" name="__codelineno-13-17" href="#__codelineno-13-17"></a>
+</span><span id="__span-13-18"><a id="__codelineno-13-18" name="__codelineno-13-18" href="#__codelineno-13-18"></a>  plotting/                # Shared
+</span><span id="__span-13-19"><a id="__codelineno-13-19" name="__codelineno-13-19" href="#__codelineno-13-19"></a>  regridding/              # Shared
+</span><span id="__span-13-20"><a id="__codelineno-13-20" name="__codelineno-13-20" href="#__codelineno-13-20"></a>  tides/                   # Shared (usable by any coastal model)
+</span><span id="__span-13-21"><a id="__codelineno-13-21" name="__codelineno-13-21" href="#__codelineno-13-21"></a>
+</span><span id="__span-13-22"><a id="__codelineno-13-22" name="__codelineno-13-22" href="#__codelineno-13-22"></a>  stages/                  # Shared base + download
+</span><span id="__span-13-23"><a id="__codelineno-13-23" name="__codelineno-13-23" href="#__codelineno-13-23"></a>    __init__.py            # Re-export all stages (backward compat)
+</span><span id="__span-13-24"><a id="__codelineno-13-24" name="__codelineno-13-24" href="#__codelineno-13-24"></a>    base.py                # WorkflowStage ABC
+</span><span id="__span-13-25"><a id="__codelineno-13-25" name="__codelineno-13-25" href="#__codelineno-13-25"></a>    download.py            # DownloadStage
+</span><span id="__span-13-26"><a id="__codelineno-13-26" name="__codelineno-13-26" href="#__codelineno-13-26"></a>
+</span><span id="__span-13-27"><a id="__codelineno-13-27" name="__codelineno-13-27" href="#__codelineno-13-27"></a>  schism/                  # SCHISM workflow package
+</span><span id="__span-13-28"><a id="__codelineno-13-28" name="__codelineno-13-28" href="#__codelineno-13-28"></a>    __init__.py            # Public API
+</span><span id="__span-13-29"><a id="__codelineno-13-29" name="__codelineno-13-29" href="#__codelineno-13-29"></a>    constants.py           # &lt;- exists
+</span><span id="__span-13-30"><a id="__codelineno-13-30" name="__codelineno-13-30" href="#__codelineno-13-30"></a>    project_reader.py      # &lt;- exists
+</span><span id="__span-13-31"><a id="__codelineno-13-31" name="__codelineno-13-31" href="#__codelineno-13-31"></a>    subsetter.py           # &lt;- exists
+</span><span id="__span-13-32"><a id="__codelineno-13-32" name="__codelineno-13-32" href="#__codelineno-13-32"></a>    prep.py                # &lt;- from schism_prep.py
+</span><span id="__span-13-33"><a id="__codelineno-13-33" name="__codelineno-13-33" href="#__codelineno-13-33"></a>    sflux.py               # &lt;- from root sflux.py
+</span><span id="__span-13-34"><a id="__codelineno-13-34" name="__codelineno-13-34" href="#__codelineno-13-34"></a>    stages.py              # &lt;- merge of stages/schism.py
+</span><span id="__span-13-35"><a id="__codelineno-13-35" name="__codelineno-13-35" href="#__codelineno-13-35"></a>                           #    + stages/boundary.py
+</span><span id="__span-13-36"><a id="__codelineno-13-36" name="__codelineno-13-36" href="#__codelineno-13-36"></a>                           #    + stages/forcing.py
+</span><span id="__span-13-37"><a id="__codelineno-13-37" name="__codelineno-13-37" href="#__codelineno-13-37"></a>
+</span><span id="__span-13-38"><a id="__codelineno-13-38" name="__codelineno-13-38" href="#__codelineno-13-38"></a>  sfincs/                  # SFINCS workflow package
+</span><span id="__span-13-39"><a id="__codelineno-13-39" name="__codelineno-13-39" href="#__codelineno-13-39"></a>    __init__.py            # Public API
+</span><span id="__span-13-40"><a id="__codelineno-13-40" name="__codelineno-13-40" href="#__codelineno-13-40"></a>    stages.py              # &lt;- from stages/sfincs_build.py
+</span><span id="__span-13-41"><a id="__codelineno-13-41" name="__codelineno-13-41" href="#__codelineno-13-41"></a>    create.py              # &lt;- from stages/sfincs_create.py + creator.py
+</span><span id="__span-13-42"><a id="__codelineno-13-42" name="__codelineno-13-42" href="#__codelineno-13-42"></a>
+</span><span id="__span-13-43"><a id="__codelineno-13-43" name="__codelineno-13-43" href="#__codelineno-13-43"></a>  data_catalog/            # Keep shared or move to sfincs/ (TBD)
+</span></code></pre></div>
+<h3 id="32-file-moves">3.2 File moves<a class="headerlink" href="#32-file-moves" title="Permanent link">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Current path</th>
+<th>New path</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>schism_prep.py</code></td>
+<td><code>schism/prep.py</code></td>
+<td>All 15 functions move</td>
+</tr>
+<tr>
+<td><code>sflux.py</code></td>
+<td><code>schism/sflux.py</code></td>
+<td>SCHISM-only atmospheric forcing</td>
+</tr>
+<tr>
+<td><code>stages/schism.py</code></td>
+<td><code>schism/stages.py</code></td>
+<td>5 stage classes + helpers</td>
+</tr>
+<tr>
+<td><code>stages/boundary.py</code></td>
+<td><code>schism/stages.py</code> (merge)</td>
+<td>4 SCHISM-only stage classes</td>
+</tr>
+<tr>
+<td><code>stages/forcing.py</code></td>
+<td><code>schism/stages.py</code> (merge)</td>
+<td>3 SCHISM-only stage classes</td>
+</tr>
+<tr>
+<td><code>stages/sfincs_build.py</code></td>
+<td><code>sfincs/stages.py</code></td>
+<td>14 classes</td>
+</tr>
+<tr>
+<td><code>stages/sfincs_create.py</code></td>
+<td><code>sfincs/create.py</code></td>
+<td>Creation pipeline stages</td>
+</tr>
+<tr>
+<td><code>creator.py</code></td>
+<td><code>sfincs/create.py</code> (merge)</td>
+<td><code>SfincsCreator</code> class</td>
+</tr>
+</tbody>
+</table>
+<h3 id="33-backward-compatibility">3.3 Backward compatibility<a class="headerlink" href="#33-backward-compatibility" title="Permanent link">#</a></h3>
+<p><strong><code>stages/__init__.py</code></strong> continues to re-export everything from the new locations:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># Backward compat -- import from new locations</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">coastal_calibration.schism.stages</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>    <span class="n">BoundaryConditionStage</span><span class="p">,</span>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>    <span class="n">PreSCHISMStage</span><span class="p">,</span>
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>    <span class="n">SCHISMRunStage</span><span class="p">,</span>
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>    <span class="n">SchismDischargeStage</span><span class="p">,</span>
+</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>    <span class="o">...</span>
+</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="p">)</span>
+</span><span id="__span-14-9"><a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a><span class="kn">from</span><span class="w"> </span><span class="nn">coastal_calibration.sfincs.stages</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+</span><span id="__span-14-10"><a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a>    <span class="n">SfincsDischargeStage</span><span class="p">,</span>
+</span><span id="__span-14-11"><a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a>    <span class="n">SfincsInitStage</span><span class="p">,</span>
+</span><span id="__span-14-12"><a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a>    <span class="o">...</span>
+</span><span id="__span-14-13"><a id="__codelineno-14-13" name="__codelineno-14-13" href="#__codelineno-14-13"></a><span class="p">)</span>
+</span></code></pre></div>
+<p><strong><code>__init__.py</code></strong> (root) updates lazy import paths but keeps the same public names.</p>
+<p>Old files (<code>schism_prep.py</code>, <code>sflux.py</code>, <code>creator.py</code>) can either:</p>
+<ul>
+<li>Be deleted (breaking change) -- preferred for cleanliness</li>
+<li>Become thin re-export shims with deprecation warnings</li>
+</ul>
+<h3 id="34-import-updates">3.4 Import updates<a class="headerlink" href="#34-import-updates" title="Permanent link">#</a></h3>
+<p>All internal imports need updating. Key patterns:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1"># Before</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">coastal_calibration.schism_prep</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_discharge</span>
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">coastal_calibration.sflux</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_sflux</span>
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="c1"># After</span>
+</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="kn">from</span><span class="w"> </span><span class="nn">coastal_calibration.schism.prep</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_discharge</span>
+</span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="kn">from</span><span class="w"> </span><span class="nn">coastal_calibration.schism.sflux</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_sflux</span>
+</span></code></pre></div>
+<p>Since stages move into their model packages, <code>config/schema.py</code> import paths for
+<code>create_stages()</code> change:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1"># Before</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">coastal_calibration.stages</span><span class="w"> </span><span class="kn">import</span> <span class="n">PreSCHISMStage</span>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="c1"># After</span>
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">coastal_calibration.schism.stages</span><span class="w"> </span><span class="kn">import</span> <span class="n">PreSCHISMStage</span>
+</span></code></pre></div>
+<h3 id="35-test-updates">3.5 Test updates<a class="headerlink" href="#35-test-updates" title="Permanent link">#</a></h3>
+<ul>
+<li>Move/update test imports to match new paths</li>
+<li><code>tests/common/test_schism_prep.py</code> -&gt; tests <code>schism.prep</code> functions</li>
+<li><code>tests/common/test_stages.py</code> -&gt; verify re-exports still work</li>
+</ul>
+<h3 id="36-update-__init__py-lazy-import-registry">3.6 Update <code>__init__.py</code> lazy import registry<a class="headerlink" href="#36-update-__init__py-lazy-import-registry" title="Permanent link">#</a></h3>
+<p>The root <code>__init__.py</code> has ~80 lazy import entries. Update source paths for moved
+modules while keeping the same exported names.</p>
+<hr />
+<h2 id="key-files-reference">Key Files Reference<a class="headerlink" href="#key-files-reference" title="Permanent link">#</a></h2>
+<h3 id="files-to-modify-in-phase-1">Files to modify in Phase 1<a class="headerlink" href="#files-to-modify-in-phase-1" title="Permanent link">#</a></h3>
+<ul>
+<li><code>src/coastal_calibration/stages/schism.py</code> -- Add <code>SchismDischargeStage</code>, slim
+    <code>PreSCHISMStage</code></li>
+<li><code>src/coastal_calibration/stages/__init__.py</code> -- Export new stage</li>
+<li><code>src/coastal_calibration/stages/boundary.py</code> -- Pass <code>correction_file</code> explicitly to
+    boundary stages</li>
+<li><code>src/coastal_calibration/schism_prep.py</code> -- Remove <code>element_areas.txt</code> from static
+    symlinks, remove <code>elevation_correction.csv</code> from optional symlinks, add
+    <code>correction_file</code> param to <code>make_tpxo_boundary</code>/<code>make_stofs_boundary</code>, update
+    <code>merge_source_sink</code> <code>root_dir</code> usage</li>
+<li><code>src/coastal_calibration/config/schema.py</code> -- Update <code>stage_order</code>, <code>create_stages</code>,
+    <code>validate</code> (remove <code>nwmReaches.csv</code> from required)</li>
+<li><code>tests/common/test_schism_prep.py</code> -- Update tests</li>
+<li><code>CHANGELOG.md</code> -- Document changes</li>
+</ul>
+<h3 id="files-to-modify-in-phase-2">Files to modify in Phase 2<a class="headerlink" href="#files-to-modify-in-phase-2" title="Permanent link">#</a></h3>
+<ul>
+<li><code>src/coastal_calibration/stages/schism.py</code> -- Replace hgrid helpers with
+    <code>NWMSCHISMProject</code></li>
+<li><code>src/coastal_calibration/schism_prep.py</code> -- Optional: compute element areas from mesh</li>
+</ul>
+<h3 id="files-to-move-in-phase-3">Files to move in Phase 3<a class="headerlink" href="#files-to-move-in-phase-3" title="Permanent link">#</a></h3>
+<ul>
+<li>See table in section 3.2</li>
+</ul>
+<h3 id="key-existing-functions-to-reuse">Key existing functions to reuse<a class="headerlink" href="#key-existing-functions-to-reuse" title="Permanent link">#</a></h3>
+<ul>
+<li><code>NWMSCHISMProject</code> (<code>schism/project_reader.py</code>) -- mesh reading, element areas,
+    boundaries</li>
+<li><code>SCHISMFiles</code> constants (<code>schism/constants.py</code>) -- file name constants</li>
+<li><code>WorkflowStage</code> (<code>stages/base.py</code>) -- base class for all stages</li>
+<li><code>correct_elevation</code> (<code>schism_prep.py:766</code>) -- elevation correction function</li>
+<li><code>make_discharge</code>, <code>run_combine_sink_source</code>, <code>merge_source_sink</code> (<code>schism_prep.py</code>) --
+    discharge pipeline functions</li>
+<li><code>stage_chrtout_files</code> (<code>schism_prep.py:87</code>) -- CHRTOUT file staging</li>
+</ul>
+<hr />
+<h2 id="verification">Verification<a class="headerlink" href="#verification" title="Permanent link">#</a></h2>
+<h3 id="phase-1">Phase 1<a class="headerlink" href="#phase-1" title="Permanent link">#</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>pixi<span class="w"> </span>r<span class="w"> </span>lint
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>pixi<span class="w"> </span>r<span class="w"> </span>typecheck
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>pixi<span class="w"> </span>r<span class="w"> </span>-e<span class="w"> </span>test313-common<span class="w"> </span>test-common
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>pixi<span class="w"> </span>r<span class="w"> </span>-e<span class="w"> </span>test313-schism<span class="w"> </span>test-schism
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>pixi<span class="w"> </span>r<span class="w"> </span>-e<span class="w"> </span>test313<span class="w"> </span><span class="nb">test</span>
+</span></code></pre></div>
+<p>Verify:</p>
+<ul>
+<li><code>SchismDischargeStage</code> produces <code>source.nc</code> when <code>nwmReaches.csv</code> exists in
+    <code>prebuilt_dir</code></li>
+<li><code>PreSCHISMStage</code> no longer touches discharge files</li>
+<li>Boundary stages apply elevation correction from <code>prebuilt_dir</code> path, not <code>work_dir</code>
+    symlink</li>
+<li><code>element_areas.txt</code> is no longer symlinked by <code>update_params</code></li>
+<li><code>nwmReaches.csv</code> is no longer in the required files validation list</li>
+<li>Stage order includes <code>schism_discharge</code> between <code>schism_boundary</code> and <code>schism_prep</code></li>
+</ul>
+<h3 id="phase-2">Phase 2<a class="headerlink" href="#phase-2" title="Permanent link">#</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>pixi<span class="w"> </span>r<span class="w"> </span>-e<span class="w"> </span>test313-common<span class="w"> </span>test-common
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>pixi<span class="w"> </span>r<span class="w"> </span>-e<span class="w"> </span>test313-schism<span class="w"> </span>test-schism
+</span></code></pre></div>
+<p>Verify:</p>
+<ul>
+<li><code>SchismObservationStage</code> works with <code>NWMSCHISMProject</code> instead of standalone helpers</li>
+<li>Deleted helper functions are not imported anywhere</li>
+</ul>
+<h3 id="phase-3">Phase 3<a class="headerlink" href="#phase-3" title="Permanent link">#</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>pixi<span class="w"> </span>r<span class="w"> </span>-e<span class="w"> </span>test313<span class="w"> </span><span class="nb">test</span>
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>pixi<span class="w"> </span>r<span class="w"> </span>typecheck
+</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>pixi<span class="w"> </span>r<span class="w"> </span>lint
+</span></code></pre></div>
+<p>Verify:</p>
+<ul>
+<li>All imports resolve (both new paths and backward-compat re-exports)</li>
+<li>CLI still works: <code>pixi r -e dev python -m coastal_calibration.cli --help</code></li>
+<li>Root <code>__init__.py</code> lazy imports all resolve</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2025 Raytheon Company. BSD-2-Clause License.
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/NGWPC/nwm-coastal" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["content.action.edit", "content.code.annotate", "content.code.copy", "content.tabs.link", "navigation.collapse", "navigation.expand", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.instant.progress", "navigation.path", "navigation.indexes", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "search.suggest", "toc.follow", "toc.integrate"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../javascripts/mathjax.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

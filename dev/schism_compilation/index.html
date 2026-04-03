@@ -1784,8 +1784,8 @@ environment variable reading), making them unit-testable.</p>
 <hr />
 <h2 id="logging">Logging<a class="headerlink" href="#logging" title="Permanent link">#</a></h2>
 <p>All new SCHISM modules use the central package logger from
-<code>coastal_calibration.utils.logging</code>:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">coastal_calibration.utils.logging</span><span class="w"> </span><span class="kn">import</span> <span class="n">logger</span>
+<code>coastal_calibration.logging</code>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">coastal_calibration.logging</span><span class="w"> </span><span class="kn">import</span> <span class="n">logger</span>
 </span></code></pre></div>
 <p>The central logger is <code>logging.getLogger("coastal_calibration")</code> and is configured with
 <code>RichHandler</code> for console output and optional file logging via <code>configure_logger()</code>.</p>
@@ -1804,23 +1804,23 @@ environment variable reading), making them unit-testable.</p>
 </tr>
 <tr>
 <td><code>schism_prep.py</code></td>
-<td><code>from coastal_calibration.utils.logging import logger</code></td>
+<td><code>from coastal_calibration.logging import logger</code></td>
 </tr>
 <tr>
 <td><code>sflux.py</code></td>
-<td><code>from coastal_calibration.utils.logging import logger</code></td>
+<td><code>from coastal_calibration.logging import logger</code></td>
 </tr>
 <tr>
 <td><code>tides/_otps.py</code>, <code>tides/_ocean_tide.py</code></td>
-<td><code>from coastal_calibration.utils.logging import logger</code></td>
+<td><code>from coastal_calibration.logging import logger</code></td>
 </tr>
 <tr>
 <td><code>regridding/regrid_estofs.py</code>, <code>regrid_forcings.py</code>, <code>esmf_utils.py</code></td>
-<td><code>from coastal_calibration.utils.logging import logger</code></td>
+<td><code>from coastal_calibration.logging import logger</code></td>
 </tr>
 <tr>
 <td><code>utils/floodmap.py</code></td>
-<td><code>from coastal_calibration.utils.logging import logger</code></td>
+<td><code>from coastal_calibration.logging import logger</code></td>
 </tr>
 </tbody>
 </table>
@@ -1868,10 +1868,10 @@ variables are for:</p>
 </span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">env</span><span class="p">[</span><span class="s2">&quot;OMP_PROC_BIND&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;close&quot;</span>
 </span></code></pre></div>
 <h4 id="schismmodelconfigbuild_environment-schemapy"><code>SchismModelConfig.build_environment()</code> (schema.py)<a class="headerlink" href="#schismmodelconfigbuild_environment-schemapy" title="Permanent link">#</a></h4>
-<p>Delegates to <code>build_mpi_env()</code> from <code>coastal_calibration.utils.mpi</code>, which auto-detects
-the active MPI implementation (OpenMPI or MPICH) and sets the appropriate tuning
-variables. Settings are layered: general settings apply on all clusters, EFA-specific
-settings are added only when AWS EFA devices are detected.</p>
+<p>Delegates to <code>build_mpi_env()</code> from <code>coastal_calibration.utils</code>, which auto-detects the
+active MPI implementation (OpenMPI or MPICH) and sets the appropriate tuning variables.
+Settings are layered: general settings apply on all clusters, EFA-specific settings are
+added only when AWS EFA devices are detected.</p>
 <p><strong>OpenMPI — general</strong> (all clusters):</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">env</span><span class="p">[</span><span class="s2">&quot;OMPI_MCA_mpi_warn_on_fork&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;0&quot;</span>  <span class="c1"># suppress NFS fork warnings</span>
 </span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">env</span><span class="p">[</span><span class="s2">&quot;OMPI_MCA_orte_tmpdir_base&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;/tmp&quot;</span>  <span class="c1"># shared-memory on local disk</span>
@@ -2462,7 +2462,7 @@ for this by fetching <code>tm02</code> files offset by +2 hours from the simulat
 <ul>
 <li>All modules (<code>schism_prep.py</code>, <code>sflux.py</code>, <code>tides/</code>, <code>regridding/</code>,
     <code>utils/floodmap.py</code>) switched from <code>logging.getLogger(__name__)</code> to the central
-    package logger: <code>from coastal_calibration.utils.logging import logger</code></li>
+    package logger: <code>from coastal_calibration.logging import logger</code></li>
 <li>No <code>logging.getLogger(__name__)</code> calls remain in <code>src/coastal_calibration/</code></li>
 <li>Stage classes use <code>WorkflowMonitor</code> which wraps the same central logger</li>
 <li>Function-level logs use 4-space indent (<code>"    "</code>) for proper alignment with

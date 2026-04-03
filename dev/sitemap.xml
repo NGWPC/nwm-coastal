@@ -17,6 +17,10 @@
         <changefreq>daily</changefreq>
     </url>
     <url>
+        <loc>https://NGWPC.github.io/nwm-coastal/stable/workflow_restructuring_plan/</loc>
+        <changefreq>daily</changefreq>
+    </url>
+    <url>
         <loc>https://NGWPC.github.io/nwm-coastal/stable/examples/</loc>
         <changefreq>daily</changefreq>
     </url>

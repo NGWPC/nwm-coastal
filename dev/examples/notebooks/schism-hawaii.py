@@ -70,7 +70,7 @@ run_config = CoastalCalibConfig.from_dict(
         "model": "schism",
         "simulation": {
             "start_date": "2025-11-26",
-            "duration_hours": 50,
+            "duration_hours": 3,
             "coastal_domain": "hawaii",
             "meteo_source": "nwm_ana",
             "timestep_seconds": 300,  # 5-minute timestep
@@ -84,8 +84,9 @@ run_config = CoastalCalibConfig.from_dict(
         "model_config": {
             "prebuilt_dir": "./model",  # pre-built mesh and config files
             "geogrid_file": "./geo_em_HI.nc",  # for ESMF atmospheric regridding
+            "discharge_file": "./model/nwmReaches.csv",  # NWM reach → element mapping
             "nodes": 1,  # number of compute nodes
-            "ntasks_per_node": 4,  # MPI tasks per node
+            "ntasks_per_node": 8,  # MPI tasks per node
             "nscribes": 2,  # I/O server tasks
             "oversubscribe": True,
             "include_noaa_gages": True,
@@ -94,7 +95,6 @@ run_config = CoastalCalibConfig.from_dict(
 )
 
 print(f"Work directory: {run_config.paths.work_dir}")
-print(f"Prebuilt dir:   {run_config.model_config.prebuilt_dir}")
 print(f"Domain:         {run_config.simulation.coastal_domain}")
 print(f"Duration:       {run_config.simulation.duration_hours}h")
 
