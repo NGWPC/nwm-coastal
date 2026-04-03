@@ -409,9 +409,20 @@ class NWMSCHISMProject:
 
     @property
     def element_areas(self) -> NDArray[np.float64]:
-        """Get all element areas computed in geodesic space (m²)."""
+        """Get element areas in m².
+
+        Prefers the pre-computed ``element_areas.txt`` file when present
+        (faster and correct for both geographic and projected meshes).
+        Falls back to geodesic computation from ``hgrid.gr3`` when the
+        file is absent (assumes geographic coordinates).
+        """
         if self._element_areas is None:
-            self._element_areas = self._compute_element_areas()
+            if self.elem_area_file.exists():
+                self._element_areas = np.loadtxt(
+                    self.elem_area_file, dtype=np.float64
+                )
+            else:
+                self._element_areas = self._compute_element_areas()
         return self._element_areas
 
     def _get_element_connections(self) -> NDArray[np.int64]:
