@@ -174,7 +174,7 @@ class BoundarySet:
         for i, boundary in enumerate(self.land_boundaries, start=1):
             btype = boundary.boundary_type
             file_handle.write(
-                f"{boundary.n_nodes} {btype} = Number of nodes for "
+                f"{boundary.n_nodes} {btype.value} = Number of nodes for "
                 f"{btype_str[btype]} boundary {i}\n"
             )
             file_handle.writelines(f"{node_id}\n" for node_id in boundary.nodes)
@@ -681,13 +681,25 @@ class NWMSCHISMProject:
             # Read nope line
             nope = int(_readline().split()[0])
 
-            # Read boundary flags
-            boundary_flags = []
+            # Read boundary flags (4 flags per open boundary)
+            boundary_flags: list[tuple[int, int, int, int]] = []
             for _ in range(nope):
                 parts = _readline().split()
-                # First value is node count, rest are flags
-                flags = [int(parts[i]) for i in range(1, len(parts))]
-                boundary_flags.append(flags)
+                # First value is node count, next 4 are BC flags
+                if len(parts) < 5:
+                    msg = (
+                        f"Expected at least 5 values (node_count + 4 flags) "
+                        f"in bctides boundary line, got {len(parts)}: {parts}"
+                    )
+                    raise ValueError(msg)
+                boundary_flags.append(
+                    (
+                        int(parts[1]),
+                        int(parts[2]),
+                        int(parts[3]),
+                        int(parts[4]),
+                    )
+                )
 
         return header_line, ntip_line, nbfr_line, boundary_flags
 
