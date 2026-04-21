@@ -10,17 +10,17 @@ import os
 import shutil
 import tempfile
 import time
-from collections import defaultdict
+from collections import Counter, defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import IO, TYPE_CHECKING
 
+import netCDF4
 import numpy as np
 import pandas as pd
 import pyproj
 import shapely
-from scipy.io import netcdf_file
 from shapely import STRtree
 
 from coastal_calibration.logging import logger
@@ -602,7 +602,7 @@ class MeshClassifier:
 def _build_shared_nodes_graph(
     shared_nodes: NDArray[np.int64] | Sequence[int] | Sequence[np.int64],
     elements: NDArray[np.int64],
-) -> dict[np.int64, set[np.int64]]:
+) -> dict[int, set[int]]:
     """Build undirected graph from shared nodes and element connectivity.
 
     Parameters
@@ -629,7 +629,7 @@ def _build_shared_nodes_graph(
         return {}
 
     valid_shared = shared_in_elems[valid_mask]
-    adjacency = defaultdict(set)
+    adjacency: dict[int, set[int]] = defaultdict(set)
 
     for elem_shared in valid_shared:
         nodes = elem_shared[elem_shared != 0]
@@ -646,126 +646,111 @@ def _build_shared_nodes_graph(
     return adjacency
 
 
-def _find_path(
-    adjacency: dict[np.int64, set[np.int64]], start_node: np.int64, end_node: np.int64
-) -> NDArray[np.int64]:
-    """Find a path between two nodes in a line graph.
+def _extract_side_segments(
+    bnd_nodes: list[int],
+    side_nodes: set[int],
+    *,
+    is_closed: bool = False,
+) -> list[list[int]]:
+    """Extract contiguous segments of a boundary on one side of the cut.
+
+    Walks the boundary, collecting runs of nodes that belong to
+    *side_nodes*.  For closed boundaries (islands) the first and last
+    segment are merged when they wrap around.
 
     Parameters
     ----------
-    adjacency : dict
-        Node adjacency mapping.
-    start_node : int
-        Starting node ID.
-    end_node : int
-        Ending node ID.
+    bnd_nodes : list of int
+        1-based node IDs in boundary traversal order.
+    side_nodes : set of int
+        Node IDs belonging to this side (includes shared nodes).
+    is_closed : bool
+        Whether this boundary is a closed loop (island).
 
     Returns
     -------
-    numpy.ndarray
-        Node ID array representing a path from start to end.
+    list of list of int
+        Contiguous segments of node IDs on this side.
     """
-    if start_node == end_node:
-        return np.array([start_node], dtype=np.int64)
+    segments: list[list[int]] = []
+    current: list[int] = []
 
-    path = [start_node]
-    visited = {start_node}
-    current = start_node
+    for node in bnd_nodes:
+        if node in side_nodes:
+            current.append(node)
+        elif current:
+            segments.append(current)
+            current = []
+    if current:
+        segments.append(current)
 
-    while current != end_node:
-        neighbors = [n for n in adjacency[current] if n not in visited]
+    if is_closed and len(segments) >= 2:
+        first_on = bnd_nodes[0] in side_nodes
+        last_on = bnd_nodes[-1] in side_nodes
+        if first_on and last_on:
+            segments[0] = segments[-1] + segments[0]
+            segments.pop()
 
-        if not neighbors:
-            break
-
-        next_node = neighbors[0]
-        path.append(next_node)
-        visited.add(next_node)
-        current = next_node
-
-    return np.array(path, dtype=np.int64)
+    return segments
 
 
-def _split_boundary(
-    full_boundary: NDArray[np.int64],
-    submesh_nodes: NDArray[np.int64],
-    shared_nodes: NDArray[np.int64],
-    shared_adjacency: dict[np.int64, set[np.int64]],
-) -> NDArray[np.int64]:
-    """Split a full boundary for a single submesh using graph traversal.
+def _build_cut_boundaries(
+    terminal_shared: list[int],
+    shared_adjacency: dict[int, set[int]],
+    node_mapping: dict[int, int],
+) -> list[list[int]]:
+    """Build new open boundaries along the cut line.
+
+    Finds paths through the shared-node graph between pairs of
+    terminal nodes (shared nodes that lie on original boundaries).
 
     Parameters
     ----------
-    full_boundary : numpy.ndarray
-        Full boundary node sequence.
-    submesh_nodes : numpy.ndarray
-        Node IDs present in the submesh.
-    shared_nodes : numpy.ndarray
-        Shared node IDs across both submeshes.
+    terminal_shared : list of int
+        Shared node IDs that lie on original boundaries.
     shared_adjacency : dict
-        Adjacency graph of shared nodes.
+        Shared-node adjacency graph.
+    node_mapping : dict
+        Original -> new node ID mapping.
 
     Returns
     -------
-    numpy.ndarray
-        New boundary node sequence for the submesh (1-based IDs).
+    list of list of int
+        Remapped open boundary segments along the cut line.
     """
-    subgraph = full_boundary[np.isin(full_boundary, submesh_nodes, assume_unique=True)]
+    if len(terminal_shared) < 2:
+        return []
 
-    if subgraph.size == 0:
-        return np.array([], dtype=np.int64)
+    terminal_set = set(terminal_shared)
+    used: set[int] = set()
+    cut_bnds: list[list[int]] = []
 
-    shared_in_subgraph = np.intersect1d(subgraph, shared_nodes, assume_unique=True)
+    for start in terminal_shared:
+        if start in used:
+            continue
 
-    if shared_in_subgraph.size < 2:
-        return subgraph
+        path = [start]
+        visited = {start}
+        current = start
 
-    start_shared = shared_in_subgraph[0]
-    start_idx = np.where(subgraph == start_shared)[0][0]
+        while True:
+            neighbors = sorted(n for n in shared_adjacency.get(current, set()) if n not in visited)
+            if not neighbors:
+                break
+            next_node = neighbors[0]
+            path.append(next_node)
+            visited.add(next_node)
+            if next_node in terminal_set:
+                break
+            current = next_node
 
-    start_idx_in_full = np.where(full_boundary == start_shared)[0][0]
-    next_after_start = full_boundary[(start_idx_in_full + 1) % len(full_boundary)]
-    start_is_terminal = next_after_start not in submesh_nodes
+        if len(path) >= 2 and path[-1] in terminal_set:
+            used.add(start)
+            used.add(path[-1])
+            remapped = [node_mapping[n] for n in path]
+            cut_bnds.append(remapped)
 
-    new_boundary = []
-
-    if start_is_terminal:
-        other_shared = shared_in_subgraph[1] if len(shared_in_subgraph) > 1 else start_shared
-
-        shared_path = _find_path(shared_adjacency, start_shared, other_shared)
-        new_boundary.extend(shared_path)
-
-        other_idx = np.where(subgraph == other_shared)[0][0]
-        idx = (other_idx + 1) % len(subgraph)
-
-        while idx != start_idx:
-            node = subgraph[idx]
-            if node not in shared_nodes:
-                new_boundary.append(node)
-            idx = (idx + 1) % len(subgraph)
-    else:
-        idx = start_idx
-        terminal_shared = None
-
-        for _ in range(len(subgraph) + 1):
-            node = subgraph[idx]
-            new_boundary.append(node)
-
-            if node in shared_nodes and node != start_shared:
-                idx_in_full = np.where(full_boundary == node)[0][0]
-                next_in_full = full_boundary[(idx_in_full + 1) % len(full_boundary)]
-
-                if next_in_full not in submesh_nodes:
-                    terminal_shared = np.int64(node)
-                    break
-
-            idx = (idx + 1) % len(subgraph)
-
-        if terminal_shared is not None and terminal_shared != start_shared:
-            shared_path = _find_path(shared_adjacency, terminal_shared, start_shared)
-            new_boundary.extend(shared_path[1:-1])
-
-    return np.array(new_boundary, dtype=np.int64)
+    return cut_bnds
 
 
 @dataclass
@@ -1142,10 +1127,14 @@ class MeshSubsetter:
         boundary_set: BoundarySet,
         side_nodes: NDArray[np.int64],
         shared_nodes: NDArray[np.int64],
-        shared_adjacency: dict[np.int64, set[np.int64]],
+        shared_adjacency: dict[int, set[int]],
         mapping: dict[int, int],
-    ) -> BoundarySet:
+    ) -> tuple[BoundarySet, int]:
         """Split and remap boundaries for a single side.
+
+        For each original boundary the portion on this side is extracted
+        via `_extract_side_segments`.  New open boundary segments are
+        then created along the cut line from the shared-node graph.
 
         Parameters
         ----------
@@ -1162,57 +1151,69 @@ class MeshSubsetter:
 
         Returns
         -------
-        BoundarySet
-            New BoundarySet with remapped node IDs for the side.
+        tuple[BoundarySet, int]
+            New BoundarySet with remapped node IDs and the number of
+            cut-line open boundaries that were added.
         """
-        open_bnd_cross = {
-            i
-            for i, bnd in enumerate(boundary_set.open_boundaries)
-            if np.isin(bnd, shared_nodes, assume_unique=True).any()
-        }
-        land_bnd_cross = {
-            i
-            for i, bnd in enumerate(boundary_set.land_boundaries)
-            if np.isin(bnd.nodes, shared_nodes, assume_unique=True).any()
-        }
+        side_set = {int(n) for n in side_nodes}
+        shared_set = {int(n) for n in shared_nodes}
 
-        open_bnds = []
-        open_flags = []
+        open_bnds: list[list[int]] = []
+        open_flags: list[tuple[int, int, int, int]] = []
+        land_bnds: list[LandBoundary] = []
+        terminal_shared: list[int] = []
 
         for idx, open_bnd in enumerate(boundary_set.open_boundaries):
-            if idx not in open_bnd_cross:
-                if np.isin(open_bnd, side_nodes, assume_unique=True).all():
-                    open_bnds.append([mapping[n] for n in open_bnd])
-                    # Preserve flags if available
-                    if idx < len(boundary_set.open_boundary_flags):
-                        open_flags.append(boundary_set.open_boundary_flags[idx])
-                continue
-            bnd = _split_boundary(np.array(open_bnd), side_nodes, shared_nodes, shared_adjacency)
-            if bnd.size > 0:
-                open_bnds.append([mapping[n] for n in bnd])
-                # Preserve flags if available
-                if idx < len(boundary_set.open_boundary_flags):
-                    open_flags.append(boundary_set.open_boundary_flags[idx])
+            shared_on_bnd = [n for n in open_bnd if n in shared_set]
+            segments = _extract_side_segments(list(open_bnd), side_set)
 
-        land_bnds = []
-        for idx, land_bnd in enumerate(boundary_set.land_boundaries):
-            if idx not in land_bnd_cross:
-                if np.isin(land_bnd.nodes, side_nodes, assume_unique=True).all():
-                    remapped_nodes = [mapping[n] for n in land_bnd.nodes]
-                    land_bnds.append(
-                        LandBoundary(nodes=remapped_nodes, boundary_type=land_bnd.boundary_type)
-                    )
-                continue
-            bnd = _split_boundary(
-                np.array(land_bnd.nodes), side_nodes, shared_nodes, shared_adjacency
+            flags: tuple[int, int, int, int] | None = None
+            if idx < len(boundary_set.open_boundary_flags):
+                flags = boundary_set.open_boundary_flags[idx]
+
+            for seg in segments:
+                open_bnds.append([mapping[n] for n in seg])
+                open_flags.append(flags if flags is not None else (1, 0, 0, 0))
+
+            if shared_on_bnd:
+                terminal_shared.extend(shared_on_bnd)
+
+        for land_bnd in boundary_set.land_boundaries:
+            shared_on_bnd = [n for n in land_bnd.nodes if n in shared_set]
+            segments = _extract_side_segments(
+                list(land_bnd.nodes), side_set, is_closed=land_bnd.is_island
             )
-            if bnd.size > 0:
-                remapped_nodes = [mapping[n] for n in bnd]
-                land_bnds.append(
-                    LandBoundary(nodes=remapped_nodes, boundary_type=land_bnd.boundary_type)
-                )
 
-        return BoundarySet(
+            land_bnds.extend(
+                LandBoundary(
+                    nodes=[mapping[n] for n in seg],
+                    boundary_type=land_bnd.boundary_type,
+                )
+                for seg in segments
+            )
+
+            if shared_on_bnd:
+                terminal_shared.extend(shared_on_bnd)
+
+        # De-duplicate terminals preserving insertion order
+        seen: set[int] = set()
+        unique_terminals: list[int] = []
+        for n in terminal_shared:
+            if n not in seen:
+                unique_terminals.append(n)
+                seen.add(n)
+
+        cut_bnds = _build_cut_boundaries(unique_terminals, shared_adjacency, mapping)
+        n_cut = len(cut_bnds)
+
+        # Cut-line boundaries inherit the most common flag from original boundaries.
+        # In STOFS setups this is (4,0,0,0); in simple test cases (1,0,0,0).
+        cut_flag = Counter(open_flags).most_common(1)[0][0] if open_flags else (1, 0, 0, 0)
+        for cb in cut_bnds:
+            open_bnds.append(cb)
+            open_flags.append(cut_flag)
+
+        bs = BoundarySet(
             open_boundaries=open_bnds,
             land_boundaries=land_bnds,
             bctides_header=boundary_set.bctides_header,
@@ -1220,6 +1221,7 @@ class MeshSubsetter:
             nbfr_line=boundary_set.nbfr_line,
             open_boundary_flags=open_flags,
         )
+        return bs, n_cut
 
     def write_esmf_netcdf(
         self,
@@ -1251,11 +1253,15 @@ class MeshSubsetter:
         logger.info(f"Writing ESMF NetCDF files from {hgrid_file.name}")
         project = NWMSCHISMProject(output_dir, buffer_size=self.project.buffer_size, validate=False)
 
-        is_tri = project.element_connections[:, -1] == 0
-        num_element_conn = ~is_tri + 3
+        conn = project.element_connections
+        if conn.shape[1] == 4:
+            is_tri = conn[:, -1] < 0
+            num_element_conn = np.where(is_tri, np.int8(3), np.int8(4))
+        else:
+            num_element_conn = np.full(len(conn), np.int8(3), dtype=np.int8)
 
         logger.debug(f"Writing {output_nc_file.name}...")
-        with netcdf_file(str(output_nc_file), "w", version=2) as nc:
+        with netCDF4.Dataset(str(output_nc_file), "w", format="NETCDF4") as nc:
             nc.createDimension("nodeCount", project.n_nodes)
             nc.createDimension("elementCount", project.n_elements)
             nc.createDimension("maxNodePElement", project.max_nodes_per_element)
@@ -1266,11 +1272,14 @@ class MeshSubsetter:
             node_coords_var.units = "degrees"
 
             element_conn_var = nc.createVariable(
-                "elementConn", "i4", ("elementCount", "maxNodePElement")
+                "elementConn",
+                "i4",
+                ("elementCount", "maxNodePElement"),
+                fill_value=np.int32(-1),
             )
             element_conn_var[:] = project.element_connections
-            element_conn_var.long_name = "Node indices that define the element connectivity"
-            element_conn_var.start_index = 0
+            element_conn_var.long_name = "Node Indices that define the element connectivity"
+            element_conn_var.start_index = np.int8(0)
 
             num_element_conn_var = nc.createVariable("numElementConn", "i1", ("elementCount",))
             num_element_conn_var[:] = num_element_conn
@@ -1299,7 +1308,7 @@ class MeshSubsetter:
             all_open_nodes = np.array(all_open_nodes, dtype=np.int32) - 1
             n_open_bnd_nodes = len(all_open_nodes)
 
-            with netcdf_file(str(open_bnds_nc_file), "w", version=2) as nc:
+            with netCDF4.Dataset(str(open_bnds_nc_file), "w", format="NETCDF3_64BIT_OFFSET") as nc:
                 nc.createDimension("nodeCount", project.n_nodes)
                 nc.createDimension("coordDim", 2)
                 nc.createDimension("openBndNodeCount", n_open_bnd_nodes)
@@ -1459,18 +1468,20 @@ class MeshSubsetter:
             boundary_set = self.project.read_boundaries()
 
             logger.debug("Splitting boundaries...")
-            boundaries_a = self._split_boundaries_for_side(
+            boundaries_a, n_cut_a = self._split_boundaries_for_side(
                 boundary_set, self.side_a_nodes, shared_nodes, shared_adjacency, side_a_data.mapping
             )
-            boundaries_b = self._split_boundaries_for_side(
+            boundaries_b, n_cut_b = self._split_boundaries_for_side(
                 boundary_set, self.side_b_nodes, shared_nodes, shared_adjacency, side_b_data.mapping
             )
 
             logger.info(
-                f"Side A: {boundaries_a.n_open} open boundaries, {boundaries_a.n_land} land boundaries"
+                f"Side A: {boundaries_a.n_open} open ({n_cut_a} cut), "
+                f"{boundaries_a.n_land} land boundaries"
             )
             logger.info(
-                f"Side B: {boundaries_b.n_open} open boundaries, {boundaries_b.n_land} land boundaries"
+                f"Side B: {boundaries_b.n_open} open ({n_cut_b} cut), "
+                f"{boundaries_b.n_land} land boundaries"
             )
 
             with output_a.open("a", buffering=self.project.buffer_size) as f:
@@ -1717,6 +1728,25 @@ def divide_mesh(
         corrections.loc[elems_b_ids].to_csv(output_dir_b / SCHISMFiles.ELEV_CORRECTION)
     else:
         logger.warning("Elevation correction file not found; skipping subsetting.")
+
+    # Copy grid-independent config files that are the same for both sides
+    grid_independent = ["vgrid.in", "param.nml"]
+    for fname in grid_independent:
+        src = input_dir / fname
+        if src.exists():
+            shutil.copy2(src, output_dir_a / fname)
+            shutil.copy2(src, output_dir_b / fname)
+            logger.info(f"Copied {fname} to both sides")
+
+    # Copy grid-independent directories (e.g. sflux with sflux_inputs.txt)
+    sflux_src = input_dir / "sflux"
+    if sflux_src.is_dir():
+        for out_dir in (output_dir_a, output_dir_b):
+            dst = out_dir / "sflux"
+            dst.mkdir(exist_ok=True)
+            for f in sflux_src.iterdir():
+                shutil.copy2(f, dst / f.name)
+        logger.info("Copied sflux directory to both sides")
 
     logger.info(f"Complete: Side A={output_dir_a}, Side B={output_dir_b}")
     logger.info(f"Shared boundary: {len(classification.shared):,} nodes")
