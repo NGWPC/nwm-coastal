@@ -15,23 +15,32 @@
 # ---
 
 # %% [markdown]
-# # Hawaii: SCHISM Demo
+# # Hawaii: SCHISM Mesh Subset Demo
 #
-# This notebook demonstrates the SCHISM ocean model workflow using
-# the same `coastal-calibration` API shown in the SFINCS demo.
+# This notebook demonstrates mesh subsetting with
+# `coastal_calibration.schism.subsetter.divide_mesh`. A user-supplied
+# cut line is intersected with the Hawaii SCHISM mesh to produce two
+# self-contained sub-projects (`model_a`, `model_b`), each with its
+# own `hgrid.gr3`, `vgrid.in`, `nwmReaches.csv`, and reconstructed
+# open / land / island boundaries.
 #
-# SCHISM differs from SFINCS in a few key ways:
+# The workflow is:
 #
-# - **Prebuilt mesh**: SCHISM uses an unstructured triangular mesh
-#   that is prepared ahead of time (hgrid.gr3, vgrid.in, etc.)
-# - **MPI execution**: runs across multiple nodes using `mpiexec`
-#   and `pschism`
-# - **Atmospheric regridding**: NWM forcing is regridded onto the
-#   SCHISM mesh using ESMF, which requires a geogrid file
+# 1. **Divide**: cut the Hawaii mesh along a line running roughly
+#    NW-SE between the Big Island and Maui, producing `model_a` (south)
+#    and `model_b` (north).
+# 2. **Run side A**: point `CoastalCalibConfig` at `model_a` and
+#    execute the full SCHISM pipeline (download + forcing + run +
+#    validate) on the southern sub-mesh.
+# 3. **Run side B**: repeat against `model_b`. The only difference
+#    between the two configs is the `prebuilt_dir` / `work_dir` /
+#    `discharge_file` — everything else is identical.
 #
-# Despite these differences, the Python API is identical:
-# `CoastalCalibConfig` for configuration and `CoastalCalibRunner`
-# for execution. Only the `model_config` section changes.
+# Running the two halves independently is a useful validation pattern:
+# the boundary conditions and forcing on each side are set up from the
+# divided project files, so tide-gauge comparisons at stations common
+# to both halves should match the full-domain run to within
+# interpolation noise.
 
 # %% [markdown]
 # ## Setup
@@ -181,17 +190,17 @@ else:
 # %% [markdown]
 # ## Summary
 #
-# This notebook ran the full SCHISM pipeline for Hawaii using the
-# same API as SFINCS:
+# This notebook exercised the SCHISM mesh-subset workflow end-to-end:
 #
-# 1. Configured `CoastalCalibConfig` with SCHISM-specific settings
-#    (MPI layout, geogrid for ESMF regridding)
-# 2. Executed the 11-stage pipeline with `CoastalCalibRunner`
-#    (download, forcing, model prep, run, validate)
-# 3. Compared modeled water levels against NOAA observations
-# 4. Showed how the same config can be submitted to an HPC cluster
-#    via `sbatch` or any other job scheduler
+# 1. Cut the Hawaii mesh along a user-supplied line with
+#    `divide_mesh`, producing `model_a` / `model_b` sub-projects with
+#    reconstructed boundaries.
+# 2. Ran the full `CoastalCalibRunner` pipeline on each sub-mesh
+#    independently, reusing the shared downloads directory.
+# 3. Compared station water levels in each sub-domain against NOAA
+#    CO-OPS observations.
 #
-# The interface is identical to SFINCS. Only the `model_config`
-# section differs (MPI layout vs. OpenMP, geogrid for atmospheric
-# regridding, prebuilt mesh vs. automated creation).
+# The same `divide_mesh` call can be used to break a large operational
+# mesh into tiled sub-domains for parallel calibration experiments, or
+# to isolate a region of interest for focused parameter tuning without
+# touching the full-domain configuration.

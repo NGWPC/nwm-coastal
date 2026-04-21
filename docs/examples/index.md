@@ -46,10 +46,9 @@ execution.
 - [![Hawaii mesh subset (SCHISM)](images/hawaii_thumb.png){ loading=lazy }](notebooks/schism-hawaii-subset.ipynb "Hawaii mesh subset")
     **Hawaii Mesh Subset (SCHISM)**
 
-    Cut the Hawaii SCHISM mesh along a user-supplied line with
-    `divide_mesh`, producing two self-contained sub-projects and the
-    open-boundary, land-boundary, and island-boundary reconstructions
-    on each side.
+    Cut the Hawaii SCHISM mesh along a user-supplied line with `divide_mesh`, producing
+    two self-contained sub-projects and the open-boundary, land-boundary, and
+    island-boundary reconstructions on each side.
 
 </div>
 
