@@ -16,7 +16,7 @@ import subprocess
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-import netCDF4 as nc  # noqa: N813
+import netCDF4
 import numpy as np
 
 from coastal_calibration.logging import logger
@@ -350,8 +350,8 @@ def merge_source_sink(  # noqa: PLR0915
     so1 = so1[:, 1:]
 
     # Read precipitation source
-    precip = nc.Dataset(str(work_dir / "precip_source.nc"), "r")
-    so2 = precip.variables["vsource"][:]
+    with netCDF4.Dataset(str(work_dir / "precip_source.nc"), "r") as precip:
+        so2 = precip.variables["vsource"][:]
 
     # Truncate discharge arrays to match precipitation time dimension
     ntime = so2.shape[0]
@@ -374,64 +374,62 @@ def merge_source_sink(  # noqa: PLR0915
 
     # Write source.nc
     out_path = work_dir / "source.nc"
-    ncout = nc.Dataset(str(out_path), "w", format="NETCDF4")
-    ncout.set_fill_off()
+    with netCDF4.Dataset(str(out_path), "w", format="NETCDF4") as ncout:
+        ncout.set_fill_off()
 
-    ncout.createDimension("time_vsource", len(time))
-    ncout.createDimension("time_vsink", len(time))
-    ncout.createDimension("time_msource", len(time))
-    ncout.createDimension("nsources", len(keep))
-    ncout.createDimension("nsinks", nsiel)
-    ncout.createDimension("ntracers", 2)
-    ncout.createDimension("one", 1)
+        ncout.createDimension("time_vsource", len(time))
+        ncout.createDimension("time_vsink", len(time))
+        ncout.createDimension("time_msource", len(time))
+        ncout.createDimension("nsources", len(keep))
+        ncout.createDimension("nsinks", nsiel)
+        ncout.createDimension("ntracers", 2)
+        ncout.createDimension("one", 1)
 
-    ncso = ncout.createVariable("source_elem", "i4", ("nsources",))
-    ncsi = ncout.createVariable("sink_elem", "i4", ("nsinks",))
-    ncvso = ncout.createVariable(
-        "vsource",
-        "f8",
-        ("time_vsource", "nsources"),
-        zlib=True,
-    )
-    ncvsi = ncout.createVariable(
-        "vsink",
-        "f8",
-        ("time_vsink", "nsinks"),
-        zlib=True,
-    )
-    ncvmo = ncout.createVariable(
-        "msource",
-        "i4",
-        ("time_msource", "ntracers", "nsources"),
-        zlib=True,
-    )
-    nctso = ncout.createVariable("time_vsource", "f8", ("time_vsource",))
-    nctsi = ncout.createVariable("time_vsink", "f8", ("time_vsink",))
-    nctmo = ncout.createVariable("time_msource", "f8", ("time_msource",))
-    ncvsos = ncout.createVariable("time_step_vsource", "f4", ("one",))
-    ncvsis = ncout.createVariable("time_step_vsink", "f4", ("one",))
-    ncvmos = ncout.createVariable("time_step_msource", "f4", ("one",))
+        ncso = ncout.createVariable("source_elem", "i4", ("nsources",))
+        ncsi = ncout.createVariable("sink_elem", "i4", ("nsinks",))
+        ncvso = ncout.createVariable(
+            "vsource",
+            "f8",
+            ("time_vsource", "nsources"),
+            zlib=True,
+        )
+        ncvsi = ncout.createVariable(
+            "vsink",
+            "f8",
+            ("time_vsink", "nsinks"),
+            zlib=True,
+        )
+        ncvmo = ncout.createVariable(
+            "msource",
+            "i4",
+            ("time_msource", "ntracers", "nsources"),
+            zlib=True,
+        )
+        nctso = ncout.createVariable("time_vsource", "f8", ("time_vsource",))
+        nctsi = ncout.createVariable("time_vsink", "f8", ("time_vsink",))
+        nctmo = ncout.createVariable("time_msource", "f8", ("time_msource",))
+        ncvsos = ncout.createVariable("time_step_vsource", "f4", ("one",))
+        ncvsis = ncout.createVariable("time_step_vsink", "f4", ("one",))
+        ncvmos = ncout.createVariable("time_step_msource", "f4", ("one",))
 
-    ncso[:] = keep
-    ncsi[:] = siel
-    ncvso[:] = so2
-    ncvsi[:] = si
-    nctso[:] = time
-    nctsi[:] = time
-    nctmo[:] = time
-    ncvsos[:] = time[1] - time[0]
-    ncvsis[:] = time[1] - time[0]
-    ncvmos[:] = time[1] - time[0]
+        ncso[:] = keep
+        ncsi[:] = siel
+        ncvso[:] = so2
+        ncvsi[:] = si
+        nctso[:] = time
+        nctsi[:] = time
+        nctmo[:] = time
+        ncvsos[:] = time[1] - time[0]
+        ncvsis[:] = time[1] - time[0]
+        ncvmos[:] = time[1] - time[0]
 
-    fill_val = np.full((len(time), len(keep)), -9999.0)
-    ncvmo[:, 0, :] = fill_val
-    ncout.sync()
+        fill_val = np.full((len(time), len(keep)), -9999.0)
+        ncvmo[:, 0, :] = fill_val
+        ncout.sync()
 
-    fill_val.fill(0)
-    ncvmo[:, 1, :] = fill_val
-    ncout.sync()
-
-    ncout.close()
+        fill_val.fill(0)
+        ncvmo[:, 1, :] = fill_val
+        ncout.sync()
     logger.info(
         "    Wrote source.nc — %d sources (from %d), %d sinks, %d timesteps",
         len(keep),
@@ -780,7 +778,7 @@ def correct_elevation(
         row count is validated against this value before applying the
         correction.
     """
-    import netCDF4 as nc  # noqa: N813
+    import netCDF4
     import numpy as np
 
     elev_correct = np.loadtxt(str(correction_file), delimiter=",", skiprows=1, usecols=5)
@@ -791,7 +789,7 @@ def correct_elevation(
             f"has {n_open_boundary_nodes} open boundary nodes"
         )
 
-    with nc.Dataset(elev_file, "r+") as ds:
+    with netCDF4.Dataset(elev_file, "r+") as ds:
         elev_var = ds["time_series"]
         for t in range(elev_var.shape[0]):
             elev_var[t] = elev_var[t].ravel() - elev_correct

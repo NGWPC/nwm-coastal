@@ -129,9 +129,37 @@ This page provides detailed documentation for the NWM Coastal Python API.
 
 ::: coastal_calibration.plotting.stations.plot_station_comparison
 
-### plotable_stations
+### plot_water_level
 
-::: coastal_calibration.plotting.stations.plotable_stations
+::: coastal_calibration.plotting.spatial.plot_water_level
+
+### animate_water_level
+
+::: coastal_calibration.plotting.animate.animate_water_level
+
+## Output Readers
+
+### load_schism_elevation
+
+::: coastal_calibration.schism.outputs.load_schism_elevation
+
+### load_sfincs_water_level
+
+::: coastal_calibration.sfincs.outputs.load_sfincs_water_level
+
+## Observation Points
+
+### load_obs_points
+
+::: coastal_calibration.observations.load_obs_points
+
+### validate_points_in_domain
+
+::: coastal_calibration.observations.validate_points_in_domain
+
+### extract_water_level_series
+
+::: coastal_calibration.observations.extract_water_level_series
 
 ## Flood Depth Map
 

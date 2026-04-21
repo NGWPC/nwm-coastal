@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from pathlib import Path
 
-import netCDF4 as nc  # noqa: N813
+import netCDF4
 import numpy as np
 from scipy.interpolate import griddata
 
@@ -61,23 +61,23 @@ def _generate_tidal_levels(  # noqa: PLR0915
 
     x = y = i = None  # populated on first constituent file
     for col, file in enumerate(consfiles):
-        data = nc.Dataset(file, "r")
-        if col == 0:
-            x = data.variables["lon"][:]
-            y = data.variables["lat"][:]
-            x, y = np.meshgrid(x, y)
-            i = np.where(x > 180.0)
-            x[i] = x[i] - 360.0
-            i = np.where(
-                (x < max(lo) + 1) & (x > min(lo) - 1) & (y < max(la) + 1) & (y > min(la) - 1)
-            )
-            x = x[i]
-            y = y[i]
+        with netCDF4.Dataset(file, "r") as data:
+            if col == 0:
+                x = data.variables["lon"][:]
+                y = data.variables["lat"][:]
+                x, y = np.meshgrid(x, y)
+                i = np.where(x > 180.0)
+                x[i] = x[i] - 360.0
+                i = np.where(
+                    (x < max(lo) + 1) & (x > min(lo) - 1) & (y < max(la) + 1) & (y > min(la) - 1)
+                )
+                x = x[i]
+                y = y[i]
 
-        a = data.variables["amplitude"][:]
-        a = a[i]
-        p = data.variables["phase"][:]
-        p = p[i]
+            a = data.variables["amplitude"][:]
+            a = a[i]
+            p = data.variables["phase"][:]
+            p = p[i]
 
         mask = ~a.mask if hasattr(a, "mask") else np.ones(a.shape, dtype=bool)
         if x is None or y is None:
@@ -90,7 +90,6 @@ def _generate_tidal_levels(  # noqa: PLR0915
 
         amp[:, col] = griddata((xI, yI), a, (lo, la), method="linear")
         pha[:, col] = griddata((xI, yI), p, (lo, la), method="linear")
-        data.close()
 
     pred_times = Tide._times(start_time, total_hours)  # pyright: ignore[reportPrivateUsage]
     if not isinstance(pred_times, list):
@@ -110,29 +109,26 @@ def _generate_tidal_levels(  # noqa: PLR0915
         wl[:, i] = tide.at(pred_times) / 100.0
 
     mode = "a" if Path(output_file).exists() else "w"
-    ncout = nc.Dataset(output_file, mode, format="NETCDF4")
+    with netCDF4.Dataset(output_file, mode, format="NETCDF4") as ncout:
+        if mode == "w":
+            ncout.createDimension("time", None)
+            ncout.createDimension("nOpenBndNodes", amp.shape[0])
+            nctime = ncout.createVariable("time", "f8", ("time",))
+            ncwl = ncout.createVariable("time_series", "f8", ("time", "nOpenBndNodes"))
+            nctime[:] = np.arange(651600.0, 865000, 3600.0)
+            ncwl[:] = wl
+            start = 0
+        else:
+            nctime = ncout["time"]
+            ncwl = ncout["time_series"]
+            start = 181
 
-    if mode == "w":
-        ncout.createDimension("time", None)
-        ncout.createDimension("nOpenBndNodes", amp.shape[0])
-        nctime = ncout.createVariable("time", "f8", ("time",))
-        ncwl = ncout.createVariable("time_series", "f8", ("time", "nOpenBndNodes"))
-        nctime[:] = np.arange(651600.0, 865000, 3600.0)
-        ncwl[:] = wl
-        start = 0
-    else:
-        nctime = ncout["time"]
-        ncwl = ncout["time_series"]
-        start = 181
-
-    t_step = 3600
-    t_start = start * t_step
-    t_end = (start + total_hours.stop) * t_step
-    new_times = np.arange(t_start, t_end, t_step)
-    nctime[start:] = new_times
-    ncwl[start:] = wl
-
-    ncout.close()
+        t_step = 3600
+        t_start = start * t_step
+        t_end = (start + total_hours.stop) * t_step
+        new_times = np.arange(t_start, t_end, t_step)
+        nctime[start:] = new_times
+        ncwl[start:] = wl
 
 
 def generate_ocean_tide(

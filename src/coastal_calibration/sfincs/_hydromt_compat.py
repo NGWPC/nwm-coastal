@@ -179,7 +179,7 @@ def patch_meteo_write_gridded() -> None:
         time_vals = ds["time"].to_numpy()
         var_names = list(ds.data_vars)
 
-        nc = netCDF4.Dataset(str(out_path), "w")
+        nc = netCDF4.Dataset(str(out_path), "w", format="NETCDF4")
         try:
             # --- dimensions ---
             nc.createDimension("time", None)  # unlimited

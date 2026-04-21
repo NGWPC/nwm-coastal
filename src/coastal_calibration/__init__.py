@@ -42,7 +42,6 @@ if TYPE_CHECKING:
         plot_floodmap,
         plot_mesh,
         plot_station_comparison,
-        plotable_stations,
     )
     from coastal_calibration.runner import (
         CoastalCalibRunner,
@@ -109,7 +108,6 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "plot_floodmap": ("coastal_calibration.plotting", "plot_floodmap"),
     "plot_mesh": ("coastal_calibration.plotting", "plot_mesh"),
     "plot_station_comparison": ("coastal_calibration.plotting", "plot_station_comparison"),
-    "plotable_stations": ("coastal_calibration.plotting", "plotable_stations"),
     # Runner
     "CoastalCalibRunner": ("coastal_calibration.runner", "CoastalCalibRunner"),
     "WorkflowResult": ("coastal_calibration.runner", "WorkflowResult"),
@@ -125,20 +123,6 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     # Logging
     "configure_logger": ("coastal_calibration.logging", "configure_logger"),
 }
-
-
-def __getattr__(name: str) -> object:
-    if name in _LAZY_IMPORTS:
-        module_path, attr = _LAZY_IMPORTS[name]
-        import importlib
-
-        mod = importlib.import_module(module_path)
-        val = getattr(mod, attr)
-        # Cache on the module so __getattr__ is not called again
-        globals()[name] = val
-        return val
-    msg = f"module {__name__!r} has no attribute {name!r}"
-    raise AttributeError(msg)
 
 
 __all__ = [
@@ -183,7 +167,24 @@ __all__ = [
     "plot_floodmap",
     "plot_mesh",
     "plot_station_comparison",
-    "plotable_stations",
     "remove_nc_symlinks",
     "run_workflow",
 ]
+
+
+def __dir__() -> list[str]:
+    return __all__
+
+
+def __getattr__(name: str) -> object:
+    if name in _LAZY_IMPORTS:
+        module_path, attr = _LAZY_IMPORTS[name]
+        import importlib
+
+        mod = importlib.import_module(module_path)
+        val = getattr(mod, attr)
+        # Cache on the module so __getattr__ is not called again
+        globals()[name] = val
+        return val
+    msg = f"module {__name__!r} has no attribute {name!r}"
+    raise AttributeError(msg)

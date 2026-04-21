@@ -296,6 +296,25 @@ class SchismModelConfig(ModelConfig):
         Path to a ``nwmReaches.csv`` file mapping NWM reach feature IDs
         to SCHISM source/sink elements.  When ``None`` (default), the
         discharge stage is skipped and no river forcing is generated.
+    create_water_level_animation : bool
+        When True, the ``schism_plot`` stage loads the 2-D elevation
+        field from ``outputs/out2d_*.nc`` and renders an MP4 animation
+        to ``figs/water_level.mp4`` using
+        :func:`coastal_calibration.plotting.animate_water_level`.
+        Requires an ``ffmpeg`` binary on PATH.  Independent of
+        ``include_noaa_gages``.  Defaults to False.
+    animation_fps : int
+        Frames per second for the animation output.
+    animation_time_stride : int
+        Keep every ``animation_time_stride``-th frame from the model
+        time series; useful for long runs.
+    obs_points_csv : Path, optional
+        Path to a CSV with columns ``id, lon, lat`` specifying extra
+        observation points for water-level extraction after the run.
+        The ``schism_plot`` stage interpolates water-surface elevation
+        at each point (and at any NOAA CO-OPS gauges when
+        ``include_noaa_gages`` is enabled) and writes the combined time
+        series to ``obs_water_level.parquet`` in the work directory.
     """
 
     prebuilt_dir: Path = field(default_factory=Path)
@@ -309,6 +328,10 @@ class SchismModelConfig(ModelConfig):
     schism_exe: Path | None = None
     include_noaa_gages: bool = False
     discharge_file: Path | None = None
+    create_water_level_animation: bool = False
+    animation_fps: int = 10
+    animation_time_stride: int = 1
+    obs_points_csv: Path | None = None
     runtime_env: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -318,6 +341,8 @@ class SchismModelConfig(ModelConfig):
             self.schism_exe = Path(self.schism_exe).expanduser().resolve()
         if self.discharge_file is not None:
             self.discharge_file = Path(self.discharge_file).expanduser().resolve()
+        if self.obs_points_csv is not None:
+            self.obs_points_csv = Path(self.obs_points_csv).expanduser().resolve()
 
     @property
     def model_name(self) -> str:  # noqa: D102
@@ -458,6 +483,10 @@ class SchismModelConfig(ModelConfig):
             "schism_exe": (str(self.schism_exe) if self.schism_exe else None),
             "include_noaa_gages": self.include_noaa_gages,
             "discharge_file": (str(self.discharge_file) if self.discharge_file else None),
+            "create_water_level_animation": self.create_water_level_animation,
+            "animation_fps": self.animation_fps,
+            "animation_time_stride": self.animation_time_stride,
+            "obs_points_csv": (str(self.obs_points_csv) if self.obs_points_csv else None),
             "runtime_env": self.runtime_env,
         }
         return d
@@ -548,6 +577,24 @@ class SfincsModelConfig(ModelConfig):
         that HydroMT-SFINCS sets by default (e.g. ``advection: 0``,
         ``nuvisc: 0.01``).  Keys must be valid ``sfincs.inp`` parameter
         names.
+    create_water_level_animation : bool
+        When True, the ``sfincs_plot`` stage loads the time-dependent
+        water level field from ``sfincs_map.nc`` and renders an MP4
+        animation to ``figs/water_level.mp4`` using
+        :func:`coastal_calibration.plotting.animate_water_level`.
+        Requires an ``ffmpeg`` binary on PATH.  Defaults to False.
+    animation_fps : int
+        Frames per second for the animation output.
+    animation_time_stride : int
+        Keep every ``animation_time_stride``-th frame from the model
+        time series; useful for long runs.
+    obs_points_csv : Path, optional
+        Path to a CSV with columns ``id, lon, lat`` specifying extra
+        observation points for water-level extraction after the run.
+        The ``sfincs_plot`` stage interpolates water-surface elevation
+        at each point (and at any NOAA CO-OPS gauges found in
+        ``obs_station_map.json``) and writes the combined time series
+        to ``obs_water_level.parquet`` alongside ``sfincs_map.nc``.
     """
 
     # Known sfincs.inp parameter names parsed by the SFINCS binary
@@ -753,6 +800,10 @@ class SfincsModelConfig(ModelConfig):
     floodmap_dem: Path | None = None
     floodmap_hmin: float = 0.05
     floodmap_enabled: bool = True
+    create_water_level_animation: bool = False
+    animation_fps: int = 10
+    animation_time_stride: int = 1
+    obs_points_csv: Path | None = None
     runtime_env: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -767,6 +818,8 @@ class SfincsModelConfig(ModelConfig):
             self.sfincs_exe = Path(self.sfincs_exe).expanduser().resolve()
         if self.floodmap_dem is not None:
             self.floodmap_dem = Path(self.floodmap_dem).expanduser().resolve()
+        if self.obs_points_csv is not None:
+            self.obs_points_csv = Path(self.obs_points_csv).expanduser().resolve()
         if self.omp_num_threads <= 0:
             from coastal_calibration.utils import get_cpu_count
 
@@ -887,6 +940,10 @@ class SfincsModelConfig(ModelConfig):
             "floodmap_dem": (str(self.floodmap_dem) if self.floodmap_dem else None),
             "floodmap_hmin": self.floodmap_hmin,
             "floodmap_enabled": self.floodmap_enabled,
+            "create_water_level_animation": self.create_water_level_animation,
+            "animation_fps": self.animation_fps,
+            "animation_time_stride": self.animation_time_stride,
+            "obs_points_csv": (str(self.obs_points_csv) if self.obs_points_csv else None),
             "runtime_env": self.runtime_env,
         }
 

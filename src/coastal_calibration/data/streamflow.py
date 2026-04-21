@@ -90,12 +90,12 @@ def _read_from_zarr(
 
 def _extract_timestamp(ds: Any, fpath: Path) -> pd.Timestamp:
     """Extract timestamp from an open netCDF4 Dataset or fall back to filename."""
-    import netCDF4 as nc  # noqa: N813
+    import netCDF4
 
     for tvar_name in ("time", "model_output_valid_time"):
         if tvar_name in ds.variables:
             tvar = ds.variables[tvar_name]
-            t_val = nc.num2date(
+            t_val = netCDF4.num2date(
                 tvar[:].item(),
                 units=tvar.units,
                 calendar=getattr(tvar, "calendar", "standard"),
@@ -120,7 +120,7 @@ def _read_from_chrtout(
     files from different NWM domains (with different feature layouts) are
     handled correctly.
     """
-    import netCDF4 as nc  # noqa: N813
+    import netCDF4
 
     if not chrtout_files:
         return pd.DataFrame()
@@ -132,7 +132,7 @@ def _read_from_chrtout(
     rows: list[tuple[pd.Timestamp, np.ndarray]] = []
 
     for fpath in chrtout_files:
-        with nc.Dataset(str(fpath), "r") as ds:
+        with netCDF4.Dataset(str(fpath), "r") as ds:
             all_fids = ds.variables["feature_id"][:]
             sf = np.ma.filled(ds.variables["streamflow"][:], 0.0)
             if sf.ndim > 1:

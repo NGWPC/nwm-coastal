@@ -672,7 +672,7 @@ class TestSfincsPlotStage:
     """Test the plot stage with mocked observations and model output."""
 
     def test_plot_skips_without_output(self, sfincs_workflow_config):
-        """When sfincs_his.nc is missing, the plot stage skips."""
+        """When sfincs_his.nc is missing, the station sub-task skips cleanly."""
         from coastal_calibration.sfincs.stages import (
             SfincsInitStage,
             SfincsPlotStage,
@@ -681,7 +681,11 @@ class TestSfincsPlotStage:
         SfincsInitStage(sfincs_workflow_config).run()
 
         result = SfincsPlotStage(sfincs_workflow_config).run()
-        assert result["status"] == "skipped"
+        # Top-level stage status always reports the aggregate; per-sub-task
+        # status lives under the matching key.
+        assert result["status"] == "completed"
+        assert result["stations"]["status"] == "skipped"
+        assert "animation" not in result  # toggle off by default
 
     def test_plot_with_mock_output(self, sfincs_workflow_config):
         """Test the plot stage with a synthetic sfincs_his.nc.
@@ -771,7 +775,8 @@ class TestSfincsPlotStage:
         assert result["status"] == "completed"
         figs_dir = model_root / "figs"
         assert figs_dir.exists()
-        assert len(result["figures"]) > 0
+        assert result["stations"]["status"] == "completed"
+        assert len(result["stations"]["figures"]) > 0
 
 
 # ---------------------------------------------------------------------------

@@ -258,6 +258,24 @@ class TestSchismModelConfig:
         assert "schism_exe" in d
         assert d["include_noaa_gages"] is False
 
+    def test_animation_defaults(self):
+        cfg = SchismModelConfig()
+        assert cfg.create_water_level_animation is False
+        assert cfg.animation_fps == 10
+        assert cfg.animation_time_stride == 1
+
+    def test_animation_in_to_dict(self):
+        cfg = SchismModelConfig(
+            create_water_level_animation=True,
+            animation_fps=5,
+            animation_time_stride=2,
+        )
+        d = cfg.to_dict()
+        assert d["create_water_level_animation"] is True
+        assert d["animation_fps"] == 5
+        assert d["animation_time_stride"] == 2
+        assert "animation_format" not in d
+
 
 class TestSfincsModelConfig:
     def test_defaults(self, tmp_path):
@@ -296,6 +314,25 @@ class TestSfincsModelConfig:
         d = cfg.to_dict()
         assert d["prebuilt_dir"] == str(tmp_path)
         assert d["omp_num_threads"] == get_cpu_count()
+
+    def test_animation_defaults(self, tmp_path):
+        cfg = SfincsModelConfig(prebuilt_dir=tmp_path)
+        assert cfg.create_water_level_animation is False
+        assert cfg.animation_fps == 10
+        assert cfg.animation_time_stride == 1
+
+    def test_animation_in_to_dict(self, tmp_path):
+        cfg = SfincsModelConfig(
+            prebuilt_dir=tmp_path,
+            create_water_level_animation=True,
+            animation_fps=4,
+            animation_time_stride=5,
+        )
+        d = cfg.to_dict()
+        assert d["create_water_level_animation"] is True
+        assert d["animation_fps"] == 4
+        assert d["animation_time_stride"] == 5
+        assert "animation_format" not in d
 
     def test_explicit_vdatum_offsets(self, tmp_path):
         cfg = SfincsModelConfig(

@@ -28,8 +28,8 @@ import math
 from pathlib import Path
 
 import esmpy as ESMF
+import netCDF4
 import numpy as np
-from netCDF4 import Dataset
 
 from coastal_calibration.logging import logger
 
@@ -42,7 +42,7 @@ from .esmf_utils import (
 )
 
 
-def _pick_time_var(ds: Dataset) -> str:
+def _pick_time_var(ds: netCDF4.Dataset) -> str:
     """Return the name of the time variable in *ds*.
 
     WRF-Hydro LDASIN files use ``"time"``; ERA5/HRRR-derived files may use
@@ -128,7 +128,7 @@ class CoastalForcingRegridder:
         self.schism_mesh = ESMF.Mesh(
             filename=str(schism_mesh_path), filetype=ESMF.FileFormat.ESMFMESH
         )
-        with Dataset(schism_mesh_path, "r") as smesh:
+        with netCDF4.Dataset(schism_mesh_path, "r") as smesh:
             self.total_elements = smesh.dimensions["elementCount"].size
 
         # Determine output lat/lon range from mesh node coords (MPI-aware)
@@ -138,14 +138,12 @@ class CoastalForcingRegridder:
         lat_min, lat_max = allreduce_minmax(node_lats)  # pyright: ignore[reportArgumentType]
 
         # Read source grid and height from geogrid file
-        ds = Dataset(geo_em_path, "r")
-        self.src_height = ds.variables["HGT_M"][:]
-
-        xlat = ds.variables["XLAT_M"][0, :].T
-        xlon = ds.variables["XLONG_M"][0, :].T
-        clat = ds.variables["XLAT_C"][0, :].T
-        clon = ds.variables["XLONG_C"][0, :].T
-        ds.close()
+        with netCDF4.Dataset(geo_em_path, "r") as ds:
+            self.src_height = ds.variables["HGT_M"][:]
+            xlat = ds.variables["XLAT_M"][0, :].T
+            xlon = ds.variables["XLONG_M"][0, :].T
+            clat = ds.variables["XLAT_C"][0, :].T
+            clon = ds.variables["XLONG_C"][0, :].T
 
         # Build source (WRF-Hydro curvilinear) grid
         self.in_grid, self.in_bounds = build_grid(xlat, xlon, clat, clon)
@@ -171,7 +169,7 @@ class CoastalForcingRegridder:
 
         self.schism_first_timestep = None
 
-    def _read_start_time(self, ds: Dataset) -> float:
+    def _read_start_time(self, ds: netCDF4.Dataset) -> float:
         """Extract the forcing start time from an input dataset."""
         if "time" in ds.variables:
             return ds["time"][0] * 60  # minutes -> seconds
@@ -179,7 +177,7 @@ class CoastalForcingRegridder:
             return ds["valid_time"][0]
         raise KeyError("Input file has neither 'time' nor 'valid_time' variable")
 
-    def _init_vsource_nc(self, ds: Dataset, ntimes: int):
+    def _init_vsource_nc(self, ds: netCDF4.Dataset, ntimes: int):
         """Create dimensions and variables for the SCHISM vsource file."""
         ds.createDimension("time_vsource", ntimes)
         ds.createDimension("nsources", self.total_elements)
@@ -193,75 +191,77 @@ class CoastalForcingRegridder:
         eso[:] = np.arange(1, self.total_elements + 1)
         vts[:] = 3600
 
-    def _regrid_to_schism(self, input_file: Path, vsource_ds: Dataset | None):
+    def _regrid_to_schism(self, input_file: Path, vsource_ds: netCDF4.Dataset | None):
         """Regrid RAINRATE to SCHISM mesh elements and write to vsource."""
-        input_ds = Dataset(input_file)
+        with netCDF4.Dataset(input_file) as input_ds:
+            # Populate source field
+            in_field = ESMF.Field(grid=self.in_grid, name="rainrate-in")
+            b = self.in_bounds
+            in_field.data[...] = input_ds.variables["RAINRATE"][0, :].T[  # pyright: ignore[reportOptionalSubscript]
+                b.x_lo : b.x_hi, b.y_lo : b.y_hi
+            ]
 
-        # Populate source field
-        in_field = ESMF.Field(grid=self.in_grid, name="rainrate-in")
-        b = self.in_bounds
-        in_field.data[...] = input_ds.variables["RAINRATE"][0, :].T[  # pyright: ignore[reportOptionalSubscript]
-            b.x_lo : b.x_hi, b.y_lo : b.y_hi
-        ]
-
-        # Populate destination field on mesh elements
-        out_field = ESMF.Field(
-            grid=self.schism_mesh, meshloc=ESMF.MeshLoc.ELEMENT, name="rainrate-out"
-        )
-        # Initialise to 0 so unmapped elements (IGNORE action) are left at 0.
-        out_field.data[...] = 0.0  # pyright: ignore[reportOptionalSubscript]
-
-        # Build regridder once, reuse for subsequent files.
-        # CONSERVE is required for Grid -> Mesh(ELEMENT) regridding;
-        # BILINEAR only supports Mesh(NODE) destinations.
-        if self._schism_regridder is None:
-            self._schism_regridder = Regridder(
-                in_field,
-                out_field,
-                method=ESMF.RegridMethod.CONSERVE,  # pyright: ignore[reportArgumentType]
-                unmapped_action=ESMF.UnmappedAction.IGNORE,  # pyright: ignore[reportArgumentType]
+            # Populate destination field on mesh elements
+            out_field = ESMF.Field(
+                grid=self.schism_mesh, meshloc=ESMF.MeshLoc.ELEMENT, name="rainrate-out"
             )
+            # Initialise to 0 so unmapped elements (IGNORE action) are left at 0.
+            out_field.data[...] = 0.0  # pyright: ignore[reportOptionalSubscript]
 
-        out_field = self._schism_regridder(in_field, out_field)
-        # Clamp any negative bilinear interpolation artefacts to zero.
-        np.clip(out_field.data, 0.0, None, out=out_field.data)  # pyright: ignore[reportCallIssue, reportArgumentType]
+            # Build regridder once, reuse for subsequent files.
+            # CONSERVE is required for Grid -> Mesh(ELEMENT) regridding;
+            # BILINEAR only supports Mesh(NODE) destinations.
+            if self._schism_regridder is None:
+                self._schism_regridder = Regridder(
+                    in_field,
+                    out_field,
+                    method=ESMF.RegridMethod.CONSERVE,  # pyright: ignore[reportArgumentType]
+                    unmapped_action=ESMF.UnmappedAction.IGNORE,  # pyright: ignore[reportArgumentType]
+                )
 
-        # Convert to volumetric flux (m^3/s)
-        R0_SCHISM = 6378206.4  # earth radius in meters used by SCHISM
-        DENSITY_FACTOR = 1000
+            out_field = self._schism_regridder(in_field, out_field)
+            # Clamp any negative bilinear interpolation artefacts to zero.
+            np.clip(out_field.data, 0.0, None, out=out_field.data)  # pyright: ignore[reportCallIssue, reportArgumentType]
 
-        unit_areas = ESMF.Field(self.schism_mesh, meshloc=ESMF.MeshLoc.ELEMENT, name="areafield")
-        unit_areas.get_area()
-        areas_m2 = unit_areas.data[...] * (R0_SCHISM * R0_SCHISM)  # pyright: ignore[reportOptionalSubscript]
-        out_field.data[...] *= areas_m2 / DENSITY_FACTOR  # pyright: ignore[reportOptionalSubscript]
-        unit_areas.destroy()
+            # Convert to volumetric flux (m^3/s)
+            R0_SCHISM = 6378206.4  # earth radius in meters used by SCHISM
+            DENSITY_FACTOR = 1000
 
-        # Gather distributed data to root
-        local_count: int = self.schism_mesh.size[1]  # pyright: ignore[reportAssignmentType]
-        all_elements = gatherv_1d(out_field.data, local_count)  # pyright: ignore[reportArgumentType]
-
-        if all_elements is not None and len(all_elements) != self.total_elements:
-            msg = (
-                f"Gathered element count {len(all_elements)} != "
-                f"mesh dimension {self.total_elements} - dimension mismatch would "
-                "corrupt the vsource output file"
+            unit_areas = ESMF.Field(
+                self.schism_mesh, meshloc=ESMF.MeshLoc.ELEMENT, name="areafield"
             )
-            raise ValueError(msg)
+            unit_areas.get_area()
+            areas_m2 = unit_areas.data[...] * (R0_SCHISM * R0_SCHISM)  # pyright: ignore[reportOptionalSubscript]
+            out_field.data[...] *= areas_m2 / DENSITY_FACTOR  # pyright: ignore[reportOptionalSubscript]
+            unit_areas.destroy()
 
-        # Write on root rank
-        if self.root and vsource_ds is not None:
-            step_time = self._read_start_time(input_ds)
-            output_ts = int(step_time - self.schism_first_timestep)  # pyright: ignore[reportOperatorIssue]
-            output_idx = output_ts // 3600
-            vsource_ds["time_vsource"][output_idx] = output_ts
-            vsource_ds["vsource"][output_idx, :] = all_elements
-            vsource_ds.sync()
+            # Gather distributed data to root
+            local_count: int = self.schism_mesh.size[1]  # pyright: ignore[reportAssignmentType]
+            all_elements = gatherv_1d(out_field.data, local_count)  # pyright: ignore[reportArgumentType]
 
-        in_field.destroy()
-        out_field.destroy()
-        input_ds.close()
+            if all_elements is not None and len(all_elements) != self.total_elements:
+                msg = (
+                    f"Gathered element count {len(all_elements)} != "
+                    f"mesh dimension {self.total_elements} - dimension mismatch would "
+                    "corrupt the vsource output file"
+                )
+                raise ValueError(msg)
 
-    def _init_latlon_nc(self, output_ds: Dataset, nlats: int, nlons: int, input_ds: Dataset):
+            # Write on root rank
+            if self.root and vsource_ds is not None:
+                step_time = self._read_start_time(input_ds)
+                output_ts = int(step_time - self.schism_first_timestep)  # pyright: ignore[reportOperatorIssue]
+                output_idx = output_ts // 3600
+                vsource_ds["time_vsource"][output_idx] = output_ts
+                vsource_ds["vsource"][output_idx, :] = all_elements
+                vsource_ds.sync()
+
+            in_field.destroy()
+            out_field.destroy()
+
+    def _init_latlon_nc(
+        self, output_ds: netCDF4.Dataset, nlats: int, nlons: int, input_ds: netCDF4.Dataset
+    ):
         """Create dimensions, coordinates, and time variable for lat-lon output."""
         output_ds.createDimension(dimname="lat", size=nlats)
         output_ds.createDimension(dimname="lon", size=nlons)
@@ -294,103 +294,105 @@ class CoastalForcingRegridder:
 
     def _regrid_to_latlon(self, input_file: Path, apply_slp: bool = True):  # noqa: PLR0912, PLR0915
         """Regrid atmospheric variables to a regular lat-lon grid."""
-        input_ds = Dataset(input_file)
-        nlons, nlats = self.out_grid.max_index
+        with netCDF4.Dataset(input_file) as input_ds:
+            nlons, nlats = self.out_grid.max_index
 
-        # Prepare output dataset on root
-        if self.root:
-            output_path = self.output_dir / (input_file.stem + ".latlon.nc")
-            output_ds = Dataset(output_path, "w")
-            self._init_latlon_nc(output_ds, nlats, nlons, input_ds)
-        else:
-            output_ds = None
-
-        for variable in self.LATLON_VARS:
-            if variable not in input_ds.variables:
-                continue
-
-            # Read and optionally transform the variable
-            data = input_ds.variables[variable][0, :].T
-            var_name = variable
-            var_attrs = {}
-            for attr in ("standard_name", "long_name", "units"):
-                if attr in input_ds.variables[variable].ncattrs():
-                    var_attrs[attr] = getattr(input_ds.variables[variable], attr)
-
-            if apply_slp and variable == "PSFC":
-                data = sea_level_pressure(
-                    temp=input_ds.variables["T2D"][0, :].T,
-                    mixing=input_ds.variables["Q2D"][0, :].T,
-                    height=self.src_height[0, :].T,
-                    press=data,
-                )
-                var_name = "SLP"
-                var_attrs = {
-                    "standard_name": "air_pressure_at_mean_sea_level",
-                    "long_name": "Air pressure reduced to mean sea level",
-                    "units": "Pa",
-                }
-
-            # Create output variable on root
+            # Prepare output dataset on root
             if self.root:
-                if output_ds is None:
-                    msg = "output_ds is None on root rank"
-                    raise RuntimeError(msg)
-                new_var = output_ds.createVariable(
-                    varname=var_name, datatype="f4", dimensions=("time", "lat", "lon")
-                )
-                for attr, val in var_attrs.items():
-                    setattr(new_var, attr, val)
-
-            # Populate source field with local partition slice
-            in_field = ESMF.Field(grid=self.in_grid, name=f"{variable}-in")
-            b = self.in_bounds
-            in_field.data[...] = data[b.x_lo : b.x_hi, b.y_lo : b.y_hi]  # pyright: ignore[reportOptionalSubscript]
-
-            out_field = ESMF.Field(grid=self.out_grid, name=f"{variable}-out")
-            out_field.data[...] = 0.0  # pyright: ignore[reportOptionalSubscript]
-
-            # Build regridder once, reuse for subsequent variables/files
-            if self._latlon_regridder is None:
-                self._latlon_regridder = Regridder(
-                    in_field,
-                    out_field,
-                    method=ESMF.RegridMethod.BILINEAR,  # pyright: ignore[reportArgumentType]
-                    unmapped_action=ESMF.UnmappedAction.IGNORE,  # pyright: ignore[reportArgumentType]
-                )
+                output_path = self.output_dir / (input_file.stem + ".latlon.nc")
+                output_ds = netCDF4.Dataset(output_path, "w", format="NETCDF4")
+                self._init_latlon_nc(output_ds, nlats, nlons, input_ds)
             else:
-                self._latlon_regridder(
-                    in_field,
-                    out_field,
-                    zero_region=ESMF.constants.Region.SELECT,  # pyright: ignore[reportArgumentType]
-                )
+                output_ds = None
 
-            # Assemble global output from all partitions
-            global_output = np.zeros((nlons, nlats))
-            ob = self.out_bounds
-            global_output[ob.x_lo : ob.x_hi, ob.y_lo : ob.y_hi] = out_field.data[...]  # pyright: ignore[reportOptionalSubscript]
+            try:
+                for variable in self.LATLON_VARS:
+                    if variable not in input_ds.variables:
+                        continue
 
-            final_output = gather_reduce(global_output, global_shape=(nlons, nlats))
+                    # Read and optionally transform the variable
+                    data = input_ds.variables[variable][0, :].T
+                    var_name = variable
+                    var_attrs = {}
+                    for attr in ("standard_name", "long_name", "units"):
+                        if attr in input_ds.variables[variable].ncattrs():
+                            var_attrs[attr] = getattr(input_ds.variables[variable], attr)
 
-            if self.root:
-                if output_ds is None or final_output is None:
-                    msg = "output_ds or final_output is None on root rank"
-                    raise RuntimeError(msg)
-                output_ds.variables[var_name][0, :] = final_output.T
+                    if apply_slp and variable == "PSFC":
+                        data = sea_level_pressure(
+                            temp=input_ds.variables["T2D"][0, :].T,
+                            mixing=input_ds.variables["Q2D"][0, :].T,
+                            height=self.src_height[0, :].T,
+                            press=data,
+                        )
+                        var_name = "SLP"
+                        var_attrs = {
+                            "standard_name": "air_pressure_at_mean_sea_level",
+                            "long_name": "Air pressure reduced to mean sea level",
+                            "units": "Pa",
+                        }
 
-            in_field.destroy()
-            out_field.destroy()
+                    # Create output variable on root
+                    if self.root:
+                        if output_ds is None:
+                            msg = "output_ds is None on root rank"
+                            raise RuntimeError(msg)
+                        new_var = output_ds.createVariable(
+                            varname=var_name, datatype="f4", dimensions=("time", "lat", "lon")
+                        )
+                        for attr, val in var_attrs.items():
+                            setattr(new_var, attr, val)
 
-        # Write coordinates and close
-        if self.root:
-            if output_ds is None:
-                msg = "output_ds is None on root rank"
-                raise RuntimeError(msg)
-            output_ds.variables["lat"][:] = self.lats
-            output_ds.variables["lon"][:] = self.lons
-            output_ds.variables["time"][:] = input_ds.variables[_pick_time_var(input_ds)][:]
-            output_ds.close()
-        input_ds.close()
+                    # Populate source field with local partition slice
+                    in_field = ESMF.Field(grid=self.in_grid, name=f"{variable}-in")
+                    b = self.in_bounds
+                    in_field.data[...] = data[b.x_lo : b.x_hi, b.y_lo : b.y_hi]  # pyright: ignore[reportOptionalSubscript]
+
+                    out_field = ESMF.Field(grid=self.out_grid, name=f"{variable}-out")
+                    out_field.data[...] = 0.0  # pyright: ignore[reportOptionalSubscript]
+
+                    # Build regridder once, reuse for subsequent variables/files
+                    if self._latlon_regridder is None:
+                        self._latlon_regridder = Regridder(
+                            in_field,
+                            out_field,
+                            method=ESMF.RegridMethod.BILINEAR,  # pyright: ignore[reportArgumentType]
+                            unmapped_action=ESMF.UnmappedAction.IGNORE,  # pyright: ignore[reportArgumentType]
+                        )
+                    else:
+                        self._latlon_regridder(
+                            in_field,
+                            out_field,
+                            zero_region=ESMF.constants.Region.SELECT,  # pyright: ignore[reportArgumentType]
+                        )
+
+                    # Assemble global output from all partitions
+                    global_output = np.zeros((nlons, nlats))
+                    ob = self.out_bounds
+                    global_output[ob.x_lo : ob.x_hi, ob.y_lo : ob.y_hi] = out_field.data[...]  # pyright: ignore[reportOptionalSubscript]
+
+                    final_output = gather_reduce(global_output, global_shape=(nlons, nlats))
+
+                    if self.root:
+                        if output_ds is None or final_output is None:
+                            msg = "output_ds or final_output is None on root rank"
+                            raise RuntimeError(msg)
+                        output_ds.variables[var_name][0, :] = final_output.T
+
+                    in_field.destroy()
+                    out_field.destroy()
+
+                # Write coordinates
+                if self.root:
+                    if output_ds is None:
+                        msg = "output_ds is None on root rank"
+                        raise RuntimeError(msg)
+                    output_ds.variables["lat"][:] = self.lats
+                    output_ds.variables["lon"][:] = self.lons
+                    output_ds.variables["time"][:] = input_ds.variables[_pick_time_var(input_ds)][:]
+            finally:
+                if output_ds is not None:
+                    output_ds.close()
 
     def run(
         self,
@@ -424,25 +426,28 @@ class CoastalForcingRegridder:
 
         # Determine first timestep for SCHISM time offsets
         if self.root:
-            with Dataset(input_files[0]) as ds0:
+            with netCDF4.Dataset(input_files[0]) as ds0:
                 self.schism_first_timestep = self._read_start_time(ds0)
 
         # Initialize SCHISM vsource output on idx=0
         schism_vsource = None
         if idx == 0 and self.root:
-            schism_vsource = Dataset(self.output_dir / "precip_source.nc", "w", format="NETCDF4")
+            schism_vsource = netCDF4.Dataset(
+                self.output_dir / "precip_source.nc", "w", format="NETCDF4"
+            )
             self._init_vsource_nc(schism_vsource, len(input_files))
 
-        # Process files
-        for file in input_files:
-            if not skip_latlon and file in sub_input_files:
-                self._regrid_to_latlon(file, apply_slp=apply_slp)
-            if idx == 0:
-                self._regrid_to_schism(file, schism_vsource)
-
-        if schism_vsource is not None:
-            schism_vsource.sync()
-            schism_vsource.close()
+        try:
+            # Process files
+            for file in input_files:
+                if not skip_latlon and file in sub_input_files:
+                    self._regrid_to_latlon(file, apply_slp=apply_slp)
+                if idx == 0:
+                    self._regrid_to_schism(file, schism_vsource)
+        finally:
+            if schism_vsource is not None:
+                schism_vsource.sync()
+                schism_vsource.close()
 
 
 def main() -> None:

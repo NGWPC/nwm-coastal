@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
+import pandas as pd
 from pyproj import Transformer
 
 from coastal_calibration.base import WorkflowStage
@@ -102,6 +103,43 @@ def _data_catalog_path(config: CoastalCalibConfig) -> Path | None:
     """Return catalog path if it exists on disk, else None."""
     candidate = config.paths.work_dir / "data_catalog.yml"
     return candidate if candidate.exists() else None
+
+
+def _read_obs_station_map_wgs84(model_root: Path) -> pd.DataFrame | None:
+    """Parse ``obs_station_map.json`` into an (id, lon, lat) frame in WGS84.
+
+    The JSON file stores NOAA gauge coordinates in the model's native CRS
+    (typically a UTM zone). This helper transforms them back to WGS84 so
+    the downstream obs-extraction pipeline can handle user CSV points and
+    NOAA points uniformly.
+    """
+    import json
+
+    map_file = model_root / "obs_station_map.json"
+    if not map_file.is_file():
+        return None
+
+    entries = json.loads(map_file.read_text())
+    if not entries:
+        return None
+
+    # Best effort source-CRS: pull from sfincs.inp or sfincs.nc beside this file.
+    from coastal_calibration.observations import _is_wgs84  # pyright: ignore[reportPrivateUsage]
+    from coastal_calibration.sfincs.outputs import (
+        _detect_crs,  # pyright: ignore[reportPrivateUsage]  -- shared intra-package helper
+    )
+
+    src_crs = _detect_crs(model_root / "sfincs_map.nc")
+    xs = np.array([e["x"] for e in entries], dtype=np.float64)
+    ys = np.array([e["y"] for e in entries], dtype=np.float64)
+    ids = [str(e["station_id"]) for e in entries]
+
+    if not _is_wgs84(src_crs):
+        t = Transformer.from_crs(src_crs, "EPSG:4326", always_xy=True)
+        lon, lat = t.transform(xs, ys)
+    else:
+        lon, lat = xs, ys
+    return pd.DataFrame({"id": ids, "lon": lon, "lat": lat})
 
 
 def _get_model(config: CoastalCalibConfig) -> SfincsModel:
@@ -2030,20 +2068,24 @@ class SfincsPlotStage(_SfincsStageBase):
 
         return point_zs
 
-    def run(self) -> dict[str, Any]:
-        """Read SFINCS output, fetch NOAA observations, and plot comparison."""
+    def _run_station_comparison(self, figs_dir: Path) -> dict[str, Any]:
+        """Produce NOAA-CO-OPS station comparison figures.
+
+        Returns a ``status`` dict that mirrors the legacy :meth:`run`
+        return shape so callers can inspect skip reasons.
+        """
         model_root = get_model_root(self.config)
         his_file = model_root / "sfincs_his.nc"
 
         if not his_file.exists():
-            self._log("sfincs_his.nc not found, skipping plot stage")
+            self._log("sfincs_his.nc not found, skipping station comparison")
             return {"status": "skipped", "reason": "no output"}
 
         self._update_substep("Reading SFINCS output")
         point_zs = self._read_point_zs(his_file)
 
         if point_zs is None:
-            self._log("No point_zs or point_h in output, skipping plot stage")
+            self._log("No point_zs or point_h in output, skipping station comparison")
             return {"status": "skipped", "reason": "no point_zs"}
 
         station_dim = self._station_dim(point_zs)
@@ -2051,7 +2093,7 @@ class SfincsPlotStage(_SfincsStageBase):
         noaa_indices, noaa_station_ids = self._match_noaa_stations()
 
         if not noaa_station_ids:
-            self._log("No NOAA observation points found, skipping plot stage")
+            self._log("No NOAA observation points found, skipping station comparison")
             return {"status": "skipped", "reason": "no noaa stations"}
 
         # Guard against matched station indices that exceed the number
@@ -2097,17 +2139,136 @@ class SfincsPlotStage(_SfincsStageBase):
         self._update_substep("Generating comparison plots")
         from coastal_calibration.plotting import plot_station_comparison
 
-        figs_dir = model_root / "figs"
         fig_paths = plot_station_comparison(
-            sim_times, sim_elevation, noaa_station_ids, obs_ds, figs_dir
+            {"Simulated": (sim_times, sim_elevation)},
+            noaa_station_ids,
+            figs_dir,
+            obs_ds=obs_ds,
         )
 
         self._log(f"Saved {len(fig_paths)} comparison figure(s) to {figs_dir}")
+
         return {
             "status": "completed",
             "figures": [str(p) for p in fig_paths],
-            "figs_dir": str(figs_dir),
         }
+
+    def _run_obs_points(self, model_root: Path) -> dict[str, Any]:
+        """Extract water level at user and NOAA obs points; write parquet."""
+        from coastal_calibration.observations import (
+            combine_obs_points,
+            extract_water_level_series,
+            load_obs_points,
+            validate_points_in_domain,
+        )
+        from coastal_calibration.sfincs.outputs import load_sfincs_water_level
+
+        map_file = model_root / "sfincs_map.nc"
+        if not map_file.exists():
+            self._log("sfincs_map.nc not found, skipping obs-points extraction")
+            return {"status": "skipped", "reason": "no sfincs_map.nc"}
+
+        user_points: pd.DataFrame | None = None
+        if self.sfincs.obs_points_csv is not None:
+            user_points = load_obs_points(self.sfincs.obs_points_csv)
+            self._log(f"Loaded {len(user_points)} user observation point(s)")
+
+        noaa_points = _read_obs_station_map_wgs84(model_root)
+        if noaa_points is not None:
+            self._log(f"Including {len(noaa_points)} NOAA gauge(s) from obs_station_map.json")
+
+        all_points = combine_obs_points(user_points, noaa_points)
+        if all_points.empty:
+            self._log("No obs points to extract (neither user CSV nor NOAA map present)")
+            return {"status": "skipped", "reason": "no points"}
+
+        self._update_substep("Extracting water level at obs points")
+        try:
+            ds = load_sfincs_water_level(model_root)
+        except NotImplementedError as exc:
+            self._log(f"Skipping obs-points extraction: {exc}", "warning")
+            return {"status": "skipped", "reason": "unsupported map layout"}
+
+        validate_points_in_domain(all_points, ds)
+        series = extract_water_level_series(ds, all_points, variable="zs")
+
+        outfile = model_root / "obs_water_level.parquet"
+        series.to_parquet(outfile)
+        self._log(
+            f"Wrote {outfile.name} with {len(series.columns)} station(s) "
+            f"and {len(series)} timestep(s)"
+        )
+        return {
+            "status": "completed",
+            "path": str(outfile),
+            "n_points": len(series.columns),
+            "n_user": 0 if user_points is None else len(user_points),
+            "n_noaa": 0 if noaa_points is None else len(noaa_points),
+        }
+
+    def _run_water_level_animation(self, figs_dir: Path) -> dict[str, Any]:
+        """Render an MP4/GIF animation from the SFINCS ``sfincs_map.nc`` output."""
+        model_root = get_model_root(self.config)
+        map_file = model_root / "sfincs_map.nc"
+        if not map_file.exists():
+            self._log("sfincs_map.nc not found, skipping water-level animation")
+            return {"status": "skipped", "reason": "no sfincs_map.nc"}
+
+        self._update_substep("Rendering water-level animation")
+        from coastal_calibration.plotting import animate_water_level
+        from coastal_calibration.sfincs.outputs import load_sfincs_water_level
+
+        try:
+            ds = load_sfincs_water_level(model_root)
+        except NotImplementedError as exc:
+            self._log(f"Skipping water-level animation: {exc}", "warning")
+            return {"status": "skipped", "reason": "unsupported map layout"}
+
+        outfile = figs_dir / "water_level.mp4"
+        animate_water_level(
+            ds,
+            outfile,
+            variable="zs",
+            fps=self.sfincs.animation_fps,
+            time_stride=self.sfincs.animation_time_stride,
+        )
+        self._log(f"Saved water-level animation to {outfile}")
+        return {"status": "completed", "animation": str(outfile)}
+
+    def run(self) -> dict[str, Any]:
+        """Produce SFINCS post-run figures: station comparison + animation.
+
+        The two sub-tasks run independently:
+
+        - Station comparison always attempts; skips cleanly if the inputs
+          required for NOAA CO-OPS matching are absent.
+        - Water-level animation runs only when
+          :attr:`SfincsModelConfig.create_water_level_animation` is True.
+        """
+        model_root = get_model_root(self.config)
+        figs_dir = model_root / "figs"
+        figs_dir.mkdir(parents=True, exist_ok=True)
+
+        result: dict[str, Any] = {
+            "status": "completed",
+            "figs_dir": str(figs_dir),
+            "stations": self._run_station_comparison(figs_dir),
+        }
+
+        if self.sfincs.create_water_level_animation:
+            result["animation"] = self._run_water_level_animation(figs_dir)
+
+        # The obs-points parquet is written whenever either a user CSV is
+        # provided or the model's obs_station_map.json is present (i.e. NOAA
+        # gauges were registered at model-create time).
+        want_obs_parquet = (
+            self.sfincs.obs_points_csv is not None
+            or (model_root / "obs_station_map.json").is_file()
+        )
+        if want_obs_parquet:
+            result["obs_points"] = self._run_obs_points(model_root)
+
+        return result
 
 
 # ---------------------------------------------------------------------------

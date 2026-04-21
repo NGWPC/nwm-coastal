@@ -1,3 +1,4 @@
+exclude: ^legacy-coastal/
 repos:
 - repo: https://github.com/pre-commit/pre-commit-hooks
   rev: v6.0.0
@@ -43,8 +44,19 @@ repos:
   rev: v1.19.1
   hooks:
   - id: jupytext
-    entry: jupytext --sync
-    files: ^docs/examples/notebooks/
+    args: [--sync]
+    files: ^docs/examples/.*\.(py|ipynb)$
+
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: v0.15.11
+  hooks:
+  - id: ruff
+    name: Linting with Ruff
+    types_or: [python, jupyter]
+    args: [--fix, --unsafe-fixes]
+  - id: ruff-format
+    name: Formatting with Ruff
+    types_or: [python, jupyter]
 
 - repo: local
   hooks:
@@ -54,17 +66,6 @@ repos:
     language: python
     files: ^docs/examples/notebooks/.*\.ipynb$
     pass_filenames: true
-
-- repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.15.8
-  hooks:
-  - id: ruff
-    name: Linting with Ruff
-    types_or: [python, jupyter]
-    args: [--fix, --unsafe-fixes]
-  - id: ruff-format
-    name: Formatting with Ruff
-    types_or: [python, jupyter]
 
 - repo: https://github.com/PyCQA/doc8
   rev: v2.0.0
@@ -82,7 +83,7 @@ repos:
     - tomli
 
 - repo: https://github.com/tox-dev/pyproject-fmt
-  rev: v2.21.0
+  rev: v2.21.1
   hooks:
   - id: pyproject-fmt
     name: Apply a consistent format to pyproject.toml
@@ -110,6 +111,5 @@ repos:
     - ruff
     - mdformat-config
     - mdformat-toc
-    # - mdformat-admon
     args: [--wrap, '88']
-    exclude: ^docs/reference/
+    exclude: ^(docs/reference/|legacy-coastal/)
