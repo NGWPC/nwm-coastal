@@ -176,6 +176,7 @@ nav:
     - Lavaca Bay: examples/notebooks/lavaca.ipynb
     - Narragansett Bay: examples/notebooks/narragansett.ipynb
     - Hawaii: examples/notebooks/schism-hawaii.ipynb
+    - Hawaii Mesh Subset: examples/notebooks/schism-hawaii-subset.ipynb
   - Post-run Plotting:
     - Lavaca Bay (SFINCS): examples/notebooks/plot_sfincs_lavaca.ipynb
     - Narragansett Bay (SFINCS): examples/notebooks/plot_sfincs_narragansett.ipynb
