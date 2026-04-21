@@ -1,550 +1,408 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
-this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+All notable changes to this project will be documented in this file. The format is based
+on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
 ### Added
 
-- **`SchismDischargeStage`**: new dedicated stage for river discharge generation,
-    extracted from `PreSCHISMStage`. Encapsulates CHRTOUT staging, `nwmReaches.csv`
-    handling, `make_discharge`, `combine_sink_source`, and `merge_source_sink`. Skipped
-    when `discharge_file` is not configured (matching the SFINCS `SfincsDischargeStage`
-    pattern).
-- **`discharge_file` config option**: added `discharge_file: Path | None` (default
-    `None`) to `SchismModelConfig`. Points to a `nwmReaches.csv` file mapping NWM reach
-    feature IDs to SCHISM source/sink elements. When `None`, the discharge stage is
-    skipped and no river forcing is generated.
+- **outputs**: Add canonical water-level loaders for SCHISM (`load_schism_elevation`) and SFINCS (`load_sfincs_water_level`)
+- **plotting**: Add shared spatial renderer `plot_water_level` that dispatches on `mesh_type` to SCHISM unstructured, SFINCS regular, or SFINCS UGRID-quadtree
+- **plotting**: Add water-level animation writer `animate_water_level` with MP4 (FFMpeg) and GIF (Pillow) backends
+- **observations**: Add observations module for user-point water-level extraction (`load_obs_points`, `validate_points_in_domain`, `extract_water_level_series`)
+- **stages**: Add `create_water_level_animation`, `animation_fps`, `animation_time_stride`, and `obs_points_csv` config fields on SCHISM and SFINCS plot stages
+- **stages**: Generalize station comparison to overlay multiple simulated runs against optional NOAA observations
+- **examples**: Add post-run plotting notebooks for Lavaca Bay, Narragansett Bay, and Hawaii, plus a SCHISM mesh-subset demo
+- **tooling**: Configure git-cliff for changelog generation with `changelog` and `changelog-update` pixi tasks
+- Add MPI runtime detection and system binary support
+- Add pixi-build recipes for SFINCS and SCHISM
+- Add tides, regridding, sflux, and schism_prep modules
+- Add pixi SCHISM build infrastructure
+- **discharge**: Rename nwm_discharge to river_discharge and add snap distance threshold
+- **qgis**: NWM flowlines override, flowpath export, and stream order validation
+- **plotting**: Add reusable plotting module
+- **discharge**: Simplify nwm_discharge config to flowlines + nwm_id_column
+- **qgis**: NWM flowlines override, flowpath export, stream order validation
+- **utils**: Add clip-and-reproject raster utility
+- Add flood depth map downscaling stage
+- Make gages and nexus NHF layers optional
+- Add NWM Coastal QGIS plugin
+- Make from_dict public on config classes
+- Add human-readable __str__ to workflow result classes
+- Add quadtree output read compatibility patch
+- Auto-fetch CopDEM, GEBCO, and ESA WorldCover without data catalogs
 
 ### Changed
 
-- **Elevation correction is now explicit**: `make_tpxo_boundary` and
-    `make_stofs_boundary` accept an optional `correction_file` parameter instead of
-    implicitly checking for `elevation_correction.csv` in the work directory. Boundary
-    stages resolve the correction file from `prebuilt_dir`. Node-count validation is
-    performed when applying the correction.
-- **`PreSCHISMStage` slimmed down**: now only handles mesh partitioning and `param.nml`
-    patching. Discharge operations moved to `SchismDischargeStage`.
-- **`merge_source_sink` accepts element areas array**: the `root_dir`/`element_area_dir`
-    parameter replaced with `element_areas: ndarray`, computed at runtime from the mesh
-    via `NWMSCHISMProject.element_areas`. Eliminates dependency on `element_areas.txt`
-    for the discharge pipeline.
-- **`SchismObservationStage` uses `NWMSCHISMProject`**: replaced ~90 lines of standalone
-    hgrid.gr3 parsing helpers (`_read_hgrid_header`, `_read_node_coordinates`,
-    `_read_open_boundary_nodes`) with the `NWMSCHISMProject` class from the new
-    `schism/` module.
-- **`stage_chrtout_files` simplified**: removed `prebuilt_dir` parameter and
-    `nwmReaches.csv` copy (now handled by `SchismDischargeStage`).
-- **`update_params` no longer symlinks discharge/correction files**: `element_areas.txt`
-    and `elevation_correction.csv` removed from the symlink lists since they are now
-    handled by their respective stages.
-- **`nwmReaches.csv` removed from required validation**: no longer checked in
-    `SchismModelConfig.validate()`; the `discharge_file` config option replaces it.
-- **Package reorganization**: moved all model-specific code into dedicated packages:
-    - SCHISM workflow: `coastal_calibration.schism.{prep,sflux,stages,boundary,forcing}`
-    - SFINCS workflow:
-        `coastal_calibration.sfincs.{stages,create,data_catalog,plotting,floodmap,_hydromt_compat}`
-    - Data acquisition:
-        `coastal_calibration.data.{downloader,coops_api,download_stage,   streamflow,copdem,esa_worldcover,gebco_wms,topobathy_noaa,topobathy_nws,transformation}`
-    - `WorkflowStage` base class moved to `coastal_calibration.base`
-    - `stages/` directory dissolved; `utils/` retains only general utilities (logging,
-        system, time, mpi, workflow)
-    - HydroMT compatibility patch log messages downgraded from INFO to DEBUG.
-
-### Added (continued)
-
-- **MPI detection module** (`utils/mpi.py`): auto-detects the active MPI implementation
-    (OpenMPI or MPICH/Cray MPICH) at runtime via `mpiexec --version` and sets the
-    correct tuning environment variables and launcher flags for each. On AWS EFA
-    instances, libfabric transport and buffer tuning are applied automatically; on plain
-    NFS/Lustre clusters only general settings (shared-memory on `/tmp`, fork-warning
-    suppression) are used.
-- **`schism_exe` config option**: added `schism_exe: Path | None` (default `None`) to
-    `SchismModelConfig`, matching the existing `sfincs_exe` pattern. When set, the
-    `schism_run` stage uses the given executable and isolates the subprocess environment
-    from conda libraries for system MPI compatibility.
-- **`runtime_env` config option**: both `SchismModelConfig` and `SfincsModelConfig`
-    accept a `runtime_env: dict[str, str]` for injecting extra environment variables
-    into the model run subprocess. Applied last, so it can override auto-detected MPI
-    tuning values.
-- **Type stubs**: added `types-geopandas` and `types-shapely` to the typecheck
-    environment for better third-party type coverage.
-
-### Changed
-
-- **Lazy imports**: converted `__init__.py` files (package root, `config/`, `utils/`)
-    and `cli.py` to use deferred imports via `__getattr__`. The CLI
-    (`coastal-calibration --version`) no longer pulls the full dependency tree at
-    startup, reducing cold-start time from ~12 s to under 1 s on NFS.
-- **System MPI isolation**: when `schism_exe` or `sfincs_exe` is set to a
-    system-compiled binary, the run stage strips conda library paths from the subprocess
-    environment so the binary finds system MPI/HDF5/NetCDF. A new `runtime_env` config
-    option allows injecting extra env vars for the model run. Python MPI stages (ESMF
-    regridding) continue using conda OpenMPI.
-- **OpenMP tuning**: moved common OpenMP variables (`OMP_NUM_THREADS`, `OMP_PLACES`,
-    `OMP_PROC_BIND`) from model-specific `build_environment()` methods to the shared
-    `WorkflowStage.build_environment()` in `stages/base.py`.
-- **SFINCS run stage**: `SfincsRunStage.run()` now uses `self.build_environment()`
-    instead of constructing an inline env dict, ensuring `HDF5_USE_FILE_LOCKING` and
-    OpenMP pinning are applied consistently.
+- **subsetter**: Rewrite mesh-cut boundary reconstruction with explicit segment extraction and switch from `scipy.io.netcdf_file` to `netCDF4`
+- **plotting**: Make `plotable_stations` private; `plot_station_comparison` is now the sole public station entry point
+- **tooling**: Rename pixi `notebook` feature to `dev` and broaden jupytext hook to all `docs/examples/` notebooks
+- Standardize `netCDF4` imports (drop the `nc` alias) across streamflow, regridding, schism/prep, schism/sflux, and tides modules
+- Reorganize package into model-specific and data subpackages
+- Move ModelConfig field docs to NumPy class docstring
+- Use #: comments for ModelConfig field docs
+- Remove all legacy config field references
+- Remove legacy config migration helpers
+- Remove legacy binary field migration
+- Convert package imports to lazy loading
+- Rename LevelInfo.count to n_cells and type crs as optional
+- Replace activation scripts with pixi-build path dependencies
+- Move submodules under coastal_models/
+- Use ty: ignore with correct rule names instead of type: ignore
+- Replace assert statements with proper exceptions in src
+- Fix lint errors and configure ruff for new modules
+- Reorganize tests into domain-specific directories
+- Replace Singularity invocations with native Python calls in stages
+- Move legacy bash scripts to tests/legacy_scripts
+- **logging**: Consolidate hydromt output suppression
+- **stages**: Remove duplicate station plotting from sfincs/schism stages
+- **sfincs**: Replace Singularity container with native binary execution
+- Fix lint errors from pre-commit hooks
+- Apply ssort reordering and ruff formatting
+- **qgis-plugin**: Extract helpers from \_on_union_divides
+- Fix typos
+- Rewrite NOAA station matching with spatial KDTree lookup
+- Rewrite observation point snapping for quadtree grids
+- Rename topobathy modules and standardize dataset source names
+- Replace per-module loggers with shared logger
+- Move SFINCS observation points from run to create workflow
+- Replace rioxarray with gdalwarp for NOAA DEM and topobathy clipping
+- Code quality improvements and performance fixes
 
 ### Fixed
 
-- **Type checking**: resolved all 895 pyright strict-mode errors across 35 source files.
-    Real type issues (wrong argument types, unnecessary isinstance checks, missing
-    annotations, None-safety) were fixed in code; remaining noise from third-party
-    libraries without type stubs is suppressed via targeted pyright config rules.
-- **Script permissions**: marked `scripts/find_compatible_sdk.sh`,
-    `coastal_models/schism/build.sh`, and `coastal_models/sfincs/build.sh` as executable
-    to satisfy the pre-commit shebang check.
-- **Cluster install verification**: replaced `shutil.which` check with `ls` in
-    `CLUSTER_INSTALL.md` — the old command returned `None` because running the Python
-    binary directly bypasses the wrapper's `PATH` setup.
+- Address second round of PR review comments
+- Update stale import paths in docs for mkdocs build
+- Use hgrid.ll for geodesic area computation on projected meshes
+- Address PR review comments
+- Validate schism_exe, use exe name in substep, scope nb-clean
+- Pass subprocess env to MPI detection and apply runtime_env consistently
+- Scope MPI detection to subprocess env and harden EFA probe
+- Address PR review comments
+- Restore isinstance guards for runtime safety
+- Resolve remaining pyright errors across codebase
+- Resolve pyright errors in regridding, stages, and floodmap
+- Add type stubs and suppress third-party pyright noise
+- Address CI failure and review feedback
+- Address PR review comments
+- Assorted source fixes for demo workflow
+- Address PR review comments
+- Scope data catalog globs to exact simulation months
+- **ci**: Pin mkdocs-jupyter\<0.26 to fix missing CSS template
+- **ci**: Set JUPYTER_PLATFORM_DIRS=1 for mkdocs builds
+- Handle empty staout and non-fatal QUICKSEARCH errors
+- Clean all generated files before fresh SCHISM workflow runs
+- Clean stale sflux files before regeneration
+- Use CONSERVE regrid method for Grid-to-Mesh(ELEMENT) regridding
+- **tests**: Enlarge synthetic ESMF grids to avoid BILINEAR regrid failures
+- **ci**: Exclude regridding tests from CI catch-all test environments
+- **tests**: Skip ESMF regridding tests on platforms where rc=509
+- Stage remaining changes and add missing type annotations
+- **typecheck**: Resolve all ty type errors
+- Improve SFINCS streamflow, floodmap, raster, and data catalog
+- Address PR review comments
+- **typecheck**: Update ty environment python path
+- **pixi**: Add sfincs activation script to dev environment
+- **sfincs**: Detect stale Makefile prefix and reconfigure before build
+- Address PR review comments
+- **docs**: Exclude downloads dir from mkdocs and disable notebook execution
+- **typecheck**: Configure ty to resolve imports from pixi environment
+- **symlinks**: Report pre-existing symlinks instead of showing zero created
+- Address PR review comments
+- **floodmap**: Correct flatten order and add hydromt output suppression
+- Address PR review comments
+- **sfincs**: Discharge timeseries, STOFS catalog, and floodmap resolution
+- Address PR review comments
+- **sfincs**: Replace meteo create/clip with clip-before-reproject
+- **notebooks**: Address PR review comments on flood map basemaps
+- **notebooks**: Use contextily basemap in lavaca_cli notebook
+- **notebooks**: Use contextily basemap in lavaca_api notebook
+- **deps**: Add contextily to plot dependencies
+- Address PR review comments on flood map stage
+- Use MPLBACKEND env var instead of matplotlib.use in conftest
+- Resolve remaining type errors in hydromt compat and gdal helpers
+- Set matplotlib Agg backend in conftest to prevent test hangs
+- Set matplotlib Agg backend only outside Jupyter kernels
+- **qgis-plugin**: Address PR review comments
+- **tests**: Update texas.zip path and mock NOAA station coordinates
+- Use geopandas to read zone polygons in compute_aoi_coverage
+- Suppress hydromt-sfincs stdout in both terminal and Jupyter
+- Harden SFINCS init and plot stages
+- Improve GDAL coverage computation and resolve lint
+- **docs**: Resolve LICENSE rendering and add manual version deploy
+- **docs**: Resolve LICENSE rendering and add manual version deploy
+- Address PR review comments for SFINCS creation workflow
+- Remove duplicate [0.2.0] section from CHANGELOG auto-merge
 
-### Changed
+### New Contributors
 
-- **Build system**: migrated SFINCS and SCHISM compilation from activation scripts
-    (`scripts/ensure-sfincs.sh`, `scripts/ensure-schism.sh`) to pixi-build packages
-    using the `rattler-build` backend. Build recipes live in `coastal_models/sfincs/`
-    and `coastal_models/schism/` with `recipe.yaml` + `build.sh`. Builds are cached as
-    conda packages and only recompile when the submodule source or recipe changes.
-- **Submodule layout**: moved git submodules from `SFINCS/` and `schism/` to
-    `coastal_models/sfincs/repo/` and `coastal_models/schism/repo/`. The in-tree
-    `./repo` source paths avoid a pixi-build cache invalidation bug with out-of-tree
-    paths ([prefix-dev/pixi#4837](https://github.com/prefix-dev/pixi/issues/4837)).
-- **MPI variant consistency**: both SFINCS and SCHISM recipes now pin `hdf5` and
-    `libnetcdf`/`netcdf-fortran` to `mpi_openmpi_*` build variants, matching ESMF/esmpy
-    runtime expectations and avoiding library conflicts in shared environments.
-- **macOS SDK probe**: replaced hardcoded `MacOSX15*` SDK fallback with a dynamic probe
-    (`scripts/find_compatible_sdk.sh`) that tests each installed SDK against the active
-    linker and picks the newest compatible one.
-- **Cluster install**: rewrote `CLUSTER_INSTALL.md` around full-repo clone with
-    pixi-build. The wrapper script (`nwm-coastal`) fully activates the environment so
-    pixi is not needed at runtime on compute nodes.
-- **mkdocs hooks**: `docs/hooks.py` now strips ANSI escape codes and absolute repo paths
-    from rendered notebook HTML at build time, complementing the existing
-    `scripts/clean_notebooks.py` pre-commit task.
+- @miguelp1986 made their first contribution in
+    [#28](https://github.com/NGWPC/nwm-coastal/pull/28)
 
-### Removed
-
-- `scripts/ensure-sfincs.sh` and `scripts/ensure-schism.sh` (replaced by pixi-build
-    recipes).
-- Build-tool dependencies (`c-compiler`, `fortran-compiler`, `cxx-compiler`, `cmake`,
-    `make`, `autoconf`, `automake`, `libtool`, `m4`) from pixi feature sections in
-    `pyproject.toml` (now declared in `recipe.yaml` and resolved by the build backend).
+## [3.1.1.0.0] - 2026-02-26
 
 ### Added
 
-- `coastal_calibration.plotting` module with reusable visualization utilities:
-    - `SfincsGridInfo` dataclass with `from_model_root()` factory for loading and
-        summarizing SFINCS grid metadata (quadtree and regular grids).
-    - `plot_mesh()` for visualizing the SFINCS mesh colored by refinement level with
-        optional satellite basemap via `contextily`.
-    - `plot_floodmap()` for reading and plotting flood-depth Cloud Optimized GeoTIFFs with
-        automatic overview-level selection and basemap overlay.
-    - `plot_station_comparison()` for generating 2×2 simulated vs observed water-level
-        comparison plots, consolidated from the former `sfincs_plot` and `schism_plot`
-        stage internals.
-    - `plotable_stations()` helper for filtering stations that have both simulated and
-        observed data.
-- `_KNOWN_INP_PARAMS` allowlist on `SfincsModelConfig` that validates `inp_overrides`
-    keys against all ~170 recognized `sfincs.inp` parameters, catching typos early
-    (SFINCS silently ignores unknown parameters).
-- `SfincsDischargeStage` now assigns real NWM `CHRTOUT` discharge timeseries to source
-    points via `_assign_discharge_timeseries`, using the shared `read_streamflow`
-    utility (`nwm_retro` reads from S3 Zarr, `nwm_ana` reads from local CHRTOUT via
-    `netCDF4`).
-- `tests/test_floodmap.py` with unit tests for `_write_floodmap_cog`,
-    `_ensure_overviews`, and an integration test for `create_flood_depth_map`.
-- QGIS plugin: optional NWM Flowlines Override in the basemap dialog, allowing users to
-    load flowpaths from a separate NWM GeoPackage with configurable layer name and
-    stream order column.
-- QGIS plugin: "Export Selected Flowpaths" toolbar button that saves the current
-    selection on the flowpaths layer to a GeoJSON file.
-- QGIS plugin: stream order validation against the actual min/max range in the data,
-    with a clear error when the user-specified value is out of range.
-- QGIS plugin: auto-enable labels for gages (`site_no`) and CO-OPS (`station_id`) layers
-    with font size 15 and text buffer.
-- Narragansett Bay, RI example notebook showing compound forcing (ocean + river
-    discharge + meteo) with NWM streamflow.
-- SCHISM de-containerization: all Singularity container invocations replaced with native
-    Python function calls, MPI module invocations (`mpiexec -m`), and subprocess calls
-    for Fortran binaries (`pschism`, `combine_hotstart7`, `combine_sink_source`,
-    `metis_prep`, `gpmetis`).
-- `coastal_calibration.schism_prep` module with 12 pure-Python functions replacing bash
-    scripts: `stage_ldasin_files`, `make_sflux`, `update_params`, `make_tpxo_boundary`,
-    `make_stofs_boundary`, `correct_elevation`, `stage_chrtout_files`, `make_discharge`,
-    `run_combine_sink_source`, `merge_source_sink`, `partition_mesh`,
-    `combine_hotstart`.
-- `coastal_calibration.sflux` module replacing `makeAtmo.py` for sflux atmospheric
-    forcing generation with inline sea-level pressure reduction.
-- `coastal_calibration.tides` package replacing `tpxo_to_open_bnds_hgrid/` and
-    `makeOceanTide.py` with TPXO boundary utilities and bundled `pytides` harmonic
-    library.
-- `coastal_calibration.regridding` package with ESMF-based regridding for STOFS boundary
-    conditions (`regrid_estofs`) and NWM atmospheric forcing (`regrid_forcings`) with
-    MPI-aware LocStream partitioning.
-- `coastal_calibration.utils.streamflow` module supporting NWM retrospective (S3 Zarr)
-    and analysis (local CHRTOUT) streamflow reads via unified `read_streamflow()`
-    function.
-- `scripts/ensure-schism.sh` pixi activation script for native SCHISM binary compilation
-    with SHA256-based rebuild detection.
-- ESMF/esmpy compatibility shim (`esmf_compat/ESMF.py`) for `import ESMF` → `esmpy`
-    transition with auto-initialized `Manager`.
-- Hawaii SCHISM example notebook demonstrating end-to-end workflow with 3-hour
-    simulation on ~878K node mesh.
-- `prepare-topobathy` and `update-dem-index` CLI commands for DEM management.
-- `docs/schism_compilation.md`: comprehensive SCHISM de-containerization guide covering
-    architecture, build system, stage inventory, and known issues.
-- `docs/stofs_tpxo_improvements.md`: analysis of STOFS/TPXO boundary condition pipeline
-    issues and improvement plan.
-- SCHISM compilation and unit tests in `tests/schism/` and regridding tests in
-    `tests/regridding/` with synthetic grid generation.
+- Per-stage completion tracking in submit path
+- For schism fall back to user from env when slurm.user is not specified
+- Add a new config for passing forcing vdatum adjustment (**breaking**)
+- Add quiet flag and log output to mark_stage_completed
+- Add support for tpxo for sfincs
+- Patch hydromt-sfincs to use chunked writing in the write step and reducing memory
+    footprint
+- Add the missing divider in the log message after slurm job steps
+- Make sfincs datum adjusment configurable since navd88 conversion is difficult to
+    automate.
+- Filter stations without obs/sim data and adjust the plot setting for better plots.
+- Filter stations without obs/sim data and adjust the plot setting for better plots.
+- Add a new stage for adding stations to schism and comparison with noaa gages
+- Add back support for wind and pressure for sfincs
+- Add a plotting stage to sfincs
+- Add observation points from noaa coops
+- Make model field required in YAML config and add it to schism init template
+- Refactor the sfincs runner to integrate with the existing codebase. (**breaking**)
+- Use a custom runner for running sfincs for better integration with the existing
+    codebase.
+- Move the workflow and time utilities to the main utils module. (**breaking**)
+- Make the output arg of the init subcommand mandatory. (**breaking**)
+- Read the username from the env and use that by default.
+- **sfincs**: Integrate NOAA DEM fetch stage into creation workflow
+- **noaa-dem**: Add NOAA DEM auto-discovery and download utility
+- **sfincs**: Support quadtree grids, obs snapping, and inp overrides
+- **cli**: Add `create` and `prepare-topobathy` subcommands
+- Add SFINCS model creation workflow from AOI polygon
+- Per-stage completion tracking in submit path
+- For schism fall back to user from env when slurm.user is not specified
+- Add a new config for passing forcing vdatum adjustment (**breaking**)
+- Add quiet flag and log output to mark_stage_completed
+- Add support for tpxo for sfincs
+- Patch hydromt-sfincs to use chunked writing in the write step and reducing memory
+    footprint
+- Add the missing divider in the log message after slurm job steps
+- Make sfincs datum adjusment configurable since navd88 conversion is difficult to
+    automate.
+- Filter stations without obs/sim data and adjust the plot setting for better plots.
+- Filter stations without obs/sim data and adjust the plot setting for better plots.
+- Add a new stage for adding stations to schism and comparison with noaa gages
+- Add back support for wind and pressure for sfincs
+- Add a plotting stage to sfincs
+- Add observation points from noaa coops
+- Make model field required in YAML config and add it to schism init template
+- Refactor the sfincs runner to integrate with the existing codebase. (**breaking**)
+- Use a custom runner for running sfincs for better integration with the existing
+    codebase.
+- Move the workflow and time utilities to the main utils module. (**breaking**)
+- Make the output arg of the init subcommand mandatory. (**breaking**)
+- Read the username from the env and use that by default.
 
 ### Changed
 
-- Centralize station comparison plotting into `coastal_calibration.plotting.stations`,
-    removing duplicate `_plotable_stations` and `_plot_figures` code from
-    `SfincsPlotStage` and `SchismPlotStage`.
-- Refactor Lavaca and Narragansett example notebooks to use the new `plotting` module
-    (`SfincsGridInfo`, `plot_mesh`, `plot_floodmap`) instead of inline visualization
-    code.
-- **Breaking:** Rename `nwm_discharge` config section to `river_discharge` and add
-    `max_snap_distance_m` field (default 2000 m). Discharge points that must move
-    farther than this threshold to reach an active grid cell are dropped with a warning.
-    Previously these points could be silently written with out-of-bounds coordinates.
-- **Breaking:** Simplify `river_discharge` config from 5 fields (`hydrofabric_gpkg`,
-    `flowpaths_layer`, `flowpath_id_column`, `flowpath_ids`, `coastal_domain`) to 2
-    fields (`flowlines`, `nwm_id_column`). Users now provide a GeoJSON file of selected
-    flowpaths (e.g., exported from the QGIS plugin) instead of a full NWM hydrofabric
-    GeoPackage with explicit IDs.
-- QGIS plugin: "Export Selected Flowpaths" now writes GeoJSON (`.geojson`) instead of
-    GeoPackage (`.gpkg`).
-- Rename example directory `texas-lavaca/` to `lavaca-tx/` and update notebook paths
-    accordingly.
-- Consolidate example notebooks: remove CLI variants and `_api`/`_cli` suffixes, keeping
-    one notebook per region (`lavaca.ipynb`, `narragansett.ipynb`).
-- Rewrite `create_flood_depth_map` to read the DEM and index COG at full resolution and
-    write a flood-depth Cloud Optimized GeoTIFF block-by-block, bypassing an upstream
-    `hydromt_sfincs` bug where `downscale_floodmap` opened rasters with
-    `overview_level=0` and silently halved the output resolution.
-- Separate discharge concerns between `create` and `run` stages: the create stage now
-    only writes the `.src` file with snapped locations, while the run stage
-    (`SfincsDischargeStage`) adds points to the model and attaches real NWM streamflow
-    data.
-- Consolidate stdout/logging suppression for `hydromt-sfincs` into a shared
-    `suppress_hydromt_output()` context manager in `utils.logging`, replacing duplicated
-    `_suppress_stdout` helpers in `creator.py` and `sfincs_create.py`.
-- `SfincsGridInfo.from_model_root()` no longer accepts a `base_resolution` parameter;
-    the coarsest cell size is now derived automatically from the quadtree grid data.
-- Bump `pyproject-fmt` pre-commit hook from v2.16.2 to v2.18.1.
-- `sfincs_symlinks` stage now reports when symlinks already exist instead of silently
-    showing "Created 0 … symlinks".
-- Add `jupytext` pre-commit hook (`--sync`) to keep `.ipynb` and `.py` notebook pairs in
-    sync automatically.
-- Configure `ty` type-checker to resolve third-party imports from the pixi `typecheck`
-    environment via `python` path instead of `extra-paths`.
-- Exclude `docs/examples/downloads/`, `examples/hawaii/run/`, `examples/lavaca-tx/run/`,
-    and example `cache/` directories from MkDocs static file copying to prevent
-    `No space left on device` errors from large simulation data files.
-- Update all documentation to reflect SCHISM de-containerization: new stage names
-    (`schism_forcing_prep`, `schism_sflux`, `schism_params`, `schism_boundary`,
-    `schism_prep`, `schism_postprocess`), removal of `singularity_image` config field,
-    addition of `prebuilt_dir` and `geogrid_file` fields, and removal of all
-    Singularity/container references from user-facing docs.
-- Remove `sfincs_obs` from the SFINCS stage pipeline documentation.
-- Add Hawaii SCHISM example card with correct thumbnail to the examples index page.
-- Fix jupytext `formats` config in `pyproject.toml` (trailing slash in the prefix key
-    caused a triple-slash path that resolved to the read-only root filesystem on macOS).
-- Scope the jupytext pre-commit hook to `docs/examples/notebooks/` and exclude `.ipynb`
-    files from `pretty-format-json` to prevent hook conflicts.
-- Improve writing quality and consistency across all documentation files.
-- Discharge snapping now always snaps to the nearest active cell (previously kept points
-    as-is when they happened to land on an active cell) and converts KDTree distances
-    from CRS units to meters before comparing with `max_snap_distance_m`.
-- Simplify `SfincsDischargeStage` discharge loading: remove the HydroMT `get_geodataset`
-    fallback chain and call `read_streamflow` directly. Resolves CHRTOUT files from
-    `config.paths.streamflow_dir` instead of the HydroMT data catalog.
-- **Breaking:** All SCHISM stages now run natively without Singularity containers.
-    Stages call Python functions directly instead of shelling out to bash scripts inside
-    `singularity exec`.
-- **Breaking:** SCHISM stage names renamed to `schism_*` prefix convention (matching
-    SFINCS `sfincs_*` pattern): `schism_forcing_prep`, `schism_forcing`, `schism_sflux`,
-    `schism_params`, `schism_obs`, `schism_boundary`, `schism_prep`, `schism_run`,
-    `schism_postprocess`, `schism_plot`.
-- **Breaking:** `singularity_image` config field removed from `SchismModelConfig`.
-- All environment-variable-based argument passing in SCHISM stages replaced with
-    explicit Python function parameters or CLI arguments (`--cycle-date`,
-    `--cycle-time`, `--length-hrs`, `--job-index`, `--job-count`).
-- ESMF regridding modules invoked via `mpiexec -m coastal_calibration.regridding.*` with
-    CLI arguments instead of environment variables.
-- Unified logging: all SCHISM modules use central `coastal_calibration` logger with
-    4-space indent for function-level logs under 2-space stage-level logs.
-- Tests reorganized from flat `tests/` directory into `tests/common/`, `tests/schism/`,
-    `tests/sfincs/`, `tests/regridding/` subdirectories.
-- Pixi `netcdf4` dependency pinned to MPI-aware conda-forge build variant
-    (`mpi_openmpi_*`) for parallel HDF5 support across all environments.
+- Remove duplicate domain mappings in runner.py
+- Move singularity_image to SchismModelConfig, make sif_path required, and make
+    slurm.user optional (**breaking**)
+- Fix meteo grid inflation and forcing pipeline, cutting runtime from 15h+ to \<15min
+- Use apply_all_patches() for hydromt compatibility patches
+- Derive DownloadStage description dynamically from config
+- Add logging, improve docs, and add apply_all_patches helper
+- Deduplicate SFINCS stages and fix OOM forcing write
+- Include stages that are submitted via slurm jobs in the log
+- Make submit and run identical so --start-from/--stop-after gets supported by submit.
+- Replace SCHISM-centric config with polymorphic ModelConfig ABC (**breaking**)
+- Reformat GitHub templates and project metadata files
+- **sfincs**: Inline obs-snapping thresholds, clean up imports
+- Add 2-space indentation to workflow log messages
+- Remove submit execution path and SlurmConfig
+- Remove duplicate domain mappings in runner.py
+- Move singularity_image to SchismModelConfig, make sif_path required, and make
+    slurm.user optional (**breaking**)
+- Fix meteo grid inflation and forcing pipeline, cutting runtime from 15h+ to \<15min
+- Use apply_all_patches() for hydromt compatibility patches
+- Derive DownloadStage description dynamically from config
+- Add logging, improve docs, and add apply_all_patches helper
+- Deduplicate SFINCS stages and fix OOM forcing write
+- Include stages that are submitted via slurm jobs in the log
+- Make submit and run identical so --start-from/--stop-after gets supported by submit.
+- Replace SCHISM-centric config with polymorphic ModelConfig ABC (**breaking**)
 
 ### Fixed
 
-- Clean all generated files (discharge, boundary, sflux, partitioning, outputs, status)
-    from the run directory at the start of a full workflow run via
-    `clean_run_directory()`. When resuming with `start_from`, no wipe occurs so
-    prerequisites and earlier outputs are preserved. Consolidates the per-stage cleanup
-    previously in `make_sflux()` and `PreForcingStage`.
-- Use `CONSERVE` regrid method for Grid-to-Mesh(ELEMENT) regridding in
-    `_regrid_to_schism`. ESMF `BILINEAR` only supports `MeshLoc.NODE` destinations; the
-    `BILINEAR` + `ELEMENT` combination was silently accepted by some ESMF builds (macOS)
-    but correctly rejected with `ESMC_RC_ARG_VALUE` (rc=509) on others (Ubuntu CI).
-- `_read_staout` now returns empty arrays when `staout_1` has no data (e.g., station
-    output not enabled), preventing `IndexError` on 1-dimensional array indexing.
-- `PostSCHISMStage` filters known non-fatal `QUICKSEARCH` dry-node warnings from
-    `fatal.error` instead of treating all content as a hard failure.
-- `SchismPlotStage` skips gracefully when `staout_1` is empty instead of crashing.
-- Skip ESMF regridding tests on platforms where `ESMF.Mesh` is unavailable or
-    `ESMC_FieldRegridStore` fails with rc=509. Enlarge synthetic ESMF grids to avoid
-    BILINEAR regrid failures on small domains.
-- Exclude regridding tests from CI catch-all test environments that lack MPI/ESMF.
-- Replace `assert` statements with proper exceptions (`ValueError`, `RuntimeError`,
-    `FileNotFoundError`) throughout `src/` modules.
-- Use `ty: ignore[rule-name]` with specific rule names instead of blanket `type: ignore`
-    comments.
-- Add `*.ESMF_LogFile` to `.gitignore`.
-- Configure `schism` submodule to track only HEAD (no internal changes tracked),
-    matching the SFINCS submodule pattern.
-- SFINCS activation script now detects stale `Makefile` configured for a different
-    environment prefix and reconfigures automatically, fixing `sfincs` binary not found
-    when switching between pixi environments.
-- Flood depth map generation for regular (non-quadtree) SFINCS grids: the `zsmax` index
-    lookup in `_reduce_zsmax` used C-order (row-major) flattening but
-    `SfincsGrid.get_indices_at_points` returns Fortran-order (column-major) linearized
-    indices. Changed to Fortran-order to match, fixing incorrect flood depth values on
-    regular grids.
-- `sfincs_floodmap` stage now reads `zsmax` via `SfincsModel` with `apply_all_patches()`
-    instead of `xu.open_dataset`, fixing a crash on quadtree models without refinement
-    levels (where the output lacks UGRID topology).
-- STOFS data catalog entry previously used a recursive glob (`stofs/**/*.fields.cwl.nc`)
-    that matched all cached STOFS files. When the cache held files from different STOFS
-    mesh versions with incompatible dimensions, `xarray` concatenation failed. A new
-    `_stofs_uri()` helper now builds an exact file path for the simulation's date and
-    cycle hour, avoiding multi-file collision.
-- Expand the STOFS `drop_variables` list to also drop `nvell`, `ibtype`, `nbvv`,
-    `max_nvell`, and `depth`, reducing memory for the ~12-million-node STOFS mesh.
-- `_downstream_endpoint` now compares both endpoints of NWM hydrofabric flowpath
-    linestrings and returns whichever is closest to the AOI boundary, fixing incorrect
-    discharge point placement when flowpath direction is reversed.
-- Quadtree mesh plotting (`SfincsGridInfo`) now masks fill values (-1) in face-node
-    connectivity before computing cell widths, fixing bogus level counts and distorted
-    mesh visualizations.
-- QGIS plugin: use `mActionVertexToolActiveLayer.svg` icon for the Edit Polygon toolbar
-    button (previously used the removed `mActionNodeTool.svg`).
-- NWM data catalog globs (`*.LDASIN_DOMAIN1.nc`, `*.CHRTOUT_DOMAIN1.nc`) now include the
-    simulation year-month prefix (e.g., `202506*.LDASIN_DOMAIN1.nc`). Previously, stale
-    files from other runs or domains in the shared download directory were loaded,
-    causing `xr.open_mfdataset` to fail with "non-monotonic global indexes along
-    dimension x" when combining grids of different sizes (e.g., Hawaii 390×590 vs CONUS
-    3840×4608).
-- `clip_and_reproject` now sorts spatial coordinates after the `nearest_index` reproject
-    step, preventing "non-monotonic global indexes" errors from floating-point drift in
-    reprojected coordinates.
-- `_read_from_chrtout` in `utils/streamflow.py` now handles CHRTOUT files with 2D
-    `streamflow(time, feature_id)` arrays by squeezing the time dimension, fixing
-    compatibility with test fixtures that write multi-dimensional streamflow data.
+- Address mkdocs warnings
+- Address issues raised by PR reviewer
+- Replace fragile conda hook/activate with direct PATH exports in submit script
+- Add the missing env vars to the submit path and remove dead exports
+- Add conda related paths to the run workflow
+- Export SCHISM_BEGIN_DATE and SCHISM_END_DATE in submit path
+- Truncate discharge arrays to match precip timesteps in merge_source_sink
+- Copy setup_tpxo.txt and Model_tpxo10_atlas from $SCRIPTS_DIR
+- Export date-component env vars in submit path header
+- Add set -e to all bash scripts to propagate errors
+- Export COASTAL_SCRIPTS_DIR and related vars in submit path
+- Source inner scripts from $SCRIPTS_DIR instead of ./
+- Correct shebangs in pre/post_regrid_stofs.bash
+- Compute LENGTH_HRS directly instead of parsing container stdout
+- Use srun instead of mpiexec for MPI stages inside SLURM allocations
+- Avoid pipe deadlock in container commands by draining output via Popen
+- Use NSCRIBES from env with fallback instead of hardcoding
+- Add missing sub-hourly CHRTOUT symlinks for hawaii in last timestep
+- Use numeric comparison (-gt) instead of string comparison (>) for LENGTH_HRS
+- Use integer division for netCDF array index in FECPP app
+- Correct malformed shebangs in forcing bash scripts
+- Add missing $ in ${PDY} variable expansion for log filename
+- Use $COASTAL_DOMAIN instead of hardcoded prvi in TPXO input path
+- Add the mpi/fabric tuning parameters to run
+- Suppress all esmf logs except for errors
+- Set HDF5_USE_FILE_LOCKING to avoid netcdf write issue on nsf mounted locations
+- Add the missing mpi_tasks for the run workflow for schism
+- Shift the start date for hawaii by 1d to avoid the missing file
+- Use the correct wl adjustment obtained from noaa vdatum
+- Get user from env when not provided in config
+- Call end_workflow before returning early in no-wait mode
+- Call expanduser() before resolve() on all path config fields
+- Nwm_retro need to use the same preprocessor as nwm_ana
+- Explicitly set the boundary format to the new nc
+- Explicitly set the boundary format to the new nc
+- Explicitly set the boundary format to the new nc
+- Address the time pasing issue for tpxo
+- Use the correct path to tpxo data for sfincs since it runs the data processing on
+    login node
+- Use the correct package name for click
+- Add a preprocessor to avoid the regular grid issue
+- Use 4326 for stofs data and drop adcirc related vars
+- Replace the code object so pydantic picks it up
+- Monkey patch hydromt's \_serialize_crs for cases where crs is proj without authority
+- Add crs info for all supported data sources by @cheginit
+- Add the missing cd step for submit for sfincs models
+- When submit was used for a sfincs model, the container download step was not run
+- Pass the package name so version is identified correctly
+- For the prvi domain prefer nwm_ana over nwm_retro due to a known schism issue with
+    retro
+- Exclude noaa stations where datum is not available.
+- Add the divider line only in the end_stage.
+- Patch the nspool_sta value to be a multiple 18 for all cases.
+- Use the correct path for hgrid.gr3 when querying noaa gages.
+- Modify the stage ordering so noaa query occurs after hgrid file is available.
+- For nwm_ana use the nwm_retro naing convention to avoid the overwrite issue for
+    multiple days.
+- Let hydromt handle the projection detection
+- Let hydromt handle the projection detection
+- Use the symlink workaround only for nwm_retro.
+- Get the observed data in msl.
+- Use point_zs for comparing water levels.
+- Query coops with msl.
+- Set dev as the default when no release exists.
+- Resolve the relative paths provided in config prior to using them.
+- Fix the order of setting log level to avoid suppressing them.
+- Do not write wind entry into the config if it doesn't exists.
+- Use a more robust approach for determining corrupt download files and redirect all
+    sfincs logs to a file.
+- For large files the default 600s timeout for download is not enough for stofs and a
+    size validation is needed.
+- For now pin pyproject formatter for 2.12 since the new version messes up the pixi
+    blocks.
+- Add a logic for cold-start models to set a ram up time to avoid the boundary issues.
+- Remove the duplicate key.
+- Use soft wrap to avoid the log msg dangling issues.
+- Adjust the start date to 2021 for hawaii since we need sub-hourly data.
+- Use a more robust approach for find the stofs path when an old file still exists.
+- Include the date for stofs in the download path since when the start date is changed
+    using skip would have caused using a stale stofs file.
+- Fix the dates for nwm_ana. There were changes in the file names at certain periods.
+- **sfincs**: Avoid RuntimeWarning from NaN-to-int cast in face node indexing
+- Rename the data module since data folder is in gitignore
+- **noaa-dem**: Reduce statement count and branches in noaa_dem.py
+- **compat**: Patch quadtree subgrid setter and \_parse_river_list crash
+- Use non-interactive matplotlib backend in SchismPlotStage
+- Deduplicate observation points by spatial proximity
+- Resolve all ty type-checker diagnostics
+- Address mkdocs warnings
+- Address issues raised by PR reviewer
+- Replace fragile conda hook/activate with direct PATH exports in submit script
+- Add the missing env vars to the submit path and remove dead exports
+- Add conda related paths to the run workflow
+- Export SCHISM_BEGIN_DATE and SCHISM_END_DATE in submit path
+- Truncate discharge arrays to match precip timesteps in merge_source_sink
+- Copy setup_tpxo.txt and Model_tpxo10_atlas from $SCRIPTS_DIR
+- Export date-component env vars in submit path header
+- Add set -e to all bash scripts to propagate errors
+- Export COASTAL_SCRIPTS_DIR and related vars in submit path
+- Source inner scripts from $SCRIPTS_DIR instead of ./
+- Correct shebangs in pre/post_regrid_stofs.bash
+- Compute LENGTH_HRS directly instead of parsing container stdout
+- Use srun instead of mpiexec for MPI stages inside SLURM allocations
+- Avoid pipe deadlock in container commands by draining output via Popen
+- Use NSCRIBES from env with fallback instead of hardcoding
+- Add missing sub-hourly CHRTOUT symlinks for hawaii in last timestep
+- Use numeric comparison (-gt) instead of string comparison (>) for LENGTH_HRS
+- Use integer division for netCDF array index in FECPP app
+- Correct malformed shebangs in forcing bash scripts
+- Add missing $ in ${PDY} variable expansion for log filename
+- Use $COASTAL_DOMAIN instead of hardcoded prvi in TPXO input path
+- Add the mpi/fabric tuning parameters to run
+- Suppress all esmf logs except for errors
+- Set HDF5_USE_FILE_LOCKING to avoid netcdf write issue on nsf mounted locations
+- Add the missing mpi_tasks for the run workflow for schism
+- Shift the start date for hawaii by 1d to avoid the missing file
+- Use the correct wl adjustment obtained from noaa vdatum
+- Get user from env when not provided in config
+- Call end_workflow before returning early in no-wait mode
+- Call expanduser() before resolve() on all path config fields
+- Nwm_retro need to use the same preprocessor as nwm_ana
+- Explicitly set the boundary format to the new nc
+- Explicitly set the boundary format to the new nc
+- Explicitly set the boundary format to the new nc
+- Address the time pasing issue for tpxo
+- Use the correct path to tpxo data for sfincs since it runs the data processing on
+    login node
+- Use the correct package name for click
+- Add a preprocessor to avoid the regular grid issue
+- Use 4326 for stofs data and drop adcirc related vars
+- Replace the code object so pydantic picks it up
+- Monkey patch hydromt's \_serialize_crs for cases where crs is proj without authority
+- Add crs info for all supported data sources by @cheginit
+- Add the missing cd step for submit for sfincs models
+- When submit was used for a sfincs model, the container download step was not run
+- Pass the package name so version is identified correctly
+- For the prvi domain prefer nwm_ana over nwm_retro due to a known schism issue with
+    retro
+- Exclude noaa stations where datum is not available.
+- Add the divider line only in the end_stage.
+- Patch the nspool_sta value to be a multiple 18 for all cases.
+- Use the correct path for hgrid.gr3 when querying noaa gages.
+- Modify the stage ordering so noaa query occurs after hgrid file is available.
+- For nwm_ana use the nwm_retro naing convention to avoid the overwrite issue for
+    multiple days.
+- Let hydromt handle the projection detection
+- Let hydromt handle the projection detection
+- Use the symlink workaround only for nwm_retro.
+- Get the observed data in msl.
+- Use point_zs for comparing water levels.
+- Query coops with msl.
+- Set dev as the default when no release exists.
+- Resolve the relative paths provided in config prior to using them.
+- Fix the order of setting log level to avoid suppressing them.
+- Do not write wind entry into the config if it doesn't exists.
+- Use a more robust approach for determining corrupt download files and redirect all
+    sfincs logs to a file.
+- For large files the default 600s timeout for download is not enough for stofs and a
+    size validation is needed.
+- For now pin pyproject formatter for 2.12 since the new version messes up the pixi
+    blocks.
+- Add a logic for cold-start models to set a ram up time to avoid the boundary issues.
+- Remove the duplicate key.
+- Use soft wrap to avoid the log msg dangling issues.
+- Adjust the start date to 2021 for hawaii since we need sub-hourly data.
+- Use a more robust approach for find the stofs path when an old file still exists.
+- Include the date for stofs in the download path since when the start date is changed
+    using skip would have caused using a stale stofs file.
+- Fix the dates for nwm_ana. There were changes in the file names at certain periods.
 
-### Removed
+### New Contributors
 
-- `scripts_path.py` module. All script paths now resolved via Python imports.
-- `src/coastal_calibration/scripts/` directory. Legacy bash and Python scripts moved to
-    `tests/legacy_scripts/` as reference implementations for regression testing.
-- `run_singularity_command()` and `_get_default_bindings()` from `stages/base.py`.
-    Singularity execution infrastructure fully removed.
-- `requires_container` class attribute from `WorkflowStage`. All stages now run
-    natively.
-- `Dockerfile.ngencoastal`. Container build file no longer needed.
-- All `run_sing_*.bash` Singularity wrapper scripts.
-- `MPIConfig` class (fields absorbed into `SchismModelConfig`).
-
-## [3.1.1.0.0] - 2026-02-19
-
-### Added
-
-- Initial release of NWM Coastal
-- SCHISM coastal model workflow support
-- YAML configuration with variable interpolation
-- Configuration inheritance with `_base` field
-- CLI commands: `init`, `validate`, `submit`, `run`, `stages`
-- Python API for programmatic workflow control
-- Automatic data download from NWM and STOFS sources
-- Support for TPXO and STOFS boundary conditions
-- Support for four coastal domains: Hawaii, PRVI, Atlantic/Gulf, Pacific
-- Interactive and non-interactive job submission modes
-- Partial workflow execution with `--start-from` and `--stop-after`
-- Smart default paths with interpolation templates
-- Comprehensive configuration validation
-- MkDocs documentation with Material theme
-- Per-stage completion tracking in the `submit` path's generated runner script: each
-    container stage is recorded in `.pipeline_status.json` as it finishes, enabling
-    mid-pipeline restarts after a SLURM job failure without re-running expensive stages
-    (e.g., `predict_tide`). On resubmit, completed stages are automatically skipped.
-- `meteo_res` option in `SfincsModelConfig` to control the output resolution (m) of
-    gridded meteorological forcing (precipitation, wind, pressure). When not set, the
-    resolution is derived from the SFINCS quadtree grid base cell size.
-- Meteo grid clipping (`_clip_meteo_to_domain`) that trims reprojected meteo grids to
-    the model domain extent, preventing the LCC → UTM reprojection from inflating grids
-    to CONUS scale, **reducing SFINCS runtime from 15 h+ to under 15 min**.
-- Stale netCDF file cleanup in `SfincsInitStage` to prevent HDF5 segfaults when
-    re-running a pipeline over an existing model directory.
-- `GeoDataset`-based water-level forcing with IDW interpolation to boundary points,
-    replacing the built-in `model.water_level.create(geodataset=...)` which passed all
-    source stations incompatibly with `.bnd` files.
-- Active-cell filtering for discharge source points to prevent a SFINCS Fortran segfault
-    when a source point falls on an inactive grid cell.
-- `apply_all_patches()` convenience function in `_hydromt_compat` that applies all
-    `hydromt`/`hydromt-sfincs` compatibility patches in one call, with logging.
-- `quiet` parameter on `WorkflowMonitor.mark_stage_completed()` to control whether a
-    visible COMPLETED log line is emitted for externally-executed stages.
-- Unified `run` and `submit` execution pipelines. Both commands now execute the same
-    stage pipeline. `submit` automatically partitions stages into login-node
-    (Python-only) and SLURM job (container) groups.
-- `--start-from` and `--stop-after` options for `submit` command, matching `run`
-- `requires_container` class attribute on `WorkflowStage` for automatic stage
-    classification (Python-only vs container)
-- `schism_obs` stage: automatic NOAA CO-OPS water level station discovery via concave
-    hull of open boundary nodes, writing `station.in` and `station_noaa_ids.txt`
-- `schism_plot` stage: post-run comparison plots of simulated vs NOAA-observed water
-    levels with MLLW→MSL datum conversion
-- `COOPSAPIClient` for querying the NOAA CO-OPS API (station metadata, water levels,
-    datums) with local caching of station metadata
-- `include_noaa_gages` option in `SchismModelConfig` (defaults to `false`) that enables
-    the `schism_obs` and `schism_plot` stages
-- Automatic `param.nml` patching (`iout_sta = 1`, `nspool_sta = 18`) when `station.in`
-    exists, ensuring `mod(nhot_write, nspool_sta) == 0` across all domain templates
-- `forcing_to_mesh_offset_m` option in `SfincsModelConfig` to apply a vertical offset to
-    boundary-condition water levels before they enter SFINCS. For tidal-only sources
-    like TPXO, this anchors the tidal signal to the correct geodetic height of MSL on
-    the mesh.
-- `vdatum_mesh_to_msl_m` option in `SfincsModelConfig` to convert SFINCS output from the
-    mesh vertical datum to MSL for comparison with NOAA CO-OPS observations.
-- Sanity-check warning in `sfincs_forcing` when adjusted boundary water levels fall
-    outside the ±15 m range, indicating a possible sign or magnitude error in
-    `forcing_to_mesh_offset_m`.
-- `sfincs_wind`, `sfincs_pressure`, and `sfincs_plot` stages to SFINCS workflow
-- SFINCS coastal model workflow with full pipeline (download through `sfincs_run`)
-- Polymorphic `ModelConfig` ABC with `SchismModelConfig` and `SfincsModelConfig`
-    concrete implementations
-- `MODEL_REGISTRY` for automatic model dispatch from YAML `model:` key
-- `--model` option for `init` and `stages` CLI commands
-- Model-specific compute parameters (SCHISM: multi-node MPI; SFINCS: single-node OpenMP)
-- `${model}` variable in default path templates for model-aware directory naming
-
-### Changed
-
-- `DownloadStage.description` is now a property that derives its text from the
-    configured data sources (e.g. "Download input data (NWM, TPXO)") instead of a static
-    string.
-- `hydromt` compatibility patches consolidated into `apply_all_patches()` with per-patch
-    logging; individual imports replaced by a single call.
-- `CoastalCalibConfig` now takes `model_config: ModelConfig` instead of separate
-    `model`, `mpi`, and `sfincs` parameters
-- `SlurmConfig` now contains only scheduling parameters (`job_name`, `partition`,
-    `time_limit`, `account`, `qos`, `user`); compute resources (`nodes`,
-    `ntasks_per_node`, `exclusive`) moved to `SchismModelConfig`
-- Default path templates use `${model}_` prefix instead of hardcoded `schism_`
-- Stage order and stage creation delegated to `ModelConfig` subclasses
-- SFINCS datum handling split into two separate offsets: the former single
-    `navd88_to_msl_m` field is replaced by `forcing_to_mesh_offset_m` (applied to
-    boundary forcing before simulation) and `vdatum_mesh_to_msl_m` (applied to model
-    output for observation comparison). The two offsets serve fundamentally different
-    purposes and may have different values depending on the boundary source.
-- SFINCS field renames: `model_dir` -> `prebuilt_dir`, `obs_points` ->
-    `observation_points`, `obs_merge` -> `merge_observations`, `src_locations` ->
-    `discharge_locations_file`, `src_merge` -> `merge_discharge`
-
-### Fixed
-
-- Call `expanduser()` before `resolve()` on all path config fields so that paths
-    containing `~` are correctly expanded to the user's home directory.
-- Call `monitor.end_workflow()` before returning early in no-wait mode (`submit` with
-    `wait=False`), so that the workflow timing summary is always closed.
-- Set `HDF5_USE_FILE_LOCKING=FALSE` in container environment to prevent
-    `PermissionError` on NFS-mounted filesystems.
-- Add conda environment paths (`PATH`, `LD_LIBRARY_PATH`) to the `run` path's
-    `build_environment()` so that `mpiexec` and MPI shared libraries from the conda
-    environment are found, matching the environment set up by the generated `submit`
-    scripts. Without these paths, the `run` path could not locate `mpiexec`, causing MPI
-    stages to hang or fail.
-- Add MPI/EFA fabric tuning variables (`MPICH_OFI_STARTUP_CONNECT`,
-    `FI_OFI_RXM_SAR_LIMIT`, etc.) to the `run` path's SCHISM environment, matching the
-    `submit` path and preventing hangs on AWS `c5n` nodes.
-- Suppress ESMF diagnostic output from SLURM logs by redirecting stdout to `/dev/null`
-    for MPI stages and setting `ESMF.Manager(debug=False)`.
-- Redirect container stdout/stderr to temporary files instead of pipes to prevent
-    pipe-buffer deadlocks with MPI process trees (`mpiexec` → `singularity`), where
-    inherited pipe file-descriptors in child processes can fill the OS pipe buffer (64
-    KB on Linux) and deadlock the entire tree.
-- Use `$COASTAL_DOMAIN` instead of hardcoded `prvi` in `make_tpxo_ocean.bash` so the
-    correct open-boundary mesh is used for all domains.
-- Add missing `$` in `${PDY}` variable expansion in `post_regrid_stofs.bash` log
-    filename.
-- Correct malformed shebangs (`#/usr/bin/evn`) in `pre_nwm_forcing_coastal.bash` and
-    `post_nwm_forcing_coastal.bash`.
-- Use integer division (`//`) for the netCDF array index in `WrfHydroFECPP/fecpp/app.py`
-    to avoid `float` index errors.
-- Use numeric comparison (`-gt`) instead of string comparison (`>`) for `LENGTH_HRS` in
-    `update_param.bash`.
-- Add missing sub-hourly `CHRTOUT` symlinks for Hawaii in the last-timestep block of
-    `initial_discharge.bash`.
-- Read `NSCRIBES` from the environment with a fallback default instead of hardcoding it
-    in `pre_schism.bash` and `run_sing_coastal_workflow_post_schism.bash`.
-- Compute `LENGTH_HRS` in `STOFSBoundaryStage` directly instead of parsing stdout from
-    the pre-script, which was silently lost after the `Popen.communicate()` fix
-    redirected stdout to `/dev/null`.
-- Remove duplicate domain-to-inland/geogrid mappings in `runner.py` and use the
-    canonical properties from `SimulationConfig` to prevent the two copies from drifting
-    out of sync.
-- Correct shebangs (`#!/usr/bin/bash` → `#!/usr/bin/env bash`) in
-    `pre_regrid_stofs.bash` and `post_regrid_stofs.bash` for consistency and
-    portability.
-- Source inner bash scripts from `$SCRIPTS_DIR` instead of `./` in all wrapper scripts,
-    so that the bind-mounted (package) versions are used rather than the stale copies
-    baked into the container image.
-- Export `COASTAL_SCRIPTS_DIR`, `WRF_HYDRO_DIR`, `TPXO_SCRIPTS_DIR`, and
-    `FORCINGS_SCRIPTS_DIR` in the `submit` path's generated runner script. These
-    variables were only set in the `run` path, causing
-    `$COASTAL_SCRIPTS_DIR/makeAtmo.py` (and similar) to resolve to just `/makeAtmo.py`
-    and fail silently.
-- Export date-component variables (`FORCING_START_YEAR`, `FORCING_START_MONTH`,
-    `FORCING_START_DAY`, `FORCING_START_HOUR`, `PDY`, `cyc`, `FORCING_BEGIN_DATE`,
-    `FORCING_END_DATE`, `END_DATETIME`) in the `submit` path header so that
-    `makeAtmo.py`, `makeDischarge.py`, and other Python scripts inside the container
-    have access to them across all stages.
-- Add `set -e` to all inner bash scripts (`post_nwm_forcing_coastal.bash`,
-    `initial_discharge.bash`, `merge_source_sink.bash`, `combine_sink_source.bash`,
-    `pre_nwm_forcing_coastal.bash`, `post_regrid_stofs.bash`, `pre_regrid_stofs.bash`,
-    `make_tpxo_ocean.bash`, `pre_schism.bash`, `post_schism.bash`, `update_param.bash`)
-    so that command failures (e.g., `python` file-not-found or import errors) propagate
-    instead of being silently swallowed.
-- Correct shebang in `make_tpxo_ocean.bash` and `pre_schism.bash` (`#!/usr/bin/bash` →
-    `#!/usr/bin/env bash`).
-- Copy `setup_tpxo.txt` and `Model_tpxo10_atlas` from `$SCRIPTS_DIR` instead of `./` in
-    `make_tpxo_ocean.bash`, so the bind-mounted (package) versions are used rather than
-    stale copies baked into the container image.
-- Truncate discharge arrays in `merge_source_sink.py` to match the precipitation
-    timestep count from `precip_source.nc`, preventing a shape-mismatch `ValueError`
-    when sub-hourly `CHRTOUT` files (e.g., Hawaii) produce one extra trailing timestep.
-- Export `SCHISM_BEGIN_DATE` and `SCHISM_END_DATE` in the `submit` path header so that
-    `update_param.bash` can patch `param.nml` with the correct simulation start/end
-    dates. Without these, `param.nml` retains its template defaults (2000-01-01) and
-    SCHISM aborts with a time mismatch against `sflux` forcing files.
-- Report accurately which container stages completed vs failed when a SLURM job ends
-    with a non-zero exit status, instead of marking all container stages as failed.
-
-### Removed
-
-- `MPIConfig` class (fields absorbed into `SchismModelConfig`)
-
-[3.1.1.0.0]: https://github.com/NGWPC/nwm-coastal/releases/tag/3.1.1.0.0
-[unreleased]: https://github.com/NGWPC/nwm-coastal/compare/3.1.1.0.0...HEAD
+- @cheginit made their first contribution
+- @cmaynard-ngwpc made their first contribution
+- @jduckerOWP made their first contribution
+- @christophertubbs made their first contribution \[unreleased\]:
+    <https://github.com/NGWPC/nwm-coastal/compare/3.1.1.0.0...HEAD> \[3.1.1.0.0\]:
+    <https://github.com/NGWPC/nwm-coastal/releases/tag/3.1.1.0.0>
