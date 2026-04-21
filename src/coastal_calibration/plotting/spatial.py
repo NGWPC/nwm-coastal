@@ -506,6 +506,13 @@ def plot_water_level(
     ValueError
         If no water-level variable can be auto-detected or the mesh type
         is unknown.
+
+    Notes
+    -----
+    When *ax* is *None* a new figure is created and the caller owns it —
+    remember to ``plt.close(ax.get_figure())`` when looping over many
+    frames outside a notebook, otherwise matplotlib accumulates figures
+    and memory grows unbounded.
     """
     import matplotlib.pyplot as plt
 

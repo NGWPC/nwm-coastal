@@ -73,22 +73,6 @@ def _read_station_lonlat(work_dir: Path) -> pd.DataFrame | None:
     return pd.DataFrame({"id": ids, "lon": lons, "lat": lats})
 
 
-def _combine_obs_points(user: pd.DataFrame | None, noaa: pd.DataFrame | None) -> pd.DataFrame:
-    """Concat user- and NOAA-supplied obs points; raise on id collision."""
-    frames = [df for df in (user, noaa) if df is not None and not df.empty]
-    if not frames:
-        return pd.DataFrame(columns=["id", "lon", "lat"])
-    combined = pd.concat(frames, ignore_index=True)
-    if combined["id"].duplicated().any():
-        dupes = combined.loc[combined["id"].duplicated(keep=False), "id"].unique().tolist()
-        msg = (
-            "Duplicate obs-point ids detected between user CSV and NOAA gauges: "
-            f"{sorted(dupes)}. Rename or remove the colliding user ids."
-        )
-        raise ValueError(msg)
-    return combined
-
-
 def _read_staout(staout_path: Path) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     """Read SCHISM station output file (staout_1).
 
@@ -799,6 +783,7 @@ class SchismPlotStage(WorkflowStage):
     def _run_obs_points(self, work_dir: Path) -> dict[str, Any]:
         """Extract water level at user and NOAA obs points; write parquet."""
         from coastal_calibration.observations import (
+            combine_obs_points,
             extract_water_level_series,
             load_obs_points,
             validate_points_in_domain,
@@ -819,7 +804,7 @@ class SchismPlotStage(WorkflowStage):
         if noaa_points is not None:
             self._log(f"Including {len(noaa_points)} NOAA gauge(s) from station.in")
 
-        all_points = _combine_obs_points(user_points, noaa_points)
+        all_points = combine_obs_points(user_points, noaa_points)
         if all_points.empty:
             self._log("No obs points to extract (neither user CSV nor NOAA gauges active)")
             return {"status": "skipped", "reason": "no points"}

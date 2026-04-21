@@ -35,6 +35,7 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
 __all__ = [
+    "combine_obs_points",
     "extract_water_level_series",
     "load_obs_points",
     "validate_points_in_domain",
@@ -43,6 +44,55 @@ __all__ = [
 
 #: Canonical column names required in the user-supplied CSV.
 _REQUIRED_COLS: tuple[str, ...] = ("id", "lon", "lat")
+
+
+def _is_wgs84(crs: str | None) -> bool:
+    """Return True if *crs* is missing or names WGS84 (EPSG:4326).
+
+    Handles case and whitespace variants (``"epsg:4326"``, ``"EPSG: 4326"``).
+    A ``None`` CRS is treated as WGS84 — callers that can't identify the
+    model CRS default to the lon/lat assumption used everywhere else in
+    the package.
+    """
+    if crs is None:
+        return True
+    return crs.upper().replace(" ", "") == "EPSG:4326"
+
+
+def combine_obs_points(user: pd.DataFrame | None, noaa: pd.DataFrame | None) -> pd.DataFrame:
+    """Concat user- and NOAA-supplied obs-point frames; raise on id collision.
+
+    Parameters
+    ----------
+    user, noaa : pandas.DataFrame or None
+        Frames with at minimum ``id``, ``lon``, ``lat`` columns. Either
+        can be ``None`` or empty.
+
+    Returns
+    -------
+    pandas.DataFrame
+        The row-wise concat, with the same three columns. When both
+        inputs are empty / ``None``, returns an empty frame with the
+        canonical schema.
+
+    Raises
+    ------
+    ValueError
+        If both frames contribute the same ``id``, so downstream
+        time-series columns wouldn't be uniquely identifiable.
+    """
+    frames = [df for df in (user, noaa) if df is not None and not df.empty]
+    if not frames:
+        return pd.DataFrame(columns=list(_REQUIRED_COLS))
+    combined = pd.concat(frames, ignore_index=True)
+    if combined["id"].duplicated().any():
+        dupes = combined.loc[combined["id"].duplicated(keep=False), "id"].unique().tolist()
+        msg = (
+            "Duplicate obs-point ids detected between user CSV and NOAA gauges: "
+            f"{sorted(dupes)}. Rename or remove the colliding user ids."
+        )
+        raise ValueError(msg)
+    return combined
 
 
 def load_obs_points(path: str | Path) -> pd.DataFrame:
@@ -118,7 +168,7 @@ def _domain_bbox_wgs84(ds: xr.Dataset) -> shapely.Polygon:
         y = np.asarray(ds["node_y"].to_numpy(), dtype=np.float64)
 
     crs = ds.attrs.get("crs")
-    if crs and crs.upper().replace(" ", "") != "EPSG:4326":
+    if not _is_wgs84(crs):
         from pyproj import Transformer
 
         t = Transformer.from_crs(crs, "EPSG:4326", always_xy=True)
@@ -200,7 +250,7 @@ def _query_points_in_model_crs(
     lon = points["lon"].to_numpy(dtype=np.float64)
     lat = points["lat"].to_numpy(dtype=np.float64)
     crs = ds.attrs.get("crs")
-    if crs and crs.upper().replace(" ", "") != "EPSG:4326":
+    if not _is_wgs84(crs):
         from pyproj import Transformer
 
         t = Transformer.from_crs("EPSG:4326", crs, always_xy=True)
@@ -327,6 +377,16 @@ def extract_water_level_series(
         point (named by its ``id``). Values are water-surface elevation
         (metres, MSL) interpolated by nearest-cell lookup in the model
         mesh.
+
+    Notes
+    -----
+    The unstructured-mesh lookup is brute-force — one ``argmin`` scan
+    of all mesh nodes/faces per observation point, implemented in
+    Python. This is intentional (avoids a SciPy runtime dep and keeps
+    peak memory bounded), but it scales as ``O(n_cells * n_points)``.
+    Up to a few hundred obs points against a multi-million-node mesh
+    stays well under a second; past that, pre-build a spatial index at
+    the caller instead of calling this function inside a loop.
     """
     if variable is None:
         variable = _auto_variable(ds)

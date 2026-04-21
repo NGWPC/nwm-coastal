@@ -253,9 +253,13 @@ def animate_water_level(
     ds_for_limits = _apply_wet_mask(ds, variable, dry_threshold) if mask_dry else ds
     vmin_r, vmax_r = _resolve_limits(ds_for_limits, variable, vmin, vmax)
 
-    time_indices = np.arange(0, ds.sizes["time"], max(1, int(time_stride)), dtype=np.int64)
+    stride = int(time_stride)
+    if stride < 1:
+        msg = f"time_stride must be >= 1 (got {time_stride})"
+        raise ValueError(msg)
+    time_indices = np.arange(0, ds.sizes["time"], stride, dtype=np.int64)
     if time_indices.size == 0:
-        msg = "No frames to animate — time dimension is empty after applying time_stride."
+        msg = "No frames to animate — time dimension is empty."
         raise ValueError(msg)
 
     fig, ax = plt.subplots(figsize=figsize)

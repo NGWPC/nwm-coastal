@@ -144,21 +144,9 @@ def plot_station_comparison(
     ``tab10`` colormap (cycling at 10 runs); markers cycle through a
     10-shape palette independently.
     """
-    import sys
-
-    import matplotlib
-
-    if "ipykernel" not in sys.modules:
-        matplotlib.use("Agg")
-
-    import matplotlib.pyplot as plt
-
     if len(runs) == 0:
         msg = "plot_station_comparison: `runs` is empty."
         raise ValueError(msg)
-
-    figs_dir = Path(figs_dir)
-    figs_dir.mkdir(parents=True, exist_ok=True)
 
     runs_dict = dict(runs)
     n_stations = len(station_ids)
@@ -174,6 +162,18 @@ def plot_station_comparison(
             f"Offending runs: {', '.join(bad_shapes)}"
         )
         raise ValueError(msg)
+
+    import sys
+
+    import matplotlib
+
+    if "ipykernel" not in sys.modules:
+        matplotlib.use("Agg")
+
+    import matplotlib.pyplot as plt
+
+    figs_dir = Path(figs_dir)
+    figs_dir.mkdir(parents=True, exist_ok=True)
 
     stations = _plotable_stations(station_ids, runs_dict, obs_ds)
     if not stations:

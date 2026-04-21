@@ -124,6 +124,7 @@ def _read_obs_station_map_wgs84(model_root: Path) -> pd.DataFrame | None:
         return None
 
     # Best effort source-CRS: pull from sfincs.inp or sfincs.nc beside this file.
+    from coastal_calibration.observations import _is_wgs84  # pyright: ignore[reportPrivateUsage]
     from coastal_calibration.sfincs.outputs import (
         _detect_crs,  # pyright: ignore[reportPrivateUsage]  -- shared intra-package helper
     )
@@ -133,28 +134,12 @@ def _read_obs_station_map_wgs84(model_root: Path) -> pd.DataFrame | None:
     ys = np.array([e["y"] for e in entries], dtype=np.float64)
     ids = [str(e["station_id"]) for e in entries]
 
-    if src_crs and src_crs.upper().replace(" ", "") != "EPSG:4326":
+    if not _is_wgs84(src_crs):
         t = Transformer.from_crs(src_crs, "EPSG:4326", always_xy=True)
         lon, lat = t.transform(xs, ys)
     else:
         lon, lat = xs, ys
     return pd.DataFrame({"id": ids, "lon": lon, "lat": lat})
-
-
-def _combine_obs_points(user: pd.DataFrame | None, noaa: pd.DataFrame | None) -> pd.DataFrame:
-    """Concat user- and NOAA-supplied obs points; raise on id collision."""
-    frames = [df for df in (user, noaa) if df is not None and not df.empty]
-    if not frames:
-        return pd.DataFrame(columns=["id", "lon", "lat"])
-    combined = pd.concat(frames, ignore_index=True)
-    if combined["id"].duplicated().any():
-        dupes = combined.loc[combined["id"].duplicated(keep=False), "id"].unique().tolist()
-        msg = (
-            "Duplicate obs-point ids detected between user CSV and NOAA gauges: "
-            f"{sorted(dupes)}. Rename or remove the colliding user ids."
-        )
-        raise ValueError(msg)
-    return combined
 
 
 def _get_model(config: CoastalCalibConfig) -> SfincsModel:
@@ -2171,6 +2156,7 @@ class SfincsPlotStage(_SfincsStageBase):
     def _run_obs_points(self, model_root: Path) -> dict[str, Any]:
         """Extract water level at user and NOAA obs points; write parquet."""
         from coastal_calibration.observations import (
+            combine_obs_points,
             extract_water_level_series,
             load_obs_points,
             validate_points_in_domain,
@@ -2191,7 +2177,7 @@ class SfincsPlotStage(_SfincsStageBase):
         if noaa_points is not None:
             self._log(f"Including {len(noaa_points)} NOAA gauge(s) from obs_station_map.json")
 
-        all_points = _combine_obs_points(user_points, noaa_points)
+        all_points = combine_obs_points(user_points, noaa_points)
         if all_points.empty:
             self._log("No obs points to extract (neither user CSV nor NOAA map present)")
             return {"status": "skipped", "reason": "no points"}
