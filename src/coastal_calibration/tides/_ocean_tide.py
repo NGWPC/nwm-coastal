@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from pathlib import Path
 
-import netCDF4 as nc  # noqa: N813
+import netCDF4
 import numpy as np
 from scipy.interpolate import griddata
 
@@ -61,7 +61,7 @@ def _generate_tidal_levels(  # noqa: PLR0915
 
     x = y = i = None  # populated on first constituent file
     for col, file in enumerate(consfiles):
-        data = nc.Dataset(file, "r")
+        data = netCDF4.Dataset(file, "r")
         if col == 0:
             x = data.variables["lon"][:]
             y = data.variables["lat"][:]
@@ -110,7 +110,7 @@ def _generate_tidal_levels(  # noqa: PLR0915
         wl[:, i] = tide.at(pred_times) / 100.0
 
     mode = "a" if Path(output_file).exists() else "w"
-    ncout = nc.Dataset(output_file, mode, format="NETCDF4")
+    ncout = netCDF4.Dataset(output_file, mode, format="NETCDF4")
 
     if mode == "w":
         ncout.createDimension("time", None)

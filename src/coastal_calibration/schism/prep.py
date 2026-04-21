@@ -16,7 +16,7 @@ import subprocess
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-import netCDF4 as nc  # noqa: N813
+import netCDF4
 import numpy as np
 
 from coastal_calibration.logging import logger
@@ -350,7 +350,7 @@ def merge_source_sink(  # noqa: PLR0915
     so1 = so1[:, 1:]
 
     # Read precipitation source
-    precip = nc.Dataset(str(work_dir / "precip_source.nc"), "r")
+    precip = netCDF4.Dataset(str(work_dir / "precip_source.nc"), "r")
     so2 = precip.variables["vsource"][:]
 
     # Truncate discharge arrays to match precipitation time dimension
@@ -374,7 +374,7 @@ def merge_source_sink(  # noqa: PLR0915
 
     # Write source.nc
     out_path = work_dir / "source.nc"
-    ncout = nc.Dataset(str(out_path), "w", format="NETCDF4")
+    ncout = netCDF4.Dataset(str(out_path), "w", format="NETCDF4")
     ncout.set_fill_off()
 
     ncout.createDimension("time_vsource", len(time))
@@ -780,7 +780,7 @@ def correct_elevation(
         row count is validated against this value before applying the
         correction.
     """
-    import netCDF4 as nc  # noqa: N813
+    import netCDF4
     import numpy as np
 
     elev_correct = np.loadtxt(str(correction_file), delimiter=",", skiprows=1, usecols=5)
@@ -791,7 +791,7 @@ def correct_elevation(
             f"has {n_open_boundary_nodes} open boundary nodes"
         )
 
-    with nc.Dataset(elev_file, "r+") as ds:
+    with netCDF4.Dataset(elev_file, "r+") as ds:
         elev_var = ds["time_series"]
         for t in range(elev_var.shape[0]):
             elev_var[t] = elev_var[t].ravel() - elev_correct

@@ -28,8 +28,8 @@ import math
 from pathlib import Path
 
 import esmpy as ESMF
+import netCDF4
 import numpy as np
-from netCDF4 import Dataset
 
 from coastal_calibration.logging import logger
 
@@ -42,7 +42,7 @@ from .esmf_utils import (
 )
 
 
-def _pick_time_var(ds: Dataset) -> str:
+def _pick_time_var(ds: netCDF4.Dataset) -> str:
     """Return the name of the time variable in *ds*.
 
     WRF-Hydro LDASIN files use ``"time"``; ERA5/HRRR-derived files may use
@@ -128,7 +128,7 @@ class CoastalForcingRegridder:
         self.schism_mesh = ESMF.Mesh(
             filename=str(schism_mesh_path), filetype=ESMF.FileFormat.ESMFMESH
         )
-        with Dataset(schism_mesh_path, "r") as smesh:
+        with netCDF4.Dataset(schism_mesh_path, "r") as smesh:
             self.total_elements = smesh.dimensions["elementCount"].size
 
         # Determine output lat/lon range from mesh node coords (MPI-aware)
@@ -138,7 +138,7 @@ class CoastalForcingRegridder:
         lat_min, lat_max = allreduce_minmax(node_lats)  # pyright: ignore[reportArgumentType]
 
         # Read source grid and height from geogrid file
-        ds = Dataset(geo_em_path, "r")
+        ds = netCDF4.Dataset(geo_em_path, "r")
         self.src_height = ds.variables["HGT_M"][:]
 
         xlat = ds.variables["XLAT_M"][0, :].T
@@ -171,7 +171,7 @@ class CoastalForcingRegridder:
 
         self.schism_first_timestep = None
 
-    def _read_start_time(self, ds: Dataset) -> float:
+    def _read_start_time(self, ds: netCDF4.Dataset) -> float:
         """Extract the forcing start time from an input dataset."""
         if "time" in ds.variables:
             return ds["time"][0] * 60  # minutes -> seconds
@@ -179,7 +179,7 @@ class CoastalForcingRegridder:
             return ds["valid_time"][0]
         raise KeyError("Input file has neither 'time' nor 'valid_time' variable")
 
-    def _init_vsource_nc(self, ds: Dataset, ntimes: int):
+    def _init_vsource_nc(self, ds: netCDF4.Dataset, ntimes: int):
         """Create dimensions and variables for the SCHISM vsource file."""
         ds.createDimension("time_vsource", ntimes)
         ds.createDimension("nsources", self.total_elements)
@@ -193,9 +193,9 @@ class CoastalForcingRegridder:
         eso[:] = np.arange(1, self.total_elements + 1)
         vts[:] = 3600
 
-    def _regrid_to_schism(self, input_file: Path, vsource_ds: Dataset | None):
+    def _regrid_to_schism(self, input_file: Path, vsource_ds: netCDF4.Dataset | None):
         """Regrid RAINRATE to SCHISM mesh elements and write to vsource."""
-        input_ds = Dataset(input_file)
+        input_ds = netCDF4.Dataset(input_file)
 
         # Populate source field
         in_field = ESMF.Field(grid=self.in_grid, name="rainrate-in")
@@ -261,7 +261,9 @@ class CoastalForcingRegridder:
         out_field.destroy()
         input_ds.close()
 
-    def _init_latlon_nc(self, output_ds: Dataset, nlats: int, nlons: int, input_ds: Dataset):
+    def _init_latlon_nc(
+        self, output_ds: netCDF4.Dataset, nlats: int, nlons: int, input_ds: netCDF4.Dataset
+    ):
         """Create dimensions, coordinates, and time variable for lat-lon output."""
         output_ds.createDimension(dimname="lat", size=nlats)
         output_ds.createDimension(dimname="lon", size=nlons)
@@ -294,13 +296,13 @@ class CoastalForcingRegridder:
 
     def _regrid_to_latlon(self, input_file: Path, apply_slp: bool = True):  # noqa: PLR0912, PLR0915
         """Regrid atmospheric variables to a regular lat-lon grid."""
-        input_ds = Dataset(input_file)
+        input_ds = netCDF4.Dataset(input_file)
         nlons, nlats = self.out_grid.max_index
 
         # Prepare output dataset on root
         if self.root:
             output_path = self.output_dir / (input_file.stem + ".latlon.nc")
-            output_ds = Dataset(output_path, "w")
+            output_ds = netCDF4.Dataset(output_path, "w", format="NETCDF4")
             self._init_latlon_nc(output_ds, nlats, nlons, input_ds)
         else:
             output_ds = None
@@ -424,13 +426,15 @@ class CoastalForcingRegridder:
 
         # Determine first timestep for SCHISM time offsets
         if self.root:
-            with Dataset(input_files[0]) as ds0:
+            with netCDF4.Dataset(input_files[0]) as ds0:
                 self.schism_first_timestep = self._read_start_time(ds0)
 
         # Initialize SCHISM vsource output on idx=0
         schism_vsource = None
         if idx == 0 and self.root:
-            schism_vsource = Dataset(self.output_dir / "precip_source.nc", "w", format="NETCDF4")
+            schism_vsource = netCDF4.Dataset(
+                self.output_dir / "precip_source.nc", "w", format="NETCDF4"
+            )
             self._init_vsource_nc(schism_vsource, len(input_files))
 
         # Process files

@@ -50,8 +50,6 @@ if not logger.handlers:
         show_path=False,
         rich_tracebacks=True,
         tracebacks_show_locals=True,
-        # log_time_format="[%Y/%m/%d %H:%M:%S]",
-        # omit_repeated_times=False,
     )
     _console_handler.setFormatter(logging.Formatter("%(message)s"))
 

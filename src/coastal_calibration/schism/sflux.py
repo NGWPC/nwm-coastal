@@ -10,7 +10,7 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING
 
-import netCDF4 as nc  # noqa: N813
+import netCDF4
 import numpy as np
 
 from coastal_calibration.logging import logger
@@ -90,7 +90,7 @@ def make_atmo_sflux(  # noqa: PLR0915
 
     # Load geospatial data
     logger.debug("    Loading geogrid data from %s", geogrid_file)
-    with nc.Dataset(geogrid_file) as geo:
+    with netCDF4.Dataset(geogrid_file) as geo:
         height = geo["HGT_M"][0, :]
         lats = geo["XLAT_M"][0, :]
         lons = geo["XLONG_M"][0, :]
@@ -105,7 +105,7 @@ def make_atmo_sflux(  # noqa: PLR0915
     sflux_dir.mkdir(parents=True, exist_ok=True)
     out_path = sflux_dir / "sflux_air_1.0001.nc"
 
-    ncout = nc.Dataset(out_path, "w", format="NETCDF4")
+    ncout = netCDF4.Dataset(out_path, "w", format="NETCDF4")
     try:
         ncout.createDimension("time", len(files) + 1)
         ncout.createDimension("ny_grid", lats.shape[0])
@@ -169,7 +169,7 @@ def make_atmo_sflux(  # noqa: PLR0915
         ncq.units = "kg/kg"
 
         for i, file in enumerate(files):
-            with nc.Dataset(file) as data:
+            with netCDF4.Dataset(file) as data:
                 nct[i, :] = data.variables["T2D"][:]
                 ncq[i, :] = data.variables["Q2D"][:]
                 ncu[i, :] = data.variables["U2D"][:]

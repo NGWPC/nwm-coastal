@@ -30,7 +30,7 @@ class Tide:
 
     Parameters
     ----------
-    model : np.ndarray
+    model : numpy.ndarray
         Structured array with dtype :attr:`Tide.dtype`.
     radians : bool
         If ``True`` the phases in *model* are in radians; they are
