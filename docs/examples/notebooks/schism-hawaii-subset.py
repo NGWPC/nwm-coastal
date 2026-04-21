@@ -45,27 +45,23 @@ from pathlib import Path
 notebook_dir = Path.cwd()  # assumes notebook is run from docs/examples/notebooks/
 os.chdir(notebook_dir.parent / "hawaii")
 
-# %% [markdown]
-# ## 1. Build the run configuration
-#
-# The configuration mirrors the SFINCS workflow. The main differences
-# are in `model_config`:
-#
-# - `prebuilt_dir`: path to the pre-built SCHISM model files
-# - `geogrid_file`: WRF geogrid for ESMF atmospheric regridding
-# - `nodes`, `ntasks_per_node`, `nscribes`: MPI layout for `pschism`
-# - `include_noaa_gages`: auto-discover NOAA tide gauges in the domain
-#
-# **Note**: the pre-built model directory (`./model`) and geogrid file
-# (`./geo_em_HI.nc`) are not included in the repository. Users must
-# place the correct files at these paths (or adjust the paths below).
+# %%
+import coastal_calibration.schism.subsetter as ss
+import shapely
+
+
+project = "model"
+nwm = ss.NWMSCHISMProject(project)
+
+line = shapely.LineString([[-155.778814, 20.624375], [-156.563293, 20.071111]])
+res = ss.divide_mesh(project, line, ".", side_a_name="model_a", side_b_name="model_b")
 
 # %%
 from coastal_calibration import CoastalCalibConfig, CoastalCalibRunner, configure_logger
 
 configure_logger(level="INFO")
 
-run_config = CoastalCalibConfig.from_dict(
+config_a = CoastalCalibConfig.from_dict(
     {
         "model": "schism",
         "simulation": {
@@ -77,14 +73,14 @@ run_config = CoastalCalibConfig.from_dict(
         },
         "boundary": {"source": "stofs"},
         "paths": {
-            "work_dir": "./run",
+            "work_dir": "./run_a",
             "raw_download_dir": "../downloads",
         },
         "download": {"enabled": True},
         "model_config": {
-            "prebuilt_dir": "./model",  # pre-built mesh and config files
+            "prebuilt_dir": "./model_a",  # pre-built mesh and config files
             "geogrid_file": "./geo_em_HI.nc",  # for ESMF atmospheric regridding
-            "discharge_file": "./model/nwmReaches.csv",  # NWM reach → element mapping
+            "discharge_file": "./model_a/nwmReaches.csv",  # NWM reach → element mapping
             "nodes": 1,  # number of compute nodes
             "ntasks_per_node": 8,  # MPI tasks per node
             "nscribes": 2,  # I/O server tasks
@@ -94,9 +90,9 @@ run_config = CoastalCalibConfig.from_dict(
     }
 )
 
-print(f"Work directory: {run_config.paths.work_dir}")
-print(f"Domain:         {run_config.simulation.coastal_domain}")
-print(f"Duration:       {run_config.simulation.duration_hours}h")
+print(f"Work directory: {config_a.paths.work_dir}")
+print(f"Domain:         {config_a.simulation.coastal_domain}")
+print(f"Duration:       {config_a.simulation.duration_hours}h")
 
 # %% [markdown]
 # ## 2. Run the pipeline
@@ -113,11 +109,11 @@ print(f"Duration:       {run_config.simulation.duration_hours}h")
 #    outputs, and generate comparison plots against NOAA observations
 
 # %%
-runner = CoastalCalibRunner(run_config)
-result = runner.run()
-if not result.success:
-    raise RuntimeError(f"Pipeline failed at stage '{result.stages_failed}': {result.errors}")
-print(result)
+runner_a = CoastalCalibRunner(config_a)
+result_a = runner_a.run()
+if not result_a.success:
+    raise RuntimeError(f"Pipeline failed at stage '{result_a.stages_failed}': {result_a.errors}")
+print(result_a)
 
 # %% [markdown]
 # ## 3. View results
@@ -126,75 +122,61 @@ print(result)
 # tide gauge observations at stations within the domain.
 
 # %%
-import shutil
-
 from IPython.display import Image
 
-figs = sorted(Path("run/figs").glob("stations_comparison_*.png"))
+figs = sorted(Path("run_a/figs").glob("stations_comparison_*.png"))
 if not figs:
     print("No station comparison figures were generated; skipping thumbnail creation and display.")
 else:
-    shutil.copy2(figs[-1], "../images/hawaii_thumb.png")
     for png in figs:
         display(Image(filename=str(png), width=800))
 
-# %% [markdown]
-# ## 4. Inspect outputs
-
 # %%
-outputs_dir = Path("run/outputs")
-if outputs_dir.exists():
-    all_outputs = sorted(outputs_dir.iterdir())
-    for f in all_outputs[:20]:
-        sz = f.stat().st_size
-        label = f"{sz / 1e6:.1f} MB" if sz > 1e6 else f"{sz / 1e3:.1f} KB"
-        print(f"  {f.name:<40s} {label}")
-    if len(all_outputs) > 20:
-        print(f"  ... and {len(all_outputs) - 20} more files")
-else:
-    print("No outputs directory found")
+config_b = CoastalCalibConfig.from_dict(
+    {
+        "model": "schism",
+        "simulation": {
+            "start_date": "2025-11-26",
+            "duration_hours": 50,
+            "coastal_domain": "hawaii",
+            "meteo_source": "nwm_ana",
+            "timestep_seconds": 300,  # 5-minute timestep
+        },
+        "boundary": {"source": "stofs"},
+        "paths": {
+            "work_dir": "./run_b",
+            "raw_download_dir": "../downloads",
+        },
+        "download": {"enabled": True},
+        "model_config": {
+            "prebuilt_dir": "./model_b",  # pre-built mesh and config files
+            "geogrid_file": "./geo_em_HI.nc",  # for ESMF atmospheric regridding
+            "discharge_file": "./model_b/nwmReaches.csv",  # NWM reach → element mapping
+            "nodes": 1,  # number of compute nodes
+            "ntasks_per_node": 8,  # MPI tasks per node
+            "nscribes": 2,  # I/O server tasks
+            "oversubscribe": True,
+            "include_noaa_gages": True,
+        },
+    }
+)
 
-# %% [markdown]
-# ## Running on HPC
-#
-# The same configuration can be submitted to any HPC cluster using
-# a job scheduler. For example, with SLURM you can embed the config
-# directly in an `sbatch` script:
-#
-# ```bash
-# !/usr/bin/env bash
-# #SBATCH --job-name=coastal_schism
-# #SBATCH --partition=c5n-18xlarge
-# #SBATCH -N 2
-# #SBATCH --ntasks-per-node=18
-# #SBATCH --exclusive
-# #SBATCH --output=slurm-%j.out
-#
-# CONFIG_FILE="/tmp/coastal_config_${SLURM_JOB_ID}.yaml"
-#
-# cat > "${CONFIG_FILE}" <<'EOF'
-# model: schism
-#
-# simulation:
-#   start_date: 2025-11-26
-#   duration_hours: 50
-#   coastal_domain: hawaii
-#   meteo_source: nwm_ana
-#
-# boundary:
-#   source: stofs
-#
-# model_config:
-#   include_noaa_gages: true
-# EOF
-#
-# coastal-calibration run "${CONFIG_FILE}"
-# rm -f "${CONFIG_FILE}"
-# ```
-#
-# The same approach works with PBS, LSF, or any other scheduler.
-# The only requirement is that the `coastal-calibration` command
-# is available on the compute nodes.
+print(f"Work directory: {config_b.paths.work_dir}")
+print(f"Domain:         {config_b.simulation.coastal_domain}")
+print(f"Duration:       {config_b.simulation.duration_hours}h")
+
+runner_b = CoastalCalibRunner(config_b)
+result_b = runner_b.run()
+if not result_b.success:
+    raise RuntimeError(f"Pipeline failed at stage '{result_b.stages_failed}': {result_b.errors}")
+print(result_b)
+
+figs = sorted(Path("run_b/figs").glob("stations_comparison_*.png"))
+if not figs:
+    print("No station comparison figures were generated; skipping thumbnail creation and display.")
+else:
+    for png in figs:
+        display(Image(filename=str(png), width=800))
 
 # %% [markdown]
 # ## Summary
