@@ -172,9 +172,14 @@ nav:
   - Workflow Stages: user-guide/workflow-stages.md
 - Examples:
   - Overview: examples/index.md
-  - Lavaca Bay: examples/notebooks/lavaca.ipynb
-  - Narragansett Bay: examples/notebooks/narragansett.ipynb
-  - Hawaii: examples/notebooks/schism-hawaii.ipynb
+  - Tutorials:
+    - Lavaca Bay: examples/notebooks/lavaca.ipynb
+    - Narragansett Bay: examples/notebooks/narragansett.ipynb
+    - Hawaii: examples/notebooks/schism-hawaii.ipynb
+  - Post-run Plotting:
+    - Lavaca Bay (SFINCS): examples/notebooks/plot_sfincs_lavaca.ipynb
+    - Narragansett Bay (SFINCS): examples/notebooks/plot_sfincs_narragansett.ipynb
+    - Hawaii (SCHISM): examples/notebooks/plot_schism_hawaii.ipynb
 - Design: DESIGN.md
 - Reference:
   - API Reference: reference/api.md

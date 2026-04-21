@@ -50,6 +50,13 @@ dependencies = [
   "tiny-retriever>=0.3",
   "xarray>=2024.1",
 ]
+optional-dependencies.dev = [
+  "git-cliff",
+  "ipykernel",
+  "ipywidgets",
+  "jupytext",
+  "nbconvert",
+]
 optional-dependencies.docs = [
   "jupytext",
   "mike>=2",
@@ -63,18 +70,13 @@ optional-dependencies.lint = [
   "codespell",
   "pre-commit",
 ]
-optional-dependencies.notebook = [
-  "ipykernel",
-  "ipywidgets",
-  "jupytext",
-  "nbconvert",
-]
 optional-dependencies.plot = [
   "contextily>=1.6",
   "geopandas>=1",
   "matplotlib>=3.9",
   "numpy>=2",
   "pandas>=2.2",
+  "pyarrow>=15",
   "shapely>=2",
   "xarray>=2024.1",
 ]
@@ -92,6 +94,7 @@ optional-dependencies.test = [
 optional-dependencies.typecheck = [
   "pandas-stubs",
   "pyright",
+  "scipy-stubs",
   "types-geopandas",
   "types-pyyaml",
   "types-shapely",
@@ -118,12 +121,28 @@ test313-sfincs = { features = [ "test", "test-sfincs", "sfincs", "plot", "py313"
 test313-schism = { features = [ "test", "test-schism", "schism", "plot", "py313" ] }
 test311 = { features = [ "test", "test311", "schism", "sfincs", "plot", "py311" ] }
 test313 = { features = [ "test", "test313", "schism", "sfincs", "plot", "py313" ] }
-dev = { features = [ "notebook", "schism", "sfincs", "plot", "test", "py313" ] }
-schism = { features = [ "notebook", "schism", "plot", "py313" ] }
-sfincs = { features = [ "notebook", "sfincs", "plot", "py313" ] }
+dev = { features = [ "dev", "schism", "sfincs", "plot", "test", "py313" ] }
+schism = { features = [ "schism", "plot", "py313" ] }
+sfincs = { features = [ "sfincs", "plot", "py313" ] }
 typecheck = { features = [ "typecheck", "schism", "sfincs", "plot", "test", "py313" ] }
 lint = { features = [ "lint", "py313" ], no-default-feature = true }
 docs = { features = [ "docs", "py313" ] }
+
+[tool.pixi.feature.dev.tasks]
+# Preview unreleased changes without writing to CHANGELOG.md
+changelog = "git cliff -c pyproject.toml --unreleased"
+# Update CHANGELOG.md with all unreleased commits
+changelog-update = "git cliff -c pyproject.toml -o CHANGELOG.md"
+# Sync all percent-format .py scripts → paired .ipynb files
+nb-sync = "jupytext --sync docs/examples/*.py"
+# Execute all notebooks in-place (requires .ipynb to exist; run nb-sync first)
+nb-execute = "jupyter nbconvert --to notebook --execute --inplace docs/examples/*.ipynb"
+# Full workflow: sync .py → .ipynb, then execute — use before building docs or committing
+nb-run = { depends-on = [ "nb-sync", "nb-execute" ] }
+# Pair an existing .ipynb with a .py counterpart (one-time setup for imported notebooks)
+nb-pair = "jupytext --set-formats 'ipynb,py:percent' docs/examples/*.ipynb"
+# Strip all cell outputs from .ipynb files (keeps repo diff clean)
+nb-clear = "jupyter nbconvert --ClearOutputPreprocessor.enabled=True --to notebook --inplace docs/examples/*.ipynb"
 
 [tool.pixi.feature.docs.tasks]
 docs-build = "mkdocs build --strict"
@@ -135,20 +154,6 @@ docs-release = "mike deploy --push --update-aliases $(git describe --tags --abbr
 lint = "pre-commit run --all-files"
 pcupdate = "pre-commit autoupdate"
 spell = "codespell -w"
-
-[tool.pixi.feature.notebook.tasks]
-# Sync all percent-format .py scripts → paired .ipynb files
-nb-sync = "jupytext --sync docs/examples/notebooks/*.py"
-# Execute all notebooks in-place (requires .ipynb to exist; run nb-sync first)
-nb-execute = "jupyter nbconvert --to notebook --execute --inplace docs/examples/notebooks/*.ipynb"
-# Strip ANSI codes and absolute paths from outputs — run after nb-execute before committing
-nb-clean = "python scripts/clean_notebooks.py"
-# Full workflow: sync .py → .ipynb, then execute and clean — use before building docs or committing
-nb-run = { depends-on = [ "nb-sync", "nb-execute", "nb-clean" ] }
-# Pair an existing .ipynb with a .py counterpart (one-time setup for imported notebooks)
-nb-pair = "jupytext --set-formats 'ipynb,py:percent' docs/examples/notebooks/*.ipynb"
-# Strip all cell outputs from .ipynb files (keeps repo diff clean)
-nb-clear = "jupyter nbconvert --ClearOutputPreprocessor.enabled=True --to notebook --inplace docs/examples/notebooks/*.ipynb"
 
 [tool.pixi.feature.plot.dependencies]
 proj = "*"
@@ -270,10 +275,7 @@ include = [
   "src/coastal_calibration/*.py",
   "tests/**/*.py",
 ]
-exclude = [
-  "docs/examples/notebooks/*.py",
-  "tests/legacy_scripts/**/*.py",
-]
+exclude = [ "docs/examples/notebooks/*.py", "legacy-coastal", "tests/legacy_scripts/**/*.py" ]
 lint.select = [
   # flake8-bugbear
   "B",
@@ -417,11 +419,11 @@ lint.isort.required-imports = [ "from __future__ import annotations" ]
 lint.pydocstyle.convention = "numpy"
 
 [tool.codespell]
-skip = "__pycache__,_build,.git,./htmlcov,pixi.lock,./site,./cache,*.ipynb"
+skip = "__pycache__,_build,.git,./htmlcov,pixi.lock,./site,./cache,*.ipynb,./legacy-coastal/"
 ignore-words-list = "gages,parm,oce,gage,nd"
 
 [tool.pyproject-fmt]
-expand_tables = [ "tool.pixi" ]
+expand_tables = [ "tool.pixi", "tool.git-cliff" ]
 
 [tool.pyright]
 pythonVersion = "3.11"
@@ -490,3 +492,93 @@ report.omit = [
 notebook_metadata_filter = "kernelspec,jupytext"
 cell_metadata_filter = "-all"
 formats = "ipynb,py:percent"
+
+[tool.git-cliff.changelog]
+header = """
+# Changelog
+
+All notable changes to this project will be documented in this file.
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+"""
+body = """
+{%- macro remote_url() -%}
+  https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}
+{%- endmacro -%}
+
+{% if version -%}
+## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else -%}
+## [Unreleased]
+{% endif -%}
+
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group }}
+{% for commit in commits %}
+- {% if commit.scope %}**{{ commit.scope }}**: {% endif %}\
+{{ commit.message | split(pat="\\n") | first | upper_first | trim }}\
+{% if commit.breaking %} (**breaking**){% endif %}\
+{% if commit.remote.username and commit.remote.username != "github-actions[bot]" %} by @{{ commit.remote.username }}{% endif %}\
+{% if commit.remote.pr_number %} in \
+[#{{ commit.remote.pr_number }}]({{ self::remote_url() }}/pull/{{ commit.remote.pr_number }})\
+{% endif %}
+{%- endfor %}
+{% endfor -%}
+
+{%- if github.contributors | filter(attribute="is_first_time", value=true) | length != 0 %}
+### New Contributors
+{% for contributor in github.contributors | filter(attribute="is_first_time", value=true) %}
+{%- if contributor.username and contributor.username != "github-actions[bot]" %}
+- @{{ contributor.username }} made their first contribution\
+{% if contributor.pr_number %} in \
+[#{{ contributor.pr_number }}]({{ self::remote_url() }}/pull/{{ contributor.pr_number }})\
+{% endif %}
+{%- endif -%}
+{%- endfor %}
+{% endif %}
+"""
+footer = """
+{%- macro remote_url() -%}
+  https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}
+{%- endmacro -%}
+
+{% for release in releases -%}
+{% if release.version -%}
+{% if release.previous.version -%}
+[{{ release.version | trim_start_matches(pat="v") }}]: \
+<{{ self::remote_url() }}/compare/{{ release.previous.version }}...{{ release.version }}>
+{% else -%}
+[{{ release.version | trim_start_matches(pat="v") }}]: \
+<{{ self::remote_url() }}/releases/tag/{{ release.version }}>
+{% endif -%}
+{% else -%}
+{% if release.previous.version -%}
+[unreleased]: <{{ self::remote_url() }}/compare/{{ release.previous.version }}...HEAD>
+{% endif -%}
+{% endif -%}
+{% endfor %}"""
+trim = true
+
+[tool.git-cliff.git]
+conventional_commits = true
+filter_unconventional = true
+split_commits = false
+commit_parsers = [
+  { message = "^feat", group = "Added" },
+  { message = "^fix", group = "Fixed" },
+  { message = "^perf", group = "Changed" },
+  { message = "^refactor", group = "Changed" },
+  { message = "^revert", group = "Fixed" },
+  { message = "^style", group = "Changed" },
+  { message = "^docs", skip = true },
+  { message = "^test", skip = true },
+  { message = "^chore", skip = true },
+  { message = "^ci", skip = true },
+  { message = "^build", skip = true },
+]
+protect_breaking_commits = true
+filter_commits = false
+tag_pattern = "[0-9].*"
+topo_order = false
+sort_commits = "newest"
