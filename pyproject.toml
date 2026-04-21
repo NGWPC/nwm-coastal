@@ -160,7 +160,7 @@ proj = "*"
 libgdal-core = "*"
 hdf5 = "*"
 libnetcdf = "*"
-ffmpeg = "*"
+ffmpeg = { version = ">=6", build = "gpl_*" }
 
 [tool.pixi.feature.py311.dependencies]
 python = "~=3.11.0"
