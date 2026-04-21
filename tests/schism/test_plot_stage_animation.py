@@ -2,7 +2,7 @@
 
 Drives :class:`~coastal_calibration.schism.stages.SchismPlotStage` end-to-end
 with a synthetic SCHISM ``outputs/`` directory and verifies that the
-animation GIF is produced when the toggle is on — and is skipped cleanly
+animation MP4 is produced when the toggle is on — and is skipped cleanly
 when it's off.
 """
 

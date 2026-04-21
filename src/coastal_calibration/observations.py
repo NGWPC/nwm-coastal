@@ -162,8 +162,9 @@ def validate_points_in_domain(points: pd.DataFrame, ds: xr.Dataset) -> shapely.P
 
     bbox = _domain_bbox_wgs84(ds)
     pts = shapely.points(points["lon"].to_numpy(), points["lat"].to_numpy())
-    # shapely.contains treats the box as a closed region.
-    inside = shapely.contains(bbox, pts)
+    # Use `covers` rather than `contains` so points exactly on the bbox
+    # edge pass — `contains` excludes the boundary.
+    inside = shapely.covers(bbox, pts)
     if not np.asarray(inside).all():
         bad_ids = points.loc[~np.asarray(inside), "id"].tolist()
         head = bad_ids[:10]

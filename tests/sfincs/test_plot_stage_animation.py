@@ -1,7 +1,7 @@
 """Integration tests for SFINCS ``create_water_level_animation`` workflow toggle.
 
 Drives :class:`~coastal_calibration.sfincs.stages.SfincsPlotStage` end-to-end
-with a synthetic ``sfincs_map.nc`` and verifies that the animation GIF is
+with a synthetic ``sfincs_map.nc`` and verifies that the animation MP4 is
 produced when the toggle is on — and is skipped cleanly when it's off.
 """
 

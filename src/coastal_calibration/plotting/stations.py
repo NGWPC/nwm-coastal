@@ -161,6 +161,20 @@ def plot_station_comparison(
     figs_dir.mkdir(parents=True, exist_ok=True)
 
     runs_dict = dict(runs)
+    n_stations = len(station_ids)
+    bad_shapes: list[str] = []
+    for label, (_, elev) in runs_dict.items():
+        arr = np.asarray(elev)
+        if arr.ndim != 2 or arr.shape[1] != n_stations:
+            bad_shapes.append(f"{label!r}: shape {arr.shape}")
+    if bad_shapes:
+        msg = (
+            f"plot_station_comparison: each run's elevation must be 2-D with "
+            f"{n_stations} columns (one per station in `station_ids`). "
+            f"Offending runs: {', '.join(bad_shapes)}"
+        )
+        raise ValueError(msg)
+
     stations = _plotable_stations(station_ids, runs_dict, obs_ds)
     if not stations:
         return []

@@ -172,6 +172,24 @@ class TestValidatePointsInDomain:
         with pytest.raises(ValueError, match="outside the model"):
             validate_points_in_domain(pts, ds)
 
+    def test_points_on_bbox_boundary_pass(self):
+        ds = _schism_ds()
+        bbox = validate_points_in_domain(
+            pd.DataFrame({"id": ["center"], "lon": [-71.3], "lat": [41.5]}),
+            ds,
+        )
+        minx, miny, maxx, maxy = bbox.bounds
+        # All four corners of the bounding box should validate (boundary
+        # points are inside a closed domain).
+        corners = pd.DataFrame(
+            {
+                "id": ["ll", "lr", "ur", "ul"],
+                "lon": [minx, maxx, maxx, minx],
+                "lat": [miny, miny, maxy, maxy],
+            }
+        )
+        validate_points_in_domain(corners, ds)
+
     def test_projected_ds_rebased_to_wgs84(self):
         """A UTM-19N dataset must still validate WGS84-supplied points.
 
