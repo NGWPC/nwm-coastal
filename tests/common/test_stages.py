@@ -16,12 +16,7 @@ from coastal_calibration.config.schema import (
 )
 from coastal_calibration.data.download_stage import DownloadStage
 from coastal_calibration.logging import WorkflowMonitor
-from coastal_calibration.plotting.stations import (
-    plot_station_comparison,
-)
-from coastal_calibration.plotting.stations import (
-    plotable_stations as _plotable_stations,
-)
+from coastal_calibration.plotting.stations import plot_station_comparison
 from coastal_calibration.schism.boundary import (
     BoundaryConditionStage,
     STOFSBoundaryStage,
@@ -413,88 +408,12 @@ class TestPatchParamNml:
         assert nhot_write % 18 == 0
 
 
-class TestPlotableStations:
-    """Tests for _plotable_stations pre-filter."""
-
-    @staticmethod
-    def _make_obs_ds(station_ids, n_times=10, fill_value=0.0):
-        """Create a minimal xr.Dataset mimicking CO-OPS observations."""
-        import numpy as np
-        import xarray as xr
-
-        t0 = np.datetime64("2021-06-11")
-        times = np.arange(t0, t0 + np.timedelta64(n_times, "h"), np.timedelta64(1, "h"))
-        data = np.full((len(station_ids), n_times), fill_value)
-        return xr.Dataset(
-            {"water_level": (["station", "time"], data)},
-            coords={"station": station_ids, "time": times},
-        )
-
-    def test_all_valid(self):
-        """Stations with both sim and obs should all be returned."""
-        import numpy as np
-
-        sim = np.ones((5, 3))
-        obs = self._make_obs_ds(["A", "B", "C"])
-        result = _plotable_stations(["A", "B", "C"], sim, obs)
-        assert len(result) == 3
-        assert [sid for sid, _ in result] == ["A", "B", "C"]
-
-    def test_sim_only_excluded(self):
-        """Station with sim but no obs is excluded (no comparison possible)."""
-        import numpy as np
-
-        sim = np.ones((5, 2))
-        obs = self._make_obs_ds(["A"], fill_value=np.nan)
-        result = _plotable_stations(["A", "B"], sim, obs)
-        # "A" has sim (all 1s) but NaN obs -> excluded
-        # "B" has sim (all 1s) but not in obs -> excluded
-        assert len(result) == 0
-
-    def test_obs_only_excluded(self):
-        """Station with obs but NaN sim is excluded (no comparison possible)."""
-        import numpy as np
-
-        sim = np.full((5, 1), np.nan)
-        obs = self._make_obs_ds(["A"], fill_value=1.0)
-        result = _plotable_stations(["A"], sim, obs)
-        assert len(result) == 0
-
-    def test_neither_obs_nor_sim(self):
-        """Station with all-NaN sim and all-NaN obs is excluded."""
-        import numpy as np
-
-        sim = np.full((5, 2), np.nan)
-        obs = self._make_obs_ds(["A", "B"], fill_value=np.nan)
-        result = _plotable_stations(["A", "B"], sim, obs)
-        assert len(result) == 0
-
-    def test_mixed_keeps_both_only(self):
-        """Only stations with both sim and obs are kept for comparison."""
-        import numpy as np
-
-        # Station 0 ("A"): sim valid, obs NaN -> excluded (no comparison)
-        # Station 1 ("B"): sim NaN, obs NaN -> excluded
-        # Station 2 ("C"): sim NaN, obs valid -> excluded (no comparison)
-        # Station 3 ("D"): sim valid, obs valid -> KEPT
-        sim = np.full((5, 4), np.nan)
-        sim[:, 0] = 1.0
-        sim[:, 3] = 2.0
-        obs = self._make_obs_ds(["A", "B", "C", "D"], fill_value=np.nan)
-        obs.water_level.loc[{"station": "C"}] = 1.0
-        obs.water_level.loc[{"station": "D"}] = 3.0
-        result = _plotable_stations(["A", "B", "C", "D"], sim, obs)
-        assert [sid for sid, _ in result] == ["D"]
-        assert [idx for _, idx in result] == [3]
-
-
 @pytest.mark.skipif(not _has_matplotlib, reason="requires matplotlib (sfincs/test env)")
-class TestPlotFigures:
-    """Tests for plot_station_comparison."""
+class TestPlotStationComparison:
+    """Tests for :func:`plot_station_comparison`."""
 
     @staticmethod
     def _make_obs_ds(station_ids, n_times=10, fill_value=0.0):
-        """Create a minimal xr.Dataset mimicking CO-OPS observations."""
         import numpy as np
         import xarray as xr
 
@@ -506,199 +425,119 @@ class TestPlotFigures:
             coords={"station": station_ids, "time": times},
         )
 
-    def test_skips_station_with_no_data(self, tmp_path):
-        """Station with all-NaN sim and all-NaN obs produces no panel."""
+    def _make_run(self, n_times: int, n_stations: int, value: float):
         import numpy as np
 
-        n_times = 10
         t0 = np.datetime64("2021-06-11")
-        sim_times = np.arange(t0, t0 + np.timedelta64(n_times, "h"), np.timedelta64(1, "h"))
-        # 2 stations: first has data, second is all NaN
-        sim = np.full((n_times, 2), np.nan)
-        sim[:, 0] = np.linspace(0, 1, n_times)
-        obs = self._make_obs_ds(["A", "B"], n_times=n_times)
-        obs.water_level.loc[{"station": "B"}] = np.nan
+        times = np.arange(t0, t0 + np.timedelta64(n_times, "h"), np.timedelta64(1, "h"))
+        elev = np.full((n_times, n_stations), value)
+        return times, elev
 
-        figs_dir = tmp_path / "figs"
-        paths = plot_station_comparison(sim_times, sim, ["A", "B"], obs, figs_dir)
+    def test_two_runs_and_obs_overlay(self, tmp_path):
+        """Two model permutations overlaid with observed data → one figure."""
+        ids = ["A", "B"]
+        run_a = self._make_run(10, 2, 1.0)
+        run_b = self._make_run(10, 2, 1.5)
+        obs = self._make_obs_ds(ids, n_times=10, fill_value=1.2)
+
+        paths = plot_station_comparison(
+            {"baseline": run_a, "tuned": run_b},
+            ids,
+            tmp_path / "figs",
+            obs_ds=obs,
+        )
         assert len(paths) == 1
         assert paths[0].exists()
 
-    def test_returns_empty_when_all_nan(self, tmp_path):
-        """When all stations lack data, no figures are created."""
+    def test_runs_without_obs(self, tmp_path):
+        """Pure model-vs-model comparison — ``obs_ds`` is optional."""
+        ids = ["A", "B"]
+        run_a = self._make_run(10, 2, 1.0)
+        run_b = self._make_run(10, 2, 1.5)
+
+        paths = plot_station_comparison(
+            {"baseline": run_a, "tuned": run_b},
+            ids,
+            tmp_path / "figs",
+        )
+        assert len(paths) == 1
+        assert paths[0].exists()
+
+    def test_single_run_with_obs(self, tmp_path):
+        """A single-entry ``runs`` dict is the common sim-vs-obs case."""
+        ids = ["A"]
+        run = self._make_run(10, 1, 1.0)
+        obs = self._make_obs_ds(ids, fill_value=1.0)
+
+        paths = plot_station_comparison({"Simulated": run}, ids, tmp_path / "figs", obs_ds=obs)
+        assert len(paths) == 1
+        assert paths[0].exists()
+
+    def test_plotable_keeps_station_when_any_run_has_data(self, tmp_path):
+        """Plotability rule: any run (or obs) with finite data keeps the station."""
         import numpy as np
 
-        n_times = 5
-        t0 = np.datetime64("2021-06-11")
-        sim_times = np.arange(t0, t0 + np.timedelta64(n_times, "h"), np.timedelta64(1, "h"))
-        sim = np.full((n_times, 2), np.nan)
-        obs = self._make_obs_ds(["A", "B"], n_times=n_times, fill_value=np.nan)
+        ids = ["A", "B"]
+        run_a_t, run_a_e = self._make_run(5, 2, 1.0)
+        run_a_e[:, 1] = np.nan  # run A has no data at station B
+        run_b = self._make_run(5, 2, 2.0)  # run B has data everywhere
 
-        figs_dir = tmp_path / "figs"
-        paths = plot_station_comparison(sim_times, sim, ["A", "B"], obs, figs_dir)
+        paths = plot_station_comparison(
+            {"a": (run_a_t, run_a_e), "b": run_b},
+            ids,
+            tmp_path / "figs",
+        )
+        assert len(paths) == 1
+
+    def test_obs_only_station_is_plotable(self, tmp_path):
+        """A station with obs data but NaN in all runs is kept."""
+        import numpy as np
+
+        ids = ["A"]
+        t, e = self._make_run(5, 1, np.nan)
+        obs = self._make_obs_ds(ids, n_times=5, fill_value=1.0)
+
+        paths = plot_station_comparison({"sim": (t, e)}, ids, tmp_path / "figs", obs_ds=obs)
+        assert len(paths) == 1
+
+    def test_empty_runs_raises(self, tmp_path):
+        with pytest.raises(ValueError, match="empty"):
+            plot_station_comparison({}, ["A"], tmp_path / "figs")
+
+    def test_all_nan_yields_empty(self, tmp_path):
+        """Station with NaN everywhere (runs + obs) produces no figures."""
+        import numpy as np
+
+        t0 = np.datetime64("2021-06-11")
+        times = np.arange(t0, t0 + np.timedelta64(5, "h"), np.timedelta64(1, "h"))
+        bad_elev = np.full((5, 2), np.nan)
+        bad_obs = self._make_obs_ds(["A", "B"], n_times=5, fill_value=np.nan)
+
+        paths = plot_station_comparison(
+            {"x": (times, bad_elev), "y": (times, bad_elev)},
+            ["A", "B"],
+            tmp_path / "figs",
+            obs_ds=bad_obs,
+        )
         assert paths == []
 
-    def test_produces_multiple_figures(self, tmp_path):
-        """More than 4 valid stations yields multiple figures."""
-        import numpy as np
+    def test_pagination_over_four_stations(self, tmp_path):
+        """More than 4 plotable stations → multiple figures (4 per fig)."""
+        n = 6
+        ids = [f"S{i}" for i in range(n)]
+        run = self._make_run(10, n, 1.0)
+        obs = self._make_obs_ds(ids, fill_value=1.0)
 
-        n_times = 10
-        n_stations = 6
-        t0 = np.datetime64("2021-06-11")
-        sim_times = np.arange(t0, t0 + np.timedelta64(n_times, "h"), np.timedelta64(1, "h"))
-        sim = np.ones((n_times, n_stations))
-        ids = [f"S{i}" for i in range(n_stations)]
-        obs = self._make_obs_ds(ids, n_times=n_times, fill_value=1.0)
-
-        figs_dir = tmp_path / "figs"
-        paths = plot_station_comparison(sim_times, sim, ids, obs, figs_dir)
+        paths = plot_station_comparison({"sim": run}, ids, tmp_path / "figs", obs_ds=obs)
         assert len(paths) == 2
         assert all(p.exists() for p in paths)
 
     def test_single_station_layout(self, tmp_path):
-        """A single valid station should produce a 1x1 figure."""
-        import numpy as np
+        """A single plotable station → one 1-by-1 figure."""
+        ids = ["A"]
+        run = self._make_run(10, 1, 1.0)
+        obs = self._make_obs_ds(ids, fill_value=1.0)
 
-        n_times = 10
-        t0 = np.datetime64("2021-06-11")
-        sim_times = np.arange(t0, t0 + np.timedelta64(n_times, "h"), np.timedelta64(1, "h"))
-        sim = np.ones((n_times, 1))
-        obs = self._make_obs_ds(["A"], n_times=n_times, fill_value=1.0)
-
-        figs_dir = tmp_path / "figs"
-        paths = plot_station_comparison(sim_times, sim, ["A"], obs, figs_dir)
-        assert len(paths) == 1
-        assert paths[0].exists()
-
-
-# ---------------------------------------------------------------------------
-# SFINCS plot stage tests
-# ---------------------------------------------------------------------------
-
-
-class TestSfincsPlotableStations:
-    """Tests for _plotable_stations in sfincs_build (identical logic to SCHISM)."""
-
-    @staticmethod
-    def _make_obs_ds(station_ids, n_times=10, fill_value=0.0):
-        import numpy as np
-        import xarray as xr
-
-        t0 = np.datetime64("2021-06-11")
-        times = np.arange(t0, t0 + np.timedelta64(n_times, "h"), np.timedelta64(1, "h"))
-        data = np.full((len(station_ids), n_times), fill_value)
-        return xr.Dataset(
-            {"water_level": (["station", "time"], data)},
-            coords={"station": station_ids, "time": times},
-        )
-
-    def test_all_valid(self):
-        import numpy as np
-
-        sim = np.ones((5, 3))
-        obs = self._make_obs_ds(["A", "B", "C"])
-        result = _plotable_stations(["A", "B", "C"], sim, obs)
-        assert len(result) == 3
-
-    def test_sim_only_excluded(self):
-        import numpy as np
-
-        sim = np.ones((5, 2))
-        obs = self._make_obs_ds(["A"], fill_value=np.nan)
-        result = _plotable_stations(["A", "B"], sim, obs)
-        assert len(result) == 0
-
-    def test_obs_only_excluded(self):
-        import numpy as np
-
-        sim = np.full((5, 1), np.nan)
-        obs = self._make_obs_ds(["A"], fill_value=1.0)
-        result = _plotable_stations(["A"], sim, obs)
-        assert len(result) == 0
-
-    def test_mixed_keeps_both_only(self):
-        import numpy as np
-
-        sim = np.full((5, 3), np.nan)
-        sim[:, 2] = 2.0
-        obs = self._make_obs_ds(["A", "B", "C"], fill_value=np.nan)
-        obs.water_level.loc[{"station": "C"}] = 3.0
-        result = _plotable_stations(["A", "B", "C"], sim, obs)
-        assert [sid for sid, _ in result] == ["C"]
-
-
-@pytest.mark.skipif(not _has_matplotlib, reason="requires matplotlib (sfincs/test env)")
-class TestSfincsPlotFigures:
-    """Tests for plot_station_comparison (identical to SCHISM)."""
-
-    @staticmethod
-    def _make_obs_ds(station_ids, n_times=10, fill_value=0.0):
-        import numpy as np
-        import xarray as xr
-
-        t0 = np.datetime64("2021-06-11")
-        times = np.arange(t0, t0 + np.timedelta64(n_times, "h"), np.timedelta64(1, "h"))
-        data = np.full((len(station_ids), n_times), fill_value)
-        return xr.Dataset(
-            {"water_level": (["station", "time"], data)},
-            coords={"station": station_ids, "time": times},
-        )
-
-    def test_skips_station_with_no_data(self, tmp_path):
-        import numpy as np
-
-        n_times = 10
-        t0 = np.datetime64("2021-06-11")
-        sim_times = np.arange(t0, t0 + np.timedelta64(n_times, "h"), np.timedelta64(1, "h"))
-        sim = np.full((n_times, 2), np.nan)
-        sim[:, 0] = np.linspace(0, 1, n_times)
-        obs = self._make_obs_ds(["A", "B"], n_times=n_times)
-        obs.water_level.loc[{"station": "B"}] = np.nan
-
-        figs_dir = tmp_path / "figs"
-        paths = plot_station_comparison(sim_times, sim, ["A", "B"], obs, figs_dir)
-        assert len(paths) == 1
-        assert paths[0].exists()
-
-    def test_returns_empty_when_all_nan(self, tmp_path):
-        import numpy as np
-
-        n_times = 5
-        t0 = np.datetime64("2021-06-11")
-        sim_times = np.arange(t0, t0 + np.timedelta64(n_times, "h"), np.timedelta64(1, "h"))
-        sim = np.full((n_times, 2), np.nan)
-        obs = self._make_obs_ds(["A", "B"], n_times=n_times, fill_value=np.nan)
-
-        figs_dir = tmp_path / "figs"
-        paths = plot_station_comparison(sim_times, sim, ["A", "B"], obs, figs_dir)
-        assert paths == []
-
-    def test_produces_multiple_figures(self, tmp_path):
-        import numpy as np
-
-        n_times = 10
-        n_stations = 6
-        t0 = np.datetime64("2021-06-11")
-        sim_times = np.arange(t0, t0 + np.timedelta64(n_times, "h"), np.timedelta64(1, "h"))
-        sim = np.ones((n_times, n_stations))
-        ids = [f"S{i}" for i in range(n_stations)]
-        obs = self._make_obs_ds(ids, n_times=n_times, fill_value=1.0)
-
-        figs_dir = tmp_path / "figs"
-        paths = plot_station_comparison(sim_times, sim, ids, obs, figs_dir)
-        assert len(paths) == 2
-        assert all(p.exists() for p in paths)
-
-    def test_single_station_layout(self, tmp_path):
-        import numpy as np
-
-        n_times = 10
-        t0 = np.datetime64("2021-06-11")
-        sim_times = np.arange(t0, t0 + np.timedelta64(n_times, "h"), np.timedelta64(1, "h"))
-        sim = np.ones((n_times, 1))
-        obs = self._make_obs_ds(["A"], n_times=n_times, fill_value=1.0)
-
-        figs_dir = tmp_path / "figs"
-        paths = plot_station_comparison(sim_times, sim, ["A"], obs, figs_dir)
+        paths = plot_station_comparison({"sim": run}, ids, tmp_path / "figs", obs_ds=obs)
         assert len(paths) == 1
         assert paths[0].exists()

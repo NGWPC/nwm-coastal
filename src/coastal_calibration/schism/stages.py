@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
+import pandas as pd
 
 from coastal_calibration.base import WorkflowStage
 
@@ -49,6 +50,43 @@ def _read_station_noaa_ids(base_dir: Path) -> list[str]:
     """Read station NOAA IDs from the companion file."""
     path = base_dir / "station_noaa_ids.txt"
     return [line.strip() for line in path.read_text().splitlines() if line.strip()]
+
+
+def _read_station_lonlat(work_dir: Path) -> pd.DataFrame | None:
+    """Parse ``station.in`` + ``station_noaa_ids.txt`` into an (id, lon, lat) frame.
+
+    Returns ``None`` if either file is missing.
+    """
+    station_in = work_dir / "station.in"
+    ids_file = work_dir / "station_noaa_ids.txt"
+    if not station_in.is_file() or not ids_file.is_file():
+        return None
+    ids = _read_station_noaa_ids(work_dir)
+    # station.in: header line, count line, then one `idx lon lat depth` per row.
+    lines = [ln for ln in station_in.read_text().splitlines() if ln.strip()]
+    lons: list[float] = []
+    lats: list[float] = []
+    for raw in lines[2 : 2 + len(ids)]:
+        parts = raw.split()
+        lons.append(float(parts[1]))
+        lats.append(float(parts[2]))
+    return pd.DataFrame({"id": ids, "lon": lons, "lat": lats})
+
+
+def _combine_obs_points(user: pd.DataFrame | None, noaa: pd.DataFrame | None) -> pd.DataFrame:
+    """Concat user- and NOAA-supplied obs points; raise on id collision."""
+    frames = [df for df in (user, noaa) if df is not None and not df.empty]
+    if not frames:
+        return pd.DataFrame(columns=["id", "lon", "lat"])
+    combined = pd.concat(frames, ignore_index=True)
+    if combined["id"].duplicated().any():
+        dupes = combined.loc[combined["id"].duplicated(keep=False), "id"].unique().tolist()
+        msg = (
+            "Duplicate obs-point ids detected between user CSV and NOAA gauges: "
+            f"{sorted(dupes)}. Rename or remove the colliding user ids."
+        )
+        raise ValueError(msg)
+    return combined
 
 
 def _read_staout(staout_path: Path) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
@@ -690,38 +728,35 @@ class SchismPlotStage(WorkflowStage):
         obs_ds.attrs["datum"] = "MSL"
         return obs_ds
 
-    def run(self) -> dict[str, Any]:
-        """Read SCHISM output, fetch NOAA observations, and plot comparison."""
-        if not self.model.include_noaa_gages:
-            self._log("include_noaa_gages is disabled, skipping")
-            return {"status": "skipped"}
+    def _run_station_comparison(self, figs_dir: Path) -> dict[str, Any]:
+        """Produce CO-OPS station comparison figures. No-op if inputs missing.
 
+        This path is gated by ``include_noaa_gages`` on
+        :class:`SchismModelConfig` in :meth:`run`; the helper itself assumes
+        the caller has already checked the gate.
+        """
         work_dir = self.config.paths.work_dir
 
-        # Check required files
         station_ids_file = work_dir / "station_noaa_ids.txt"
         staout_path = work_dir / "outputs" / "staout_1"
 
         if not station_ids_file.exists():
-            self._log("station_noaa_ids.txt not found, skipping plot stage")
+            self._log("station_noaa_ids.txt not found, skipping station comparison")
             return {"status": "skipped", "reason": "no station IDs file"}
-
         if not staout_path.exists():
-            self._log("outputs/staout_1 not found, skipping plot stage")
+            self._log("outputs/staout_1 not found, skipping station comparison")
             return {"status": "skipped", "reason": "no staout_1"}
 
-        # Read station IDs
         station_ids = _read_station_noaa_ids(work_dir)
         if not station_ids:
-            self._log("No station IDs found, skipping plot stage")
+            self._log("No station IDs found, skipping station comparison")
             return {"status": "skipped", "reason": "empty station IDs"}
 
-        # Read SCHISM station output
         self._update_substep("Reading SCHISM station output")
         time_seconds, elevation = _read_staout(staout_path)
 
         if elevation.size == 0:
-            self._log("staout_1 is empty (no station output written), skipping plot stage")
+            self._log("staout_1 is empty, skipping station comparison")
             return {"status": "skipped", "reason": "empty staout_1"}
 
         if elevation.shape[1] != len(station_ids):
@@ -730,18 +765,15 @@ class SchismPlotStage(WorkflowStage):
                 f"but {len(station_ids)} station IDs",
                 "warning",
             )
-            # Use the minimum to avoid index errors
             n = min(elevation.shape[1], len(station_ids))
             elevation = elevation[:, :n]
             station_ids = station_ids[:n]
 
-        # Convert simulation time to datetimes (vectorised).
         sim = self.config.simulation
         start_dt = sim.start_date
         start_ns = np.datetime64(start_dt, "ns")
         sim_times = start_ns + (time_seconds * 1e9).astype("timedelta64[ns]")
 
-        # Fetch observed water levels (MLLW -> MSL)
         self._update_substep("Fetching NOAA CO-OPS observations")
         begin_date = start_dt.strftime("%Y%m%d %H:%M")
         end_dt = start_dt + timedelta(hours=sim.duration_hours)
@@ -749,17 +781,123 @@ class SchismPlotStage(WorkflowStage):
 
         obs_ds = self._fetch_observations_msl(station_ids, begin_date, end_date)
 
-        # Generate comparison plots (2x2 per figure)
         self._update_substep("Generating comparison plots")
         from coastal_calibration.plotting import plot_station_comparison
 
-        figs_dir = work_dir / "figs"
-        fig_paths = plot_station_comparison(sim_times, elevation, station_ids, obs_ds, figs_dir)
-
+        fig_paths = plot_station_comparison(
+            {"Simulated": (sim_times, elevation)},
+            station_ids,
+            figs_dir,
+            obs_ds=obs_ds,
+        )
         self._log(f"Saved {len(fig_paths)} comparison figure(s) to {figs_dir}")
-
         return {
             "status": "completed",
             "figures": [str(p) for p in fig_paths],
-            "figs_dir": str(figs_dir),
         }
+
+    def _run_obs_points(self, work_dir: Path) -> dict[str, Any]:
+        """Extract water level at user and NOAA obs points; write parquet."""
+        from coastal_calibration.observations import (
+            extract_water_level_series,
+            load_obs_points,
+            validate_points_in_domain,
+        )
+        from coastal_calibration.schism.outputs import load_schism_elevation
+
+        outputs_dir = work_dir / "outputs"
+        if not outputs_dir.is_dir() or not any(outputs_dir.glob("out2d_*.nc")):
+            self._log("No out2d_*.nc blocks, skipping obs-points extraction")
+            return {"status": "skipped", "reason": "no out2d_*.nc"}
+
+        user_points: pd.DataFrame | None = None
+        if self.model.obs_points_csv is not None:
+            user_points = load_obs_points(self.model.obs_points_csv)
+            self._log(f"Loaded {len(user_points)} user observation point(s)")
+
+        noaa_points = _read_station_lonlat(work_dir) if self.model.include_noaa_gages else None
+        if noaa_points is not None:
+            self._log(f"Including {len(noaa_points)} NOAA gauge(s) from station.in")
+
+        all_points = _combine_obs_points(user_points, noaa_points)
+        if all_points.empty:
+            self._log("No obs points to extract (neither user CSV nor NOAA gauges active)")
+            return {"status": "skipped", "reason": "no points"}
+
+        self._update_substep("Extracting water level at obs points")
+        ds = load_schism_elevation(work_dir)
+        validate_points_in_domain(all_points, ds)
+        series = extract_water_level_series(ds, all_points, variable="elevation")
+
+        outfile = work_dir / "obs_water_level.parquet"
+        series.to_parquet(outfile)
+        self._log(
+            f"Wrote {outfile.name} with {len(series.columns)} station(s) "
+            f"and {len(series)} timestep(s)"
+        )
+        return {
+            "status": "completed",
+            "path": str(outfile),
+            "n_points": len(series.columns),
+            "n_user": 0 if user_points is None else len(user_points),
+            "n_noaa": 0 if noaa_points is None else len(noaa_points),
+        }
+
+    def _run_water_level_animation(self, figs_dir: Path) -> dict[str, Any]:
+        """Render an MP4/GIF animation from the SCHISM ``out2d_*.nc`` output."""
+        work_dir = self.config.paths.work_dir
+        outputs_dir = work_dir / "outputs"
+        blocks = sorted(outputs_dir.glob("out2d_*.nc")) if outputs_dir.is_dir() else []
+        if not blocks:
+            self._log("No out2d_*.nc blocks found, skipping water-level animation")
+            return {"status": "skipped", "reason": "no out2d_*.nc"}
+
+        self._update_substep("Rendering water-level animation")
+        from coastal_calibration.plotting import animate_water_level
+        from coastal_calibration.schism.outputs import load_schism_elevation
+
+        ds = load_schism_elevation(work_dir)
+        outfile = figs_dir / "water_level.mp4"
+        animate_water_level(
+            ds,
+            outfile,
+            variable="elevation",
+            fps=self.model.animation_fps,
+            time_stride=self.model.animation_time_stride,
+        )
+        self._log(f"Saved water-level animation to {outfile}")
+        return {"status": "completed", "animation": str(outfile)}
+
+    def run(self) -> dict[str, Any]:
+        """Produce SCHISM post-run figures: station comparison + animation.
+
+        Either sub-task can be independently disabled via the
+        ``include_noaa_gages`` / ``create_water_level_animation`` fields on
+        :class:`SchismModelConfig`. When both are disabled the stage is a
+        no-op.
+        """
+        work_dir = self.config.paths.work_dir
+        figs_dir = work_dir / "figs"
+        figs_dir.mkdir(parents=True, exist_ok=True)
+
+        want_stations = self.model.include_noaa_gages
+        want_animation = self.model.create_water_level_animation
+        want_obs_parquet = self.model.obs_points_csv is not None or self.model.include_noaa_gages
+
+        if not (want_stations or want_animation or want_obs_parquet):
+            self._log(
+                "No post-run products requested (set include_noaa_gages, "
+                "create_water_level_animation, or obs_points_csv), skipping"
+            )
+            return {"status": "skipped"}
+
+        result: dict[str, Any] = {"status": "completed", "figs_dir": str(figs_dir)}
+
+        if want_stations:
+            result["stations"] = self._run_station_comparison(figs_dir)
+        if want_animation:
+            result["animation"] = self._run_water_level_animation(figs_dir)
+        if want_obs_parquet:
+            result["obs_points"] = self._run_obs_points(work_dir)
+
+        return result
