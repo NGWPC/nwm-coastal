@@ -10,10 +10,8 @@ No SCHISM binaries are needed; tests exercise the splitting algorithm only.
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
-import numpy as np
 import pytest
 import shapely
 
@@ -22,10 +20,12 @@ from coastal_calibration.schism.subsetter import (
     MeshClassifier,
     MeshSubsetter,
     _build_cut_boundaries,
-    _build_shared_nodes_graph,
     _extract_side_segments,
 )
 from tests.schism.schism_testkit import generate_test_case
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -35,9 +35,7 @@ GRID_SIZE = (9, 7)
 RESOLUTION = (1.0, 1.0)
 
 
-def _make_project(
-    tmp_path: Path, boundary_type: Literal["shore", "ocean", "island"]
-) -> Path:
+def _make_project(tmp_path: Path, boundary_type: Literal["shore", "ocean", "island"]) -> Path:
     d = tmp_path / boundary_type
     generate_test_case(
         grid_size=GRID_SIZE,
@@ -104,21 +102,15 @@ class TestExtractSideSegments:
         assert result == [[3]]
 
     def test_island_wraparound(self):
-        result = _extract_side_segments(
-            [1, 2, 3, 4, 5, 6], {1, 2, 5, 6}, is_closed=True
-        )
+        result = _extract_side_segments([1, 2, 3, 4, 5, 6], {1, 2, 5, 6}, is_closed=True)
         assert result == [[5, 6, 1, 2]]
 
     def test_island_no_wrap(self):
-        result = _extract_side_segments(
-            [1, 2, 3, 4, 5, 6], {3, 4}, is_closed=True
-        )
+        result = _extract_side_segments([1, 2, 3, 4, 5, 6], {3, 4}, is_closed=True)
         assert result == [[3, 4]]
 
     def test_island_all_on_side(self):
-        result = _extract_side_segments(
-            [1, 2, 3, 4], {1, 2, 3, 4}, is_closed=True
-        )
+        result = _extract_side_segments([1, 2, 3, 4], {1, 2, 3, 4}, is_closed=True)
         assert result == [[1, 2, 3, 4]]
 
     def test_empty_boundary(self):
@@ -151,8 +143,12 @@ class TestBuildCutBoundaries:
 
     def test_two_disjoint_paths(self):
         adjacency = {
-            1: {2}, 2: {1, 3}, 3: {2},
-            10: {11}, 11: {10, 12}, 12: {11},
+            1: {2},
+            2: {1, 3},
+            3: {2},
+            10: {11},
+            11: {10, 12},
+            12: {11},
         }
         mapping = {i: i for i in [1, 2, 3, 10, 11, 12]}
         result = _build_cut_boundaries([1, 3, 10, 12], adjacency, mapping)

@@ -128,9 +128,7 @@ def _sfincs_quadtree_utm_ds() -> xr.Dataset:
     node_x = xx.ravel().astype(np.float64)
     node_y = yy.ravel().astype(np.float64)
     # 4 quads, 0-based.
-    face_nodes = np.array(
-        [[0, 1, 4, 3], [1, 2, 5, 4], [3, 4, 7, 6], [4, 5, 8, 7]], dtype=np.int64
-    )
+    face_nodes = np.array([[0, 1, 4, 3], [1, 2, 5, 4], [3, 4, 7, 6], [4, 5, 8, 7]], dtype=np.int64)
     times = pd.date_range("2024-01-01", periods=3, freq="1h")
     # Distinctive face values so we can verify nearest-face lookup.
     zs = np.array(
@@ -170,9 +168,7 @@ class TestValidatePointsInDomain:
 
     def test_some_outside_raises(self):
         ds = _schism_ds()
-        pts = pd.DataFrame(
-            {"id": ["ok", "bad"], "lon": [-71.3, -75.0], "lat": [41.5, 41.5]}
-        )
+        pts = pd.DataFrame({"id": ["ok", "bad"], "lon": [-71.3, -75.0], "lat": [41.5, 41.5]})
         with pytest.raises(ValueError, match="outside the model"):
             validate_points_in_domain(pts, ds)
 
@@ -183,9 +179,7 @@ class TestValidatePointsInDomain:
         lat ∈ [41.44, 41.62] once reprojected.
         """
         ds = _sfincs_quadtree_utm_ds()
-        inside = pd.DataFrame(
-            {"id": ["A"], "lon": [-71.38], "lat": [41.50]}
-        )
+        inside = pd.DataFrame({"id": ["A"], "lon": [-71.38], "lat": [41.50]})
         validate_points_in_domain(inside, ds)
 
         outside = pd.DataFrame({"id": ["X"], "lon": [-60.0], "lat": [41.5]})
@@ -202,9 +196,7 @@ class TestExtractSchism:
     def test_nearest_node_extraction(self):
         ds = _schism_ds()
         # Near node 0 (-71.6, 41.3) → elev column 0 at t=0 is 0.10.
-        pts = pd.DataFrame(
-            {"id": ["near_node0"], "lon": [-71.55], "lat": [41.32]}
-        )
+        pts = pd.DataFrame({"id": ["near_node0"], "lon": [-71.55], "lat": [41.32]})
         series = extract_water_level_series(ds, pts, variable="elevation")
         assert list(series.columns) == ["near_node0"]
         assert series.iloc[0, 0] == pytest.approx(0.10)
@@ -266,9 +258,7 @@ class TestExtractRegular:
 class TestParquetRoundtrip:
     def test_dataframe_round_trips(self, tmp_path: Path):
         ds = _schism_ds()
-        pts = pd.DataFrame(
-            {"id": ["a", "b"], "lon": [-71.55, -71.15], "lat": [41.32, 41.32]}
-        )
+        pts = pd.DataFrame({"id": ["a", "b"], "lon": [-71.55, -71.15], "lat": [41.32, 41.32]})
         series = extract_water_level_series(ds, pts, variable="elevation")
         out = tmp_path / "obs_water_level.parquet"
         series.to_parquet(out)

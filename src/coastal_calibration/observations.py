@@ -136,9 +136,7 @@ def _domain_bbox_wgs84(ds: xr.Dataset) -> shapely.Polygon:
     return shapely.box(lon.min(), lat.min(), lon.max(), lat.max())
 
 
-def validate_points_in_domain(
-    points: pd.DataFrame, ds: xr.Dataset
-) -> shapely.Polygon:
+def validate_points_in_domain(points: pd.DataFrame, ds: xr.Dataset) -> shapely.Polygon:
     """Raise if any point in *points* falls outside the model WGS84 bbox.
 
     Parameters
@@ -242,9 +240,7 @@ def _argmin_per_query(
     return out
 
 
-def _nearest_cell_indices(
-    ds: xr.Dataset, qx: NDArray[np.float64], qy: NDArray[np.float64]
-) -> Any:
+def _nearest_cell_indices(ds: xr.Dataset, qx: NDArray[np.float64], qy: NDArray[np.float64]) -> Any:
     """Find nearest cell index per query point, dispatching on mesh type.
 
     Returns a dispatcher-specific payload the corresponding extractor
@@ -274,9 +270,7 @@ def _nearest_cell_indices(
     raise ValueError(msg)
 
 
-def _pull_time_series(
-    ds: xr.Dataset, variable: str, locator: Any
-) -> NDArray[np.float64]:
+def _pull_time_series(ds: xr.Dataset, variable: str, locator: Any) -> NDArray[np.float64]:
     """Pull the time series at each located cell; returns shape ``(n_time, n_pts)``."""
     import xarray as xr
 

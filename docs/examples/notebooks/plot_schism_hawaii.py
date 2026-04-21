@@ -77,7 +77,9 @@ print(f"dims             : {dict(ds.sizes)}")
 print(f"variables        : {sorted(ds.data_vars)}")
 print(f"time[0]          : {ds.time.values[0]}")
 print(f"time[-1]         : {ds.time.values[-1]}")
-print(f"elevation range  : {float(ds['elevation'].min()):+.3f} .. {float(ds['elevation'].max()):+.3f} m")
+print(
+    f"elevation range  : {float(ds['elevation'].min()):+.3f} .. {float(ds['elevation'].max()):+.3f} m"
+)
 print(f"h range          : {float(ds['h'].min()):+.3f} .. {float(ds['h'].max()):+.3f} m")
 
 # %% [markdown]
@@ -182,9 +184,7 @@ display(Image(filename=str(depth_png), width=800))
 # %%
 elev_anom = ds["elevation"] - ds["elevation"].mean("time")
 ds_anom = ds.assign(elev_anom=elev_anom)
-ds_anom["elev_anom"].attrs.update(
-    {"long_name": "water-level anomaly from time-mean", "units": "m"}
-)
+ds_anom["elev_anom"].attrs.update({"long_name": "water-level anomaly from time-mean", "units": "m"})
 
 amp = float(abs(elev_anom.where(wet)).quantile(0.98).values)
 print(f"anomaly symmetric range: [-{amp:.3f}, +{amp:.3f}] m")
@@ -255,7 +255,9 @@ anim_path = animate_water_level(
     vmax=vmax,
     title_prefix="Hawaii",
 )
-print(f"wrote {anim_path.relative_to(run_dir.resolve())}  ({anim_path.stat().st_size / 1024:.1f} KB)")
+print(
+    f"wrote {anim_path.relative_to(run_dir.resolve())}  ({anim_path.stat().st_size / 1024:.1f} KB)"
+)
 
 Video(str(anim_path), embed=True, width=800)
 
@@ -297,7 +299,9 @@ validate_points_in_domain(points, ds)
 series = extract_water_level_series(ds, points, variable="elevation")
 parquet_path = run_dir / "obs_water_level.parquet"
 series.to_parquet(parquet_path)
-print(f"wrote {parquet_path.relative_to(run_dir.parent)}  ({parquet_path.stat().st_size / 1024:.1f} KB)")
+print(
+    f"wrote {parquet_path.relative_to(run_dir.parent)}  ({parquet_path.stat().st_size / 1024:.1f} KB)"
+)
 print(series.describe().loc[["min", "50%", "mean", "max"]].round(3))
 
 # %% [markdown]

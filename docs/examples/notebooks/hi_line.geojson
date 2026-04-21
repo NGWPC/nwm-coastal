@@ -1,8 +1,31 @@
 {
-"type": "FeatureCollection",
-"name": "hi_line",
-"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
-"features": [
-{ "type": "Feature", "properties": { "id": 1 }, "geometry": { "type": "LineString", "coordinates": [ [ -155.778814925268307, 20.624375177570755 ], [ -156.563293695138583, 20.071111203030661 ] ] } }
-]
+  "type": "FeatureCollection",
+  "name": "hi_line",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "urn:ogc:def:crs:OGC:1.3:CRS84"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 1
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -155.7788149252683,
+            20.624375177570755
+          ],
+          [
+            -156.56329369513858,
+            20.07111120303066
+          ]
+        ]
+      }
+    }
+  ]
 }

@@ -64,9 +64,7 @@ def _sfincs_regular_dataset(n_time: int = 4, n_y: int = 4, n_x: int = 5) -> xr.D
 def _sfincs_quadtree_dataset(n_time: int = 4) -> xr.Dataset:
     node_x = np.array([0.0, 1.0, 2.0, 0.0, 1.0, 2.0, 0.0, 1.0, 2.0], dtype=np.float64)
     node_y = np.array([0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0], dtype=np.float64)
-    face_nodes = np.array(
-        [[0, 1, 4, 3], [1, 2, 5, 4], [3, 4, 7, 6], [4, 5, 8, 7]], dtype=np.int64
-    )
+    face_nodes = np.array([[0, 1, 4, 3], [1, 2, 5, 4], [3, 4, 7, 6], [4, 5, 8, 7]], dtype=np.int64)
     times = pd.date_range("2024-01-01", periods=n_time, freq="1h")
     zs = np.outer(np.arange(1.0, n_time + 1.0), np.arange(1.0, 5.0)).astype(np.float32)
     return xr.Dataset(
@@ -133,9 +131,7 @@ class TestAnimateMp4:
 
     def test_time_stride_reduces_frames(self, tmp_path: Path):
         ds = _sfincs_regular_dataset(n_time=6)
-        out = animate_water_level(
-            ds, tmp_path / "strided.mp4", fps=5, dpi=60, time_stride=3
-        )
+        out = animate_water_level(ds, tmp_path / "strided.mp4", fps=5, dpi=60, time_stride=3)
         assert out.is_file()
         # Two output frames (0, 3); mp4 can't be inspected without ffprobe, but
         # file should at least exist and be non-empty.
@@ -156,25 +152,24 @@ class TestEdgeCases:
     def test_empty_time_axis_after_stride(self, tmp_path: Path):
         # Only one timestep; stride of 10 still yields one frame (index 0).
         ds = _sfincs_regular_dataset(n_time=1)
-        out = animate_water_level(
-            ds, tmp_path / "single.gif", fps=5, dpi=60, time_stride=10
-        )
+        out = animate_water_level(ds, tmp_path / "single.gif", fps=5, dpi=60, time_stride=10)
         assert out.is_file()
 
     def test_explicit_writer_override(self, tmp_path: Path):
         """An explicit pillow writer should happily render to a .gif path."""
         ds = _sfincs_regular_dataset(n_time=2)
-        out = animate_water_level(
-            ds, tmp_path / "explicit.gif", fps=5, dpi=60, writer="pillow"
-        )
+        out = animate_water_level(ds, tmp_path / "explicit.gif", fps=5, dpi=60, writer="pillow")
         assert out.is_file()
 
     def test_colour_limits_propagate(self, tmp_path: Path):
         ds = _sfincs_regular_dataset(n_time=2)
         out = animate_water_level(
-            ds, tmp_path / "limited.gif",
-            fps=5, dpi=60,
-            vmin=-1.0, vmax=10.0,
+            ds,
+            tmp_path / "limited.gif",
+            fps=5,
+            dpi=60,
+            vmin=-1.0,
+            vmax=10.0,
         )
         assert out.is_file()
 
@@ -182,8 +177,10 @@ class TestEdgeCases:
         """Smoke-test the title-prefix kwarg by rendering one frame."""
         ds = _sfincs_regular_dataset(n_time=1)
         out = animate_water_level(
-            ds, tmp_path / "titled.gif",
-            fps=5, dpi=60,
+            ds,
+            tmp_path / "titled.gif",
+            fps=5,
+            dpi=60,
             title_prefix="Prefix",
         )
         assert out.is_file()
@@ -197,8 +194,11 @@ class TestEdgeCases:
         ds = ds.assign(dryFlagNode=(("time", "node"), dry))
 
         out = animate_water_level(
-            ds, tmp_path / "masked.gif",
-            fps=5, dpi=60, mask_dry=True,
+            ds,
+            tmp_path / "masked.gif",
+            fps=5,
+            dpi=60,
+            mask_dry=True,
         )
         assert out.is_file()
         assert out.stat().st_size > 0

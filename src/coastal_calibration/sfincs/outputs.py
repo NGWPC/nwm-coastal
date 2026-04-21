@@ -172,9 +172,7 @@ def _build_quadtree(ds: xr.Dataset) -> xr.Dataset:
         d for d in zs_da.dims if str(d).startswith("nmesh2d_face") or d == "face"
     ]
     if "time" not in zs_da.dims or not face_dim_candidates:
-        msg = (
-            f"Expected zs to be face-valued with a 'time' dim; got dims {tuple(zs_da.dims)}"
-        )
+        msg = f"Expected zs to be face-valued with a 'time' dim; got dims {tuple(zs_da.dims)}"
         raise ValueError(msg)
     face_dim = face_dim_candidates[0]
     zs_da = zs_da.transpose("time", face_dim)
@@ -231,8 +229,7 @@ def _build_regular(ds: xr.Dataset) -> xr.Dataset:
     missing = required_dims - dims_str
     if missing:
         msg = (
-            f"Expected zs to have dims {required_dims}; "
-            f"got {tuple(zs_da.dims)} (missing {missing})"
+            f"Expected zs to have dims {required_dims}; got {tuple(zs_da.dims)} (missing {missing})"
         )
         raise ValueError(msg)
     zs_da = zs_da.transpose("time", "y", "x")

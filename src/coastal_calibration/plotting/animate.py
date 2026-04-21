@@ -144,6 +144,17 @@ def _make_updater(
     return update
 
 
+def _frame_title(ds: xr.Dataset, variable: str, frame_idx: int, prefix: str | None) -> str:
+    """Build the per-frame title string."""
+    t = np.asarray(ds["time"].to_numpy())[frame_idx]
+    if np.issubdtype(np.asarray(t).dtype, np.datetime64):
+        t_str = np.datetime_as_string(np.asarray(t), unit="m")
+    else:
+        t_str = str(t)
+    base = f"{variable} @ {t_str}"
+    return f"{prefix} — {base}" if prefix else base
+
+
 def animate_water_level(
     ds: xr.Dataset,
     outfile: str | Path,
@@ -265,8 +276,12 @@ def animate_water_level(
     )
 
     base_update = _make_updater(
-        coll, ds, variable, time_indices,
-        mask_dry=mask_dry, dry_threshold=dry_threshold,
+        coll,
+        ds,
+        variable,
+        time_indices,
+        mask_dry=mask_dry,
+        dry_threshold=dry_threshold,
     )
 
     def update(i: int) -> tuple[Any, ...]:
@@ -286,16 +301,3 @@ def animate_water_level(
 
     _log.info("wrote %s (%d frames, %d fps)", outfile, len(time_indices), fps)
     return outfile
-
-
-def _frame_title(
-    ds: xr.Dataset, variable: str, frame_idx: int, prefix: str | None
-) -> str:
-    """Build the per-frame title string."""
-    t = np.asarray(ds["time"].to_numpy())[frame_idx]
-    if np.issubdtype(np.asarray(t).dtype, np.datetime64):
-        t_str = np.datetime_as_string(np.asarray(t), unit="m")
-    else:
-        t_str = str(t)
-    base = f"{variable} @ {t_str}"
-    return f"{prefix} — {base}" if prefix else base

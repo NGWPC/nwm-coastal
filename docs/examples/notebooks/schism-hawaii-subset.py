@@ -46,9 +46,9 @@ notebook_dir = Path.cwd()  # assumes notebook is run from docs/examples/notebook
 os.chdir(notebook_dir.parent / "hawaii")
 
 # %%
-import coastal_calibration.schism.subsetter as ss
 import shapely
 
+import coastal_calibration.schism.subsetter as ss
 
 project = "model"
 nwm = ss.NWMSCHISMProject(project)

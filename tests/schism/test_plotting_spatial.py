@@ -88,9 +88,7 @@ def _sfincs_quadtree_dataset(n_time: int = 3) -> xr.Dataset:
     node_x = np.array([0.0, 1.0, 2.0, 0.0, 1.0, 2.0, 0.0, 1.0, 2.0], dtype=np.float64)
     node_y = np.array([0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0], dtype=np.float64)
     # 4 quads, 0-based CCW.
-    face_nodes = np.array(
-        [[0, 1, 4, 3], [1, 2, 5, 4], [3, 4, 7, 6], [4, 5, 8, 7]], dtype=np.int64
-    )
+    face_nodes = np.array([[0, 1, 4, 3], [1, 2, 5, 4], [3, 4, 7, 6], [4, 5, 8, 7]], dtype=np.int64)
     times = pd.date_range("2024-01-01", periods=n_time, freq="1h")
     zs = np.outer(np.arange(1.0, n_time + 1.0), np.arange(1.0, 5.0)).astype(np.float32)
     return xr.Dataset(

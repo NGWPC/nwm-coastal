@@ -8,14 +8,23 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project ad
 
 ### Added
 
-- **outputs**: Add canonical water-level loaders for SCHISM (`load_schism_elevation`) and SFINCS (`load_sfincs_water_level`)
-- **plotting**: Add shared spatial renderer `plot_water_level` that dispatches on `mesh_type` to SCHISM unstructured, SFINCS regular, or SFINCS UGRID-quadtree
-- **plotting**: Add water-level animation writer `animate_water_level` with MP4 (FFMpeg) and GIF (Pillow) backends
-- **observations**: Add observations module for user-point water-level extraction (`load_obs_points`, `validate_points_in_domain`, `extract_water_level_series`)
-- **stages**: Add `create_water_level_animation`, `animation_fps`, `animation_time_stride`, and `obs_points_csv` config fields on SCHISM and SFINCS plot stages
-- **stages**: Generalize station comparison to overlay multiple simulated runs against optional NOAA observations
-- **examples**: Add post-run plotting notebooks for Lavaca Bay, Narragansett Bay, and Hawaii, plus a SCHISM mesh-subset demo
-- **tooling**: Configure git-cliff for changelog generation with `changelog` and `changelog-update` pixi tasks
+- **outputs**: Add canonical water-level loaders for SCHISM (`load_schism_elevation`)
+    and SFINCS (`load_sfincs_water_level`)
+- **plotting**: Add shared spatial renderer `plot_water_level` that dispatches on
+    `mesh_type` to SCHISM unstructured, SFINCS regular, or SFINCS UGRID-quadtree
+- **plotting**: Add water-level animation writer `animate_water_level` with MP4 (FFMpeg)
+    and GIF (Pillow) backends
+- **observations**: Add observations module for user-point water-level extraction
+    (`load_obs_points`, `validate_points_in_domain`, `extract_water_level_series`)
+- **stages**: Add `create_water_level_animation`, `animation_fps`,
+    `animation_time_stride`, and `obs_points_csv` config fields on SCHISM and SFINCS
+    plot stages
+- **stages**: Generalize station comparison to overlay multiple simulated runs against
+    optional NOAA observations
+- **examples**: Add post-run plotting notebooks for Lavaca Bay, Narragansett Bay, and
+    Hawaii, plus a SCHISM mesh-subset demo
+- **tooling**: Configure git-cliff for changelog generation with `changelog` and
+    `changelog-update` pixi tasks
 - Add MPI runtime detection and system binary support
 - Add pixi-build recipes for SFINCS and SCHISM
 - Add tides, regridding, sflux, and schism_prep modules
@@ -36,10 +45,14 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project ad
 
 ### Changed
 
-- **subsetter**: Rewrite mesh-cut boundary reconstruction with explicit segment extraction and switch from `scipy.io.netcdf_file` to `netCDF4`
-- **plotting**: Make `plotable_stations` private; `plot_station_comparison` is now the sole public station entry point
-- **tooling**: Rename pixi `notebook` feature to `dev` and broaden jupytext hook to all `docs/examples/` notebooks
-- Standardize `netCDF4` imports (drop the `nc` alias) across streamflow, regridding, schism/prep, schism/sflux, and tides modules
+- **subsetter**: Rewrite mesh-cut boundary reconstruction with explicit segment
+    extraction and switch from `scipy.io.netcdf_file` to `netCDF4`
+- **plotting**: Make `plotable_stations` private; `plot_station_comparison` is now the
+    sole public station entry point
+- **tooling**: Rename pixi `notebook` feature to `dev` and broaden jupytext hook to all
+    `docs/examples/` notebooks
+- Standardize `netCDF4` imports (drop the `nc` alias) across streamflow, regridding,
+    schism/prep, schism/sflux, and tides modules
 - Reorganize package into model-specific and data subpackages
 - Move ModelConfig field docs to NumPy class docstring
 - Use #: comments for ModelConfig field docs
@@ -153,7 +166,7 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project ad
 - Patch hydromt-sfincs to use chunked writing in the write step and reducing memory
     footprint
 - Add the missing divider in the log message after slurm job steps
-- Make sfincs datum adjusment configurable since navd88 conversion is difficult to
+- Make sfincs datum adjustment configurable since navd88 conversion is difficult to
     automate.
 - Filter stations without obs/sim data and adjust the plot setting for better plots.
 - Filter stations without obs/sim data and adjust the plot setting for better plots.
@@ -181,7 +194,7 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project ad
 - Patch hydromt-sfincs to use chunked writing in the write step and reducing memory
     footprint
 - Add the missing divider in the log message after slurm job steps
-- Make sfincs datum adjusment configurable since navd88 conversion is difficult to
+- Make sfincs datum adjustment configurable since navd88 conversion is difficult to
     automate.
 - Filter stations without obs/sim data and adjust the plot setting for better plots.
 - Filter stations without obs/sim data and adjust the plot setting for better plots.
@@ -264,7 +277,7 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project ad
 - Explicitly set the boundary format to the new nc
 - Explicitly set the boundary format to the new nc
 - Explicitly set the boundary format to the new nc
-- Address the time pasing issue for tpxo
+- Address the time parsing issue for tpxo
 - Use the correct path to tpxo data for sfincs since it runs the data processing on
     login node
 - Use the correct package name for click
@@ -352,7 +365,7 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project ad
 - Explicitly set the boundary format to the new nc
 - Explicitly set the boundary format to the new nc
 - Explicitly set the boundary format to the new nc
-- Address the time pasing issue for tpxo
+- Address the time parsing issue for tpxo
 - Use the correct path to tpxo data for sfincs since it runs the data processing on
     login node
 - Use the correct package name for click

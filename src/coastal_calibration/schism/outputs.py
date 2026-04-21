@@ -59,9 +59,7 @@ def _resolve_outputs_dir(run_dir: Path) -> Path:
     outputs = run_dir / "outputs"
     if outputs.is_dir() and list(outputs.glob(_OUT2D_GLOB)):
         return outputs
-    raise FileNotFoundError(
-        f"No SCHISM {_OUT2D_GLOB} files found under {run_dir} or {outputs}"
-    )
+    raise FileNotFoundError(f"No SCHISM {_OUT2D_GLOB} files found under {run_dir} or {outputs}")
 
 
 def _parse_base_date(attr: str) -> pd.Timestamp:
@@ -76,9 +74,7 @@ def _parse_base_date(attr: str) -> pd.Timestamp:
         raise ValueError(f"Unexpected SCHISM base_date format: {attr!r}")
     year, month, day, hour = (int(float(p)) for p in parts[:4])
     minute = int(float(parts[4])) if len(parts) >= 5 else 0
-    return pd.Timestamp(
-        year=year, month=month, day=day, hour=hour, minute=minute
-    )
+    return pd.Timestamp(year=year, month=month, day=day, hour=hour, minute=minute)
 
 
 def _detect_crs(ds0: xr.Dataset) -> str | None:
@@ -189,9 +185,7 @@ def load_schism_elevation(
                 f"SCHISM output file {files[0].name} is missing required "
                 f"variables: {', '.join(missing)}"
             )
-        present_optional = tuple(
-            v for v in _OPTIONAL_TIME_VARS if v in ds0_probe.variables
-        )
+        present_optional = tuple(v for v in _OPTIONAL_TIME_VARS if v in ds0_probe.variables)
 
     time_vars = ("elevation", "time", *present_optional)
     per_block: list[xr.Dataset] = []
@@ -211,9 +205,7 @@ def load_schism_elevation(
         crs_label = _detect_crs(ds0)
 
     if base_date_attr is None:
-        raise KeyError(
-            f"Missing 'base_date' attribute on time variable in {files[0].name}"
-        )
+        raise KeyError(f"Missing 'base_date' attribute on time variable in {files[0].name}")
     base_date = _parse_base_date(str(base_date_attr))
 
     # SCHISM writes seconds-since-base_date as the raw time values.
@@ -258,12 +250,18 @@ def load_schism_elevation(
         {"long_name": "free-surface elevation", "units": "m", "datum": "MSL"}
     )
     out["h"].attrs.update(
-        {"long_name": "water depth", "units": "m",
-         "description": "elevation + depth; ~0 at dry nodes"}
+        {
+            "long_name": "water depth",
+            "units": "m",
+            "description": "elevation + depth; ~0 at dry nodes",
+        }
     )
     out["depth"].attrs.update(
-        {"long_name": "bathymetric depth", "units": "m",
-         "description": "positive when bed is below the datum"}
+        {
+            "long_name": "bathymetric depth",
+            "units": "m",
+            "description": "positive when bed is below the datum",
+        }
     )
     out["node_x"].attrs.update({"long_name": "node longitude", "units": "degrees_east"})
     out["node_y"].attrs.update({"long_name": "node latitude", "units": "degrees_north"})

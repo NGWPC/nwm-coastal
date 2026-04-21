@@ -6,7 +6,7 @@ produced by :mod:`coastal_calibration.schism.outputs` (unstructured triangular
 dispatches on the ``mesh_type`` attribute to the right matplotlib primitive
 (:func:`matplotlib.pyplot.tripcolor` vs :meth:`matplotlib.axes.Axes.pcolormesh`).
 
-The single-frame renderer is re-used by
+The single-frame renderer is reused by
 :mod:`coastal_calibration.plotting.animate` to produce animations.
 """
 
@@ -31,7 +31,7 @@ __all__ = ["plot_water_level", "triangulate_faces", "triangulate_faces_indexed"]
 #: Known ``mesh_type`` attribute values.
 _REGULAR = "regular"
 _UGRID_TRI_QUAD = "ugrid-triangle-or-quad"  # node-valued data (e.g. SCHISM)
-_UGRID_QUADTREE = "ugrid-quadtree"          # face-valued data (e.g. SFINCS quadtree)
+_UGRID_QUADTREE = "ugrid-quadtree"  # face-valued data (e.g. SFINCS quadtree)
 
 
 def _select_time(da: xr.DataArray, time: int | Any) -> xr.DataArray:
@@ -183,8 +183,13 @@ def _plot_regular(
     x = np.asarray(ds["x"].to_numpy())
     y = np.asarray(ds["y"].to_numpy())
     return ax.pcolormesh(
-        x, y, values,
-        cmap=_extended_cmap(cmap), vmin=vmin, vmax=vmax, shading=shading,
+        x,
+        y,
+        values,
+        cmap=_extended_cmap(cmap),
+        vmin=vmin,
+        vmax=vmax,
+        shading=shading,
     )
 
 
@@ -205,8 +210,12 @@ def _plot_unstructured(
     # only shading that preserves the node-length value contract required by
     # in-place ``set_array`` updates in the animation writer.
     return ax.tripcolor(
-        triangulation, values,
-        cmap=_extended_cmap(cmap), vmin=vmin, vmax=vmax, shading="gouraud",
+        triangulation,
+        values,
+        cmap=_extended_cmap(cmap),
+        vmin=vmin,
+        vmax=vmax,
+        shading="gouraud",
     )
 
 
@@ -239,8 +248,12 @@ def _plot_quadtree(
 
     tri_values = face_values[triangle_face]
     coll = ax.tripcolor(
-        triangulation, facecolors=tri_values,
-        cmap=_extended_cmap(cmap), vmin=vmin, vmax=vmax, shading="flat",
+        triangulation,
+        facecolors=tri_values,
+        cmap=_extended_cmap(cmap),
+        vmin=vmin,
+        vmax=vmax,
+        shading="flat",
     )
     # Stash the broadcast map on the collection so animation writers can
     # re-expand face-length frames to triangle-length without recomputing.
@@ -278,9 +291,7 @@ def _wet_mask(ds: xr.Dataset, dry_threshold: float) -> xr.DataArray | None:
     return None
 
 
-def _apply_wet_mask(
-    ds: xr.Dataset, variable: str, dry_threshold: float
-) -> xr.Dataset:
+def _apply_wet_mask(ds: xr.Dataset, variable: str, dry_threshold: float) -> xr.Dataset:
     """Return a shallow copy of *ds* with *variable* masked at dry cells.
 
     Dry cells become NaN, which matplotlib renders with the cmap's "bad"
@@ -364,18 +375,34 @@ def _dispatch_plot(
     """Route to the right matplotlib primitive based on mesh_type."""
     if mesh_type == _REGULAR:
         return _plot_regular(
-            ds, variable, time, ax,
-            cmap=cmap, vmin=vmin, vmax=vmax, shading=shading_regular,
+            ds,
+            variable,
+            time,
+            ax,
+            cmap=cmap,
+            vmin=vmin,
+            vmax=vmax,
+            shading=shading_regular,
         )
     if mesh_type == _UGRID_TRI_QUAD:
         return _plot_unstructured(
-            ds, variable, time, ax,
-            cmap=cmap, vmin=vmin, vmax=vmax,
+            ds,
+            variable,
+            time,
+            ax,
+            cmap=cmap,
+            vmin=vmin,
+            vmax=vmax,
         )
     if mesh_type == _UGRID_QUADTREE:
         return _plot_quadtree(
-            ds, variable, time, ax,
-            cmap=cmap, vmin=vmin, vmax=vmax,
+            ds,
+            variable,
+            time,
+            ax,
+            cmap=cmap,
+            vmin=vmin,
+            vmax=vmax,
         )
     msg = f"Unknown mesh_type={mesh_type!r}"
     raise ValueError(msg)
@@ -506,9 +533,14 @@ def plot_water_level(
         _, ax = plt.subplots(figsize=figsize)
 
     coll = _dispatch_plot(
-        ds, variable, time, ax,
+        ds,
+        variable,
+        time,
+        ax,
         mesh_type=mesh_type,
-        cmap=cmap, vmin=vmin, vmax=vmax,
+        cmap=cmap,
+        vmin=vmin,
+        vmax=vmax,
         shading_regular=shading_regular,
     )
 
@@ -534,7 +566,11 @@ def plot_water_level(
             units = ds[variable].attrs.get("units", "m")
             extend = _colorbar_extend(np.asarray(ds[variable].to_numpy()), vmin, vmax)
             fig.colorbar(
-                coll, ax=ax, label=f"{variable} ({units})", shrink=0.8, extend=extend,
+                coll,
+                ax=ax,
+                label=f"{variable} ({units})",
+                shrink=0.8,
+                extend=extend,
             )
 
     if basemap:

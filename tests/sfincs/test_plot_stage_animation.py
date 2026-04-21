@@ -33,9 +33,7 @@ def _have_ffmpeg() -> bool:
     return writers.is_available("ffmpeg")
 
 
-_skip_if_no_ffmpeg = pytest.mark.skipif(
-    not _have_ffmpeg(), reason="ffmpeg not available on PATH"
-)
+_skip_if_no_ffmpeg = pytest.mark.skipif(not _have_ffmpeg(), reason="ffmpeg not available on PATH")
 
 # ---------------------------------------------------------------------------
 # Synthetic fixture builder — UGRID quadtree layout matches real SFINCS output.
@@ -168,9 +166,7 @@ class TestSfincsPlotStageAnimation:
         assert result["animation"]["reason"] == "no sfincs_map.nc"
 
     @_skip_if_no_ffmpeg
-    def test_time_stride_honored(
-        self, sfincs_model_with_map: tuple[Path, Path], tmp_path: Path
-    ):
+    def test_time_stride_honored(self, sfincs_model_with_map: tuple[Path, Path], tmp_path: Path):
         """A stride of 2 on a 3-frame series still produces a valid animation."""
         work, _model_root = sfincs_model_with_map
         cfg = _make_config(
@@ -199,9 +195,9 @@ class TestSfincsPlotStageObsPoints:
         # Synthetic mesh is in a raw 3x3 grid spanning (0, 0) .. (2, 2);
         # without a CRS attr the observations helper treats those as WGS84.
         csv = tmp_path / "user_obs.csv"
-        pd.DataFrame(
-            {"id": ["p1", "p2"], "lon": [0.5, 1.5], "lat": [0.5, 1.5]}
-        ).to_csv(csv, index=False)
+        pd.DataFrame({"id": ["p1", "p2"], "lon": [0.5, 1.5], "lat": [0.5, 1.5]}).to_csv(
+            csv, index=False
+        )
 
         cfg = _make_config(work, tmp_path, obs_points_csv=csv)
         stage = SfincsPlotStage(cfg)
@@ -224,9 +220,7 @@ class TestSfincsPlotStageObsPoints:
 
         work, _ = sfincs_model_with_map
         csv = tmp_path / "bad_obs.csv"
-        pd.DataFrame(
-            {"id": ["way_off"], "lon": [99.0], "lat": [99.0]}
-        ).to_csv(csv, index=False)
+        pd.DataFrame({"id": ["way_off"], "lon": [99.0], "lat": [99.0]}).to_csv(csv, index=False)
 
         cfg = _make_config(work, tmp_path, obs_points_csv=csv)
         stage = SfincsPlotStage(cfg)
