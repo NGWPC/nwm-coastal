@@ -120,6 +120,16 @@ class MaskConfig:
     #: Reset existing boundary conditions before creating new ones.
     reset_bounds: bool = True
 
+    #: When ``True``, drop active cells that are not in the largest
+    #: connected component of the mask. Coastal SFINCS domains carved
+    #: from a watershed AOI commonly leave a handful of isolated active
+    #: cells just above the ``zmin`` threshold (offshore bumps that
+    #: barely clear the cutoff but are surrounded by deeper inactive
+    #: cells). These render as floating "blocks" in spatial plots and
+    #: contribute nothing to the model. The default is ``False`` to
+    #: preserve historical behavior; turn this on for new models.
+    keep_largest_only: bool = False
+
 
 @dataclass
 class SubgridConfig:
@@ -181,7 +191,12 @@ class RiverDischargeConfig:
     flowlines: Path
 
     #: Column in the GeoJSON whose values correspond to NWM
-    #: ``feature_id`` values in CHRTOUT files.
+    #: ``feature_id`` values in CHRTOUT files. The exact column name
+    #: depends on the source NHF dataset that QGIS exported (typically
+    #: ``"ID"``, ``"flowpath_id"``, or ``"comid"``); whichever you
+    #: configure here is normalized internally to ``"name"`` — the
+    #: column SFINCS uses in ``model.discharge_points.gdf`` and that the
+    #: run stage reads back as an integer for NWM streamflow lookup.
     nwm_id_column: str
 
     #: Maximum distance (meters) a discharge point may be snapped to
@@ -218,6 +233,18 @@ class SfincsCreateConfig:
     data_catalog: DataCatalogConfig = field(default_factory=DataCatalogConfig)
     monitoring: MonitoringConfig = field(default_factory=MonitoringConfig)
     river_discharge: RiverDischargeConfig | None = None
+
+    #: When > 0, simplify the AOI before grid creation by morphological
+    #: closing: erode the polygon by this distance (meters), keep only
+    #: the largest connected piece, then re-dilate. This drops thin
+    #: "necks" that connect smaller sub-regions to the main coastal
+    #: area. Such sub-regions are typically poorly resolved at the
+    #: SFINCS quadtree base resolution and produce visible artifacts
+    #: (e.g. cells with anomalously low water levels that never
+    #: equilibrate with the main ocean). The cleaned AOI is also
+    #: picked up by the discharge stage so flowpath crossings line up
+    #: with the actual model domain. Default 0.0 (off).
+    aoi_simplify_neck_m: float = 0.0
 
     #: When True, automatically query NOAA CO-OPS for water level
     #: stations within the model domain and add them as observation
@@ -363,6 +390,7 @@ class SfincsCreateConfig:
         obs_file_raw = data.get("observation_locations_file")
         observation_locations_file = Path(obs_file_raw) if obs_file_raw else None
         merge_observations = data.get("merge_observations", False)
+        aoi_simplify_neck_m = float(data.get("aoi_simplify_neck_m", 0.0))
 
         return cls(
             aoi=Path(aoi),
@@ -375,6 +403,7 @@ class SfincsCreateConfig:
             data_catalog=data_catalog,
             monitoring=monitoring,
             river_discharge=river_discharge,
+            aoi_simplify_neck_m=aoi_simplify_neck_m,
             add_noaa_gages=add_noaa_gages,
             observation_points=observation_points,
             observation_locations_file=observation_locations_file,
@@ -573,6 +602,7 @@ class SfincsCreateConfig:
                 "zmin": self.mask.zmin,
                 "boundary_zmax": self.mask.boundary_zmax,
                 "reset_bounds": self.mask.reset_bounds,
+                "keep_largest_only": self.mask.keep_largest_only,
             },
             "subgrid": {
                 "nr_subgrid_pixels": self.subgrid.nr_subgrid_pixels,
@@ -602,6 +632,7 @@ class SfincsCreateConfig:
                 if self.river_discharge is not None
                 else None
             ),
+            "aoi_simplify_neck_m": self.aoi_simplify_neck_m,
             "add_noaa_gages": self.add_noaa_gages,
             "observation_points": self.observation_points,
             "observation_locations_file": (

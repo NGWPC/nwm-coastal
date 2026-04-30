@@ -33,8 +33,17 @@ GEO_LAT_S, GEO_LAT_N = 20.0, 22.0
 # ---------------------------------------------------------------------------
 
 
-def make_stofs_nc(path: Path, n_nodes: int = 50, n_times: int = 10) -> None:
-    """Write a minimal ESTOFS-like NetCDF file.
+def make_stofs_nc(path: Path, mesh_nx: int = 10, mesh_ny: int = 5, n_times: int = 10) -> None:
+    """Write a minimal ESTOFS-like NetCDF file with element connectivity.
+
+    Layout: a regular ``mesh_nx * mesh_ny`` node grid covering the
+    domain, triangulated into ``2 * (mesh_nx-1) * (mesh_ny-1)``
+    elements (50 nodes / 72 triangles for the defaults). Real ESTOFS
+    files carry triangle connectivity in an ``element(nele, three)``
+    variable with a 1-based ``start_index`` attribute; this fixture
+    matches that structure so the BILINEAR regrid path in
+    :mod:`coastal_calibration.regridding.regrid_estofs` (which reads
+    ``f_in["element"]``) can build a source ``ESMF.Mesh``.
 
     Time layout (seconds since 2024-01-09 00:00:00):
         index 0-9  ->  hours 0-9
@@ -44,8 +53,27 @@ def make_stofs_nc(path: Path, n_nodes: int = 50, n_times: int = 10) -> None:
     mask present in real ESTOFS output.
     """
     rng = np.random.default_rng(42)
-    lons = rng.uniform(LON_W, LON_E, n_nodes)
-    lats = rng.uniform(LAT_S, LAT_N, n_nodes)
+
+    # Regular node grid → straightforward triangulation, deterministic across platforms.
+    lons_1d = np.linspace(LON_W, LON_E, mesh_nx)
+    lats_1d = np.linspace(LAT_S, LAT_N, mesh_ny)
+    lons_2d, lats_2d = np.meshgrid(lons_1d, lats_1d)  # (mesh_ny, mesh_nx)
+    node_lons = lons_2d.ravel().astype("f8")
+    node_lats = lats_2d.ravel().astype("f8")
+    n_nodes = node_lons.size
+
+    # Each quad (i,j)-(i+1,j)-(i+1,j+1)-(i,j+1) → 2 triangles, 1-based.
+    triangles: list[list[int]] = []
+    for j in range(mesh_ny - 1):
+        for i in range(mesh_nx - 1):
+            n0 = j * mesh_nx + i
+            n1 = n0 + 1
+            n2 = n0 + mesh_nx
+            n3 = n2 + 1
+            triangles.append([n0 + 1, n1 + 1, n3 + 1])
+            triangles.append([n0 + 1, n3 + 1, n2 + 1])
+    elem_conn = np.array(triangles, dtype="i4")
+    n_elem = elem_conn.shape[0]
 
     zeta_data = rng.uniform(-0.5, 1.5, (n_times, n_nodes)).astype("f4")
     mask = rng.random((n_times, n_nodes)) < 0.2
@@ -55,6 +83,8 @@ def make_stofs_nc(path: Path, n_nodes: int = 50, n_times: int = 10) -> None:
     with netCDF4.Dataset(path, "w", format="NETCDF4") as ds:
         ds.createDimension("time", n_times)
         ds.createDimension("node", n_nodes)
+        ds.createDimension("nele", n_elem)
+        ds.createDimension("three", 3)
 
         tv = ds.createVariable("time", "f8", ("time",))
         tv.units = "seconds since 2024-01-09 00:00:00"
@@ -62,10 +92,14 @@ def make_stofs_nc(path: Path, n_nodes: int = 50, n_times: int = 10) -> None:
         tv[:] = times
 
         xv = ds.createVariable("x", "f8", ("node",))
-        xv[:] = lons
+        xv[:] = node_lons
 
         yv = ds.createVariable("y", "f8", ("node",))
-        yv[:] = lats
+        yv[:] = node_lats
+
+        ev = ds.createVariable("element", "i4", ("nele", "three"))
+        ev.start_index = np.int32(1)
+        ev[:] = elem_conn
 
         fill = np.float32(-9999.0)
         zv = ds.createVariable("zeta", "f4", ("time", "node"), fill_value=fill)

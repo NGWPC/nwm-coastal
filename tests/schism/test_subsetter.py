@@ -12,15 +12,19 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal
 
+import numpy as np
 import pytest
 import shapely
 
 from coastal_calibration.schism.project_reader import NWMSCHISMProject
+from coastal_calibration.schism.stages import _chain_ring
 from coastal_calibration.schism.subsetter import (
     MeshClassifier,
     MeshSubsetter,
     _build_cut_boundaries,
+    _build_shared_nodes_graph,
     _extract_side_segments,
+    extract_mesh,
 )
 from tests.schism.schism_testkit import generate_test_case
 
@@ -337,3 +341,219 @@ class TestDivideIsland:
                 assert all(1 <= nid <= n for nid in bnd)
             for lb in bs.land_boundaries:
                 assert all(1 <= nid <= n for nid in lb.nodes)
+
+
+# ---------------------------------------------------------------------------
+# Unit tests: _build_shared_nodes_graph
+# ---------------------------------------------------------------------------
+
+
+class TestBuildSharedNodesGraph:
+    """Adjacency must follow real element edges, never quad diagonals."""
+
+    def test_empty_elements(self):
+        elements = np.empty((0, 5), dtype=np.int64)
+        assert _build_shared_nodes_graph([], elements) == {}
+
+    def test_no_shared_nodes_in_elements(self):
+        elements = np.array([[1, 1, 2, 3, 0]], dtype=np.int64)
+        assert _build_shared_nodes_graph([10, 20], elements) == {}
+
+    def test_triangle_two_shared(self):
+        elements = np.array([[1, 1, 2, 3, 0]], dtype=np.int64)
+        adj = _build_shared_nodes_graph([1, 2], elements)
+        assert adj == {1: {2}, 2: {1}}
+
+    def test_triangle_all_three_shared(self):
+        # All triangle vertices form actual edges, so all pairs are adjacent
+        elements = np.array([[1, 1, 2, 3, 0]], dtype=np.int64)
+        adj = _build_shared_nodes_graph([1, 2, 3], elements)
+        assert adj == {1: {2, 3}, 2: {1, 3}, 3: {1, 2}}
+
+    def test_quad_three_shared_excludes_diagonal(self):
+        # Quad 1-2-3-4 (CCW). Edges: 1-2, 2-3, 3-4, 4-1. Diagonals: 1-3, 2-4.
+        # If 1, 2, 3 are shared, the diagonal 1-3 must NOT be added — that
+        # was the old bug.
+        elements = np.array([[1, 1, 2, 3, 4]], dtype=np.int64)
+        adj = _build_shared_nodes_graph([1, 2, 3], elements)
+        assert adj == {1: {2}, 2: {1, 3}, 3: {2}}
+        assert 3 not in adj.get(1, set()), "diagonal 1-3 must not be in adjacency"
+        assert 1 not in adj.get(3, set()), "diagonal 1-3 must not be in adjacency"
+
+    def test_quad_diagonal_pair_only_no_edge(self):
+        # Only the diagonal pair 1, 3 shared: not edge-adjacent on the quad
+        elements = np.array([[1, 1, 2, 3, 4]], dtype=np.int64)
+        assert _build_shared_nodes_graph([1, 3], elements) == {}
+        # Other diagonal: 2, 4
+        assert _build_shared_nodes_graph([2, 4], elements) == {}
+
+    def test_quad_all_four_shared(self):
+        # All 4 edges, but NOT the 2 diagonals
+        elements = np.array([[1, 1, 2, 3, 4]], dtype=np.int64)
+        adj = _build_shared_nodes_graph([1, 2, 3, 4], elements)
+        assert adj == {1: {2, 4}, 2: {1, 3}, 3: {2, 4}, 4: {1, 3}}
+
+    def test_mixed_tri_and_quad(self):
+        elements = np.array(
+            [
+                [1, 1, 2, 3, 0],  # triangle
+                [2, 3, 4, 5, 6],  # quad (edges 3-4, 4-5, 5-6, 6-3)
+            ],
+            dtype=np.int64,
+        )
+        adj = _build_shared_nodes_graph([1, 2, 3, 4, 5, 6], elements)
+        assert adj[1] == {2, 3}
+        assert adj[2] == {1, 3}
+        # Node 3 is shared between tri (with 1, 2) and quad (with 4, 6)
+        assert adj[3] == {1, 2, 4, 6}
+        assert adj[4] == {3, 5}
+        assert adj[5] == {4, 6}
+        assert adj[6] == {3, 5}
+
+
+# ---------------------------------------------------------------------------
+# Unit tests: _chain_ring (used by both _build_domain_polygon and the QGIS plugin)
+# ---------------------------------------------------------------------------
+
+
+class TestChainRing:
+    """Must handle arbitrary segment order and orientation."""
+
+    def test_empty(self):
+        assert _chain_ring([]) == []
+
+    def test_single_segment(self):
+        assert _chain_ring([[1, 2, 3, 4]]) == [1, 2, 3, 4]
+
+    def test_two_segments_in_order(self):
+        # Segment A's last node == segment B's first node
+        result = _chain_ring([[1, 2, 3], [3, 4, 5]])
+        assert result == [1, 2, 3, 4, 5]
+
+    def test_two_segments_out_of_order(self):
+        # B[-1] matches A's first node — B prepends (reversed-form match
+        # against `first`). With (B=[3,4,5], A=[1,2,3]) the algorithm pops
+        # segment[0] first and then matches the rest.
+        result = _chain_ring([[3, 4, 5], [1, 2, 3]])
+        assert result == [1, 2, 3, 4, 5]
+
+    def test_segment_reversed(self):
+        # Second segment given in reverse direction: seg[-1] == ring[-1]
+        result = _chain_ring([[1, 2, 3], [5, 4, 3]])
+        assert result == [1, 2, 3, 4, 5]
+
+    def test_extract_mesh_like_layout(self):
+        # Mimics extract_mesh output for a single-cut subdomain:
+        #   open_kept   = [sa, x, sb]
+        #   cut_segment = [sa, z, sc]   (direction not aligned with CCW)
+        #   land_kept   = [sc, y, sb]   (direction not aligned with CCW)
+        # Naive concatenation would emit jump-lines sb -> sa and sc -> sc.
+        sa, sb, sc = 100, 200, 300
+        x, y, z = 11, 12, 13
+        segments = [
+            [sa, x, sb],  # original open kept
+            [sa, z, sc],  # cut boundary
+            [sc, y, sb],  # original land kept
+        ]
+        ring = _chain_ring(segments)
+        assert ring[0] == ring[-1], f"ring not closed: starts {ring[0]} ends {ring[-1]}"
+        all_nodes = {n for seg in segments for n in seg}
+        assert set(ring) == all_nodes
+        # 3 segments * 3 nodes - 3 shared endpoints + 1 closing repeat = 7
+        assert len(ring) == 7
+
+    def test_disconnected_segments_break_early(self):
+        # If segments don't share endpoints, the chain stops rather than
+        # emitting a jump-line.
+        result = _chain_ring([[1, 2, 3], [10, 11, 12]])
+        assert result == [1, 2, 3]
+
+
+# ---------------------------------------------------------------------------
+# Integration test: extract_mesh produces a chainable, simple polygon
+# ---------------------------------------------------------------------------
+
+
+def _extracted_polygon(mesh_dir, polygon: shapely.Polygon, tmp_path) -> shapely.Polygon:
+    """Run extract_mesh and return the polygon built from its boundaries.
+
+    Chains ``open + exterior land`` segments — exactly what the QGIS
+    plugin and ``_build_domain_polygon`` produce for visualization or
+    CO-OPS gauge filtering.
+    """
+    out_dir = tmp_path / "extracted"
+    extract_mesh(
+        input_dir=mesh_dir,
+        polygon=polygon,
+        output_dir=out_dir.parent,
+        output_name=out_dir.name,
+        write_netcdf=False,
+        crs=4326,
+    )
+
+    project = NWMSCHISMProject(out_dir, validate=False)
+    bs = project.read_boundaries()
+    coords = project.nodes_coordinates
+
+    segments = list(bs.open_boundaries)
+    segments.extend(list(lb.nodes) for lb in bs.land_boundaries if lb.is_exterior)
+    islands = [list(lb.nodes) for lb in bs.land_boundaries if lb.is_island]
+
+    ring_ids = _chain_ring(segments)
+    assert ring_ids, "chained ring empty — extract_mesh produced no exterior segments"
+
+    outer_pts = coords[np.array(ring_ids) - 1].tolist()
+    holes = [coords[np.array(isl) - 1].tolist() for isl in islands]
+    return shapely.Polygon(outer_pts, holes=holes)
+
+
+class TestExtractMeshBoundaryChain:
+    """End-to-end regression for the QGIS-plugin "diagonal jump" bug.
+
+    A correct extraction must produce boundary segments that chain into a
+    simple (non-self-intersecting) polygon — i.e. no jump-lines between
+    non-adjacent segments.
+    """
+
+    def _inner_rectangle(self) -> shapely.Polygon:
+        # Inner rectangle of the 9x7 mesh that cuts both open and land sides.
+        return shapely.Polygon([(1.5, 0.5), (6.5, 0.5), (6.5, 4.5), (1.5, 4.5)])
+
+    def test_shore_subset_polygon_is_simple(self, shore_project, tmp_path):
+        result = _extracted_polygon(shore_project, self._inner_rectangle(), tmp_path)
+        assert result.is_valid, f"extracted polygon invalid: {shapely.is_valid_reason(result)}"
+        assert result.is_simple, "extracted polygon must be simple (no self-intersections)"
+        assert result.area > 0, "extracted polygon has zero area"
+
+    def test_ocean_subset_polygon_is_simple(self, ocean_project, tmp_path):
+        # A polygon containing the ocean-island region but cutting the outer
+        # boundary on at least two sides.
+        poly = shapely.Polygon([(0.5, 0.5), (7.5, 0.5), (7.5, 5.5), (0.5, 5.5)])
+        result = _extracted_polygon(ocean_project, poly, tmp_path)
+        assert result.is_valid, f"extracted polygon invalid: {shapely.is_valid_reason(result)}"
+        assert result.is_simple, "extracted polygon must be simple (no self-intersections)"
+
+    def test_chained_ring_visits_each_node_once(self, shore_project, tmp_path):
+        # In a correctly-chained ring, only the closing node repeats — any
+        # other repeat means a jump-line was inserted.
+        out_dir = tmp_path / "extracted"
+        extract_mesh(
+            input_dir=shore_project,
+            polygon=self._inner_rectangle(),
+            output_dir=out_dir.parent,
+            output_name=out_dir.name,
+            write_netcdf=False,
+            crs=4326,
+        )
+        project = NWMSCHISMProject(out_dir, validate=False)
+        bs = project.read_boundaries()
+
+        segments = list(bs.open_boundaries)
+        segments.extend(list(lb.nodes) for lb in bs.land_boundaries if lb.is_exterior)
+        ring_ids = _chain_ring(segments)
+
+        interior = ring_ids[:-1] if ring_ids and ring_ids[0] == ring_ids[-1] else ring_ids
+        assert len(interior) == len(set(interior)), (
+            "chained ring revisits a node — extract_mesh boundary order is "
+            "not chainable, or _chain_ring is choosing wrong matches"
+        )

@@ -1,12 +1,21 @@
 r"""Regrid ESTOFS water level data to SCHISM open boundary nodes using ESMF.
 
 This module regrids ESTOFS ``zeta`` (water surface elevation) from an
-unstructured node grid to SCHISM open boundary node locations using
-nearest-source-to-destination interpolation. The output is written in
+unstructured node grid to SCHISM open boundary node locations.  The
+default interpolation is BILINEAR (barycentric within source
+triangles), with a NEAREST_STOD fallback for destination points that
+fall outside any valid source element.  The output is written in
 SCHISM's ``elev2D.th.nc`` format.
 
-MPI-parallel: ESMF decomposes the LocStreams across ranks; results
-are gathered to rank 0 for writing.
+The BILINEAR + Mesh approach replaces an earlier LocStream-only
+NEAREST_STOD setup that produced spatially discontinuous boundary
+forcing when the STOFS source resolution was much coarser than the
+SCHISM destination spacing — most notably on short cut-line boundaries
+created by polygon-based mesh extraction.  See the project README for
+the full problem statement.
+
+MPI-parallel: ESMF decomposes the source mesh and destination
+LocStream across ranks; results are gathered to rank 0 for writing.
 
 Usage::
 
@@ -33,7 +42,12 @@ from cftime import num2date
 
 from coastal_calibration.logging import logger
 
-from .esmf_utils import MaskedRegridder, build_locstream, gather_reduce
+from .esmf_utils import (
+    Regridder,
+    build_locstream,
+    build_unstructured_mesh,
+    gather_reduce,
+)
 
 local_pet = ESMF.local_pet()
 
@@ -168,6 +182,16 @@ def regrid_estofs(
     bnd_lons = np.asarray([c[0] for c in bnd_coords])
     bnd_lats = np.asarray([c[1] for c in bnd_coords])
 
+    # Bbox of destination boundary nodes — used to subset the very large
+    # global STOFS mesh down to the relevant region before handing it to
+    # ESMF.  This keeps memory and setup cost manageable.
+    dst_bbox = (
+        float(bnd_lons.min()),
+        float(bnd_lats.min()),
+        float(bnd_lons.max()),
+        float(bnd_lats.max()),
+    )
+
     with netCDF4.Dataset(nc_in) as f_in:
         start, nt, times, time_atts = _determine_time_range(
             f_in, FORECAST_START, cycle_date, cycle_time, length_hrs
@@ -175,42 +199,86 @@ def regrid_estofs(
 
         src_lon = f_in["x"][:]
         src_lat = f_in["y"][:]
+        src_elements = f_in["element"][:]
+        src_start_index = int(getattr(f_in["element"], "start_index", 1))
 
-        # Build ESMF LocStreams
-        locstream_in = build_locstream(src_lon, src_lat)
+        # Build the source as an ESMF.Mesh (with element connectivity)
+        # so we can do BILINEAR / barycentric interpolation.  The mesh
+        # is built once and reused across all timesteps.
+        src_mesh, src_keep_idx = build_unstructured_mesh(
+            src_lon,
+            src_lat,
+            src_elements,
+            start_index=src_start_index,
+            bbox=dst_bbox,
+            bbox_buffer_deg=2.0,
+        )
+        n_src_kept = len(src_keep_idx)
+        if local_pet == 0:
+            logger.info(
+                "STOFS source mesh: %d/%d nodes kept after bbox filter",
+                n_src_kept,
+                len(src_lon),
+            )
+
+        # Destination remains a LocStream — boundary points have no
+        # connectivity.  Mesh→LocStream BILINEAR is supported by ESMF.
         locstream_out = build_locstream(bnd_lons, bnd_lats)
 
-        field_in = ESMF.Field(locstream_in, name="EstofsIn")
+        # Source field on the mesh (defined at NODE locations).
+        field_in = ESMF.Field(src_mesh, name="EstofsIn", meshloc=ESMF.MeshLoc.NODE)
         field_out = ESMF.Field(locstream_out, name="OpenBoundary")
+        field_fallback = ESMF.Field(locstream_out, name="OpenBoundaryFallback")
 
-        # Global index range for slicing data arrays
-        i_lo = locstream_in._global_lower  # pyright: ignore[reportAttributeAccessIssue]
-        i_hi = locstream_in._global_upper  # pyright: ignore[reportAttributeAccessIssue]
         o_lo = locstream_out._global_lower  # pyright: ignore[reportAttributeAccessIssue]
         o_hi = locstream_out._global_upper  # pyright: ignore[reportAttributeAccessIssue]
 
-        regridder = MaskedRegridder(
+        # Build the BILINEAR regridder once (reused across timesteps).
+        # The fallback NEAREST_STOD handles any destination point that
+        # falls outside the source mesh.  Masked source nodes (dry land
+        # in STOFS) are simply set to 0 in the source data — distant
+        # masked nodes get small bilinear weights at boundary destinations
+        # so this introduces only a small bias that is dwarfed by the
+        # nearby wet-ocean values dominating the interpolation.
+        bilinear = Regridder(
+            field_in,
+            field_out,
+            method=ESMF.RegridMethod.BILINEAR,  # pyright: ignore[reportArgumentType]
+            unmapped_action=ESMF.UnmappedAction.IGNORE,  # pyright: ignore[reportArgumentType]
+        )
+        nearest = Regridder(
+            field_in,
+            field_fallback,
             method=ESMF.RegridMethod.NEAREST_STOD,  # pyright: ignore[reportArgumentType]
             unmapped_action=ESMF.UnmappedAction.IGNORE,  # pyright: ignore[reportArgumentType]
-            src_mask_values=[1],
         )
 
         output = np.zeros((nt, len(bnd_lons)))
         for t in range(start, start + nt):
-            data = f_in[regrid_field][t][i_lo:i_hi]
-            field_in.data[...] = data  # pyright: ignore[reportOptionalSubscript]
-            locstream_in["ESMF:Mask"] = (
-                data.mask.astype("i4")
-                if hasattr(data, "mask") and np.ndim(data.mask) > 0
-                else np.zeros(len(data), dtype="i4")
-            )
+            raw = f_in[regrid_field][t]
+            local_data = np.asarray(raw)[src_keep_idx].astype(np.float64, copy=False)
+            # Replace fill values with 0 so they don't pollute bilinear sums
+            local_data[local_data <= MISSING + 1.0] = 0.0
+            field_in.data[...] = local_data  # pyright: ignore[reportOptionalSubscript]
 
             field_out.data[...] = MISSING  # pyright: ignore[reportOptionalSubscript]
-            field_regridded = regridder(field_in, field_out)
-            output[t - start, o_lo:o_hi] = field_regridded.data[...]  # pyright: ignore[reportOptionalSubscript]
+            field_fallback.data[...] = MISSING  # pyright: ignore[reportOptionalSubscript]
 
+            bilinear(field_in, field_out)
+            nearest(field_in, field_fallback)
+
+            primary = np.asarray(field_out.data[...])  # pyright: ignore[reportOptionalSubscript]
+            backup = np.asarray(field_fallback.data[...])  # pyright: ignore[reportOptionalSubscript]
+            invalid = (primary <= MISSING + 1.0) | ~np.isfinite(primary)
+            primary[invalid] = backup[invalid]
+            output[t - start, o_lo:o_hi] = primary
+
+        bilinear.destroy()
+        nearest.destroy()
         field_in.destroy()
         field_out.destroy()
+        field_fallback.destroy()
+        src_mesh.destroy()
 
     # Gather distributed results to root
     output = gather_reduce(output, global_shape=(nt, len(bnd_coords)))

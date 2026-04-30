@@ -185,7 +185,21 @@ class CreateGridStage(CreateStage):
         self._log(f"AOI: {cfg.aoi}")
         self._log(f"Resolution: {cfg.grid.resolution} m, CRS: {cfg.grid.crs}")
 
-        region = {"geom": str(cfg.aoi)}
+        # Optional thin-neck cleanup: erode → keep largest → dilate.
+        # Drops sub-regions that connect to the main domain only via
+        # narrow necks; those regions are typically poorly resolved at
+        # the SFINCS quadtree base resolution and produce visible
+        # water-level artifacts. The cleaned polygon is written next
+        # to the model output and reused by the discharge stage.
+        aoi_for_region: Path | str = str(cfg.aoi)
+        if cfg.aoi_simplify_neck_m > 0:
+            cleaned_path = self._simplify_aoi_thin_necks(
+                cfg.aoi, cfg.aoi_simplify_neck_m, cfg.output_dir
+            )
+            aoi_for_region = str(cleaned_path)
+            self._log(f"Using cleaned AOI: {cleaned_path.name}")
+
+        region = {"geom": aoi_for_region}
 
         # Build refinement GeoDataFrame from config (if any)
         refinement_gdf = None
@@ -230,6 +244,18 @@ class CreateGridStage(CreateStage):
                             "warning",
                         )
                         gdf = gdf[~empty]
+                # Inward buffering of polygons with thin necks can split a
+                # single Polygon into a MultiPolygon. hydromt-sfincs's
+                # refinement-polygon code only handles single Polygons
+                # (it calls ``.exterior`` directly), so explode here to
+                # hand each component piece in as its own row.
+                exploded = gdf.explode(index_parts=False, ignore_index=True)
+                if len(exploded) > len(gdf):
+                    self._log(
+                        f"Refinement polygon '{ref.polygon.name}': split into "
+                        f"{len(exploded)} component(s) after buffer_m={ref.buffer_m} m"
+                    )
+                    gdf = exploded
                 if gdf.empty:
                     continue
                 gdf["refinement_level"] = ref.level
@@ -259,6 +285,71 @@ class CreateGridStage(CreateStage):
 
         self._log("Grid created successfully")
         return {"status": "completed"}
+
+    def _simplify_aoi_thin_necks(
+        self, aoi_path: Path, neck_m: float, output_dir: Path
+    ) -> Path:
+        """Erode → keep largest → dilate to drop thin-neck-connected sub-regions.
+
+        Returns the path to the cleaned-AOI GeoJSON written under
+        ``output_dir``. Morphology runs in a metric CRS (UTM-projected
+        when the input is geographic) so the *neck_m* threshold is
+        meaningful in meters; the output is reprojected back to the
+        original CRS for compatibility with downstream consumers.
+        """
+        import geopandas as gpd
+        from pyproj import CRS
+
+        gdf = gpd.read_file(str(aoi_path))
+        original_crs = gdf.crs
+        if original_crs is None or CRS.from_user_input(original_crs).is_geographic:
+            centroid = gdf.geometry.union_all().centroid
+            utm_zone = int((centroid.x + 180) / 6) + 1
+            metric_epsg = 32600 + utm_zone if centroid.y >= 0 else 32700 + utm_zone
+            gdf_metric = gdf.to_crs(epsg=metric_epsg)
+        else:
+            gdf_metric = gdf
+
+        poly = gdf_metric.union_all()
+        eroded = poly.buffer(-neck_m)
+        if eroded.is_empty:
+            msg = (
+                f"AOI vanished after erosion by {neck_m} m. Reduce "
+                f"aoi_simplify_neck_m or set it to 0 to disable cleanup."
+            )
+            raise ValueError(msg)
+
+        if eroded.geom_type == "MultiPolygon":
+            from shapely import MultiPolygon, Polygon
+
+            parts: list[Polygon] = list(cast("MultiPolygon", eroded).geoms)
+            largest = max(parts, key=lambda p: float(p.area))
+            n_dropped = len(parts) - 1
+            dropped_area = sum(p.area for p in parts) - largest.area
+            self._log(
+                f"AOI cleanup: erosion(-{neck_m:.0f} m) split into "
+                f"{len(parts)} parts; dropped {n_dropped} smaller "
+                f"piece(s) totalling {dropped_area / 1e6:.2f} km²"
+            )
+        else:
+            largest = eroded
+            self._log(
+                f"AOI cleanup: erosion(-{neck_m:.0f} m) produced a single "
+                "piece (no thin necks detected); proceeding with the "
+                "morphologically-closed polygon"
+            )
+
+        cleaned = largest.buffer(neck_m)
+        cleaned_gdf = gpd.GeoDataFrame(geometry=[cleaned], crs=gdf_metric.crs)
+        if original_crs is not None and CRS.from_user_input(original_crs) != gdf_metric.crs:
+            cleaned_gdf = cleaned_gdf.to_crs(original_crs)
+
+        out_path = output_dir / "aoi_cleaned.geojson"
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        if out_path.exists():
+            out_path.unlink()  # GeoJSON driver appends if file exists
+        cleaned_gdf.to_file(out_path, driver="GeoJSON")
+        return out_path
 
 
 class CreateFetchDataStage(_CreateStageBase):
@@ -429,6 +520,62 @@ class CreateMaskStage(_CreateStageBase):
     name = "create_mask"
     description = "Create active cell mask"
 
+    def _drop_disconnected_components(self) -> int:
+        """Set mask=0 for active cells that are not in the largest component.
+
+        Builds a face-to-face adjacency from the SFINCS quadtree
+        neighbour arrays (``mu*``, ``md*``, ``nu*``, ``nd*`` — 1-based,
+        0 = no neighbour), runs ``scipy.sparse.csgraph.connected_components``
+        on the active sub-graph, and returns the number of cells that
+        were dropped.
+        """
+        from scipy.sparse import csr_matrix
+        from scipy.sparse.csgraph import connected_components
+
+        qt_data = self.sfincs.quadtree_mask.data
+        mask = np.asarray(qt_data["mask"].values)
+        n = len(mask)
+
+        srcs: list[np.ndarray] = []
+        dsts: list[np.ndarray] = []
+        for nb in (
+            "mu", "mu1", "mu2", "md", "md1", "md2",
+            "nu", "nu1", "nu2", "nd", "nd1", "nd2",
+        ):
+            if nb not in qt_data:
+                continue
+            arr = np.asarray(qt_data[nb].values).astype(np.int64)
+            valid = arr > 0
+            srcs.append(np.arange(n)[valid])
+            dsts.append(arr[valid] - 1)
+        if not srcs:
+            return 0
+        src = np.concatenate(srcs)
+        dst = np.concatenate(dsts)
+        adj = csr_matrix(
+            (np.ones(len(src), dtype=np.int8), (src, dst)),
+            shape=(n, n),
+        )
+
+        active_idx = np.where(mask >= 1)[0]
+        if active_idx.size == 0:
+            return 0
+        sub = adj[active_idx][:, active_idx]
+        n_comp, labels = connected_components(sub, directed=False)
+        if n_comp <= 1:
+            return 0
+
+        sizes = np.bincount(labels)
+        largest_label = int(np.argmax(sizes))
+        drop_idx = active_idx[labels != largest_label]
+        if drop_idx.size == 0:
+            return 0
+        # In-place write so the change propagates back through the
+        # UgridDataset wrapper (assigning a new DataArray would detach
+        # it from the live model).
+        qt_data["mask"].values[drop_idx] = 0
+        return int(drop_idx.size)
+
     def run(self) -> dict[str, Any]:
         """Create active-cell mask based on elevation threshold."""
         cfg = self.config
@@ -439,6 +586,14 @@ class CreateMaskStage(_CreateStageBase):
         self.sfincs.quadtree_mask.create_active(
             zmin=cfg.mask.zmin,
         )
+
+        if cfg.mask.keep_largest_only:
+            n_dropped = self._drop_disconnected_components()
+            if n_dropped:
+                self._log(
+                    f"Dropped {n_dropped} active cell(s) in disconnected "
+                    f"components; kept the largest connected component only"
+                )
 
         self._log("Active mask created successfully")
         return {"status": "completed"}
@@ -599,29 +754,114 @@ class CreateDischargeStage(_CreateStageBase):
         return snapped
 
     @staticmethod
-    def _downstream_endpoint(geom: Any, aoi_boundary: Any) -> tuple[float, float] | None:
-        """Return the flowpath endpoint closest to the AOI boundary.
+    def _line_extreme_endpoints(geom: Any) -> tuple[Any, Any]:
+        """Return the (first, last) shapely Points of a (Multi)LineString.
 
-        NWM hydrofabric flowpath linestrings have no guaranteed
-        direction, so we compare both the first and last coordinates
-        and pick whichever is nearest to the AOI boundary.  In
-        practice the outlet should sit on (or very near) the boundary.
+        For a ``MultiLineString`` we use the first coordinate of the
+        first part and the last coordinate of the last part. NWM
+        hydrofabric flowpaths come through a ``shapely.line_merge``
+        upstream so most are plain ``LineString``; this helper
+        gracefully handles the residual multipart cases.
         """
-        from shapely import MultiLineString
+        from shapely import MultiLineString, Point
 
-        if geom is None or geom.is_empty:
-            return None
         if isinstance(geom, MultiLineString):
             first_coord = next(iter(geom.geoms)).coords[0][:2]
             last_coord = list(geom.geoms)[-1].coords[-1][:2]
         else:
             first_coord = geom.coords[0][:2]
             last_coord = geom.coords[-1][:2]
+        return Point(first_coord), Point(last_coord)
 
-        d_first = aoi_boundary.distance(shapely.Point(first_coord))
-        d_last = aoi_boundary.distance(shapely.Point(last_coord))
-        chosen = first_coord if d_first < d_last else last_coord
-        return (float(chosen[0]), float(chosen[1]))
+    @classmethod
+    def _inflow_intersection_point(
+        cls, geom: Any, aoi_polygon: Any
+    ) -> tuple[float, float] | None:
+        """Pick the discharge point on (or near) the AOI boundary for *geom*.
+
+        Strategy:
+
+        1. Compute the intersection of the flowline with the AOI's
+           boundary. The result is a ``Point``, ``MultiPoint``, or — in
+           degenerate cases — a ``GeometryCollection``; we collapse it
+           to a flat list of points.
+        2. If there is exactly one crossing, that's the discharge point.
+        3. If there are multiple crossings, pick the one closest to the
+           *upstream* end of the line. The upstream end is identified
+           by membership: the line endpoint that lies *outside* the
+           AOI is upstream; the one *inside* is downstream.
+        4. If the line never crosses the boundary (entirely inside or
+           entirely outside the AOI), fall back to whichever line
+           endpoint sits closest to the AOI boundary. The downstream
+           snap step then moves it onto the nearest active grid cell
+           (or drops it when the snap distance is exceeded).
+
+        TODO: When the line crosses the boundary multiple times **and**
+        both endpoints fall outside the AOI (the line passes through
+        without terminating inside), flow direction cannot be inferred
+        from endpoint membership alone. A robust solution would
+        consult NWM stream order or DEM-derived flow direction. For
+        the walkthrough demo data this case does not arise.
+        """
+        from shapely import LineString, MultiPoint, Point
+
+        if geom is None or geom.is_empty:
+            return None
+
+        boundary = aoi_polygon.boundary
+        crossings = geom.intersection(boundary)
+
+        if not crossings.is_empty:
+            # Collapse the intersection result into a flat list of points.
+            points: list[Any] = []
+            if isinstance(crossings, Point):
+                points.append(crossings)
+            elif isinstance(crossings, MultiPoint):
+                points.extend(crossings.geoms)
+            elif hasattr(crossings, "geoms"):
+                for sub in crossings.geoms:
+                    if isinstance(sub, Point):
+                        points.append(sub)
+                    elif isinstance(sub, LineString):
+                        # Tangential overlap (rare) — keep the segment endpoints.
+                        points.extend(Point(c[:2]) for c in sub.coords)
+            elif isinstance(crossings, LineString):
+                points.extend(Point(c[:2]) for c in crossings.coords)
+
+            if len(points) == 1:
+                p = points[0]
+                return (float(p.x), float(p.y))
+
+            if len(points) > 1:
+                first_pt, last_pt = cls._line_extreme_endpoints(geom)
+                first_in = aoi_polygon.contains(first_pt)
+                last_in = aoi_polygon.contains(last_pt)
+                if first_in and not last_in:
+                    upstream = last_pt
+                elif last_in and not first_in:
+                    upstream = first_pt
+                else:
+                    # Both inside (line dips out and back in — rare) or
+                    # both outside (line passes through — see TODO).
+                    # No reliable upstream signal: fall through to the
+                    # endpoint-distance fallback below.
+                    upstream = None
+                if upstream is not None:
+                    distances = [upstream.distance(p) for p in points]
+                    chosen = points[
+                        min(range(len(points)), key=distances.__getitem__)
+                    ]
+                    return (float(chosen.x), float(chosen.y))
+
+        # No usable boundary crossing — fall back to the line endpoint
+        # closest to the boundary. The snap step downstream will move
+        # the chosen point onto the nearest active grid cell, or drop
+        # it if it is farther than ``max_snap_distance_m``.
+        first_pt, last_pt = cls._line_extreme_endpoints(geom)
+        d_first = boundary.distance(first_pt)
+        d_last = boundary.distance(last_pt)
+        closer = first_pt if d_first <= d_last else last_pt
+        return (float(closer.x), float(closer.y))
 
     def run(self) -> dict[str, Any]:
         """Extract flowpath outlets from GeoJSON and add as discharge points."""
@@ -647,8 +887,17 @@ class CreateDischargeStage(_CreateStageBase):
             )
             return {"status": "skipped", "reason": "no flowpaths in file"}
 
-        # NWM feature IDs must be integers.
+        # Normalize: cast IDs to int and rename the user-supplied column to
+        # ``"name"``. SFINCS's discharge_points GDF uses ``"name"`` as the
+        # feature-ID column; the run stage's _assign_discharge_timeseries
+        # reads gdf["name"] back as an int when looking up NWM CHRTOUT,
+        # so writing it under the same name here keeps the contract
+        # explicit instead of going through the .src round-trip.
         flowpaths_gdf[id_col] = flowpaths_gdf[id_col].astype(int)
+        if id_col != "name":
+            if "name" in flowpaths_gdf.columns:
+                flowpaths_gdf = flowpaths_gdf.drop(columns=["name"])
+            flowpaths_gdf = flowpaths_gdf.rename(columns={id_col: "name"})
         # Merge MultiLineStrings into LineStrings for clean endpoint selection.
         flowpaths_gdf["geometry"] = shapely.line_merge(flowpaths_gdf.geometry)
 
@@ -660,22 +909,35 @@ class CreateDischargeStage(_CreateStageBase):
         if flowpaths_gdf.crs is not None and flowpaths_gdf.crs != model_crs:
             flowpaths_gdf = flowpaths_gdf.to_crs(model_crs)
 
-        aoi_gdf: gpd.GeoDataFrame = gpd.read_file(str(cfg.aoi))
+        # Prefer the cleaned AOI when CreateGridStage produced one
+        # (aoi_simplify_neck_m > 0 in the config). The cleaned polygon
+        # matches the actual model domain, so flowpath–boundary
+        # intersections line up with cells SFINCS will simulate.
+        cleaned_aoi = cfg.output_dir / "aoi_cleaned.geojson"
+        aoi_path_for_intersection = cleaned_aoi if cleaned_aoi.exists() else cfg.aoi
+        aoi_gdf: gpd.GeoDataFrame = gpd.read_file(str(aoi_path_for_intersection))
         if aoi_gdf.crs is not None and aoi_gdf.crs != model_crs:
             aoi_gdf = aoi_gdf.to_crs(model_crs)
-        aoi_boundary = aoi_gdf.union_all().boundary
+        aoi_polygon = aoi_gdf.union_all()
 
-        # Pick the flowpath endpoint closest to the AOI boundary
+        # Identify the inflow point on the AOI boundary for each flowline.
+        # Lines that never cross the boundary (entirely outside the
+        # domain, or entirely inside with no entry/exit) are skipped
+        # with a log message — there is no obvious discharge location
+        # for them. Lines that cross multiple times resolve to the
+        # most-upstream crossing.
         self._update_substep("Extracting flowpath outlet points")
         discharge_points: list[tuple[float, float, str]] = []
-        for feature_id, geom in flowpaths_gdf[[id_col, "geometry"]].itertuples(
+        for feature_id, geom in flowpaths_gdf[["name", "geometry"]].itertuples(
             name=None, index=False
         ):
-            endpoint = self._downstream_endpoint(geom, aoi_boundary)
-            if endpoint is None:
-                self._log(f"Flowpath {feature_id} has empty geometry, skipping")
+            point = self._inflow_intersection_point(geom, aoi_polygon)
+            if point is None:
+                self._log(
+                    f"Flowpath {feature_id}: no usable AOI-boundary crossing, skipping"
+                )
                 continue
-            discharge_points.append((endpoint[0], endpoint[1], str(feature_id)))
+            discharge_points.append((point[0], point[1], str(feature_id)))
 
         if not discharge_points:
             self._log("No discharge points extracted from flowpaths")

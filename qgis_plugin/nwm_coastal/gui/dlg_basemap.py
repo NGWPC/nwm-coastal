@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from qgis.PyQt.QtWidgets import (
+    QCheckBox,
     QDialog,
     QDialogButtonBox,
     QFileDialog,
@@ -13,117 +14,149 @@ from qgis.PyQt.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
-    QSpinBox,
     QVBoxLayout,
 )
 
-REQUIRED_GPKG_LAYERS_ALL = ("flowpaths", "divides")
-REQUIRED_GPKG_LAYERS_NO_FLOWPATHS = ("divides",)
-
 
 class BasemapDialog(QDialog):
-    """Dialog for selecting NHF GeoPackage, CO-OPS parquet, and stream order filter."""
+    """Dialog for selecting an NHF dataset and the layers to load.
 
-    def _browse_gpkg(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(
-            self, "Select NHF GeoPackage", "", "GeoPackage (*.gpkg)"
-        )
-        if path:
-            self.gpkg_edit.setText(path)
+    Both ``.gpkg`` GeoPackage files and ``.gdb`` File Geodatabase folders
+    are accepted; OGR opens both transparently.
 
-    def _browse_parquet(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(
-            self, "Select CO-OPS Stations Parquet", "", "Parquet (*.parquet)"
-        )
-        if path:
-            self.parquet_edit.setText(path)
+    Layout (top to bottom):
 
-    def _browse_nwm_flowlines(self) -> None:
+    1. NHF dataset path with one browse button that auto-detects format.
+    2. NHF layers to load — one editable field per category (divides,
+       flowpaths, gages, nexus) gated by a checkbox. At least one must
+       remain checked.
+    3. Optional Flowpaths Override — path to a separate ``.gpkg``/``.gdb``
+       that replaces the NHF flowpaths, with the override layer name
+       directly beneath.
+    4. CO-OPS auto-download checkbox.
+    """
+
+    _BROWSE_TOOLTIP = (
+        "Pick a .gpkg file directly. For a File Geodatabase, navigate into the "
+        ".gdb folder and pick any file inside it — the .gdb path will be detected "
+        "automatically."
+    )
+
+    def _browse_dataset_into(self, edit: QLineEdit, title: str) -> None:
+        """Single browse dialog accepting .gpkg files and .gdb directories.
+
+        Native file pickers don't let you select a ``.gdb`` directory itself
+        (it shows up as a folder, not a file). Workaround: navigate *into*
+        the ``.gdb`` and pick any internal table file (``*.gdbtable``,
+        ``*.gdbtablx``, …); we detect the parent suffix and store the
+        ``.gdb`` path itself.
+        """
+        # Filter must include .gdb internals so they aren't grayed out when
+        # the user navigates into a .gdb directory. ``*.gdbtable`` is the
+        # safest pick because every File Geodatabase has at least one.
         path, _ = QFileDialog.getOpenFileName(
-            self, "Select NWM Flowlines GeoPackage", "", "GeoPackage (*.gpkg)"
+            self,
+            title,
+            "",
+            "GeoPackage / FileGDB (*.gpkg *.gdbtable *.gdbtablx);;"
+            "GeoPackage (*.gpkg);;"
+            "All files (*)",
         )
-        if path:
-            self.nwm_flowlines_edit.setText(path)
+        if not path:
+            return
+        p = Path(path)
+        # If the user picked a file inside a .gdb folder, store the .gdb folder.
+        if p.is_file() and p.parent.suffix.lower() == ".gdb":
+            edit.setText(str(p.parent))
+        else:
+            edit.setText(str(p))
 
     @staticmethod
-    def _validate_gpkg(path: Path, label: str) -> str | None:
-        """Return an error if *path* is not a valid GeoPackage, else ``None``."""
-        if not path.is_file():
-            return f"{label} not found: {path}"
-        if path.suffix != ".gpkg":
-            return f"{label} must have .gpkg extension."
-        return None
+    def _validate_dataset(path: Path, label: str) -> str | None:
+        """Return an error if *path* is not a .gpkg file or .gdb directory."""
+        suffix = path.suffix.lower()
+        if suffix == ".gpkg":
+            if not path.is_file():
+                return f"{label} not found: {path}"
+            return None
+        if suffix == ".gdb":
+            if not path.is_dir():
+                return f"{label} (.gdb) must be an existing directory: {path}"
+            return None
+        return f"{label} must be a .gpkg file or a .gdb directory: {path}"
+
+    @staticmethod
+    def _list_layers(dataset_path: str) -> set[str] | str:
+        """Return the set of layer names in *dataset_path* (.gpkg or .gdb)."""
+        from osgeo import ogr
+
+        ds = ogr.Open(dataset_path)
+        if ds is None:
+            return f"Cannot open dataset: {dataset_path}"
+        layers = {ds.GetLayerByIndex(i).GetName() for i in range(ds.GetLayerCount())}
+        ds = None
+        return layers
 
     def _check_paths(self) -> str | None:
         """Return an error message if file paths are invalid, else ``None``."""
         if not self.gpkg_edit.text().strip():
-            return "Please select a GeoPackage file."
-        if not self.parquet_edit.text().strip():
-            return "Please select a CO-OPS Parquet file."
+            return "Please select an NHF dataset (.gpkg file or .gdb folder)."
 
-        error = self._validate_gpkg(self.gpkg_path, "GeoPackage")
+        error = self._validate_dataset(self.gpkg_path, "NHF dataset")
         if error:
             return error
-        if not self.parquet_path.is_file():
-            return f"Parquet file not found: {self.parquet_path}"
 
-        nwm = self.nwm_flowlines_edit.text().strip()
-        if nwm:
-            error = self._validate_gpkg(Path(nwm), "NWM Flowlines")
+        override = self.flowpaths_override_edit.text().strip()
+        if override:
+            error = self._validate_dataset(Path(override), "Flowpaths Override")
             if error:
                 return error
         return None
 
     @staticmethod
-    def _get_stream_order_range(
-        gpkg_path: str, layer_name: str, col_name: str
-    ) -> tuple[int, int] | str:
-        """Query min/max of *col_name* from *layer_name* via SQLite.
+    def _check_layer_name(label: str, name: str, available: set[str]) -> str | None:
+        """Return an error if *name* is empty or missing from *available*."""
+        if not name:
+            return f"{label} is enabled but the layer name is empty."
+        if name not in available:
+            available_str = ", ".join(sorted(available)) or "(none)"
+            return f"{label} layer '{name}' not found in dataset. Available layers: {available_str}"
+        return None
 
-        Returns ``(min_val, max_val)`` on success or an error string.
-        GeoPackage is SQLite-backed, so we query it directly.
-        """
-        import sqlite3
+    def _validate_layer_names(self) -> str | None:
+        """Confirm at least one layer is selected and every name resolves."""
+        rows = [
+            ("Divides", self.divides_check, self.divides_edit),
+            ("Flowpaths", self.flowpaths_check, self.flowpaths_edit),
+            ("Gages", self.gages_check, self.gages_edit),
+            ("Nexus", self.nexus_check, self.nexus_edit),
+        ]
 
-        try:
-            conn = sqlite3.connect(gpkg_path)
-            # Verify the column exists first; SQLite silently treats
-            # unmatched double-quoted names as string literals.
-            cur = conn.execute(f'PRAGMA table_info("{layer_name}")')
-            columns = {row[1] for row in cur.fetchall()}
-            if col_name not in columns:
-                conn.close()
-                return (
-                    f"Column '{col_name}' not found in '{layer_name}'. "
-                    f"Available columns: {', '.join(sorted(columns))}"
-                )
-            # col_name and layer_name are validated above against the schema,
-            # so this is safe from injection.
-            cur = conn.execute(
-                f"SELECT MIN({col_name}), MAX({col_name}) FROM [{layer_name}]"  # noqa: S608
+        if not any(check.isChecked() for _, check, _ in rows):
+            return "Select at least one NHF layer to load."
+
+        nhf_layers = self._list_layers(str(self.gpkg_path))
+        if isinstance(nhf_layers, str):
+            return nhf_layers
+
+        # Validate every checked NHF row. Skip flowpaths when override is set —
+        # the override dataset is validated separately below.
+        override_path = self.flowpaths_override_path
+        for label, check, edit in rows:
+            if not check.isChecked() or (label == "Flowpaths" and override_path is not None):
+                continue
+            error = self._check_layer_name(label, edit.text().strip(), nhf_layers)
+            if error:
+                return error
+
+        if override_path is not None and self.flowpaths_check.isChecked():
+            override_layers = self._list_layers(str(override_path))
+            if isinstance(override_layers, str):
+                return override_layers
+            return self._check_layer_name(
+                "Flowpaths Override", self.flowpaths_override_layer, override_layers
             )
-            row = cur.fetchone()
-            conn.close()
-        except sqlite3.OperationalError as exc:
-            return str(exc)
 
-        if row is None or row[0] is None or row[1] is None:
-            return f"Column '{col_name}' contains only NULL values in '{layer_name}'."
-        return (int(row[0]), int(row[1]))
-
-    @staticmethod
-    def _check_gpkg_layers(gpkg_path: str, required: set[str]) -> str | None:
-        """Return an error if *gpkg_path* is missing any *required* layers."""
-        from osgeo import ogr
-
-        ds = ogr.Open(gpkg_path)
-        if ds is None:
-            return f"Cannot open GeoPackage: {gpkg_path}"
-        available = {ds.GetLayerByIndex(i).GetName() for i in range(ds.GetLayerCount())}
-        ds = None
-        missing = required - available
-        if missing:
-            return f"GeoPackage missing required layers: {', '.join(sorted(missing))}"
         return None
 
     def _validate_and_accept(self) -> None:
@@ -133,149 +166,169 @@ class BasemapDialog(QDialog):
             self.validation_label.setText(error)
             return
 
-        has_nwm = bool(self.nwm_flowlines_edit.text().strip())
-        required = REQUIRED_GPKG_LAYERS_NO_FLOWPATHS if has_nwm else REQUIRED_GPKG_LAYERS_ALL
-
-        error = self._check_gpkg_layers(str(self.gpkg_path), set(required))
+        error = self._validate_layer_names()
         if error:
             self.validation_label.setText(error)
-            return
-
-        # Determine which gpkg/layer to use for flowpaths
-        stream_order_col = self.stream_order_column
-        if has_nwm:
-            fp_gpkg = str(self.nwm_flowlines_path)
-            fp_layer = self.nwm_layer_name
-            error = self._check_gpkg_layers(fp_gpkg, {fp_layer})
-            if error:
-                self.validation_label.setText(error)
-                return
-        else:
-            fp_gpkg = str(self.gpkg_path)
-            fp_layer = "flowpaths"
-
-        # Validate stream order value against actual data range
-        result = self._get_stream_order_range(fp_gpkg, fp_layer, stream_order_col)
-        if isinstance(result, str):
-            self.validation_label.setText(result)
-            return
-
-        so_min, so_max = result
-        user_val = self.min_stream_order
-        if user_val < so_min or user_val > so_max:
-            self.validation_label.setText(
-                f"Min Stream Order must be between {so_min} and {so_max} "
-                f"(range found in '{fp_layer}')."
-            )
             return
 
         self.validation_label.setText("")
         self.accept()
 
-    def _init_nwm_section(self, form: QFormLayout) -> None:
-        """Build the optional NWM Flowlines Override section."""
-        separator = QLabel("<b>NWM Flowlines Override (optional)</b>")
-        form.addRow(separator)
+    @staticmethod
+    def _make_layer_row(label: str, default: str) -> tuple[QCheckBox, QLineEdit]:
+        """Build a (checkbox-as-label, line-edit) pair for one NHF layer."""
+        check = QCheckBox(label)
+        check.setChecked(True)
+        edit = QLineEdit(default)
+        edit.setPlaceholderText("Layer name in dataset")
+        check.toggled.connect(edit.setEnabled)
+        return check, edit
 
-        self.nwm_flowlines_edit = QLineEdit()
-        self.nwm_flowlines_edit.setPlaceholderText(
-            "Path to NWM flowlines .gpkg (replaces NHF flowpaths)"
+    def _init_layers_section(self, form: QFormLayout) -> None:
+        """Build the editable, checkbox-toggled list of NHF layer names."""
+        form.addRow(QLabel("<b>Layers to Load (NHF)</b>"))
+
+        self.divides_check, self.divides_edit = self._make_layer_row("Divides", "divides")
+        form.addRow(self.divides_check, self.divides_edit)
+
+        self.flowpaths_check, self.flowpaths_edit = self._make_layer_row("Flowpaths", "flowpaths")
+        form.addRow(self.flowpaths_check, self.flowpaths_edit)
+
+        self.gages_check, self.gages_edit = self._make_layer_row("Gages", "gages")
+        form.addRow(self.gages_check, self.gages_edit)
+
+        self.nexus_check, self.nexus_edit = self._make_layer_row("Nexus", "nexus")
+        form.addRow(self.nexus_check, self.nexus_edit)
+
+    def _make_browse_button(self, edit: QLineEdit, title: str) -> QPushButton:
+        """Build a single browse button that handles both .gpkg and .gdb."""
+        btn = QPushButton("Browse...")
+        btn.setToolTip(self._BROWSE_TOOLTIP)
+        btn.clicked.connect(lambda: self._browse_dataset_into(edit, title))
+        return btn
+
+    def _init_override_section(self, form: QFormLayout) -> None:
+        """Build the optional Flowpaths Override section."""
+        form.addRow(QLabel("<b>Flowpaths Override (optional)</b>"))
+
+        self.flowpaths_override_edit = QLineEdit()
+        self.flowpaths_override_edit.setPlaceholderText(
+            "Path to alternate flowpaths .gpkg or .gdb (replaces NHF flowpaths)"
         )
-        nwm_browse = QPushButton("Browse...")
-        nwm_browse.clicked.connect(self._browse_nwm_flowlines)
-        nwm_row = QHBoxLayout()
-        nwm_row.addWidget(self.nwm_flowlines_edit)
-        nwm_row.addWidget(nwm_browse)
-        form.addRow("NWM Flowlines:", nwm_row)
+        self._override_browse = self._make_browse_button(
+            self.flowpaths_override_edit, "Select Flowpaths Override"
+        )
+        override_row = QHBoxLayout()
+        override_row.addWidget(self.flowpaths_override_edit)
+        override_row.addWidget(self._override_browse)
+        form.addRow("Flowpaths Override:", override_row)
 
-        self.nwm_layer_name_edit = QLineEdit()
-        self.nwm_layer_name_edit.setText("flowpaths")
-        self.nwm_layer_name_edit.setPlaceholderText("Layer name in NWM flowlines gpkg")
-        form.addRow("Flowpaths Layer:", self.nwm_layer_name_edit)
+        self.flowpaths_override_layer_edit = QLineEdit("flowpaths")
+        self.flowpaths_override_layer_edit.setPlaceholderText(
+            "Layer name within the override dataset"
+        )
+        form.addRow("Flowpath Layer Name:", self.flowpaths_override_layer_edit)
 
-        self.stream_order_col_edit = QLineEdit()
-        self.stream_order_col_edit.setText("stream_order")
-        self.stream_order_col_edit.setPlaceholderText("Column name for stream order")
-        form.addRow("Stream Order Column:", self.stream_order_col_edit)
+        # Override only applies when Flowpaths is enabled — disable when it is not.
+        for widget in (
+            self.flowpaths_override_edit,
+            self.flowpaths_override_layer_edit,
+            self._override_browse,
+        ):
+            self.flowpaths_check.toggled.connect(widget.setEnabled)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Add Basemap")
-        self.setMinimumWidth(500)
+        self.setMinimumWidth(560)
 
         layout = QVBoxLayout(self)
         form = QFormLayout()
 
-        # NHF GeoPackage path
+        # NHF dataset (GeoPackage file or File Geodatabase folder)
         self.gpkg_edit = QLineEdit()
-        self.gpkg_edit.setPlaceholderText("Path to National HydroFabric .gpkg")
-        gpkg_browse = QPushButton("Browse...")
-        gpkg_browse.clicked.connect(self._browse_gpkg)
+        self.gpkg_edit.setPlaceholderText("Path to National HydroFabric .gpkg file or .gdb folder")
+        gpkg_browse = self._make_browse_button(self.gpkg_edit, "Select NHF Dataset")
         gpkg_row = QHBoxLayout()
         gpkg_row.addWidget(self.gpkg_edit)
         gpkg_row.addWidget(gpkg_browse)
-        form.addRow("NHF GeoPackage:", gpkg_row)
+        form.addRow("NHF Dataset:", gpkg_row)
 
-        # CO-OPS Parquet path
-        self.parquet_edit = QLineEdit()
-        self.parquet_edit.setPlaceholderText("Path to CO-OPS stations .parquet")
-        parquet_browse = QPushButton("Browse...")
-        parquet_browse.clicked.connect(self._browse_parquet)
-        parquet_row = QHBoxLayout()
-        parquet_row.addWidget(self.parquet_edit)
-        parquet_row.addWidget(parquet_browse)
-        form.addRow("CO-OPS Stations:", parquet_row)
+        self._init_layers_section(form)
+        self._init_override_section(form)
 
-        # Min stream order
-        self.stream_order_spin = QSpinBox()
-        self.stream_order_spin.setMinimum(1)
-        self.stream_order_spin.setMaximum(10)
-        self.stream_order_spin.setValue(3)
-        form.addRow("Min Stream Order:", self.stream_order_spin)
-
-        # Optional NWM Flowlines Override
-        self._init_nwm_section(form)
+        # CO-OPS auto-download
+        self.coops_check = QCheckBox("Include CO-OPS stations (auto-download)")
+        self.coops_check.setChecked(True)
+        self.coops_check.setToolTip(
+            "Fetch the NOAA CO-OPS water-level station list and cache it under the "
+            "QGIS profile so subsequent sessions load instantly."
+        )
+        form.addRow("CO-OPS Stations:", self.coops_check)
 
         layout.addLayout(form)
 
-        # Validation label
         self.validation_label = QLabel("")
         self.validation_label.setStyleSheet("color: red;")
+        self.validation_label.setWordWrap(True)
         layout.addWidget(self.validation_label)
 
-        # OK / Cancel
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self._validate_and_accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
+    # ------------------------------------------------------------------
+    # Public properties
+    # ------------------------------------------------------------------
+
     @property
     def gpkg_path(self) -> Path:
         """Return the NHF GeoPackage file path."""
-        return Path(self.gpkg_edit.text())
+        return Path(self.gpkg_edit.text().strip())
 
     @property
-    def parquet_path(self) -> Path:
-        """Return the CO-OPS stations parquet file path."""
-        return Path(self.parquet_edit.text())
+    def divides_layer(self) -> str:
+        """Return the divides layer name; empty when the checkbox is off."""
+        if not self.divides_check.isChecked():
+            return ""
+        return self.divides_edit.text().strip()
 
     @property
-    def min_stream_order(self) -> int:
-        """Return the minimum stream order filter value."""
-        return self.stream_order_spin.value()
+    def flowpaths_layer(self) -> str:
+        """Return the NHF flowpaths layer name; empty when the checkbox is off."""
+        if not self.flowpaths_check.isChecked():
+            return ""
+        return self.flowpaths_edit.text().strip()
 
     @property
-    def nwm_flowlines_path(self) -> Path | None:
-        """Return NWM flowlines GeoPackage path, or ``None`` if not set."""
-        text = self.nwm_flowlines_edit.text().strip()
+    def gages_layer(self) -> str:
+        """Return the gages layer name; empty when the checkbox is off."""
+        if not self.gages_check.isChecked():
+            return ""
+        return self.gages_edit.text().strip()
+
+    @property
+    def nexus_layer(self) -> str:
+        """Return the nexus layer name; empty when the checkbox is off."""
+        if not self.nexus_check.isChecked():
+            return ""
+        return self.nexus_edit.text().strip()
+
+    @property
+    def flowpaths_override_path(self) -> Path | None:
+        """Return the override gpkg path; ``None`` when Flowpaths is off."""
+        if not self.flowpaths_check.isChecked():
+            return None
+        text = self.flowpaths_override_edit.text().strip()
         return Path(text) if text else None
 
     @property
-    def nwm_layer_name(self) -> str:
-        """Return the layer name within the NWM flowlines gpkg."""
-        return self.nwm_layer_name_edit.text().strip() or "flowpaths"
+    def flowpaths_override_layer(self) -> str:
+        """Return the layer name to use within the override gpkg."""
+        return self.flowpaths_override_layer_edit.text().strip() or "flowpaths"
 
     @property
-    def stream_order_column(self) -> str:
-        """Return the column name for stream order values."""
-        return self.stream_order_col_edit.text().strip() or "stream_order"
+    def include_coops(self) -> bool:
+        """Return ``True`` if CO-OPS stations should be downloaded and added."""
+        return self.coops_check.isChecked()

@@ -7,7 +7,7 @@ build the models) are fully isolated and managed by pixi. Nothing is installed i
 system Python or shared libraries.
 
 Pixi is only needed at **install time** (compilation and dependency resolution). At
-**runtime**, the wrapper script activates the pre-built environment directly -- pixi
+**runtime**, the wrapper scripts activate the pre-built environment directly -- pixi
 does not need to be installed on compute nodes.
 
 !!! important
@@ -64,17 +64,33 @@ On first install, pixi-build compiles SFINCS and SCHISM from the submodules unde
 | `metis_prep`          | Converts hgrid.gr3 to METIS graph format |
 | `gpmetis`             | METIS graph partitioner                  |
 
-### 3. Create a wrapper script
+### 3. Create wrapper scripts
 
-The wrapper activates the pixi environment (setting `PATH`, `LD_LIBRARY_PATH`, and
-sourcing conda activation scripts for MPI, ESMF, etc.) then runs `coastal-calibration`.
-This means pixi itself is **not needed at runtime** -- the wrapper is a self-contained
-entry point that works on any node that can see the shared filesystem.
+The wrappers activate the pre-built pixi environment (setting `PATH`,
+`LD_LIBRARY_PATH`, and sourcing conda activation scripts for MPI, ESMF, etc.) and
+then exec a target binary. Pixi itself is **not needed at runtime** -- the wrappers
+are self-contained entry points that work on any node that can see the shared
+filesystem.
+
+Two wrappers are installed side by side:
+
+- **`nwm-coastal-cli`** runs the `coastal-calibration` CLI (`run`, `create`,
+    `validate`, `init`, ...). This is the main entry point for production model
+    runs driven by YAML configs.
+- **`nwm-coastal-py`** runs the bundled `python` interpreter against the same
+    environment. The CLI exposes only a fixed set of subcommands; library features
+    like the SCHISM mesh subsetter (`extract_mesh`), the plotting and animation
+    helpers, and the end-to-end example notebooks under
+    `docs/examples/notebooks/` have no CLI surface and must be invoked from
+    Python. Use `nwm-coastal-py` for ad-hoc scripts (`nwm-coastal-py
+    walkthrough.py`) or to execute notebooks on compute nodes (`nwm-coastal-py -m
+    jupyter nbconvert --to notebook --execute --inplace walkthrough.ipynb`).
 
 ```bash
 INSTALL_DIR="$(pwd)"
 
-cat > "${INSTALL_DIR}/nwm-coastal" <<WRAPPER
+# CLI wrapper -- runs coastal-calibration subcommands
+cat > "${INSTALL_DIR}/nwm-coastal-cli" <<WRAPPER
 #!/bin/bash
 set -eu
 
@@ -93,7 +109,27 @@ done
 
 exec coastal-calibration "\$@"
 WRAPPER
-chmod +x "${INSTALL_DIR}/nwm-coastal"
+chmod +x "${INSTALL_DIR}/nwm-coastal-cli"
+
+# Python wrapper -- runs arbitrary scripts/notebooks against the same env
+cat > "${INSTALL_DIR}/nwm-coastal-py" <<WRAPPER
+#!/bin/bash
+set -eu
+
+_ENV="${INSTALL_DIR}/.pixi/envs/dev"
+
+export PATH="\${_ENV}/bin:\${PATH:-}"
+export LD_LIBRARY_PATH="\${_ENV}/lib:\${LD_LIBRARY_PATH:-}"
+export CONDA_PREFIX="\${_ENV}"
+export HDF5_USE_FILE_LOCKING=FALSE
+
+for _script in "\${_ENV}"/etc/conda/activate.d/*.sh; do
+    [ -f "\$_script" ] && . "\$_script"
+done
+
+exec python "\$@"
+WRAPPER
+chmod +x "${INSTALL_DIR}/nwm-coastal-py"
 ```
 
 ### 4. Make it available to all users
@@ -120,17 +156,19 @@ Alternatively, skip the profile drop-in and use the full path to the wrapper dir
 `sbatch` scripts:
 
 ```bash
-<SHARED_DIR>/coastal-calibration/nwm-coastal run "${CONFIG_FILE}"
+<SHARED_DIR>/coastal-calibration/nwm-coastal-cli run "${CONFIG_FILE}"
 ```
 
 ______________________________________________________________________
 
 ## Running
 
-No pixi needed. The wrapper script handles environment activation:
+No pixi needed. The wrapper scripts handle environment activation.
+
+For YAML-driven model runs use `nwm-coastal-cli`:
 
 ```bash
-nwm-coastal run config.yaml
+nwm-coastal-cli run config.yaml
 ```
 
 In Slurm job scripts:
@@ -140,12 +178,19 @@ In Slurm job scripts:
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=8
 
-nwm-coastal run "${CONFIG_FILE}"
+nwm-coastal-cli run "${CONFIG_FILE}"
 ```
 
-The wrapper ensures that `sfincs`, `pschism`, `mpiexec`, and all shared libraries are on
-`PATH` / `LD_LIBRARY_PATH`, so `coastal-calibration` can spawn model subprocesses
-directly.
+For Python scripts and notebooks that use the library API directly (mesh extraction,
+plotting, animation, custom analysis) use `nwm-coastal-py`:
+
+```bash
+nwm-coastal-py path/to/script.py
+nwm-coastal-py -m jupyter nbconvert --to notebook --execute --inplace path/to/notebook.ipynb
+```
+
+Both wrappers ensure that `sfincs`, `pschism`, `mpiexec`, and all shared libraries are
+on `PATH` / `LD_LIBRARY_PATH`, so model subprocesses can be spawned directly.
 
 ______________________________________________________________________
 
@@ -166,14 +211,15 @@ binaries linked against a previous MPI version, corrupted solver state, or recip
 changes not being picked up). The full rebuild including SFINCS and SCHISM compilation
 takes only a few minutes.
 
-The wrapper script does not need updating -- it always points to the same environment
+The wrapper scripts do not need updating -- they always point to the same environment
 directory.
 
 ## Verifying the installation
 
 ```bash
-nwm-coastal --help
-nwm-coastal --version
+nwm-coastal-cli --help
+nwm-coastal-cli --version
+nwm-coastal-py -c "import coastal_calibration; print(coastal_calibration.__version__)"
 ```
 
 Check that model binaries exist in the environment:
@@ -243,9 +289,10 @@ ______________________________________________________________________
     are added when `/sys/class/infiniband/efa*` devices are detected. On plain
     NFS/Lustre clusters without EFA, only general settings are applied (shared-memory on
     local `/tmp`, fork-warning suppression)
-- **The wrapper script** activates the pre-built environment (`PATH`, `LD_LIBRARY_PATH`,
-    conda activation scripts) and runs `coastal-calibration`. Pixi is not needed on
-    compute nodes -- the wrapper is self-contained
+- **The wrapper scripts** activate the pre-built environment (`PATH`,
+    `LD_LIBRARY_PATH`, conda activation scripts) and exec either `coastal-calibration`
+    (`nwm-coastal-cli`) or `python` (`nwm-coastal-py`). Pixi is not needed on compute
+    nodes -- the wrappers are self-contained
 - The install lives on the shared filesystem so all compute nodes can access it when
     running Slurm jobs
 - Nothing is installed into the system Python, so the cluster's existing software is

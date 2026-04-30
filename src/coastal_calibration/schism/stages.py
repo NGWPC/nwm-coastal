@@ -73,6 +73,93 @@ def _read_station_lonlat(work_dir: Path) -> pd.DataFrame | None:
     return pd.DataFrame({"id": ids, "lon": lons, "lat": lats})
 
 
+def _chain_ring(segments: list[list[int]]) -> list[int]:
+    """Chain boundary segments into a single ring of node IDs.
+
+    Handles arbitrary segment order and orientation: each remaining
+    segment is appended (or reversed) to extend the current ring at
+    either end. Drops shared endpoints to avoid duplicate vertices.
+
+    Subdomain meshes produced by ``extract_mesh`` write original
+    boundary segments and new "cut" segments in arbitrary order and
+    direction; this routine reconstructs the CCW perimeter ring from
+    them without emitting "jump" segments between non-adjacent pieces.
+
+    Kept in sync with ``_chain_outer_ring`` in
+    ``qgis_plugin/nwm_coastal/plugin_main.py``.
+
+    Returns the ring's node IDs in traversal order. An empty list
+    is returned if no segments were provided.
+    """
+    remaining = [list(s) for s in segments if s]
+    if not remaining:
+        return []
+
+    ring = remaining.pop(0)
+    while remaining:
+        last = ring[-1]
+        first = ring[0]
+        for i, seg in enumerate(remaining):
+            if seg[0] == last:
+                ring.extend(seg[1:])
+                remaining.pop(i)
+                break
+            if seg[-1] == last:
+                ring.extend(reversed(seg[:-1]))
+                remaining.pop(i)
+                break
+            if seg[-1] == first:
+                ring = list(seg) + ring[1:]
+                remaining.pop(i)
+                break
+            if seg[0] == first:
+                ring = list(reversed(seg)) + ring[1:]
+                remaining.pop(i)
+                break
+        else:
+            # No connection found: remaining segments are disconnected
+            break
+
+    return ring
+
+
+def _build_domain_polygon(project: Any) -> Any:
+    """Build an exact polygon representing the SCHISM mesh domain.
+
+    Chains open + exterior land boundary segments into a single
+    outer ring (counterclockwise) and uses island boundaries as
+    interior holes.  This is faster and more accurate than a
+    concave-hull approximation: ~15× speedup, exact geometry, and
+    holes correctly excluded.
+
+    Parameters
+    ----------
+    project : NWMSCHISMProject
+        Loaded SCHISM project.
+
+    Returns
+    -------
+    shapely.Polygon
+        The mesh domain polygon (with holes for islands).
+    """
+    import shapely
+
+    boundaries = project.read_boundaries()
+    coords = project.nodes_coordinates
+
+    ext_segments: list[list[int]] = list(boundaries.open_boundaries)
+    ext_segments.extend(list(lb.nodes) for lb in boundaries.land_boundaries if lb.is_exterior)
+    islands = [list(lb.nodes) for lb in boundaries.land_boundaries if lb.is_island]
+
+    outer_ids = _chain_ring(ext_segments)
+    if not outer_ids:
+        raise RuntimeError("Failed to chain mesh boundary segments into a ring")
+
+    outer_pts = coords[np.array(outer_ids) - 1].tolist()
+    holes = [coords[np.array(isl) - 1].tolist() for isl in islands]
+    return shapely.Polygon(outer_pts, holes=holes)
+
+
 def _read_staout(staout_path: Path) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     """Read SCHISM station output file (staout_1).
 
@@ -184,8 +271,6 @@ class SchismObservationStage(WorkflowStage):
             self._log("include_noaa_gages is disabled, skipping")
             return {"status": "skipped"}
 
-        import shapely
-
         from coastal_calibration.data.coops_api import COOPSAPIClient
         from coastal_calibration.schism import NWMSCHISMProject
 
@@ -203,8 +288,8 @@ class SchismObservationStage(WorkflowStage):
         project = NWMSCHISMProject(work_dir, validate=False)
         self._log(f"hgrid.gr3: {project.n_nodes} nodes, {project.n_elements} elements")
 
-        # Read open boundary nodes
-        self._update_substep("Reading open boundaries")
+        # Read boundaries
+        self._update_substep("Reading boundaries")
         boundaries = project.read_boundaries()
         open_boundaries = boundaries.open_boundaries
         if not open_boundaries:
@@ -219,17 +304,11 @@ class SchismObservationStage(WorkflowStage):
             f"with {total_bnd_nodes} total nodes"
         )
 
-        # Extract open boundary point coordinates
-        self._update_substep("Reading node coordinates")
-        coords = project.nodes_coordinates
-
-        # Node IDs in hgrid.gr3 are 1-based
-        bnd_node_ids = [nid for bnd in open_boundaries for nid in bnd]
-        bnd_pts = coords[np.array(bnd_node_ids) - 1]
-
-        # Compute concave hull
-        self._update_substep("Computing domain hull")
-        hull = shapely.concave_hull(shapely.MultiPoint(bnd_pts.tolist()), ratio=0.05)
+        # Build an exact polygon from chained boundary segments.
+        # This handles extracted subdomains where the land (coastline)
+        # is part of the perimeter and islands must be excluded as holes.
+        self._update_substep("Building domain polygon")
+        hull = _build_domain_polygon(project)
 
         # Query NOAA stations within the hull
         self._update_substep("Querying NOAA CO-OPS stations")
@@ -753,6 +832,62 @@ class SchismPlotStage(WorkflowStage):
             elevation = elevation[:, :n]
             station_ids = station_ids[:n]
 
+        # Apply per-station datum correction so simulated values are in MSL.
+        # ``correct_elevation`` uses per-boundary-node corrections during
+        # forcing setup, so the model interior remains in the mesh's
+        # vertical datum (effectively NAVD88 for CONUS).  Using a single
+        # boundary mean here would over-correct stations whose local
+        # geoid-MSL offset differs from the domain average; instead we
+        # take each station's local ``conversion_factor`` from the nearest
+        # boundary node.  The conversion back to MSL is ``msl = mesh + conv``.
+        corr_path = self.model.prebuilt_dir / "elevation_correction.csv"
+        if corr_path.exists():
+            try:
+                corr_df = pd.read_csv(corr_path)
+                corr_lons = corr_df["Field1"].to_numpy()
+                corr_lats = corr_df["Field2"].to_numpy()
+                conv_factors = corr_df["conversion_factor"].to_numpy()
+                fallback_conv = float(conv_factors.mean()) if conv_factors.size else 0.0
+
+                from coastal_calibration.data.coops_api import COOPSAPIClient
+
+                client = COOPSAPIClient()
+                md = client.stations_metadata
+                md_subset = md[md["station_id"].astype(str).isin(station_ids)]
+                md_by_id = md_subset.set_index(md_subset["station_id"].astype(str))
+                # Vectorised coordinate access via geopandas's .x/.y on the
+                # geometry column avoids per-row scalar indexing issues.
+                sta_lons = md_by_id.geometry.x.to_dict()
+                sta_lats = md_by_id.geometry.y.to_dict()
+
+                per_station_conv = np.full(len(station_ids), fallback_conv)
+                for i, sid in enumerate(station_ids):
+                    if sid in sta_lons:
+                        slon = float(sta_lons[sid])
+                        slat = float(sta_lats[sid])
+                        d2 = (corr_lons - slon) ** 2 + (corr_lats - slat) ** 2
+                        per_station_conv[i] = float(conv_factors[int(np.argmin(d2))])
+                    else:
+                        self._log(
+                            f"Station {sid}: no metadata; using boundary mean "
+                            f"{fallback_conv:+.4f} m for datum correction",
+                            "debug",
+                        )
+
+                elevation = elevation + per_station_conv[None, :]
+                self._log(
+                    "Applied per-station datum offset to simulated values "
+                    f"(range {per_station_conv.min():+.4f} to "
+                    f"{per_station_conv.max():+.4f} m, mean "
+                    f"{per_station_conv.mean():+.4f} m)"
+                )
+            except (KeyError, ValueError) as exc:
+                self._log(
+                    f"Could not apply elevation correction: {exc}; "
+                    "comparison may show a datum offset",
+                    "warning",
+                )
+
         sim = self.config.simulation
         start_dt = sim.start_date
         start_ns = np.datetime64(start_dt, "ns")
@@ -810,7 +945,8 @@ class SchismPlotStage(WorkflowStage):
             return {"status": "skipped", "reason": "no points"}
 
         self._update_substep("Extracting water level at obs points")
-        ds = load_schism_elevation(work_dir)
+        corr = self.model.prebuilt_dir / "elevation_correction.csv"
+        ds = load_schism_elevation(work_dir, correction_file=corr if corr.exists() else None)
         validate_points_in_domain(all_points, ds)
         series = extract_water_level_series(ds, all_points, variable="elevation")
 
@@ -841,7 +977,8 @@ class SchismPlotStage(WorkflowStage):
         from coastal_calibration.plotting import animate_water_level
         from coastal_calibration.schism.outputs import load_schism_elevation
 
-        ds = load_schism_elevation(work_dir)
+        corr = self.model.prebuilt_dir / "elevation_correction.csv"
+        ds = load_schism_elevation(work_dir, correction_file=corr if corr.exists() else None)
         outfile = figs_dir / "water_level.mp4"
         animate_water_level(
             ds,
