@@ -50,6 +50,16 @@ execution.
     two self-contained sub-projects and the open-boundary, land-boundary, and
     island-boundary reconstructions on each side.
 
+- [![Mendocino walkthrough (SCHISM + SFINCS)](images/walkthrough_thumb.png){ loading=lazy }](notebooks/walkthrough.ipynb "Mendocino walkthrough — SCHISM + SFINCS comparison")
+    **Mendocino Walkthrough (SCHISM + SFINCS)**
+
+    End-to-end side-by-side demo on a single Pacific subdomain. Extract a sub-mesh
+    from the full Pacific SCHISM domain with `extract_mesh`, run a SFINCS quadtree
+    model on the same boundary (level-4 refinement along the SCHISM mesh edge,
+    `mask.keep_largest_only`, tide-stable `inp_overrides`), then compare the two
+    against a shared NOAA gauge in a 3-line plot and render the water-level fields
+    side-by-side with a shared colorbar via `animate_water_level_comparison`.
+
 </div>
 
 ## Post-run Plotting
