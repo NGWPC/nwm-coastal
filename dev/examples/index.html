@@ -911,6 +911,8 @@
       
         
       
+        
+      
     
     
     
@@ -1055,6 +1057,34 @@
     
   
     Hawaii: SCHISM Mesh Subset Demo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="notebooks/walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pre-Delivery Walkthrough: SCHISM + SFINCS over the Mendocino Coast
   
 
     
@@ -1561,6 +1591,16 @@ can be executed directly against any of the tutorial runs once they have finishe
 <p>Cut the Hawaii SCHISM mesh along a user-supplied line with <code>divide_mesh</code>, producing
 two self-contained sub-projects and the open-boundary, land-boundary, and
 island-boundary reconstructions on each side.</p>
+</li>
+<li>
+<p><a href="notebooks/walkthrough/" title="Mendocino walkthrough — SCHISM + SFINCS comparison"><img alt="Mendocino walkthrough (SCHISM + SFINCS)" loading="lazy" src="images/walkthrough_thumb.png" /></a>
+    <strong>Mendocino Walkthrough (SCHISM + SFINCS)</strong></p>
+<p>End-to-end side-by-side demo on a single Pacific subdomain. Extract a sub-mesh
+from the full Pacific SCHISM domain with <code>extract_mesh</code>, run a SFINCS quadtree
+model on the same boundary (level-4 refinement along the SCHISM mesh edge,
+<code>mask.keep_largest_only</code>, tide-stable <code>inp_overrides</code>), then compare the two
+against a shared NOAA gauge in a 3-line plot and render the water-level fields
+side-by-side with a shared colorbar via <code>animate_water_level_comparison</code>.</p>
 </li>
 </ul>
 </div>
