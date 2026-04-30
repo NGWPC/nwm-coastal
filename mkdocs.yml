@@ -69,6 +69,10 @@ exclude_docs: |
   examples/lavaca-tx/run/
   examples/lavaca-tx/cache/
   examples/narragansett-ri/cache/
+  examples/walkthrough/
+  examples/pacific/extracted/
+  examples/pacific/run_extract/
+  examples/pacific/cache/
 
 hooks:
 - docs/hooks.py
@@ -177,6 +181,7 @@ nav:
     - Narragansett Bay: examples/notebooks/narragansett.ipynb
     - Hawaii: examples/notebooks/schism-hawaii.ipynb
     - Hawaii Mesh Subset: examples/notebooks/schism-hawaii-subset.ipynb
+    - Mendocino Walkthrough: examples/notebooks/walkthrough.ipynb
   - Post-run Plotting:
     - Lavaca Bay (SFINCS): examples/notebooks/plot_sfincs_lavaca.ipynb
     - Narragansett Bay (SFINCS): examples/notebooks/plot_sfincs_narragansett.ipynb
