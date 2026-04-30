@@ -125,6 +125,154 @@ def build_grid(
     return grid, GridBounds(y_lo, y_hi, x_lo, x_hi)
 
 
+def build_unstructured_mesh(
+    lon: np.ndarray,
+    lat: np.ndarray,
+    elements: np.ndarray,
+    *,
+    start_index: int = 0,
+    bbox: tuple[float, float, float, float] | None = None,
+    bbox_buffer_deg: float = 1.0,
+    node_mask: np.ndarray | None = None,
+) -> tuple[ESMF.Mesh, np.ndarray]:
+    """Create an ESMF Mesh from an unstructured triangular grid.
+
+    Used for BILINEAR-style regridding from unstructured sources where
+    barycentric weights inside source triangles produce smooth
+    interpolation between mesh nodes — the unstructured-mesh analog of
+    fractional pixel sampling on rasters.
+
+    A bounding box can be supplied to spatially subset very large
+    sources (e.g. global STOFS, ~12M nodes / ~25M triangles) before
+    handing them to ESMF.  Only nodes within ``bbox + bbox_buffer_deg``
+    are kept, and only elements whose three vertices are all in the
+    kept set survive.
+
+    Parameters
+    ----------
+    lon, lat
+        Global node coordinates, 1D arrays of length ``n_nodes``.
+    elements
+        Triangle connectivity, shape ``(n_elem, 3)``.
+    start_index
+        ``0`` if ``elements`` is 0-based, ``1`` if 1-based.
+    bbox
+        Optional ``(lon_min, lat_min, lon_max, lat_max)`` for spatial
+        subsetting.  When provided only nodes within this bbox (plus
+        ``bbox_buffer_deg`` margin) are loaded into the ESMF mesh.
+    bbox_buffer_deg
+        Margin added to ``bbox`` on each side to ensure all elements
+        spanning the destination region remain intact.
+    node_mask
+        Optional per-node mask aligned with the global ``lon``/``lat``
+        arrays.  Non-zero entries are excluded by ESMF when computing
+        regridding weights via ``src_mask_values=[1]``.  The mask is
+        subset to ``keep_idx`` internally.
+
+    Returns
+    -------
+    ESMF.Mesh
+        Mesh with the (possibly subset) nodes and triangular elements.
+    keep_idx : numpy.ndarray
+        1D array of node indices that were retained from the original
+        ``lon``/``lat`` arrays.  Use this to subset per-node data
+        arrays before assigning into ``field.data`` of an
+        :class:`ESMF.Field` defined on the returned mesh.
+    """
+    if lon.ndim != 1 or lat.ndim != 1:
+        raise ValueError("lon and lat must be 1D arrays")
+    if elements.ndim != 2 or elements.shape[1] != 3:
+        raise ValueError(f"elements must be (N, 3); got {elements.shape}")
+
+    n_global = len(lon)
+
+    # Convert connectivity to 0-based
+    if start_index == 1:
+        elements = elements - 1
+    elif start_index != 0:
+        raise ValueError(f"start_index must be 0 or 1, got {start_index}")
+
+    # Optional bbox filter to keep the mesh small
+    if bbox is not None:
+        lon_min, lat_min, lon_max, lat_max = bbox
+        node_mask = (
+            (lon >= lon_min - bbox_buffer_deg)
+            & (lon <= lon_max + bbox_buffer_deg)
+            & (lat >= lat_min - bbox_buffer_deg)
+            & (lat <= lat_max + bbox_buffer_deg)
+        )
+        keep_idx = np.where(node_mask)[0]
+    else:
+        keep_idx = np.arange(n_global, dtype=np.int64)
+
+    # Filter elements: keep only triangles whose vertices are all in keep_idx
+    keep_set = np.zeros(n_global, dtype=bool)
+    keep_set[keep_idx] = True
+    elem_kept_mask = keep_set[elements[:, 0]] & keep_set[elements[:, 1]] & keep_set[elements[:, 2]]
+    kept_elements = elements[elem_kept_mask]
+
+    # ESMF requires every node in the mesh to be referenced by at
+    # least one element.  After bbox-filtering elements, some bbox
+    # nodes near the boundary become orphans (their incident
+    # triangles span outside the kept region and were dropped).
+    # Restrict ``keep_idx`` to nodes that are actually referenced.
+    keep_idx = np.unique(kept_elements)
+
+    # Remap element vertex indices to the local 0..len(keep_idx) range
+    remap = -np.ones(n_global, dtype=np.int64)
+    remap[keep_idx] = np.arange(len(keep_idx), dtype=np.int64)
+    local_elements = remap[kept_elements]
+
+    n_local_nodes = len(keep_idx)
+    n_local_elems = len(local_elements)
+
+    # esmpy passes these arrays through ctypes to the ESMF C++ layer;
+    # use the default Python ``int`` / ``float`` dtypes (matching the
+    # official esmpy mesh-creation examples) to avoid undefined-
+    # behaviour crashes that occur with explicit int32 dtypes.
+    node_ids = np.arange(1, n_local_nodes + 1)
+    node_coords = np.empty(n_local_nodes * 2)
+    node_coords[0::2] = lon[keep_idx]
+    node_coords[1::2] = lat[keep_idx]
+    node_owners = np.zeros(n_local_nodes)
+
+    elem_ids = np.arange(1, n_local_elems + 1)
+    elem_types = np.full(n_local_elems, ESMF.MeshElemType.TRI)
+    elem_conn = local_elements.flatten()
+
+    if node_mask is not None:
+        local_mask = np.asarray(node_mask)[keep_idx].astype(int, copy=False)
+    else:
+        local_mask = None
+
+    # Element centroids — esmpy is unstable when these are omitted on
+    # large unstructured meshes; passing them explicitly avoids
+    # segfaults inside the ESMF C++ layer.
+    kept_lon = lon[keep_idx]
+    kept_lat = lat[keep_idx]
+    elem_centroid = np.empty(n_local_elems * 2)
+    elem_centroid[0::2] = kept_lon[local_elements].mean(axis=1)
+    elem_centroid[1::2] = kept_lat[local_elements].mean(axis=1)
+
+    mesh = ESMF.Mesh(parametric_dim=2, spatial_dim=2, coord_sys=ESMF.CoordSys.SPH_DEG)
+    mesh.add_nodes(
+        n_local_nodes,
+        node_ids,
+        node_coords,
+        node_owners,
+        node_mask=local_mask,
+    )
+    mesh.add_elements(
+        n_local_elems,
+        elem_ids,
+        elem_types,
+        elem_conn,
+        element_coords=elem_centroid,
+    )
+
+    return mesh, keep_idx
+
+
 def build_locstream(lon: np.ndarray, lat: np.ndarray) -> ESMF.LocStream:
     """Create an ESMF LocStream from 1D **global** coordinate arrays.
 

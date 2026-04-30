@@ -163,15 +163,20 @@ class STOFSBoundaryStage(WorkflowStage):
         correction_file = corr_path if corr_path.exists() else None
         n_open_boundary_nodes = _get_open_boundary_node_count(prebuilt_dir)
 
-        self._update_substep("Running regrid_estofs.py with MPI")
+        self._update_substep("Running regrid_estofs.py")
 
+        # STOFS regridding produces only ~hundreds of open-boundary
+        # values; the work is too small to benefit from parallelism and
+        # ESMF's distributed-mesh coordination overhead dominates wall
+        # time when run across many PETs.  Pin to a single rank — the
+        # serial run finishes in seconds.
         elev_file = make_stofs_boundary(
             work_dir=self.config.paths.work_dir,
             start_date=sim.start_date,
             duration_hours=sim.duration_hours,
             stofs_file=stofs_file,
             prebuilt_dir=prebuilt_dir,
-            mpi_tasks=self.model.total_tasks,
+            mpi_tasks=1,
             correction_file=correction_file,
             n_open_boundary_nodes=n_open_boundary_nodes,
         )
