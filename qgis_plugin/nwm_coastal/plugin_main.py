@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -24,6 +25,7 @@ from qgis.core import (
     QgsPalLayerSettings,
     QgsPointXY,
     QgsProject,
+    QgsProviderRegistry,
     QgsRasterLayer,
     QgsRendererCategory,
     QgsSimpleFillSymbolLayer,
@@ -810,6 +812,38 @@ class NWMCoastalPlugin:
                 push=True,
             )
 
+    def _mesh_load_failure_message(self, out_2dm: Path) -> str:
+        """Build a diagnostic-rich message for a failed mesh load.
+
+        ``QgsMeshLayer.isValid() == False`` alone doesn't tell us
+        whether the file is missing/empty, the format is wrong, or the
+        MDAL provider isn't registered in this QGIS install. On HPC
+        clusters all three are plausible failure modes, so collect the
+        relevant signals into one message the user can share.
+        """
+        parts = [f"Failed to load mesh layer from {out_2dm}"]
+        if not out_2dm.exists():
+            parts.append("file does not exist after conversion")
+        else:
+            try:
+                size = out_2dm.stat().st_size
+                parts.append(f"file size: {size:,} bytes")
+            except OSError as exc:  # pragma: no cover — diagnostic only
+                parts.append(f"stat failed: {exc}")
+        try:
+            err = self._mesh_layer.error() if self._mesh_layer is not None else None
+            if err is not None and not err.isEmpty():
+                parts.append(f"MDAL error: {err.summary()}")
+        except (RuntimeError, AttributeError):  # pragma: no cover — diagnostic only
+            pass
+        providers = QgsProviderRegistry.instance().providerList()
+        if "mdal" not in providers:
+            parts.append(
+                "the 'mdal' provider is not registered in this QGIS install "
+                f"(available: {', '.join(sorted(providers)) or 'none'})"
+            )
+        return " — ".join(parts)
+
     @staticmethod
     def _mesh_cache_dir() -> Path:
         """Return the on-disk mesh cache dir under the active QGIS profile.
@@ -856,6 +890,10 @@ class NWMCoastalPlugin:
             ``(n_nodes, n_elements)``.
         """
         buf = NWMCoastalPlugin._GR3_BUFFER
+        # fsync both outputs before the ``with`` closes them — on
+        # NFS-mounted home directories (common on HPC clusters under
+        # ``~/.local/share``) the kernel can otherwise hold writes in
+        # the page cache and let MDAL see a truncated or empty file.
         with (
             gr3_path.open("r", buffering=buf) as fin,
             out_2dm.open("w", buffering=buf) as f2dm,
@@ -905,6 +943,11 @@ class NWMCoastalPlugin:
                 processed += 1
                 if progress is not None and processed % step == 0:
                     progress(processed, total)
+
+            f2dm.flush()
+            os.fsync(f2dm.fileno())
+            fdat.flush()
+            os.fsync(fdat.fileno())
 
         if progress is not None:
             progress(total, total)
@@ -1047,7 +1090,7 @@ class NWMCoastalPlugin:
         self._mesh_layer = QgsMeshLayer(str(out_2dm), gr3_path.stem, "mdal")
         if not self._mesh_layer.isValid():
             self._log(
-                f"Failed to load mesh layer from {out_2dm}",
+                self._mesh_load_failure_message(out_2dm),
                 Qgis.MessageLevel.Critical,
                 push=True,
             )
