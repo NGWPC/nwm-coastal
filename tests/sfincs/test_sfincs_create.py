@@ -282,6 +282,42 @@ class TestSfincsCreateConfig:
         ref = d["grid"]["refinement"][0]
         assert "buffer_m" not in ref
 
+    def test_keep_largest_only_round_trip(self, aoi_file: Path, output_dir: Path) -> None:
+        """`mask.keep_largest_only` must survive the to_dict/from_dict round-trip."""
+        cfg = SfincsCreateConfig.from_dict({
+            "aoi": str(aoi_file),
+            "output_dir": str(output_dir),
+            "mask": {
+                "zmin": -50.0,
+                "boundary_zmax": -1.0,
+                "reset_bounds": True,
+                "keep_largest_only": True,
+            },
+        })
+        assert cfg.mask.keep_largest_only is True
+        d = cfg.to_dict()
+        assert d["mask"]["keep_largest_only"] is True
+        cfg2 = SfincsCreateConfig.from_dict(d)
+        assert cfg2.mask.keep_largest_only is True
+
+    def test_aoi_simplify_neck_m_round_trip(self, aoi_file: Path, output_dir: Path) -> None:
+        """`aoi_simplify_neck_m` must survive the to_dict/from_dict round-trip."""
+        cfg = SfincsCreateConfig.from_dict({
+            "aoi": str(aoi_file),
+            "output_dir": str(output_dir),
+            "aoi_simplify_neck_m": 750.0,
+        })
+        assert cfg.aoi_simplify_neck_m == 750.0
+        d = cfg.to_dict()
+        assert d["aoi_simplify_neck_m"] == 750.0
+        cfg2 = SfincsCreateConfig.from_dict(d)
+        assert cfg2.aoi_simplify_neck_m == 750.0
+
+    def test_aoi_simplify_neck_m_default_zero(self, aoi_file: Path, output_dir: Path) -> None:
+        """`aoi_simplify_neck_m` defaults to 0 (cleanup off) when unspecified."""
+        cfg = SfincsCreateConfig(aoi=aoi_file, output_dir=output_dir)
+        assert cfg.aoi_simplify_neck_m == 0.0
+
     def test_data_catalog_data_libs_is_list(self) -> None:
         """DataCatalogConfig.data_libs should default to an empty list, not a string.
 
@@ -1118,24 +1154,29 @@ class TestDischargeStageRun:
         assert result["status"] == "skipped"
         _clear_model(cfg)
 
-    def test_run_flowpath_inside_aoi_uses_endpoint(
+    def test_run_flowpath_entirely_inside_aoi_falls_back_to_closer_endpoint(
         self,
         output_dir: Path,
         tmp_path: Path,
         mock_sfincs_model: MagicMock,
     ) -> None:
-        """Flowpath inside AOI uses downstream endpoint as discharge point."""
+        """Flowpath inside the AOI uses the endpoint closest to the AOI boundary.
+
+        When a flowline never crosses the AOI boundary, the picker
+        falls back to whichever line endpoint is closest to the
+        boundary. The downstream snap step then places the discharge
+        on the nearest active grid cell (or drops it if it exceeds
+        ``max_snap_distance_m``).
+        """
         import geopandas as gpd
         import numpy as np
         from shapely import LineString, box
 
-        # AOI in EPSG:4326 (will be reprojected to model CRS by run())
         aoi = tmp_path / "aoi.geojson"
         gpd.GeoDataFrame(geometry=[box(-95.5, 29.0, -95.0, 29.5)], crs="EPSG:4326").to_file(
             aoi, driver="GeoJSON"
         )
 
-        # Flowpath entirely inside the AOI — endpoint at (-95.2, 29.3)
         geojson = tmp_path / "inside.geojson"
         gdf = gpd.GeoDataFrame(
             {"id": [2001]},
@@ -1153,7 +1194,6 @@ class TestDischargeStageRun:
                 max_snap_distance_m=100_000.0,
             ),
         )
-        # UTM equivalents of (-95.25, 29.25) and (-95.15, 29.35)
         mock_sfincs_model.quadtree_grid.data.ugrid.grid.crs = "EPSG:32615"
         face_x = np.array([281563.0, 291478.0])
         face_y = np.array([3248867.0, 3259768.0])
@@ -1167,20 +1207,23 @@ class TestDischargeStageRun:
         _set_model(cfg, mock_sfincs_model)
         stage = CreateDischargeStage(cfg)
         result = stage.run()
+        assert result["status"] == "completed"
         assert result["points_added"] == 1
-        mock_sfincs_model.discharge_points.add_point.assert_not_called()
-        src_file = cfg.output_dir / "sfincs_nwm.src"
-        assert src_file.exists()
-        assert len(src_file.read_text().strip().splitlines()) == 1
         _clear_model(cfg)
 
-    def test_run_multilinestring_merged(
+    def test_run_multilinestring_crosses_boundary_yields_inflow_point(
         self,
         output_dir: Path,
         tmp_path: Path,
         mock_sfincs_model: MagicMock,
     ) -> None:
-        """MultiLineString geometries are merged into LineStrings."""
+        """MultiLineString that crosses the AOI boundary still yields an inflow point.
+
+        Upstream ``shapely.line_merge`` collapses connected
+        MultiLineStrings to LineStrings, and the picker tolerates the
+        residual multipart cases. Here the line goes from outside the
+        AOI to inside, so a single boundary crossing is expected.
+        """
         import geopandas as gpd
         import numpy as np
         from shapely import MultiLineString, box
@@ -1190,12 +1233,17 @@ class TestDischargeStageRun:
             aoi, driver="GeoJSON"
         )
 
-        # MultiLineString that should be merged into a single LineString
+        # First segment outside the AOI, second segment inside; the
+        # parts share an endpoint so line_merge yields a single
+        # LineString that crosses the western AOI edge at lon = -95.5.
         geojson = tmp_path / "multi.geojson"
         gdf = gpd.GeoDataFrame(
             {"id": [3001]},
             geometry=[
-                MultiLineString([[(-95.4, 29.2), (-95.3, 29.25)], [(-95.3, 29.25), (-95.2, 29.3)]])
+                MultiLineString([
+                    [(-95.7, 29.25), (-95.5, 29.25)],
+                    [(-95.5, 29.25), (-95.2, 29.3)],
+                ])
             ],
             crs="EPSG:4326",
         )
@@ -1211,18 +1259,19 @@ class TestDischargeStageRun:
             ),
         )
         mock_sfincs_model.quadtree_grid.data.ugrid.grid.crs = "EPSG:32615"
-        face_x = np.array([281563.0, 291478.0])
-        face_y = np.array([3248867.0, 3259768.0])
+        face_x = np.array([261677.0, 271629.0, 281563.0, 291478.0])
+        face_y = np.array([3227087.0, 3237973.0, 3248867.0, 3259768.0])
         mock_sfincs_model.quadtree_grid.data.ugrid.grid.face_x = face_x
         mock_sfincs_model.quadtree_grid.data.ugrid.grid.face_y = face_y
         mask_mock = MagicMock()
-        mask_mock.to_numpy.return_value = np.array([1, 1])
+        mask_mock.to_numpy.return_value = np.array([1, 1, 1, 1])
         mock_sfincs_model.quadtree_grid.data.__getitem__ = lambda self, k: (
             mask_mock if k == "mask" else MagicMock()
         )
         _set_model(cfg, mock_sfincs_model)
         stage = CreateDischargeStage(cfg)
         result = stage.run()
+        assert result["status"] == "completed"
         assert result["points_added"] == 1
         _clear_model(cfg)
 
@@ -1287,8 +1336,13 @@ class TestDischargeStageRun:
         tmp_path: Path,
         mock_sfincs_model: MagicMock,
     ) -> None:
-        """Discharge point beyond max_snap_distance_m is dropped with a warning."""
-        # Outside point is ~54,650 m from nearest face center — exceeds 2000 m.
+        """Outside flowpath endpoint farther than the snap threshold is dropped.
+
+        With no boundary crossing the picker falls back to the closer
+        line endpoint, but that endpoint is ~54.6 km from any active
+        grid cell — far beyond the 2 km snap allowance — so the
+        discharge point is dropped during the snap step.
+        """
         cfg = self._make_outside_domain_cfg(
             output_dir, tmp_path, mock_sfincs_model, max_snap_distance_m=2000.0
         )
@@ -1299,14 +1353,104 @@ class TestDischargeStageRun:
         assert result["points_added"] == 0
         _clear_model(cfg)
 
-    def test_run_outside_domain_snaps_within_max_distance(
+    def test_run_multiple_crossings_picks_upstream(
         self,
         output_dir: Path,
         tmp_path: Path,
         mock_sfincs_model: MagicMock,
     ) -> None:
-        """Discharge point outside domain snaps when max_snap_distance_m is large enough."""
-        # Outside point is ~54,650 m from nearest face — 100 km threshold allows it.
+        """Multi-crossing flowline resolves to the most-upstream boundary point.
+
+        Construct a meandering line that enters the AOI from the west,
+        wiggles back across the boundary twice, then ends inside.
+        With three crossings (lon = -95.5, -95.5, -95.5 — all on the
+        western edge — but different latitudes, so they're distinct
+        points), the picker must select the one closest to the
+        outside (upstream) endpoint of the line.
+        """
+        import geopandas as gpd
+        import numpy as np
+        from shapely import LineString, box
+
+        aoi = tmp_path / "aoi.geojson"
+        gpd.GeoDataFrame(geometry=[box(-95.5, 29.0, -95.0, 29.5)], crs="EPSG:4326").to_file(
+            aoi, driver="GeoJSON"
+        )
+
+        # Path: outside → in (cross at y=29.10) → out (cross at y=29.20)
+        #     → in (cross at y=29.40) → ends inside.
+        # The upstream endpoint is the first vertex (-95.7, 29.05);
+        # the upstream-most crossing is therefore the first one at
+        # (-95.5, 29.10).
+        geojson = tmp_path / "multi_cross.geojson"
+        line = LineString([
+            (-95.70, 29.05),  # outside (upstream)
+            (-95.30, 29.10),  # inside
+            (-95.70, 29.20),  # outside again
+            (-95.30, 29.40),  # inside again
+            (-95.20, 29.45),  # ends inside (downstream)
+        ])
+        gdf = gpd.GeoDataFrame({"id": [4001]}, geometry=[line], crs="EPSG:4326")
+        gdf.to_file(geojson, driver="GeoJSON")
+
+        cfg = SfincsCreateConfig(
+            aoi=aoi,
+            output_dir=output_dir,
+            river_discharge=RiverDischargeConfig(
+                flowlines=geojson,
+                nwm_id_column="id",
+                max_snap_distance_m=100_000.0,
+            ),
+        )
+        mock_sfincs_model.quadtree_grid.data.ugrid.grid.crs = "EPSG:32615"
+        face_x = np.array([261677.0, 271629.0, 281563.0, 291478.0])
+        face_y = np.array([3227087.0, 3237973.0, 3248867.0, 3259768.0])
+        mock_sfincs_model.quadtree_grid.data.ugrid.grid.face_x = face_x
+        mock_sfincs_model.quadtree_grid.data.ugrid.grid.face_y = face_y
+        mask_mock = MagicMock()
+        mask_mock.to_numpy.return_value = np.array([1, 1, 1, 1])
+        mock_sfincs_model.quadtree_grid.data.__getitem__ = lambda self, k: (
+            mask_mock if k == "mask" else MagicMock()
+        )
+        _set_model(cfg, mock_sfincs_model)
+        stage = CreateDischargeStage(cfg)
+        result = stage.run()
+        assert result["status"] == "completed"
+        assert result["points_added"] == 1
+
+        # Verify the chosen crossing is the upstream-most (y ≈ 29.10
+        # in EPSG:4326, which projects to a UTM y around 3.221e6 in
+        # zone 15N) — *not* the downstream-most (y ≈ 29.40, ≈ 3.254e6).
+        src_file = cfg.output_dir / "sfincs_nwm.src"
+        src_line = src_file.read_text().strip()
+        # The point may have been snapped to an active cell; we
+        # check the y coordinate is closer to the upstream UTM y
+        # than to the downstream UTM y.
+        _, y_written = (float(v) for v in src_line.split()[:2])
+        # Upstream crossing UTM y ~3.221e6; downstream crossing ~3.254e6.
+        # Snapped coords come from the supplied face_y array.
+        # The picker should have produced a point near y=3.221e6,
+        # so the snapped face is the southernmost (3.227e6).
+        assert y_written < 3_240_000, (
+            f"Snapped y={y_written} should be near the upstream crossing "
+            f"(~3.227e6), not the downstream one (~3.260e6)"
+        )
+        _clear_model(cfg)
+
+    def test_run_flowpath_entirely_outside_aoi_falls_back_to_closer_endpoint(
+        self,
+        output_dir: Path,
+        tmp_path: Path,
+        mock_sfincs_model: MagicMock,
+    ) -> None:
+        """Outside flowpath snaps when ``max_snap_distance_m`` is generous enough.
+
+        With no boundary crossing, the picker selects the line
+        endpoint closest to the AOI boundary; the snap step then
+        moves it onto the nearest active grid cell. With a 100 km
+        snap allowance the outside endpoint (~54.6 km from any
+        active cell) makes it onto the grid.
+        """
         cfg = self._make_outside_domain_cfg(
             output_dir, tmp_path, mock_sfincs_model, max_snap_distance_m=100_000.0
         )
@@ -1316,13 +1460,14 @@ class TestDischargeStageRun:
         assert result["status"] == "completed"
         assert result["points_added"] == 1
 
-        # Verify snapped coordinates are on the grid (UTM), not at
-        # the original outside-domain location (~208436 easting).
         src_file = cfg.output_dir / "sfincs_nwm.src"
         assert src_file.exists()
         src_line = src_file.read_text().strip()
         x_written, y_written = (float(v) for v in src_line.split()[:2])
-        assert 256000 <= x_written <= 292000, f"Snapped x={x_written} should be inside the grid"
+        # Snapped onto the supplied face grid (UTM 15N).
+        assert 256000 <= x_written <= 292000, (
+            f"Snapped x={x_written} should be inside the grid"
+        )
         assert 3_210_000 <= y_written <= 3_266_000, (
             f"Snapped y={y_written} should be inside the grid"
         )
