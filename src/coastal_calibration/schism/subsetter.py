@@ -6,6 +6,7 @@ Memory-efficient processing with geodesic classification and chunked I/O.
 
 from __future__ import annotations
 
+import itertools
 import os
 import shutil
 import tempfile
@@ -36,7 +37,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from numpy.typing import NDArray
-    from shapely import LineString
+    from shapely import LineString, Polygon
 
 __all__ = [
     "MeshClassifier",
@@ -44,7 +45,8 @@ __all__ = [
     "MeshSubsetter",
     "NodeClassification",
     "SubsetResult",
-    "divide_mesh",
+    "extract_mesh",
+    "split_mesh",
 ]
 
 
@@ -603,45 +605,52 @@ def _build_shared_nodes_graph(
     shared_nodes: NDArray[np.int64] | Sequence[int] | Sequence[np.int64],
     elements: NDArray[np.int64],
 ) -> dict[int, set[int]]:
-    """Build undirected graph from shared nodes and element connectivity.
+    """Build undirected graph of shared-node *edges* from element connectivity.
+
+    Only nodes that are connected via an actual element edge (consecutive
+    vertices around the element) are made adjacent.  Diagonals of quads
+    are explicitly excluded so that cut-boundary path-finding follows
+    real mesh edges instead of short-cutting across an element.
 
     Parameters
     ----------
     shared_nodes : numpy.ndarray
         Shared node IDs.
     elements : numpy.ndarray
-        Element connectivity rows used to build adjacency.
+        Element connectivity rows. Each row is
+        ``[elem_id, n1, n2, n3, n4]``; quads have ``n4 != 0`` and
+        triangles have ``n4 == 0``.
 
     Returns
     -------
     dict
-        Mapping of node_id -> set(neighbor_node_ids).
+        Mapping of node_id -> set(neighbor_node_ids) restricted to
+        edge-adjacent shared-node pairs.
     """
-    elem_nodes = elements[:, 1:5].copy()
-    elem_nodes[elements[:, 4] == 0, 3] = 0
-
-    is_shared = np.isin(elem_nodes, np.asarray(shared_nodes))
-    shared_in_elems = np.where(is_shared, elem_nodes, 0)
-    shared_count = (shared_in_elems != 0).sum(axis=1)
-    valid_mask = shared_count >= 2
-
-    if not np.any(valid_mask):
+    if elements.size == 0:
         return {}
 
-    valid_shared = shared_in_elems[valid_mask]
+    shared_arr = np.asarray(shared_nodes)
+    is_quad = elements[:, 4] != 0
     adjacency: dict[int, set[int]] = defaultdict(set)
 
-    for elem_shared in valid_shared:
-        nodes = elem_shared[elem_shared != 0]
-
-        if len(nodes) >= 2:
-            i_idx, j_idx = np.triu_indices(len(nodes), k=1)
-            pairs_i = nodes[i_idx]
-            pairs_j = nodes[j_idx]
-
-            for ni, nj in zip(pairs_i, pairs_j, strict=False):
+    def _add_edges(verts: NDArray[np.int64], edges: list[tuple[int, int]]) -> None:
+        if verts.size == 0:
+            return
+        in_shared = np.isin(verts, shared_arr)
+        for i, j in edges:
+            both = in_shared[:, i] & in_shared[:, j]
+            if not both.any():
+                continue
+            for ni, nj in zip(verts[both, i], verts[both, j], strict=False):
                 adjacency[int(ni)].add(int(nj))
                 adjacency[int(nj)].add(int(ni))
+
+    # Triangles: edges (0-1, 1-2, 2-0) on columns [n1, n2, n3]
+    _add_edges(elements[~is_quad, 1:4], [(0, 1), (1, 2), (2, 0)])
+
+    # Quads: edges (0-1, 1-2, 2-3, 3-0) on columns [n1, n2, n3, n4]
+    _add_edges(elements[is_quad, 1:5], [(0, 1), (1, 2), (2, 3), (3, 0)])
 
     return adjacency
 
@@ -1526,7 +1535,159 @@ class MeshSubsetter:
         return subset_result
 
 
-def divide_mesh(
+def _subset_elevation_correction(
+    corr_file: Path,
+    project: NWMSCHISMProject,
+    subset_result: SubsetResult,
+    output_dir_a: Path,
+    output_dir_b: Path,
+) -> None:
+    """Subset the elevation correction CSV for the subset boundaries.
+
+    The correction CSV has one row per open-boundary node in the
+    *original* mesh, ordered by boundary traversal.  Columns
+    ``Field1``/``Field2`` hold the node's lon/lat and
+    ``conversion_factor`` holds the geoid-to-MSL offset.
+
+    For each subset we read its open-boundary node coordinates and
+    classify them topologically:
+
+    * **Original** nodes — those that match an entry in the input CSV
+      to within ~100 m (i.e., they were open-boundary nodes in the
+      parent mesh and survived the subset).  These reuse their
+      original ``conversion_factor`` directly.
+    * **Cut-line** nodes — new nodes created where the cut crosses
+      mesh interior (no entry in the parent CSV).  Each cut-line
+      node inherits the ``conversion_factor`` of the nearest
+      *original* node along the **same subset boundary's traversal**.
+      A contiguous run of cut nodes therefore takes the value of the
+      original-boundary node it physically connects to, which keeps
+      the boundary forcing continuous across the cut.
+
+    A subset open boundary that contains no original nodes at all
+    (entirely synthesised by the cut) cannot be anchored
+    topologically; those nodes fall back to the mean of all original
+    nodes in the subset, and a warning is logged.
+    """
+    corrections = pd.read_csv(corr_file)
+    corr_coords = corrections[["Field1", "Field2"]].values
+
+    # Threshold (degrees) for treating a subset node as "the same as"
+    # an original CSV node.  ~0.001° ≈ 100 m near the equator.
+    same_node_thresh = 0.001
+
+    for out_dir in (output_dir_a, output_dir_b):
+        sub_project = NWMSCHISMProject(out_dir, validate=False)
+        bs = sub_project.read_boundaries()
+
+        boundaries = list(bs.open_boundaries)
+        if not boundaries or not any(boundaries):
+            continue
+
+        coords = sub_project.nodes_coordinates
+
+        # Flatten boundary node IDs (1-based) and remember each
+        # boundary's [start, end) slice in the flat array.
+        all_open_ids: list[int] = []
+        bnd_slices: list[tuple[int, int]] = []
+        for bnd in boundaries:
+            start = len(all_open_ids)
+            all_open_ids.extend(bnd)
+            bnd_slices.append((start, len(all_open_ids)))
+        bnd_coords = coords[np.array(all_open_ids) - 1]
+
+        # Spatial nearest-neighbour: maps every subset boundary node to
+        # its closest row in the original CSV.  For original nodes this
+        # finds an exact match; for cut-line nodes it finds something
+        # far away (which we override using topology below).
+        corr_geoms = shapely.points(corr_coords)
+        tree = STRtree(corr_geoms)  # pyright: ignore[reportArgumentType]
+        _, nearest_idx = tree.query_nearest(shapely.points(bnd_coords), all_matches=False)
+        dists = np.linalg.norm(bnd_coords - corr_coords[nearest_idx], axis=1)
+        is_original = dists < same_node_thresh
+
+        # Build subset correction DataFrame in boundary-node order.
+        # OID_ is rewritten to the subset's 1-based ordering, and
+        # Field1/Field2 are rewritten to the subset's node locations
+        # (cut-line nodes need their own lon/lat).  ``index=False`` on
+        # write avoids duplicating an OID column that would shift
+        # ``conversion_factor`` out of column 5 read by
+        # ``correct_elevation`` (``np.loadtxt(..., usecols=5)``).
+        sub_corr = corrections.iloc[nearest_idx].copy().reset_index(drop=True)
+        if "OID_" in sub_corr.columns:
+            sub_corr["OID_"] = np.arange(1, len(sub_corr) + 1)
+        sub_corr["Field1"] = bnd_coords[:, 0]
+        sub_corr["Field2"] = bnd_coords[:, 1]
+
+        if "conversion_factor" not in sub_corr.columns:
+            sub_corr.to_csv(out_dir / SCHISMFiles.ELEV_CORRECTION, index=False)
+            continue
+
+        cf_col = sub_corr.columns.get_loc("conversion_factor")
+        cf_values = sub_corr["conversion_factor"].to_numpy().astype(float, copy=True)
+
+        # Topological anchoring: walk each subset open boundary in
+        # traversal order and, for every cut-line node, copy the
+        # conversion factor of the nearest original-boundary node
+        # in the same boundary.  A contiguous run of cut nodes
+        # therefore inherits the value of the original node at the
+        # connecting endpoint.
+        n_cut_total = 0
+        unanchored_slices: list[tuple[int, int]] = []
+        for start, end in bnd_slices:
+            seg_orig = is_original[start:end]
+            if seg_orig.all():
+                continue
+            seg_orig_pos = np.where(seg_orig)[0]
+            seg_cut_pos = np.where(~seg_orig)[0]
+            n_cut_total += len(seg_cut_pos)
+            if seg_orig_pos.size == 0:
+                # Whole boundary is synthesised by the cut — no
+                # topological anchor available; fall back below.
+                unanchored_slices.append((start, end))
+                continue
+            # Nearest original (in traversal index) for each cut node;
+            # ties broken in favour of the earlier original.
+            diffs = np.abs(seg_cut_pos[:, None] - seg_orig_pos[None, :])
+            anchor_seg_pos = seg_orig_pos[np.argmin(diffs, axis=1)]
+            anchor_global = start + anchor_seg_pos
+            anchor_factors = corrections.iloc[nearest_idx[anchor_global]][
+                "conversion_factor"
+            ].to_numpy()
+            cf_values[start + seg_cut_pos] = anchor_factors
+
+        # Fallback for boundaries with no original nodes at all.
+        if unanchored_slices:
+            anchored_mask = np.ones(len(cf_values), dtype=bool)
+            n_unanchored = 0
+            for start, end in unanchored_slices:
+                anchored_mask[start:end] = False
+                n_unanchored += end - start
+            valid = cf_values[anchored_mask & is_original]
+            fallback = float(valid.mean()) if valid.size else 0.0
+            for start, end in unanchored_slices:
+                cf_values[start:end] = fallback
+            logger.warning(
+                "  %s: %d boundary nodes had no original anchor in their "
+                "traversal; filled conversion_factor with domain mean %.4f m",
+                out_dir.name,
+                n_unanchored,
+                fallback,
+            )
+
+        sub_corr.iloc[:, cf_col] = cf_values
+
+        sub_corr.to_csv(out_dir / SCHISMFiles.ELEV_CORRECTION, index=False)
+        logger.info(
+            "  %s: %d/%d correction rows (%d cut nodes inherited from topological anchor)",
+            out_dir.name,
+            len(sub_corr),
+            len(corrections),
+            n_cut_total,
+        )
+
+
+def split_mesh(
     input_dir: Path | str,
     dividing_line: NDArray[np.float64] | LineString,
     output_dir: Path | str,
@@ -1539,7 +1700,7 @@ def divide_mesh(
     chunk_size: int = Performance.DEFAULT_CHUNK_SIZE,
     buffer_size: int = Performance.DEFAULT_BUFFER_SIZE,
 ) -> MeshDivisionResult:
-    """Divide a SCHISM mesh into two valid subsets based on a dividing line.
+    """Split a SCHISM mesh into two valid subsets along a dividing line.
 
     Parameters
     ----------
@@ -1721,11 +1882,13 @@ def divide_mesh(
 
     if project.elev_corr_file.exists():
         logger.info("Subsetting elevation correction files...")
-        corrections = pd.read_csv(project.elev_corr_file, index_col=0)
-        elems_a_ids = [int(elem[0]) for elem in elements_a]
-        elems_b_ids = [int(elem[0]) for elem in elements_b]
-        corrections.loc[elems_a_ids].to_csv(output_dir_a / SCHISMFiles.ELEV_CORRECTION)
-        corrections.loc[elems_b_ids].to_csv(output_dir_b / SCHISMFiles.ELEV_CORRECTION)
+        _subset_elevation_correction(
+            project.elev_corr_file,
+            project,
+            subset_result,
+            output_dir_a,
+            output_dir_b,
+        )
     else:
         logger.warning("Elevation correction file not found; skipping subsetting.")
 
@@ -1755,6 +1918,406 @@ def divide_mesh(
         input_dir=input_dir,
         output_dir_a=output_dir_a,
         output_dir_b=output_dir_b,
+        classification=classification,
+        subset=subset_result,
+        crs=crs,
+    )
+
+
+def extract_mesh(
+    input_dir: Path | str,
+    polygon: NDArray[np.float64] | Polygon,
+    output_dir: Path | str,
+    *,
+    output_name: str = "extracted",
+    write_netcdf: bool = True,
+    crs: str | int = 4326,
+    re_calc_area: bool = False,
+    chunk_size: int = Performance.DEFAULT_CHUNK_SIZE,
+    buffer_size: int = Performance.DEFAULT_BUFFER_SIZE,
+) -> MeshDivisionResult:
+    """Extract the subdomain of a SCHISM mesh inside a polygon.
+
+    Nodes inside the polygon are kept; outside nodes and their elements
+    are discarded.  Original boundaries that fall inside the polygon are
+    preserved and new open boundaries are created where the polygon
+    boundary crosses the mesh.
+
+    Parameters
+    ----------
+    input_dir : pathlib.Path or str
+        Directory containing NWM-SCHISM project files.
+    polygon : numpy.ndarray or shapely.Polygon
+        Nx2 coordinate array or shapely Polygon defining the region
+        to keep.
+    output_dir : pathlib.Path or str
+        Base output directory to create the output subfolder.
+    output_name : str, optional
+        Subdirectory name for the extracted mesh.
+    write_netcdf : bool, optional
+        Whether to write ESMF NetCDF files.
+    crs : str or int, optional
+        Coordinate reference system used for processing.
+    re_calc_area : bool, optional
+        Whether to recalculate element areas.
+    chunk_size : int, optional
+        Number of nodes/elements to process in each chunk.
+    buffer_size : int, optional
+        File I/O buffer size in bytes.
+
+    Returns
+    -------
+    MeshDivisionResult
+        Paths and statistics describing the extraction.
+    """
+    input_dir = Path(input_dir)
+    output_dir = Path(output_dir)
+    out = output_dir / output_name
+    out.mkdir(parents=True, exist_ok=True)
+
+    if not input_dir.exists():
+        raise FileNotFoundError(f"Input directory not found: {input_dir}")
+
+    poly = shapely.Polygon(polygon) if isinstance(polygon, np.ndarray) else polygon
+
+    project = NWMSCHISMProject(input_dir, buffer_size)
+
+    # ---- classify nodes ----
+    logger.info("Classifying nodes inside polygon...")
+    mesh_vertices = np.zeros((project.n_nodes, 3), dtype=np.float64)
+    node_ids = np.zeros(project.n_nodes, dtype=np.int64)
+
+    idx = 0
+    for nid_chunk, coords_chunk, depths_chunk in project.iter_nodes(chunk_size):
+        n = len(nid_chunk)
+        node_ids[idx : idx + n] = nid_chunk
+        mesh_vertices[idx : idx + n, :2] = coords_chunk
+        mesh_vertices[idx : idx + n, 2] = depths_chunk
+        idx += n
+
+    pts = shapely.points(mesh_vertices[:, 0], mesh_vertices[:, 1])
+    inside_mask = shapely.contains(poly, pts) | shapely.touches(poly, pts)
+
+    logger.info(f"Classification: {np.sum(inside_mask):,} inside, {np.sum(~inside_mask):,} outside")
+
+    # ---- assign elements ----
+    elements_list = list(project.iter_elements(chunk_size))
+    mesh_elements = np.vstack(elements_list) if elements_list else np.array([])
+
+    elem_node_cols = mesh_elements[:, 1:5].copy()
+    elem_node_cols[mesh_elements[:, 4] == 0, 3] = 0
+
+    node_idx = elem_node_cols.copy()
+    node_idx[node_idx > 0] -= 1
+    valid = elem_node_cols > 0
+
+    # Check which elements have at least one inside node
+    any_inside = np.zeros(len(mesh_elements), dtype=bool)
+    for col in range(4):
+        mask = np.asarray(valid[:, col], dtype=bool)
+        col_inside = np.zeros(len(mesh_elements), dtype=bool)
+        col_inside[mask] = np.asarray(inside_mask)[np.asarray(node_idx[mask, col])]
+        any_inside |= col_inside
+
+    elements_kept = mesh_elements[any_inside]
+
+    # Count boundary (partially-inside) elements
+    all_inside_mask = np.ones(len(elements_kept), dtype=bool)
+    for col in range(4):
+        mask = np.asarray(elements_kept[:, col + 1] > 0, dtype=bool)
+        node_i = elements_kept[:, col + 1].copy()
+        node_i[node_i > 0] -= 1
+        col_inside = np.ones(len(elements_kept), dtype=bool)
+        col_inside[mask] = np.asarray(inside_mask)[np.asarray(node_i[mask])]
+        all_inside_mask &= col_inside
+    n_cut_elements = np.int64(np.sum(~all_inside_mask))
+
+    # Prepare for subsetter: need element arrays with padding for MeshSubsetter
+    side_a = np.unique(elements_kept[:, 1:5])
+    side_a = side_a[side_a > 0]
+
+    inside_ids = node_ids[inside_mask]
+    shared = np.setdiff1d(side_a, inside_ids)
+
+    logger.info(
+        f"Extracted {len(elements_kept):,} elements "
+        f"({n_cut_elements:,} boundary), {len(side_a):,} nodes, "
+        f"{len(shared):,} shared"
+    )
+
+    classification = NodeClassification(
+        side_a=side_a,
+        side_b=shared,  # "side_b" is just the shared nodes (for type compat)
+        shared=shared,
+        n_cut_elements=n_cut_elements,
+    )
+
+    # ---- write extracted mesh (single side) ----
+    side_a_data = SideData(nodes=side_a, elements=elements_kept)
+
+    input_file = project.hgrid_file
+    with input_file.open("r", buffering=project.buffer_size) as f:
+        description = f.readline().strip()
+
+    # Write nodes
+    with temporary_file(".tmp", out, project.buffer_size) as (temp_file, temp_path):
+        for nid_chunk, coords_chunk, values_chunk in project.iter_nodes(chunk_size):
+            for i in range(len(nid_chunk)):
+                nid = nid_chunk[i]
+                if nid in side_a_data.mapping:
+                    new_id = side_a_data.mapping[nid]
+                    line = (
+                        f"{coords_chunk[i, 0]:.6f} {coords_chunk[i, 1]:.6f} {values_chunk[i]:.3f}\n"
+                    )
+                    temp_file.write(f"{new_id} {line}")
+        temp_file.close()
+        with (out / SCHISMFiles.HGRID_GR3).open("w", buffering=project.buffer_size) as f_out:
+            f_out.write(f"{description} - Extracted\n")
+            f_out.write(f"{len(elements_kept)} {len(side_a)}\n")
+            with temp_path.open("r", buffering=project.buffer_size) as f_in:
+                f_out.write(f_in.read())
+
+    # Write elements
+    with (out / SCHISMFiles.HGRID_GR3).open("a", buffering=project.buffer_size) as f:
+        for i, elem in enumerate(elements_kept, start=1):
+            if elem[4] == 0:
+                nodes = " ".join(str(side_a_data.mapping[int(n)]) for n in elem[1:4])
+                f.write(f"{i} 3 {nodes}\n")
+            else:
+                nodes = " ".join(str(side_a_data.mapping[int(n)]) for n in elem[1:5])
+                f.write(f"{i} 4 {nodes}\n")
+
+    # Boundaries — use the free functions directly (same logic as
+    # MeshSubsetter._split_boundaries_for_side but avoids instantiating
+    # a two-sided subsetter)
+    boundary_set = project.read_boundaries()
+
+    side_set = {int(n) for n in side_a}
+    shared_set = {int(n) for n in shared}
+
+    # Build adjacency for cut-path finding, then strip edges that lie on
+    # an original boundary. Those edges are already covered by the kept
+    # original segments — leaving them in would let the greedy walker
+    # re-trace the kept segment and emit redundant cut boundaries that
+    # overlap it, producing self-intersecting perimeters downstream.
+    shared_adjacency = _build_shared_nodes_graph(shared, elements_kept)
+    boundary_edge_pairs: set[tuple[int, int]] = set()
+    for bnd_nodes in boundary_set.open_boundaries:
+        for a, b in itertools.pairwise(bnd_nodes):
+            boundary_edge_pairs.add((min(int(a), int(b)), max(int(a), int(b))))
+    for lb in boundary_set.land_boundaries:
+        nodes = lb.nodes
+        for a, b in itertools.pairwise(nodes):
+            boundary_edge_pairs.add((min(int(a), int(b)), max(int(a), int(b))))
+        if lb.is_island and len(nodes) >= 2:
+            boundary_edge_pairs.add(
+                (min(int(nodes[-1]), int(nodes[0])), max(int(nodes[-1]), int(nodes[0])))
+            )
+    for a, neighbors in list(shared_adjacency.items()):
+        for b in list(neighbors):
+            if (min(a, b), max(a, b)) in boundary_edge_pairs:
+                shared_adjacency[a].discard(b)
+                shared_adjacency[b].discard(a)
+
+    open_bnds: list[list[int]] = []
+    open_flags: list[tuple[int, int, int, int]] = []
+    land_bnds: list[LandBoundary] = []
+    terminal_shared: list[int] = []
+
+    def _add_segment_terminals(seg: list[int]) -> None:
+        # Only segment endpoints (where the kept piece transitions to
+        # the discarded part of the original boundary) act as terminals.
+        # Interior nodes of the segment are already on the kept perimeter
+        # via the segment itself and must not seed a cut path.
+        if not seg:
+            return
+        if seg[0] in shared_set:
+            terminal_shared.append(seg[0])
+        if len(seg) > 1 and seg[-1] in shared_set:
+            terminal_shared.append(seg[-1])
+
+    for idx, open_bnd in enumerate(boundary_set.open_boundaries):
+        segments = _extract_side_segments(list(open_bnd), side_set)
+        flags: tuple[int, int, int, int] | None = None
+        if idx < len(boundary_set.open_boundary_flags):
+            flags = boundary_set.open_boundary_flags[idx]
+        for seg in segments:
+            open_bnds.append([side_a_data.mapping[n] for n in seg])
+            open_flags.append(flags if flags is not None else (1, 0, 0, 0))
+            _add_segment_terminals(seg)
+
+    for land_bnd in boundary_set.land_boundaries:
+        segments = _extract_side_segments(
+            list(land_bnd.nodes),
+            side_set,
+            is_closed=land_bnd.is_island,
+        )
+        land_bnds.extend(
+            LandBoundary(
+                nodes=[side_a_data.mapping[n] for n in seg],
+                boundary_type=land_bnd.boundary_type,
+            )
+            for seg in segments
+        )
+        for seg in segments:
+            _add_segment_terminals(seg)
+
+    seen: set[int] = set()
+    unique_terminals: list[int] = []
+    for n in terminal_shared:
+        if n not in seen:
+            unique_terminals.append(n)
+            seen.add(n)
+
+    cut_bnds = _build_cut_boundaries(unique_terminals, shared_adjacency, side_a_data.mapping)
+    n_cut = len(cut_bnds)
+    cut_flag = Counter(open_flags).most_common(1)[0][0] if open_flags else (1, 0, 0, 0)
+    for cb in cut_bnds:
+        open_bnds.append(cb)
+        open_flags.append(cut_flag)
+
+    boundaries = BoundarySet(
+        open_boundaries=open_bnds,
+        land_boundaries=land_bnds,
+        bctides_header=boundary_set.bctides_header,
+        ntip_line=boundary_set.ntip_line,
+        nbfr_line=boundary_set.nbfr_line,
+        open_boundary_flags=open_flags,
+    )
+
+    with (out / SCHISMFiles.HGRID_GR3).open("a", buffering=project.buffer_size) as f:
+        boundaries.write_to_file(f)
+
+    with (out / SCHISMFiles.BCTIDES).open("w") as f:
+        boundaries.write_bctides_file(f)
+
+    logger.info(
+        f"Extracted: {boundaries.n_open} open ({n_cut} cut), {boundaries.n_land} land boundaries"
+    )
+
+    # hgrid.ll
+    shutil.copy2(out / SCHISMFiles.HGRID_GR3, out / SCHISMFiles.HGRID_LL)
+
+    # ESMF NetCDF
+    if write_netcdf:
+        subsetter_for_nc = MeshSubsetter(
+            project,
+            side_a,
+            np.array([], dtype=np.int64),
+            chunk_size,
+        )
+        subsetter_for_nc.write_esmf_netcdf(out, boundaries)
+
+    # Node mapping
+    side_a_data.write_mapping_to_file(out / SCHISMFiles.NODE_MAPPING)
+
+    subset_result = SubsetResult(
+        side_a=side_a_data,
+        side_b=SideData(nodes=np.array([], dtype=np.int64), elements=np.array([])),
+        shared_nodes=shared,
+    )
+
+    # ---- supporting files ----
+    element_mapping = {int(elem[0]): new_id for new_id, elem in enumerate(elements_kept, 1)}
+    node_mapping = subset_result.side_a.mapping
+
+    logger.info("Subsetting hgrid.cpp...")
+    _ = subset_nongrid_file(
+        project,
+        project.hgrid_cpp_file,
+        out / SCHISMFiles.HGRID_CPP,
+        node_mapping,
+        element_mapping,
+        chunk_size,
+    )
+    # Append boundaries (combine_sink_source reads the full file)
+    with (out / SCHISMFiles.HGRID_CPP).open("a", buffering=project.buffer_size) as f:
+        boundaries.write_to_file(f)
+
+    logger.info("Subsetting NWM reaches files...")
+    _ = subset_nwm_reaches_file(
+        project.nwm_reaches_file,
+        out / SCHISMFiles.NWM_REACHES,
+        element_mapping,
+    )
+
+    logger.info("Subsetting Manning's coefficient files...")
+    _ = subset_nongrid_file(
+        project,
+        project.manning_file,
+        out / SCHISMFiles.MANNING,
+        subset_result.side_a.mapping,
+        element_mapping,
+        chunk_size,
+    )
+
+    logger.info("Subsetting wind rotation files...")
+    _ = subset_nongrid_file(
+        project,
+        project.windrot_file,
+        out / SCHISMFiles.WINDROT,
+        subset_result.side_a.mapping,
+        element_mapping,
+        chunk_size,
+    )
+
+    if re_calc_area:
+        areas = project.element_areas
+    else:
+        areas = np.loadtxt(project.elem_area_file, dtype=np.float64)
+
+    logger.info("Subsetting element area...")
+    np.savetxt(out / SCHISMFiles.ELEM_AREA, areas[elements_kept[:, 0] - 1], fmt="%.3f")
+
+    logger.info("Subsetting elevation initial condition files...")
+    _ = subset_nongrid_file(
+        project,
+        project.elev_ic_file,
+        out / SCHISMFiles.ELEV_IC,
+        subset_result.side_a.mapping,
+        element_mapping,
+        chunk_size,
+    )
+
+    if project.elev_corr_file.exists():
+        logger.info("Subsetting elevation correction files...")
+        _subset_elevation_correction(
+            project.elev_corr_file,
+            project,
+            SubsetResult(
+                side_a=subset_result.side_a,
+                side_b=SideData(nodes=np.array([], dtype=np.int64), elements=np.array([])),
+                shared_nodes=shared,
+            ),
+            out,
+            out,  # only one output dir
+        )
+    else:
+        logger.warning("Elevation correction file not found; skipping.")
+
+    # Copy grid-independent files
+    for fname in ("vgrid.in", "param.nml"):
+        src = input_dir / fname
+        if src.exists():
+            shutil.copy2(src, out / fname)
+            logger.info(f"Copied {fname}")
+
+    sflux_src = input_dir / "sflux"
+    if sflux_src.is_dir():
+        dst = out / "sflux"
+        dst.mkdir(exist_ok=True)
+        for f in sflux_src.iterdir():
+            shutil.copy2(f, dst / f.name)
+        logger.info("Copied sflux directory")
+
+    logger.info(f"Extraction complete: {out}")
+    logger.info(f"  {len(side_a):,} nodes, {len(elements_kept):,} elements")
+    logger.info(f"  {len(shared):,} shared boundary nodes")
+
+    return MeshDivisionResult(
+        input_dir=input_dir,
+        output_dir_a=out,
+        output_dir_b=out,  # single output
         classification=classification,
         subset=subset_result,
         crs=crs,
