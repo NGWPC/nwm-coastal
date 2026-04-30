@@ -15,7 +15,10 @@ import pandas as pd
 import pytest
 import xarray as xr
 
-from coastal_calibration.plotting import animate_water_level
+from coastal_calibration.plotting import (
+    animate_water_level,
+    animate_water_level_comparison,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -202,3 +205,74 @@ class TestEdgeCases:
         )
         assert out.is_file()
         assert out.stat().st_size > 0
+
+
+# ---------------------------------------------------------------------------
+# Side-by-side comparison animation.
+# ---------------------------------------------------------------------------
+
+
+class TestAnimateComparison:
+    def test_schism_vs_sfincs_quadtree_writes_gif(self, tmp_path: Path):
+        ds_l = _schism_dataset(n_time=4)
+        ds_r = _sfincs_quadtree_dataset(n_time=4)
+        out = animate_water_level_comparison(
+            ds_l,
+            ds_r,
+            tmp_path / "compare.gif",
+            labels=("SCHISM", "SFINCS"),
+            fps=5,
+            dpi=60,
+        )
+        assert out.is_file()
+        assert out.stat().st_size > 0
+
+    def test_schism_vs_regular_writes_gif(self, tmp_path: Path):
+        ds_l = _schism_dataset(n_time=3)
+        ds_r = _sfincs_regular_dataset(n_time=3)
+        out = animate_water_level_comparison(
+            ds_l,
+            ds_r,
+            tmp_path / "compare_reg.gif",
+            labels=("SCHISM", "SFINCS-reg"),
+            fps=5,
+            dpi=60,
+        )
+        assert out.is_file()
+
+    def test_different_cadence_picks_smaller_clock(self, tmp_path: Path):
+        """Different time axes — animation runs on the fewer-frame clock."""
+        ds_l = _schism_dataset(n_time=2)  # hourly @ 2024-01-01..02
+        ds_r = _sfincs_quadtree_dataset(n_time=4)  # hourly @ 2024-01-01..04
+        out = animate_water_level_comparison(
+            ds_l,
+            ds_r,
+            tmp_path / "different_cadence.gif",
+            fps=5,
+            dpi=60,
+        )
+        assert out.is_file()
+
+    def test_no_overlap_raises(self):
+        ds_l = _schism_dataset(n_time=2)
+        ds_r = _sfincs_quadtree_dataset(n_time=2)
+        # Shift right dataset out of left's window.
+        ds_r = ds_r.assign_coords(
+            time=pd.date_range("2030-01-01", periods=ds_r.sizes["time"], freq="1h")
+        )
+        with pytest.raises(ValueError, match="overlapping time window"):
+            animate_water_level_comparison(ds_l, ds_r, "/tmp/never.gif")
+
+    def test_explicit_limits(self, tmp_path: Path):
+        ds_l = _schism_dataset(n_time=2)
+        ds_r = _sfincs_quadtree_dataset(n_time=2)
+        out = animate_water_level_comparison(
+            ds_l,
+            ds_r,
+            tmp_path / "limits.gif",
+            fps=5,
+            dpi=60,
+            vmin=-1.0,
+            vmax=20.0,
+        )
+        assert out.is_file()

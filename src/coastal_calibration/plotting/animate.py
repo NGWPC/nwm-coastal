@@ -23,6 +23,8 @@ import numpy as np
 from coastal_calibration.plotting.spatial import (
     _apply_wet_mask,  # pyright: ignore[reportPrivateUsage]  -- shared intra-package helper
     _auto_variable,  # pyright: ignore[reportPrivateUsage]  -- shared intra-package helper
+    _colorbar_extend,  # pyright: ignore[reportPrivateUsage]  -- shared intra-package helper
+    _percentile_limits,  # pyright: ignore[reportPrivateUsage]  -- shared intra-package helper
     _resolve_limits,  # pyright: ignore[reportPrivateUsage]  -- shared intra-package helper
     plot_water_level,
 )
@@ -33,7 +35,7 @@ if TYPE_CHECKING:
 
 _log = logging.getLogger(__name__)
 
-__all__ = ["animate_water_level"]
+__all__ = ["animate_water_level", "animate_water_level_comparison"]
 
 
 #: Known output-file suffixes mapped to matplotlib writer names.
@@ -304,4 +306,307 @@ def animate_water_level(
     plt.close(fig)
 
     _log.info("wrote %s (%d frames, %d fps)", outfile, len(time_indices), fps)
+    return outfile
+
+
+def _trim_to_common_window(
+    ds_left: xr.Dataset, ds_right: xr.Dataset
+) -> tuple[xr.Dataset, xr.Dataset]:
+    """Slice both datasets to their overlapping time window.
+
+    The two model outputs are expected to span the same simulation period
+    but at different output cadences. This helper enforces that the
+    *animated* range starts and ends at coincident timestamps by slicing
+    each dataset to the intersection of its time coverage.
+    """
+    t_left = np.asarray(ds_left["time"].to_numpy())
+    t_right = np.asarray(ds_right["time"].to_numpy())
+    if t_left.size == 0 or t_right.size == 0:
+        msg = "One of the datasets has an empty time axis."
+        raise ValueError(msg)
+
+    start = max(t_left[0], t_right[0])
+    end = min(t_left[-1], t_right[-1])
+    if start > end:
+        msg = (
+            f"Datasets have no overlapping time window: "
+            f"left=[{t_left[0]}..{t_left[-1]}], right=[{t_right[0]}..{t_right[-1]}]."
+        )
+        raise ValueError(msg)
+    return ds_left.sel(time=slice(start, end)), ds_right.sel(time=slice(start, end))
+
+
+def _nearest_index_array(target_times: np.ndarray, lookup_times: np.ndarray) -> np.ndarray:
+    """For each *target_times* entry return the index of the nearest *lookup_times* entry.
+
+    Both inputs must be sorted (xarray time coords always are after the
+    upstream slice). Conversion to ``int64`` nanoseconds keeps the
+    arithmetic numerical and lets ``np.searchsorted`` work uniformly across
+    different datetime resolutions (e.g. ``ns``/``us``/``s``).
+    """
+    target = np.asarray(target_times).astype("datetime64[ns]").astype("int64")
+    lookup = np.asarray(lookup_times).astype("datetime64[ns]").astype("int64")
+    pos = np.searchsorted(lookup, target)
+    pos = np.clip(pos, 0, lookup.size - 1)
+    left = np.clip(pos - 1, 0, lookup.size - 1)
+    use_left = np.abs(target - lookup[left]) < np.abs(target - lookup[pos])
+    return np.where(use_left, left, pos).astype(np.int64)
+
+
+def _resolve_shared_limits(
+    ds_left: xr.Dataset,
+    variable_left: str,
+    ds_right: xr.Dataset,
+    variable_right: str,
+    vmin: float | None,
+    vmax: float | None,
+) -> tuple[float, float]:
+    """Span both datasets' 1st/99th percentiles when limits are not user-supplied."""
+    if vmin is not None and vmax is not None:
+        return float(vmin), float(vmax)
+    lo_l, hi_l = _percentile_limits(ds_left, variable_left)
+    lo_r, hi_r = _percentile_limits(ds_right, variable_right)
+    auto_lo = min(lo_l, lo_r)
+    auto_hi = max(hi_l, hi_r)
+    if auto_lo == auto_hi:
+        auto_hi = auto_lo + 1.0
+    return (
+        auto_lo if vmin is None else float(vmin),
+        auto_hi if vmax is None else float(vmax),
+    )
+
+
+def _format_time(t: Any) -> str:
+    """Format a time scalar; minute precision for datetime64, ``str(t)`` otherwise."""
+    arr = np.asarray(t)
+    if np.issubdtype(arr.dtype, np.datetime64):
+        return str(np.datetime_as_string(arr, unit="m"))
+    return str(t)
+
+
+def animate_water_level_comparison(
+    ds_left: xr.Dataset,
+    ds_right: xr.Dataset,
+    outfile: str | Path,
+    *,
+    labels: tuple[str, str] = ("left", "right"),
+    variable_left: str | None = None,
+    variable_right: str | None = None,
+    fps: int = 10,
+    time_stride: int = 1,
+    dpi: int = 150,
+    writer: Literal["auto", "ffmpeg", "pillow"] = "auto",
+    cmap: str = "viridis",
+    vmin: float | None = None,
+    vmax: float | None = None,
+    figsize: tuple[float, float] = (16, 7),
+    title_prefix: str | None = None,
+    mask_dry: bool = True,
+    dry_threshold: float = 0.05,
+) -> Path:
+    """Render a side-by-side time-animation of two water-level fields.
+
+    The left and right panels animate independently — each one is fed by its
+    own dataset, can have a different mesh layout (e.g. SCHISM unstructured
+    on the left, SFINCS quadtree or regular grid on the right), and may
+    output at a different cadence. The two panels share a single colorbar
+    placed to the right of both axes.
+
+    The two datasets are expected to cover the same simulation period; the
+    animation is run on the intersection of their time coverage and a
+    nearest-neighbour lookup is used to pull each panel's frame at the
+    master clock's timestamps.
+
+    Parameters
+    ----------
+    ds_left, ds_right : xarray.Dataset
+        Canonical datasets from a ``load_*`` reader in
+        :mod:`coastal_calibration.schism.outputs` /
+        :mod:`coastal_calibration.sfincs.outputs`. Each must carry a
+        ``mesh_type`` attribute that :func:`plot_water_level` recognises.
+    outfile : str or pathlib.Path
+        Destination path. Suffix selects the writer; see
+        :func:`animate_water_level`.
+    labels : (str, str), default ``("left", "right")``
+        Per-panel titles drawn above each axes (e.g. model names).
+    variable_left, variable_right : str, optional
+        Variables to animate on each side. ``None`` auto-detects via
+        :func:`_auto_variable` (``"zs"`` then ``"elevation"``).
+    fps : int, default ``10``
+        Frames per second in the output.
+    time_stride : int, default ``1``
+        Stride applied to the master clock's time axis (the dataset with
+        fewer frames in the overlap window). Useful for previews.
+    dpi : int, default ``150``
+        Output resolution.
+    writer : {"auto", "ffmpeg", "pillow"}, default ``"auto"``
+        Writer selector; ``"auto"`` infers from the output suffix.
+    cmap : str, default ``"viridis"``
+        Matplotlib colormap name; shared by both panels.
+    vmin, vmax : float, optional
+        Shared colormap limits for both panels. ``None`` fills the unset
+        side(s) by spanning the 1st/99th percentiles of *both* datasets so
+        the colorbar is meaningful for either field.
+    figsize : (float, float), default ``(16, 7)``
+        Figure size; the default is wide enough for two square-ish panels
+        plus the colorbar.
+    title_prefix : str, optional
+        Prefix prepended to the figure-level (suptitle) timestamp.
+    mask_dry : bool, default ``True``
+        Mask dry cells per frame on each side. See
+        :func:`plot_water_level`.
+    dry_threshold : float, default ``0.05``
+        Water-depth threshold (m) for the fallback mask.
+
+    Returns
+    -------
+    pathlib.Path
+        The resolved output path.
+
+    Raises
+    ------
+    ValueError
+        If the two datasets share no overlapping time window, or if the
+        master clock has no frames after striding.
+    RuntimeError
+        If an ``.mp4``/``.mov``/``.avi`` is requested but ``ffmpeg`` is not
+        on PATH.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.animation import FuncAnimation
+
+    outfile = Path(outfile).expanduser().resolve()
+    outfile.parent.mkdir(parents=True, exist_ok=True)
+
+    movie_writer = _pick_writer(outfile, fps=fps, writer=writer)
+
+    var_l = variable_left if variable_left is not None else _auto_variable(ds_left)
+    var_r = variable_right if variable_right is not None else _auto_variable(ds_right)
+
+    ds_l, ds_r = _trim_to_common_window(ds_left, ds_right)
+
+    stride = int(time_stride)
+    if stride < 1:
+        msg = f"time_stride must be >= 1 (got {time_stride})"
+        raise ValueError(msg)
+
+    # Master clock = side with fewer post-stride frames; the other side is
+    # sampled by nearest-neighbour lookup so frame count stays predictable.
+    n_l = (ds_l.sizes["time"] + stride - 1) // stride
+    n_r = (ds_r.sizes["time"] + stride - 1) // stride
+    if n_l <= n_r:
+        master_ds = ds_l
+        master_indices = np.arange(0, ds_l.sizes["time"], stride, dtype=np.int64)
+    else:
+        master_ds = ds_r
+        master_indices = np.arange(0, ds_r.sizes["time"], stride, dtype=np.int64)
+    if master_indices.size == 0:
+        msg = "No frames to animate — master clock is empty after striding."
+        raise ValueError(msg)
+    master_times = np.asarray(master_ds["time"].to_numpy())[master_indices]
+
+    left_indices = _nearest_index_array(master_times, ds_l["time"].to_numpy())
+    right_indices = _nearest_index_array(master_times, ds_r["time"].to_numpy())
+
+    ds_l_for_limits = _apply_wet_mask(ds_l, var_l, dry_threshold) if mask_dry else ds_l
+    ds_r_for_limits = _apply_wet_mask(ds_r, var_r, dry_threshold) if mask_dry else ds_r
+    vmin_r, vmax_r = _resolve_shared_limits(
+        ds_l_for_limits, var_l, ds_r_for_limits, var_r, vmin, vmax
+    )
+
+    fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=figsize)
+
+    # Build first frame on each axes; suppress per-axes colorbars in favour
+    # of the single shared one we attach below.
+    _, coll_left = plot_water_level(
+        ds_l,
+        time=int(left_indices[0]),
+        variable=var_l,
+        ax=ax_left,
+        cmap=cmap,
+        vmin=vmin_r,
+        vmax=vmax_r,
+        colorbar=False,
+        title=labels[0],
+        mask_dry=mask_dry,
+        dry_threshold=dry_threshold,
+    )
+    _, coll_right = plot_water_level(
+        ds_r,
+        time=int(right_indices[0]),
+        variable=var_r,
+        ax=ax_right,
+        cmap=cmap,
+        vmin=vmin_r,
+        vmax=vmax_r,
+        colorbar=False,
+        title=labels[1],
+        mask_dry=mask_dry,
+        dry_threshold=dry_threshold,
+    )
+
+    units = ds_l[var_l].attrs.get("units") or ds_r[var_r].attrs.get("units", "m")
+    combined = np.concatenate(
+        [
+            np.asarray(ds_l[var_l].to_numpy()).ravel(),
+            np.asarray(ds_r[var_r].to_numpy()).ravel(),
+        ]
+    )
+    extend = _colorbar_extend(combined, vmin_r, vmax_r)
+    fig.colorbar(
+        coll_left,
+        ax=[ax_left, ax_right],
+        label=f"water level ({units})",
+        shrink=0.8,
+        extend=extend,
+    )
+
+    update_left = _make_updater(
+        coll_left,
+        ds_l,
+        var_l,
+        left_indices,
+        mask_dry=mask_dry,
+        dry_threshold=dry_threshold,
+    )
+    update_right = _make_updater(
+        coll_right,
+        ds_r,
+        var_r,
+        right_indices,
+        mask_dry=mask_dry,
+        dry_threshold=dry_threshold,
+    )
+
+    def update(i: int) -> tuple[Any, ...]:
+        artists_l = update_left(i)
+        artists_r = update_right(i)
+        t_str = _format_time(master_times[i])
+        suptitle = f"{title_prefix} — {t_str}" if title_prefix else t_str
+        fig.suptitle(suptitle)
+        return artists_l + artists_r
+
+    fig.suptitle(
+        f"{title_prefix} — {_format_time(master_times[0])}"
+        if title_prefix
+        else _format_time(master_times[0])
+    )
+
+    anim = FuncAnimation(
+        fig,
+        update,
+        frames=master_indices.size,
+        interval=max(1, int(1000 / fps)),
+        blit=False,
+    )
+    anim.save(str(outfile), writer=movie_writer, dpi=dpi)
+    plt.close(fig)
+
+    _log.info(
+        "wrote %s (%d frames, %d fps, master=%s)",
+        outfile,
+        master_indices.size,
+        fps,
+        "left" if n_l <= n_r else "right",
+    )
     return outfile
