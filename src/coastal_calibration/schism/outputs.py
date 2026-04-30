@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pandas as pd
 import xarray as xr
+from scipy.spatial import cKDTree
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -130,6 +131,7 @@ def load_schism_elevation(
     run_dir: str | Path,
     *,
     time_slice: slice | None = None,
+    correction_file: str | Path | None = None,
 ) -> xr.Dataset:
     """Load SCHISM 2-D elevation across all output blocks.
 
@@ -141,6 +143,19 @@ def load_schism_elevation(
     time_slice : slice, optional
         Slice applied along the concatenated time dimension before the
         dataset is returned. Useful for previews of long runs.
+    correction_file : str or pathlib.Path, optional
+        Path to ``elevation_correction.csv``.  When provided, the
+        ``conversion_factor`` is interpolated from the boundary nodes
+        listed in the CSV onto every mesh node (nearest-neighbour) and
+        added to the elevations to convert from the model's mesh datum
+        back to MSL — the inverse of the boundary correction applied by
+        ``correct_elevation``.  This preserves the spatial variation of
+        the geoid-MSL offset across the domain instead of applying a
+        single boundary mean (which under-corrects nodes whose local
+        offset deviates from the average).  Use this when the model was
+        forced with STOFS via :func:`make_stofs_boundary` so that
+        simulated values are MSL-referenced (matching NOAA CO-OPS
+        observations).
 
     Returns
     -------
@@ -213,6 +228,27 @@ def load_schism_elevation(
     times = base_date + pd.to_timedelta(seconds, unit="s")
 
     elevation = raw["elevation"].to_numpy()
+
+    # Optionally convert from mesh datum back to MSL by applying the
+    # inverse of the boundary forcing correction.  The CSV holds
+    # ``conversion_factor`` per open-boundary node only; we extrapolate
+    # to interior mesh nodes by nearest-neighbour lookup so each node
+    # receives the local geoid-MSL offset rather than a single domain
+    # mean (which would under-correct nodes whose local offset deviates).
+    if correction_file is not None:
+        corr_path = Path(correction_file)
+        if corr_path.exists():
+            corr_df = pd.read_csv(corr_path)
+            corr_lons = corr_df["Field1"].to_numpy()
+            corr_lats = corr_df["Field2"].to_numpy()
+            conv_factors = corr_df["conversion_factor"].to_numpy()
+            corr_pts = np.column_stack([corr_lons, corr_lats])
+            tree = cKDTree(corr_pts)
+            node_pts = np.column_stack([node_x, node_y])
+            _, nn_idx = tree.query(node_pts, k=1)
+            node_conv = conv_factors[nn_idx]
+            elevation = (elevation + node_conv[None, :]).astype(np.float64, copy=False)
+
     # Water depth = water surface + bathymetric depth (depth is positive when
     # the bed is below the datum). For dry nodes, SCHISM reports
     # ``elevation = -depth + h_min``, so h ≈ 0 there.
