@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import contextlib
-import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -812,6 +811,24 @@ class NWMCoastalPlugin:
             )
 
     @staticmethod
+    def _mesh_cache_dir() -> Path:
+        """Return the on-disk mesh cache dir under the active QGIS profile.
+
+        Uses the QGIS profile rather than the system temp dir because on
+        HPC clusters ``/tmp`` is often per-job, tmpfs-backed, or cleaned
+        aggressively — once QGIS hands the .2dm path off to MDAL, the
+        backing file can disappear before the layer is read, leading to
+        ``Failed to load mesh layer`` errors. The profile dir is
+        guaranteed to be user-writable and persists across sessions, so
+        the .2dm/.dat sidecar stay valid for the lifetime of the layer.
+        Files are tracked via ``self._temp_*_path`` and removed when the
+        mesh is reloaded, the map is cleared, or the plugin is unloaded.
+        """
+        cache_dir = Path(QgsApplication.qgisSettingsDirPath()) / "cache" / "nwm_coastal" / "meshes"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        return cache_dir
+
+    @staticmethod
     def _convert_gr3_to_2dm(
         gr3_path: Path,
         out_2dm: Path,
@@ -998,7 +1015,7 @@ class NWMCoastalPlugin:
                     old.unlink()
             setattr(self, attr, None)
 
-        out_2dm = Path(tempfile.gettempdir()) / f"{gr3_path.stem}_{id(self)}.2dm"
+        out_2dm = self._mesh_cache_dir() / f"{gr3_path.stem}_{id(self)}.2dm"
         out_dat = out_2dm.with_suffix(".dat")
 
         msg_item, on_progress = self._push_progress_bar(
