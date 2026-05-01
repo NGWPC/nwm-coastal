@@ -337,7 +337,7 @@ def merge_source_sink(  # noqa: PLR0915
     si = np.zeros((count, nsiel + 1))
     for j, line in enumerate(vsink_lines):
         if line:
-            si[j, :] = np.fromstring(line, dtype=float, sep=" ")
+            si[j, :] = np.array(line.split(), dtype=float)
     time = si[:, 0]
     si = si[:, 1:]
 
@@ -346,7 +346,7 @@ def merge_source_sink(  # noqa: PLR0915
     so1 = np.zeros((count, nsoel1 + 1))
     for j, line in enumerate(vsource_lines):
         if line:
-            so1[j, :] = np.fromstring(line, dtype=float, sep=" ")
+            so1[j, :] = np.array(line.split(), dtype=float)
     so1 = so1[:, 1:]
 
     # Read precipitation source

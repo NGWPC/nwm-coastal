@@ -79,6 +79,8 @@ def _read_from_zarr(
 
     if df.index.duplicated().any():
         df = df[~df.index.duplicated(keep="first")]
+    if not df.index.is_monotonic_increasing:
+        df = df.sort_index()
 
     return df  # pyright: ignore[reportReturnType]
 
@@ -165,6 +167,8 @@ def _read_from_chrtout(
 
     if df.index.duplicated().any():
         df = df[~df.index.duplicated(keep="first")]
+    if not df.index.is_monotonic_increasing:
+        df = df.sort_index()
 
     return df
 

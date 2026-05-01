@@ -27,12 +27,15 @@ def _write_station_in(
     lats: list[float],
 ) -> Path:
     """Write a station.in file for SCHISM with multiple stations."""
+    if len(lons) != len(lats):
+        msg = f"Station lons/lats length mismatch: {len(lons)} vs {len(lats)}"
+        raise ValueError(msg)
     n = len(lons)
     lines = [
         "1 0 0 0 0 0 0 0 0",  # only elevation output
         str(n),
     ]
-    for i, (lon, lat) in enumerate(zip(lons, lats, strict=False), start=1):
+    for i, (lon, lat) in enumerate(zip(lons, lats, strict=True), start=1):
         lines.append(f"{i} {lon} {lat} 0.0")
     path = base_dir / "station.in"
     path.write_text("\n".join(lines) + "\n")
@@ -823,14 +826,13 @@ class SchismPlotStage(WorkflowStage):
             return {"status": "skipped", "reason": "empty staout_1"}
 
         if elevation.shape[1] != len(station_ids):
-            self._log(
-                f"Station count mismatch: staout_1 has {elevation.shape[1]} columns "
-                f"but {len(station_ids)} station IDs",
-                "warning",
+            msg = (
+                f"Station count mismatch: staout_1 has {elevation.shape[1]} "
+                f"columns but station_noaa_ids.txt has {len(station_ids)} IDs. "
+                "This indicates a corrupted run or a station.in / "
+                "station_noaa_ids.txt that is out of sync with the SCHISM run."
             )
-            n = min(elevation.shape[1], len(station_ids))
-            elevation = elevation[:, :n]
-            station_ids = station_ids[:n]
+            raise RuntimeError(msg)
 
         # Apply per-station datum correction so simulated values are in MSL.
         # ``correct_elevation`` uses per-boundary-node corrections during
