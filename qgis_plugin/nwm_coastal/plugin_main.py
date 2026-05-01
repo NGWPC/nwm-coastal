@@ -1236,8 +1236,17 @@ class NWMCoastalPlugin:
                     remaining.pop(i)
                     break
             else:
-                # No connection found: remaining segments are disconnected
-                break
+                # No greedy match — fall back to concatenating the next
+                # segment in file order. SCHISM hgrid files normally
+                # list boundaries in CCW order, but some real meshes have
+                # an off-by-one at the open/land transition (e.g. open
+                # ends at node N and land starts at N+1, where the two
+                # nodes are spatially adjacent but not identical). The
+                # pre-greedy implementation handled this by always
+                # concatenating; preserve that behavior so the polygon
+                # has a one-node visual gap rather than ending the chain
+                # early and being closed via a long diagonal.
+                ring.extend(remaining.pop(0))
 
         return ring
 
