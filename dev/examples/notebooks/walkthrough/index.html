@@ -2737,7 +2737,7 @@ for name in (*heavy_inputs, *small_inputs):
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>Working directory: /Users/tchegini/repos/nwm-coastal-dev/docs/examples/walkthrough
+<pre>Working directory: docs/examples/walkthrough
 Inputs:
   model                        symlink → /Volumes/data/schism_models/pacific
   geo_em_CONUS.nc              symlink → /Volumes/data/schism_models/geo_em_CONUS.nc
@@ -2788,30 +2788,24 @@ project under <code>extracted/</code> ready for the pipeline runner.</p>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">coastal_calibration.schism.subsetter</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ss</span>
 
-<span class="n">poly</span> <span class="o">=</span> <span class="n">shapely</span><span class="o">.</span><span class="n">get_geometry</span><span class="p">(</span>
-    <span class="n">shapely</span><span class="o">.</span><span class="n">from_geojson</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">"extract_poly.geojson"</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">()),</span> <span class="mi">0</span>
-<span class="p">)</span>
+<span class="n">poly</span> <span class="o">=</span> <span class="n">shapely</span><span class="o">.</span><span class="n">get_geometry</span><span class="p">(</span><span class="n">shapely</span><span class="o">.</span><span class="n">from_geojson</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">"extract_poly.geojson"</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">()),</span> <span class="mi">0</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Polygon: </span><span class="si">{</span><span class="n">poly</span><span class="o">.</span><span class="n">geom_type</span><span class="si">}</span><span class="s2">, bounds=</span><span class="si">{</span><span class="p">[</span><span class="nb">round</span><span class="p">(</span><span class="n">b</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">)</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="n">poly</span><span class="o">.</span><span class="n">bounds</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
 <span class="n">res</span> <span class="o">=</span> <span class="n">ss</span><span class="o">.</span><span class="n">extract_mesh</span><span class="p">(</span><span class="s2">"model"</span><span class="p">,</span> <span class="n">poly</span><span class="p">,</span> <span class="s2">"."</span><span class="p">,</span> <span class="n">output_name</span><span class="o">=</span><span class="s2">"extracted"</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span>
-    <span class="sa">f</span><span class="s2">"Extracted: </span><span class="si">{</span><span class="n">res</span><span class="o">.</span><span class="n">classification</span><span class="o">.</span><span class="n">n_side_a</span><span class="si">:</span><span class="s2">,</span><span class="si">}</span><span class="s2"> nodes, "</span>
-    <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">res</span><span class="o">.</span><span class="n">subset</span><span class="o">.</span><span class="n">side_a</span><span class="o">.</span><span class="n">n_elements</span><span class="si">:</span><span class="s2">,</span><span class="si">}</span><span class="s2"> elements"</span>
+    <span class="sa">f</span><span class="s2">"Extracted: </span><span class="si">{</span><span class="n">res</span><span class="o">.</span><span class="n">classification</span><span class="o">.</span><span class="n">n_side_a</span><span class="si">:</span><span class="s2">,</span><span class="si">}</span><span class="s2"> nodes, </span><span class="si">{</span><span class="n">res</span><span class="o">.</span><span class="n">subset</span><span class="o">.</span><span class="n">side_a</span><span class="o">.</span><span class="n">n_elements</span><span class="si">:</span><span class="s2">,</span><span class="si">}</span><span class="s2"> elements"</span>
 <span class="p">)</span>
 </pre></div>
 <div class="clipboard-copy-txt" id="cell-2">import shapely
 
 import coastal_calibration.schism.subsetter as ss
 
-poly = shapely.get_geometry(
-    shapely.from_geojson(Path("extract_poly.geojson").read_text()), 0
-)
+poly = shapely.get_geometry(shapely.from_geojson(Path("extract_poly.geojson").read_text()), 0)
 print(f"Polygon: {poly.geom_type}, bounds={[round(b, 3) for b in poly.bounds]}")
 
 res = ss.extract_mesh("model", poly, ".", output_name="extracted")
 print(
-    f"Extracted: {res.classification.n_side_a:,} nodes, "
-    f"{res.subset.side_a.n_elements:,} elements"
+    f"Extracted: {res.classification.n_side_a:,} nodes, {res.subset.side_a.n_elements:,} elements"
 )</div>
 </div>
 </div>
@@ -2980,7 +2974,7 @@ print(schism_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">15:11:37</span>                                                 
+<pre>Start Time: 2026-04-30 15:11:37                                                 
 </pre>
 </div>
 </div>
@@ -3002,7 +2996,7 @@ print(schism_result)</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
 <pre>Cleaned generated files from                                                    
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/walkthrough/</span><span class="ansi-magenta-intense-fg">run_schism</span>      
+docs/examples/walkthrough/run_schism      
 </pre>
 </div>
 </div>
@@ -3016,42 +3010,42 @@ print(schism_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">15:11:37</span>                                                 
+<pre>Start Time: 2026-04-30 15:11:37                                                 
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Download input data <span class="ansi-bold">(</span>NWM, STOFS<span class="ansi-bold">)</span>                                              
+<pre>  Download input data (NWM, STOFS)                                              
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  meteo/nwm_ana: <span class="ansi-cyan-intense-fg ansi-bold">51</span>/<span class="ansi-cyan-intense-fg ansi-bold">51</span> <span class="ansi-bold">[</span>OK<span class="ansi-bold">]</span>                                                     
+<pre>  meteo/nwm_ana: 51/51 [OK]                                                     
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  hydro/nwm: <span class="ansi-cyan-intense-fg ansi-bold">51</span>/<span class="ansi-cyan-intense-fg ansi-bold">51</span> <span class="ansi-bold">[</span>OK<span class="ansi-bold">]</span>                                                         
+<pre>  hydro/nwm: 51/51 [OK]                                                         
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  coastal/stofs: <span class="ansi-cyan-intense-fg ansi-bold">1</span>/<span class="ansi-cyan-intense-fg ansi-bold">1</span> <span class="ansi-bold">[</span>OK<span class="ansi-bold">]</span>                                                       
+<pre>  coastal/stofs: 1/1 [OK]                                                       
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Total: <span class="ansi-cyan-intense-fg ansi-bold">103</span>/<span class="ansi-cyan-intense-fg ansi-bold">103</span> <span class="ansi-bold">(</span>failed: <span class="ansi-cyan-intense-fg ansi-bold">0</span><span class="ansi-bold">)</span>                                                    
+<pre>  Total: 103/103 (failed: 0)                                                    
 </pre>
 </div>
 </div>
@@ -3059,14 +3053,14 @@ print(schism_result)</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
 <pre>  Download complete — raw files stored in                                       
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/</span><span class="ansi-magenta-intense-fg">downloads</span>                   
+docs/examples/downloads                   
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>5s<span class="ansi-bold">)</span>                                                            
+<pre>  [✓] COMPLETED (5s)                                                            
 </pre>
 </div>
 </div>
@@ -3087,7 +3081,7 @@ print(schism_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">15:11:43</span>                                                 
+<pre>Start Time: 2026-04-30 15:11:43                                                 
 </pre>
 </div>
 </div>
@@ -3109,8 +3103,8 @@ print(schism_result)</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
 <pre>    Staged LDASIN files in                                                      
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/walkthrough/run_schism/forci</span>
-<span class="ansi-magenta-fg">ng_input/</span><span class="ansi-magenta-intense-fg">2025112600</span> <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">50</span> hours from <span class="ansi-cyan-intense-fg ansi-bold">2025112600</span><span class="ansi-bold">)</span>                                  
+docs/examples/walkthrough/run_schism/forci
+ng_input/2025112600 (50 hours from 2025112600)                                  
 </pre>
 </div>
 </div>
@@ -3118,15 +3112,15 @@ print(schism_result)</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
 <pre>  Pre-forcing complete — output dir:                                            
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/walkthrough/run_schism/</span><span class="ansi-magenta-intense-fg">coast</span>
-<span class="ansi-magenta-intense-fg">al_forcing_output</span>                                                               
+docs/examples/walkthrough/run_schism/coast
+al_forcing_output                                                               
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>0s<span class="ansi-bold">)</span>                                                            
+<pre>  [✓] COMPLETED (0s)                                                            
 </pre>
 </div>
 </div>
@@ -3147,21 +3141,21 @@ print(schism_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">15:11:43</span>                                                 
+<pre>Start Time: 2026-04-30 15:11:43                                                 
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Regrid atmospheric forcing <span class="ansi-bold">(</span>MPI<span class="ansi-bold">)</span>                                              
+<pre>  Regrid atmospheric forcing (MPI)                                              
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Generating 50h forcing from <span class="ansi-cyan-intense-fg ansi-bold">202511260000</span> via MPI                              
+<pre>  Generating 50h forcing from 202511260000 via MPI                              
 </pre>
 </div>
 </div>
@@ -3169,15 +3163,15 @@ print(schism_result)</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
 <pre>  NWM forcing generated in                                                      
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/walkthrough/run_schism/</span><span class="ansi-magenta-intense-fg">forci</span>
-<span class="ansi-magenta-intense-fg">ng_input</span>                                                                        
+docs/examples/walkthrough/run_schism/forci
+ng_input                                                                        
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>45s<span class="ansi-bold">)</span>                                                           
+<pre>  [✓] COMPLETED (45s)                                                           
 </pre>
 </div>
 </div>
@@ -3198,7 +3192,7 @@ print(schism_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">15:12:29</span>                                                 
+<pre>Start Time: 2026-04-30 15:12:29                                                 
 </pre>
 </div>
 </div>
@@ -3219,16 +3213,16 @@ print(schism_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>    Creating sflux from <span class="ansi-cyan-intense-fg ansi-bold">51</span> LDASIN files in                                      
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/walkthrough/run_schism/forci</span>
-<span class="ansi-magenta-fg">ng_input/</span><span class="ansi-magenta-intense-fg">2025112600</span>                                                             
+<pre>    Creating sflux from 51 LDASIN files in                                      
+docs/examples/walkthrough/run_schism/forci
+ng_input/2025112600                                                             
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>    Renamed sflux_air_1.<span class="ansi-cyan-intense-fg ansi-bold">0001.</span>nc → sflux_air_1.<span class="ansi-cyan-intense-fg ansi-bold">1.</span>nc                              
+<pre>    Renamed sflux_air_1.0001.nc → sflux_air_1.1.nc                              
 </pre>
 </div>
 </div>
@@ -3236,21 +3230,21 @@ print(schism_result)</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
 <pre>    Generated sflux in                                                          
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/walkthrough/run_schism/</span><span class="ansi-magenta-intense-fg">sflux</span>
+docs/examples/walkthrough/run_schism/sflux
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Post-processing complete — <span class="ansi-cyan-intense-fg ansi-bold">2</span> sflux <span class="ansi-magenta-intense-fg ansi-bold">file</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span> produced                           
+<pre>  Post-processing complete — 2 sflux file(s) produced                           
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>1m 48s<span class="ansi-bold">)</span>                                                        
+<pre>  [✓] COMPLETED (1m 48s)                                                        
 </pre>
 </div>
 </div>
@@ -3271,7 +3265,7 @@ print(schism_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">15:14:17</span>                                                 
+<pre>Start Time: 2026-04-30 15:14:17                                                 
 </pre>
 </div>
 </div>
@@ -3293,7 +3287,7 @@ print(schism_result)</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
 <pre>    Created param.nml and symlinked mesh files in                               
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/walkthrough/</span><span class="ansi-magenta-intense-fg">run_schism</span>      
+docs/examples/walkthrough/run_schism      
 </pre>
 </div>
 </div>
@@ -3301,15 +3295,15 @@ print(schism_result)</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
 <pre>  Parameter file created:                                                       
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/walkthrough/run_schism/</span><span class="ansi-magenta-intense-fg">param</span>
-<span class="ansi-magenta-intense-fg">.nml</span>                                                                            
+docs/examples/walkthrough/run_schism/param
+.nml                                                                            
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>0s<span class="ansi-bold">)</span>                                                            
+<pre>  [✓] COMPLETED (0s)                                                            
 </pre>
 </div>
 </div>
@@ -3330,7 +3324,7 @@ print(schism_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">15:14:17</span>                                                 
+<pre>Start Time: 2026-04-30 15:14:17                                                 
 </pre>
 </div>
 </div>
@@ -3344,14 +3338,14 @@ print(schism_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  hgrid.gr3: <span class="ansi-cyan-intense-fg ansi-bold">16508</span> nodes, <span class="ansi-cyan-intense-fg ansi-bold">30213</span> elements                                        
+<pre>  hgrid.gr3: 16508 nodes, 30213 elements                                        
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Found <span class="ansi-cyan-intense-fg ansi-bold">3</span> open boundary <span class="ansi-magenta-intense-fg ansi-bold">segment</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span> with <span class="ansi-cyan-intense-fg ansi-bold">466</span> total nodes                         
+<pre>  Found 3 open boundary segment(s) with 466 total nodes                         
 </pre>
 </div>
 </div>
@@ -3365,28 +3359,28 @@ print(schism_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Fetching datum information for <span class="ansi-cyan-intense-fg ansi-bold">1</span> <span class="ansi-magenta-intense-fg ansi-bold">station</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>                                   
+<pre>  Fetching datum information for 1 station(s)                                   
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Fetching data from <span class="ansi-cyan-intense-fg ansi-bold">1</span> <span class="ansi-magenta-intense-fg ansi-bold">station</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>                                               
+<pre>  Fetching data from 1 station(s)                                               
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  station.in written with <span class="ansi-cyan-intense-fg ansi-bold">1</span> NOAA <span class="ansi-magenta-intense-fg ansi-bold">station</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>: <span class="ansi-cyan-intense-fg ansi-bold">9416841</span>                            
+<pre>  station.in written with 1 NOAA station(s): 9416841                            
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>0s<span class="ansi-bold">)</span>                                                            
+<pre>  [✓] COMPLETED (0s)                                                            
 </pre>
 </div>
 </div>
@@ -3407,7 +3401,7 @@ print(schism_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">15:14:17</span>                                                 
+<pre>Start Time: 2026-04-30 15:14:17                                                 
 </pre>
 </div>
 </div>
@@ -3422,8 +3416,8 @@ print(schism_result)</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
 <pre>  Auto-resolved STOFS file:                                                     
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/downloads/coastal/stofs/stof</span>
-<span class="ansi-magenta-fg">s_2d_glo.20251126/</span><span class="ansi-magenta-intense-fg">stofs_2d_glo.t00z.fields.cwl.nc</span>                               
+docs/examples/downloads/coastal/stofs/stof
+s_2d_glo.20251126/stofs_2d_glo.t00z.fields.cwl.nc                               
 </pre>
 </div>
 </div>
@@ -3431,8 +3425,8 @@ print(schism_result)</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
 <pre>  Using STOFS file:                                                             
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/downloads/coastal/stofs/stof</span>
-<span class="ansi-magenta-fg">s_2d_glo.20251126/</span><span class="ansi-magenta-intense-fg">stofs_2d_glo.t00z.fields.cwl.nc</span>                               
+docs/examples/downloads/coastal/stofs/stof
+s_2d_glo.20251126/stofs_2d_glo.t00z.fields.cwl.nc                               
 </pre>
 </div>
 </div>
@@ -3440,8 +3434,8 @@ print(schism_result)</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
 <pre>    STOFS boundary created:                                                     
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/walkthrough/run_schism/</span><span class="ansi-magenta-intense-fg">elev2</span>
-<span class="ansi-magenta-intense-fg">D.th.nc</span>                                                                         
+docs/examples/walkthrough/run_schism/elev2
+D.th.nc                                                                         
 </pre>
 </div>
 </div>
@@ -3449,15 +3443,15 @@ print(schism_result)</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
 <pre>  STOFS boundary file created:                                                  
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/walkthrough/run_schism/</span><span class="ansi-magenta-intense-fg">elev2</span>
-<span class="ansi-magenta-intense-fg">D.th.nc</span>                                                                         
+docs/examples/walkthrough/run_schism/elev2
+D.th.nc                                                                         
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>28s<span class="ansi-bold">)</span>                                                           
+<pre>  [✓] COMPLETED (28s)                                                           
 </pre>
 </div>
 </div>
@@ -3478,7 +3472,7 @@ print(schism_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">15:14:46</span>                                                 
+<pre>Start Time: 2026-04-30 15:14:46                                                 
 </pre>
 </div>
 </div>
@@ -3493,8 +3487,8 @@ print(schism_result)</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
 <pre>  Copying discharge file:                                                       
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/walkthrough/extracted/</span><span class="ansi-magenta-intense-fg">nwmRea</span>
-<span class="ansi-magenta-intense-fg">ches.csv</span>                                                                        
+docs/examples/walkthrough/extracted/nwmRea
+ches.csv                                                                        
 </pre>
 </div>
 </div>
@@ -3515,14 +3509,14 @@ print(schism_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>    Processing <span class="ansi-cyan-intense-fg ansi-bold">51</span> CHRTOUT files                                                 
+<pre>    Processing 51 CHRTOUT files                                                 
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>    Wrote vsource.th <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">51</span> rows<span class="ansi-bold">)</span>, vsink.th, source_sink.in <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">53</span> sources, <span class="ansi-cyan-intense-fg ansi-bold">20</span> sinks<span class="ansi-bold">)</span> 
+<pre>    Wrote vsource.th (51 rows), vsink.th, source_sink.in (53 sources, 20 sinks) 
 </pre>
 </div>
 </div>
@@ -3550,7 +3544,7 @@ print(schism_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>    Wrote source.nc — <span class="ansi-cyan-intense-fg ansi-bold">19</span> sources <span class="ansi-bold">(</span>from <span class="ansi-cyan-intense-fg ansi-bold">19</span><span class="ansi-bold">)</span>, <span class="ansi-cyan-intense-fg ansi-bold">20</span> sinks, <span class="ansi-cyan-intense-fg ansi-bold">51</span> timesteps              
+<pre>    Wrote source.nc — 19 sources (from 19), 20 sinks, 51 timesteps              
 </pre>
 </div>
 </div>
@@ -3564,7 +3558,7 @@ print(schism_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>4s<span class="ansi-bold">)</span>                                                            
+<pre>  [✓] COMPLETED (4s)                                                            
 </pre>
 </div>
 </div>
@@ -3585,7 +3579,7 @@ print(schism_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">15:14:51</span>                                                 
+<pre>Start Time: 2026-04-30 15:14:51                                                 
 </pre>
 </div>
 </div>
@@ -3599,23 +3593,23 @@ print(schism_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Partitioning for <span class="ansi-cyan-intense-fg ansi-bold">8</span> tasks <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">2</span> scribes<span class="ansi-bold">)</span>                                          
+<pre>  Partitioning for 8 tasks (2 scribes)                                          
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>    Partitioned mesh into <span class="ansi-cyan-intense-fg ansi-bold">6</span> compute ranks →                                     
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/walkthrough/run_schism/</span><span class="ansi-magenta-intense-fg">parti</span>
-<span class="ansi-magenta-intense-fg">tion.prop</span>                                                                       
+<pre>    Partitioned mesh into 6 compute ranks →                                     
+docs/examples/walkthrough/run_schism/parti
+tion.prop                                                                       
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Set iout_sta = <span class="ansi-cyan-intense-fg ansi-bold">1</span>, nspool_sta = <span class="ansi-cyan-intense-fg ansi-bold">18</span> in param.nml                                
+<pre>  Set iout_sta = 1, nspool_sta = 18 in param.nml                                
 </pre>
 </div>
 </div>
@@ -3629,7 +3623,7 @@ print(schism_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>0s<span class="ansi-bold">)</span>                                                            
+<pre>  [✓] COMPLETED (0s)                                                            
 </pre>
 </div>
 </div>
@@ -3650,29 +3644,29 @@ print(schism_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">15:14:52</span>                                                 
+<pre>Start Time: 2026-04-30 15:14:52                                                 
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Run SCHISM model <span class="ansi-bold">(</span>MPI<span class="ansi-bold">)</span>                                                        
+<pre>  Run SCHISM model (MPI)                                                        
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Launching pschism with <span class="ansi-cyan-intense-fg ansi-bold">8</span> MPI tasks <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">1</span> <span class="ansi-magenta-intense-fg ansi-bold">node</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>, <span class="ansi-cyan-intense-fg ansi-bold">2</span> <span class="ansi-magenta-intense-fg ansi-bold">scribe</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span><span class="ansi-bold">)</span>                   
+<pre>  Launching pschism with 8 MPI tasks (1 node(s), 2 scribe(s))                   
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Command: mpiexec -n <span class="ansi-cyan-intense-fg ansi-bold">8</span> --oversubscribe                                         
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/.pixi/envs/dev/bin/</span><span class="ansi-magenta-intense-fg">pschism</span> <span class="ansi-cyan-intense-fg ansi-bold">2</span>              
+<pre>  Command: mpiexec -n 8 --oversubscribe                                         
+.pixi/envs/dev/bin/pschism 2              
 </pre>
 </div>
 </div>
@@ -3686,7 +3680,7 @@ print(schism_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>12m 49s<span class="ansi-bold">)</span>                                                       
+<pre>  [✓] COMPLETED (12m 49s)                                                       
 </pre>
 </div>
 </div>
@@ -3707,7 +3701,7 @@ print(schism_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">15:27:41</span>                                                 
+<pre>Start Time: 2026-04-30 15:27:41                                                 
 </pre>
 </div>
 </div>
@@ -3728,7 +3722,7 @@ print(schism_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>0s<span class="ansi-bold">)</span>                                                            
+<pre>  [✓] COMPLETED (0s)                                                            
 </pre>
 </div>
 </div>
@@ -3749,29 +3743,14 @@ print(schism_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">15:27:41</span>                                                 
+<pre>Start Time: 2026-04-30 15:27:41                                                 
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Plot simulated vs observed water levels <span class="ansi-bold">(</span>SCHISM<span class="ansi-bold">)</span>                              
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Loading cached station metadata from cache/coops_stations_metadata.json       
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Applied per-station datum offset to simulated values <span class="ansi-bold">(</span>range <span class="ansi-cyan-intense-fg ansi-bold">-0.9336</span> to <span class="ansi-cyan-intense-fg ansi-bold">-0.9336</span>
-m, mean <span class="ansi-cyan-intense-fg ansi-bold">-0.9336</span> m<span class="ansi-bold">)</span>                                                              
+<pre>  Plot simulated vs observed water levels (SCHISM)                              
 </pre>
 </div>
 </div>
@@ -3785,22 +3764,8 @@ m, mean <span class="ansi-cyan-intense-fg ansi-bold">-0.9336</span> m<span class
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Requesting water_level data for <span class="ansi-cyan-intense-fg ansi-bold">1</span> <span class="ansi-magenta-intense-fg ansi-bold">station</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span> from <span class="ansi-cyan-intense-fg ansi-bold">20251126</span> <span class="ansi-green-intense-fg ansi-bold">00:00</span> to <span class="ansi-cyan-intense-fg ansi-bold">20251128</span>  
-<span class="ansi-green-intense-fg ansi-bold">02:00</span>                                                                           
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Fetching data from <span class="ansi-cyan-intense-fg ansi-bold">1</span> <span class="ansi-magenta-intense-fg ansi-bold">station</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>                                               
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Successfully retrieved data for <span class="ansi-cyan-intense-fg ansi-bold">1</span> <span class="ansi-magenta-intense-fg ansi-bold">station</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>                                  
+<pre>  Applied per-station datum offset to simulated values (range -0.9336 to -0.9336
+m, mean -0.9336 m)                                                              
 </pre>
 </div>
 </div>
@@ -3814,43 +3779,72 @@ m, mean <span class="ansi-cyan-intense-fg ansi-bold">-0.9336</span> m<span class
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Fetching datum information for <span class="ansi-cyan-intense-fg ansi-bold">1</span> <span class="ansi-magenta-intense-fg ansi-bold">station</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>                                   
+<pre>  Requesting water_level data for 1 station(s) from 20251126 00:00 to 20251128  
+02:00                                                                           
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Fetching data from <span class="ansi-cyan-intense-fg ansi-bold">1</span> <span class="ansi-magenta-intense-fg ansi-bold">station</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>                                               
+<pre>  Fetching data from 1 station(s)                                               
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Saved <span class="ansi-cyan-intense-fg ansi-bold">1</span> comparison <span class="ansi-magenta-intense-fg ansi-bold">figure</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span> to                                               
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/walkthrough/run_schism/</span><span class="ansi-magenta-intense-fg">figs</span> 
+<pre>  Successfully retrieved data for 1 station(s)                                  
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Including <span class="ansi-cyan-intense-fg ansi-bold">1</span> NOAA <span class="ansi-magenta-intense-fg ansi-bold">gauge</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span> from station.in                                     
+<pre>  Loading cached station metadata from cache/coops_stations_metadata.json       
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Wrote obs_water_level.parquet with <span class="ansi-cyan-intense-fg ansi-bold">1</span> <span class="ansi-magenta-intense-fg ansi-bold">station</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span> and <span class="ansi-cyan-intense-fg ansi-bold">50</span> <span class="ansi-magenta-intense-fg ansi-bold">timestep</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>            
+<pre>  Fetching datum information for 1 station(s)                                   
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>4s<span class="ansi-bold">)</span>                                                            
+<pre>  Fetching data from 1 station(s)                                               
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
+<pre>  Saved 1 comparison figure(s) to                                               
+docs/examples/walkthrough/run_schism/figs 
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
+<pre>  Including 1 NOAA gauge(s) from station.in                                     
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
+<pre>  Wrote obs_water_level.parquet with 1 station(s) and 50 timestep(s)            
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
+<pre>  [✓] COMPLETED (4s)                                                            
 </pre>
 </div>
 </div>
@@ -3871,7 +3865,7 @@ m, mean <span class="ansi-cyan-intense-fg ansi-bold">-0.9336</span> m<span class
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Workflow COMPLETED | Total Duration: <span class="ansi-green-intense-fg ansi-bold">0:16:09</span>                                    
+<pre>Workflow COMPLETED | Total Duration: 0:16:09                                    
 </pre>
 </div>
 </div>
@@ -3906,84 +3900,84 @@ m, mean <span class="ansi-cyan-intense-fg ansi-bold">-0.9336</span> m<span class
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> download: 5s                                                              
+<pre>  [✓] download: 5s                                                              
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> schism_forcing_prep: 0s                                                   
+<pre>  [✓] schism_forcing_prep: 0s                                                   
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> schism_forcing: 45s                                                       
+<pre>  [✓] schism_forcing: 45s                                                       
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> schism_sflux: 1m 48s                                                      
+<pre>  [✓] schism_sflux: 1m 48s                                                      
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> schism_params: 0s                                                         
+<pre>  [✓] schism_params: 0s                                                         
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> schism_obs: 0s                                                            
+<pre>  [✓] schism_obs: 0s                                                            
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> schism_boundary: 28s                                                      
+<pre>  [✓] schism_boundary: 28s                                                      
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> schism_discharge: 4s                                                      
+<pre>  [✓] schism_discharge: 4s                                                      
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> schism_prep: 0s                                                           
+<pre>  [✓] schism_prep: 0s                                                           
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> schism_run: 12m 49s                                                       
+<pre>  [✓] schism_run: 12m 49s                                                       
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> schism_postprocess: 0s                                                    
+<pre>  [✓] schism_postprocess: 0s                                                    
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> schism_plot: 4s                                                           
+<pre>  [✓] schism_plot: 4s                                                           
 </pre>
 </div>
 </div>
@@ -4136,7 +4130,7 @@ in Part 4 work without any manual station bookkeeping.</p>
             <span class="s2">"boundary_zmax"</span><span class="p">:</span> <span class="o">-</span><span class="mf">1.0</span><span class="p">,</span>
             <span class="s2">"reset_bounds"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
             <span class="c1"># Drop tiny isolated active cells just above zmin (offshore</span>
-            <span class="c1"># bumps that clear the −50 m cutoff but are surrounded by</span>
+            <span class="c1"># bumps that clear the -50 m cutoff but are surrounded by</span>
             <span class="c1"># deeper inactive cells) so the model is a single connected</span>
             <span class="c1"># domain instead of a few floating fragments.</span>
             <span class="s2">"keep_largest_only"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
@@ -4201,7 +4195,7 @@ create_config = SfincsCreateConfig.from_dict(
             "boundary_zmax": -1.0,
             "reset_bounds": True,
             # Drop tiny isolated active cells just above zmin (offshore
-            # bumps that clear the −50 m cutoff but are surrounded by
+            # bumps that clear the -50 m cutoff but are surrounded by
             # deeper inactive cells) so the model is a single connected
             # domain instead of a few floating fragments.
             "keep_largest_only": True,
@@ -4254,7 +4248,7 @@ print(create_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">15:27:49</span>                                                 
+<pre>Start Time: 2026-04-30 15:27:49                                                 
 </pre>
 </div>
 </div>
@@ -4282,7 +4276,7 @@ print(create_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">15:27:49</span>                                                 
+<pre>Start Time: 2026-04-30 15:27:49                                                 
 </pre>
 </div>
 </div>
@@ -4297,29 +4291,29 @@ print(create_result)</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
 <pre>  AOI:                                                                          
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/walkthrough/</span><span class="ansi-magenta-intense-fg">aoi.geojson</span>     
+docs/examples/walkthrough/aoi.geojson     
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Resolution: <span class="ansi-cyan-intense-fg ansi-bold">512</span> m, CRS: utm                                                   
+<pre>  Resolution: 512 m, CRS: utm                                                   
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Refinement polygon <span class="ansi-green-fg">'refine_poly.geojson'</span>: split into <span class="ansi-cyan-intense-fg ansi-bold">2</span> <span class="ansi-magenta-intense-fg ansi-bold">component</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span> after     
-<span class="ansi-yellow-fg">buffer_m</span>=<span class="ansi-cyan-intense-fg ansi-bold">-200</span> m                                                                 
+<pre>  Refinement polygon 'refine_poly.geojson': split into 2 component(s) after     
+buffer_m=-200 m                                                                 
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Refinement: <span class="ansi-cyan-intense-fg ansi-bold">1</span> <span class="ansi-magenta-intense-fg ansi-bold">polygon</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>, max level <span class="ansi-cyan-intense-fg ansi-bold">4</span>                                         
+<pre>  Refinement: 1 polygon(s), max level 4                                         
 </pre>
 </div>
 </div>
@@ -4333,7 +4327,7 @@ print(create_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>8s<span class="ansi-bold">)</span>                                                            
+<pre>  [✓] COMPLETED (8s)                                                            
 </pre>
 </div>
 </div>
@@ -4354,7 +4348,7 @@ print(create_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">15:27:57</span>                                                 
+<pre>Start Time: 2026-04-30 15:27:57                                                 
 </pre>
 </div>
 </div>
@@ -4389,14 +4383,14 @@ print(create_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Fetched <span class="ansi-cyan-intense-fg ansi-bold">3</span> <span class="ansi-magenta-intense-fg ansi-bold">dataset</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>: <span class="ansi-bold">[</span><span class="ansi-green-fg">'nws_30m'</span>, <span class="ansi-green-fg">'gebco_15arcs'</span>, <span class="ansi-green-fg">'esa_worldcover'</span><span class="ansi-bold">]</span>           
+<pre>  Fetched 3 dataset(s): ['nws_30m', 'gebco_15arcs', 'esa_worldcover']           
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>0s<span class="ansi-bold">)</span>                                                            
+<pre>  [✓] COMPLETED (0s)                                                            
 </pre>
 </div>
 </div>
@@ -4417,7 +4411,7 @@ print(create_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">15:27:57</span>                                                 
+<pre>Start Time: 2026-04-30 15:27:57                                                 
 </pre>
 </div>
 </div>
@@ -4431,7 +4425,7 @@ print(create_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Elevation datasets: <span class="ansi-bold">[</span><span class="ansi-green-fg">'nws_30m'</span>, <span class="ansi-green-fg">'gebco_15arcs'</span><span class="ansi-bold">]</span>                               
+<pre>  Elevation datasets: ['nws_30m', 'gebco_15arcs']                               
 </pre>
 </div>
 </div>
@@ -4445,7 +4439,7 @@ print(create_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>2s<span class="ansi-bold">)</span>                                                            
+<pre>  [✓] COMPLETED (2s)                                                            
 </pre>
 </div>
 </div>
@@ -4466,7 +4460,7 @@ print(create_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">15:28:00</span>                                                 
+<pre>Start Time: 2026-04-30 15:28:00                                                 
 </pre>
 </div>
 </div>
@@ -4480,14 +4474,14 @@ print(create_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-yellow-fg">zmin</span>=<span class="ansi-cyan-intense-fg ansi-bold">-50.0</span>                                                                    
+<pre>  zmin=-50.0                                                                    
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Dropped <span class="ansi-cyan-intense-fg ansi-bold">12</span> active <span class="ansi-magenta-intense-fg ansi-bold">cell</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span> in disconnected components; kept the largest        
+<pre>  Dropped 12 active cell(s) in disconnected components; kept the largest        
 connected component only                                                        
 </pre>
 </div>
@@ -4502,7 +4496,7 @@ connected component only
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>0s<span class="ansi-bold">)</span>                                                            
+<pre>  [✓] COMPLETED (0s)                                                            
 </pre>
 </div>
 </div>
@@ -4523,7 +4517,7 @@ connected component only
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">15:28:00</span>                                                 
+<pre>Start Time: 2026-04-30 15:28:00                                                 
 </pre>
 </div>
 </div>
@@ -4537,7 +4531,7 @@ connected component only
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-yellow-fg">boundary_zmax</span>=<span class="ansi-cyan-intense-fg ansi-bold">-1.0</span>                                                            
+<pre>  boundary_zmax=-1.0                                                            
 </pre>
 </div>
 </div>
@@ -4551,7 +4545,7 @@ connected component only
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>0s<span class="ansi-bold">)</span>                                                            
+<pre>  [✓] COMPLETED (0s)                                                            
 </pre>
 </div>
 </div>
@@ -4572,7 +4566,7 @@ connected component only
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">15:28:00</span>                                                 
+<pre>Start Time: 2026-04-30 15:28:00                                                 
 </pre>
 </div>
 </div>
@@ -4586,203 +4580,203 @@ connected component only
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Read <span class="ansi-cyan-intense-fg ansi-bold">26</span> <span class="ansi-magenta-intense-fg ansi-bold">flowpath</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span> from discharge_nwm.geojson                                
+<pre>  Read 26 flowpath(s) from discharge_nwm.geojson                                
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>    <span class="ansi-cyan-intense-fg ansi-bold">2666131</span>: snapped to active cell <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">103</span> m away<span class="ansi-bold">)</span>                                
+<pre>    2666131: snapped to active cell (103 m away)                                
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>    <span class="ansi-cyan-intense-fg ansi-bold">2666047</span>: snapped to active cell <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">359</span> m away<span class="ansi-bold">)</span>                                
+<pre>    2666047: snapped to active cell (359 m away)                                
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>    <span class="ansi-cyan-intense-fg ansi-bold">2665943</span>: snapped to active cell <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">341</span> m away<span class="ansi-bold">)</span>                                
+<pre>    2665943: snapped to active cell (341 m away)                                
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>    <span class="ansi-cyan-intense-fg ansi-bold">2664809</span>: snapped to active cell <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">135</span> m away<span class="ansi-bold">)</span>                                
+<pre>    2664809: snapped to active cell (135 m away)                                
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>    <span class="ansi-cyan-intense-fg ansi-bold">2664713</span>: snapped to active cell <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">486</span> m away<span class="ansi-bold">)</span>                                
+<pre>    2664713: snapped to active cell (486 m away)                                
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>    <span class="ansi-cyan-intense-fg ansi-bold">2664573</span>: snapped to active cell <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">160</span> m away<span class="ansi-bold">)</span>                                
+<pre>    2664573: snapped to active cell (160 m away)                                
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>    <span class="ansi-cyan-intense-fg ansi-bold">2664269</span>: snapped to active cell <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">187</span> m away<span class="ansi-bold">)</span>                                
+<pre>    2664269: snapped to active cell (187 m away)                                
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>    <span class="ansi-cyan-intense-fg ansi-bold">2664215</span>: snapped to active cell <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">217</span> m away<span class="ansi-bold">)</span>                                
+<pre>    2664215: snapped to active cell (217 m away)                                
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>    <span class="ansi-cyan-intense-fg ansi-bold">2664367</span>: snapped to active cell <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">291</span> m away<span class="ansi-bold">)</span>                                
+<pre>    2664367: snapped to active cell (291 m away)                                
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>    <span class="ansi-cyan-intense-fg ansi-bold">2664397</span>: snapped to active cell <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">269</span> m away<span class="ansi-bold">)</span>                                
+<pre>    2664397: snapped to active cell (269 m away)                                
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>    <span class="ansi-cyan-intense-fg ansi-bold">2664659</span>: snapped to active cell <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">120</span> m away<span class="ansi-bold">)</span>                                
+<pre>    2664659: snapped to active cell (120 m away)                                
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>    <span class="ansi-cyan-intense-fg ansi-bold">2665573</span>: snapped to active cell <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">123</span> m away<span class="ansi-bold">)</span>                                
+<pre>    2665573: snapped to active cell (123 m away)                                
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>    <span class="ansi-cyan-intense-fg ansi-bold">2664447</span>: snapped to active cell <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">241</span> m away<span class="ansi-bold">)</span>                                
+<pre>    2664447: snapped to active cell (241 m away)                                
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>    <span class="ansi-cyan-intense-fg ansi-bold">2664465</span>: snapped to active cell <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">241</span> m away<span class="ansi-bold">)</span>                                
+<pre>    2664465: snapped to active cell (241 m away)                                
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>    <span class="ansi-cyan-intense-fg ansi-bold">2664753</span>: snapped to active cell <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">488</span> m away<span class="ansi-bold">)</span>                                
+<pre>    2664753: snapped to active cell (488 m away)                                
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>    <span class="ansi-cyan-intense-fg ansi-bold">2664899</span>: snapped to active cell <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">63</span> m away<span class="ansi-bold">)</span>                                 
+<pre>    2664899: snapped to active cell (63 m away)                                 
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>    <span class="ansi-cyan-intense-fg ansi-bold">2664951</span>: snapped to active cell <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">35</span> m away<span class="ansi-bold">)</span>                                 
+<pre>    2664951: snapped to active cell (35 m away)                                 
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>    <span class="ansi-cyan-intense-fg ansi-bold">2666173</span>: snapped to active cell <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">238</span> m away<span class="ansi-bold">)</span>                                
+<pre>    2666173: snapped to active cell (238 m away)                                
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>    <span class="ansi-cyan-intense-fg ansi-bold">2666193</span>: snapped to active cell <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">208</span> m away<span class="ansi-bold">)</span>                                
+<pre>    2666193: snapped to active cell (208 m away)                                
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>    <span class="ansi-cyan-intense-fg ansi-bold">2664551</span>: snapped to active cell <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">160</span> m away<span class="ansi-bold">)</span>                                
+<pre>    2664551: snapped to active cell (160 m away)                                
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>    <span class="ansi-cyan-intense-fg ansi-bold">2664761</span>: snapped to active cell <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">147</span> m away<span class="ansi-bold">)</span>                                
+<pre>    2664761: snapped to active cell (147 m away)                                
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>    <span class="ansi-cyan-intense-fg ansi-bold">2664993</span>: snapped to active cell <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">42</span> m away<span class="ansi-bold">)</span>                                 
+<pre>    2664993: snapped to active cell (42 m away)                                 
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>    <span class="ansi-cyan-intense-fg ansi-bold">2665043</span>: snapped to active cell <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">72</span> m away<span class="ansi-bold">)</span>                                 
+<pre>    2665043: snapped to active cell (72 m away)                                 
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>    <span class="ansi-cyan-intense-fg ansi-bold">2665949</span>: snapped to active cell <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">341</span> m away<span class="ansi-bold">)</span>                                
+<pre>    2665949: snapped to active cell (341 m away)                                
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>    <span class="ansi-cyan-intense-fg ansi-bold">2666017</span>: snapped to active cell <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">360</span> m away<span class="ansi-bold">)</span>                                
+<pre>    2666017: snapped to active cell (360 m away)                                
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>    <span class="ansi-cyan-intense-fg ansi-bold">2666079</span>: snapped to active cell <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">99</span> m away<span class="ansi-bold">)</span>                                 
+<pre>    2666079: snapped to active cell (99 m away)                                 
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Wrote <span class="ansi-cyan-intense-fg ansi-bold">26</span> discharge source <span class="ansi-magenta-intense-fg ansi-bold">location</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span> to sfincs_nwm.src                       
+<pre>  Wrote 26 discharge source location(s) to sfincs_nwm.src                       
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>0s<span class="ansi-bold">)</span>                                                            
+<pre>  [✓] COMPLETED (0s)                                                            
 </pre>
 </div>
 </div>
@@ -4803,7 +4797,7 @@ connected component only
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">15:28:00</span>                                                 
+<pre>Start Time: 2026-04-30 15:28:00                                                 
 </pre>
 </div>
 </div>
@@ -4817,7 +4811,7 @@ connected component only
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-yellow-fg">nr_subgrid_pixels</span>=<span class="ansi-cyan-intense-fg ansi-bold">4</span>                                                           
+<pre>  nr_subgrid_pixels=4                                                           
 </pre>
 </div>
 </div>
@@ -4831,7 +4825,7 @@ connected component only
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>2m 22s<span class="ansi-bold">)</span>                                                        
+<pre>  [✓] COMPLETED (2m 22s)                                                        
 </pre>
 </div>
 </div>
@@ -4852,7 +4846,7 @@ connected component only
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">15:30:23</span>                                                 
+<pre>Start Time: 2026-04-30 15:30:23                                                 
 </pre>
 </div>
 </div>
@@ -4873,42 +4867,42 @@ connected component only
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Fetching datum information for <span class="ansi-cyan-intense-fg ansi-bold">1</span> <span class="ansi-magenta-intense-fg ansi-bold">station</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>                                   
+<pre>  Fetching datum information for 1 station(s)                                   
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Fetching data from <span class="ansi-cyan-intense-fg ansi-bold">1</span> <span class="ansi-magenta-intense-fg ansi-bold">station</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>                                               
+<pre>  Fetching data from 1 station(s)                                               
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Added <span class="ansi-cyan-intense-fg ansi-bold">1</span> NOAA CO-OPS observation <span class="ansi-magenta-intense-fg ansi-bold">point</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>                                      
+<pre>  Added 1 NOAA CO-OPS observation point(s)                                      
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>    noaa_9416841: placed at face center <span class="ansi-yellow-fg">z</span>=<span class="ansi-cyan-intense-fg ansi-bold">-1.041</span> m <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">23</span> m from original<span class="ansi-bold">)</span>         
+<pre>    noaa_9416841: placed at face center z=-1.041 m (23 m from original)         
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Snapped <span class="ansi-cyan-intense-fg ansi-bold">1</span> observation <span class="ansi-magenta-intense-fg ansi-bold">point</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span> to nearest wet cell                            
+<pre>  Snapped 1 observation point(s) to nearest wet cell                            
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>0s<span class="ansi-bold">)</span>                                                            
+<pre>  [✓] COMPLETED (0s)                                                            
 </pre>
 </div>
 </div>
@@ -4929,7 +4923,7 @@ connected component only
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">15:30:23</span>                                                 
+<pre>Start Time: 2026-04-30 15:30:23                                                 
 </pre>
 </div>
 </div>
@@ -4944,7 +4938,7 @@ connected component only
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
 <pre>  Output directory:                                                             
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/walkthrough/</span><span class="ansi-magenta-intense-fg">output_sfincs</span>   
+docs/examples/walkthrough/output_sfincs   
 </pre>
 </div>
 </div>
@@ -4958,7 +4952,7 @@ connected component only
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>0s<span class="ansi-bold">)</span>                                                            
+<pre>  [✓] COMPLETED (0s)                                                            
 </pre>
 </div>
 </div>
@@ -4979,7 +4973,7 @@ connected component only
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Workflow COMPLETED | Total Duration: <span class="ansi-green-intense-fg ansi-bold">0:02:34</span>                                    
+<pre>Workflow COMPLETED | Total Duration: 0:02:34                                    
 </pre>
 </div>
 </div>
@@ -5014,63 +5008,63 @@ connected component only
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> create_grid: 8s                                                           
+<pre>  [✓] create_grid: 8s                                                           
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> create_fetch_data: 0s                                                     
+<pre>  [✓] create_fetch_data: 0s                                                     
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> create_elevation: 2s                                                      
+<pre>  [✓] create_elevation: 2s                                                      
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> create_mask: 0s                                                           
+<pre>  [✓] create_mask: 0s                                                           
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> create_boundary: 0s                                                       
+<pre>  [✓] create_boundary: 0s                                                       
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> create_discharge: 0s                                                      
+<pre>  [✓] create_discharge: 0s                                                      
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> create_subgrid: 2m 22s                                                    
+<pre>  [✓] create_subgrid: 2m 22s                                                    
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> create_obs: 0s                                                            
+<pre>  [✓] create_obs: 0s                                                            
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> create_write: 0s                                                          
+<pre>  [✓] create_write: 0s                                                          
 </pre>
 </div>
 </div>
@@ -5239,7 +5233,7 @@ print(sfincs_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">15:30:24</span>                                                 
+<pre>Start Time: 2026-04-30 15:30:24                                                 
 </pre>
 </div>
 </div>
@@ -5261,7 +5255,7 @@ print(sfincs_result)</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
 <pre>Cleaned generated files from                                                    
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/walkthrough/</span><span class="ansi-magenta-intense-fg">run_sfincs</span>      
+docs/examples/walkthrough/run_sfincs      
 </pre>
 </div>
 </div>
@@ -5275,42 +5269,42 @@ print(sfincs_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">15:30:24</span>                                                 
+<pre>Start Time: 2026-04-30 15:30:24                                                 
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Download input data <span class="ansi-bold">(</span>NWM, STOFS<span class="ansi-bold">)</span>                                              
+<pre>  Download input data (NWM, STOFS)                                              
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  meteo/nwm_ana: <span class="ansi-cyan-intense-fg ansi-bold">51</span>/<span class="ansi-cyan-intense-fg ansi-bold">51</span> <span class="ansi-bold">[</span>OK<span class="ansi-bold">]</span>                                                     
+<pre>  meteo/nwm_ana: 51/51 [OK]                                                     
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  hydro/nwm: <span class="ansi-cyan-intense-fg ansi-bold">51</span>/<span class="ansi-cyan-intense-fg ansi-bold">51</span> <span class="ansi-bold">[</span>OK<span class="ansi-bold">]</span>                                                         
+<pre>  hydro/nwm: 51/51 [OK]                                                         
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  coastal/stofs: <span class="ansi-cyan-intense-fg ansi-bold">1</span>/<span class="ansi-cyan-intense-fg ansi-bold">1</span> <span class="ansi-bold">[</span>OK<span class="ansi-bold">]</span>                                                       
+<pre>  coastal/stofs: 1/1 [OK]                                                       
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Total: <span class="ansi-cyan-intense-fg ansi-bold">103</span>/<span class="ansi-cyan-intense-fg ansi-bold">103</span> <span class="ansi-bold">(</span>failed: <span class="ansi-cyan-intense-fg ansi-bold">0</span><span class="ansi-bold">)</span>                                                    
+<pre>  Total: 103/103 (failed: 0)                                                    
 </pre>
 </div>
 </div>
@@ -5318,14 +5312,14 @@ print(sfincs_result)</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
 <pre>  Download complete — raw files stored in                                       
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/</span><span class="ansi-magenta-intense-fg">downloads</span>                   
+docs/examples/downloads                   
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>6s<span class="ansi-bold">)</span>                                                            
+<pre>  [✓] COMPLETED (6s)                                                            
 </pre>
 </div>
 </div>
@@ -5346,7 +5340,7 @@ print(sfincs_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">15:30:30</span>                                                 
+<pre>Start Time: 2026-04-30 15:30:30                                                 
 </pre>
 </div>
 </div>
@@ -5360,14 +5354,14 @@ print(sfincs_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Skipped <span class="ansi-cyan-intense-fg ansi-bold">213</span> meteo + <span class="ansi-cyan-intense-fg ansi-bold">0</span> streamflow symlinks <span class="ansi-bold">(</span>already exist<span class="ansi-bold">)</span>                     
+<pre>  Skipped 213 meteo + 0 streamflow symlinks (already exist)                     
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>0s<span class="ansi-bold">)</span>                                                            
+<pre>  [✓] COMPLETED (0s)                                                            
 </pre>
 </div>
 </div>
@@ -5388,7 +5382,7 @@ print(sfincs_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">15:30:30</span>                                                 
+<pre>Start Time: 2026-04-30 15:30:30                                                 
 </pre>
 </div>
 </div>
@@ -5403,15 +5397,15 @@ print(sfincs_result)</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
 <pre>  Data catalog written to                                                       
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/walkthrough/run_sfincs/</span><span class="ansi-magenta-intense-fg">data_</span>
-<span class="ansi-magenta-intense-fg">catalog.yml</span>                                                                     
+docs/examples/walkthrough/run_sfincs/data_
+catalog.yml                                                                     
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>0s<span class="ansi-bold">)</span>                                                            
+<pre>  [✓] COMPLETED (0s)                                                            
 </pre>
 </div>
 </div>
@@ -5432,14 +5426,14 @@ print(sfincs_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">15:30:30</span>                                                 
+<pre>Start Time: 2026-04-30 15:30:30                                                 
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Initialize SFINCS model <span class="ansi-bold">(</span>pre-built<span class="ansi-bold">)</span>                                           
+<pre>  Initialize SFINCS model (pre-built)                                           
 </pre>
 </div>
 </div>
@@ -5447,25 +5441,25 @@ print(sfincs_result)</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
 <pre>  Copied pre-built model from                                                   
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/walkthrough/</span><span class="ansi-magenta-intense-fg">output_sfincs</span> to
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/walkthrough/run_sfincs/</span><span class="ansi-magenta-intense-fg">sfinc</span>
-<span class="ansi-magenta-intense-fg">s_model</span>                                                                         
+docs/examples/walkthrough/output_sfincs to
+docs/examples/walkthrough/run_sfincs/sfinc
+s_model                                                                         
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  SFINCS model initialized <span class="ansi-bold">(</span><span class="ansi-yellow-fg">grid_type</span>=<span class="ansi-magenta-fg">quadtree</span><span class="ansi-bold">)</span> at                              
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/walkthrough/run_sfincs/</span><span class="ansi-magenta-intense-fg">sfinc</span>
-<span class="ansi-magenta-intense-fg">s_model</span>                                                                         
+<pre>  SFINCS model initialized (grid_type=quadtree) at                              
+docs/examples/walkthrough/run_sfincs/sfinc
+s_model                                                                         
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>0s<span class="ansi-bold">)</span>                                                            
+<pre>  [✓] COMPLETED (0s)                                                            
 </pre>
 </div>
 </div>
@@ -5486,7 +5480,7 @@ print(sfincs_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">15:30:31</span>                                                 
+<pre>Start Time: 2026-04-30 15:30:31                                                 
 </pre>
 </div>
 </div>
@@ -5500,21 +5494,21 @@ print(sfincs_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Spinup: <span class="ansi-cyan-intense-fg ansi-bold">3600</span> s                                                                
+<pre>  Spinup: 3600 s                                                                
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Timing set: <span class="ansi-cyan-intense-fg ansi-bold">2025</span>-<span class="ansi-cyan-intense-fg ansi-bold">11</span>-<span class="ansi-cyan-intense-fg ansi-bold">26</span> <span class="ansi-green-intense-fg ansi-bold">00:00:00</span> to <span class="ansi-cyan-intense-fg ansi-bold">2025</span>-<span class="ansi-cyan-intense-fg ansi-bold">11</span>-<span class="ansi-cyan-intense-fg ansi-bold">28</span> <span class="ansi-green-intense-fg ansi-bold">02:00:00</span>                        
+<pre>  Timing set: 2025-11-26 00:00:00 to 2025-11-28 02:00:00                        
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>0s<span class="ansi-bold">)</span>                                                            
+<pre>  [✓] COMPLETED (0s)                                                            
 </pre>
 </div>
 </div>
@@ -5535,7 +5529,7 @@ print(sfincs_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">15:30:31</span>                                                 
+<pre>Start Time: 2026-04-30 15:30:31                                                 
 </pre>
 </div>
 </div>
@@ -5549,21 +5543,21 @@ print(sfincs_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Extracted <span class="ansi-cyan-intense-fg ansi-bold">825</span> boundary <span class="ansi-magenta-intense-fg ansi-bold">point</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span> from quadtree mask in sfincs.nc               
+<pre>  Extracted 825 boundary point(s) from quadtree mask in sfincs.nc               
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Loaded stofs_waterlevel: <span class="ansi-yellow-fg">time</span>=<span class="ansi-cyan-intense-fg ansi-bold">51</span>, <span class="ansi-yellow-fg">node</span>=<span class="ansi-cyan-intense-fg ansi-bold">15244</span>                                  
+<pre>  Loaded stofs_waterlevel: time=51, node=15244                                  
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Interpolated stofs_waterlevel to <span class="ansi-cyan-intense-fg ansi-bold">825</span> boundary points <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">51</span> time steps<span class="ansi-bold">)</span>          
+<pre>  Interpolated stofs_waterlevel to 825 boundary points (51 time steps)          
 </pre>
 </div>
 </div>
@@ -5584,7 +5578,7 @@ print(sfincs_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>14s<span class="ansi-bold">)</span>                                                           
+<pre>  [✓] COMPLETED (14s)                                                           
 </pre>
 </div>
 </div>
@@ -5605,7 +5599,7 @@ print(sfincs_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">15:30:45</span>                                                 
+<pre>Start Time: 2026-04-30 15:30:45                                                 
 </pre>
 </div>
 </div>
@@ -5619,23 +5613,23 @@ print(sfincs_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Added <span class="ansi-cyan-intense-fg ansi-bold">26</span> discharge source <span class="ansi-magenta-intense-fg ansi-bold">point</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span> from                                       
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/walkthrough/output_sfincs/</span><span class="ansi-magenta-intense-fg">sf</span>
-<span class="ansi-magenta-intense-fg">incs_nwm.src</span>                                                                    
+<pre>  Added 26 discharge source point(s) from                                       
+docs/examples/walkthrough/output_sfincs/sf
+incs_nwm.src                                                                    
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Assigned discharge timeseries to <span class="ansi-cyan-intense-fg ansi-bold">26</span> <span class="ansi-magenta-intense-fg ansi-bold">point</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span> <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">26</span> unique <span class="ansi-magenta-intense-fg ansi-bold">feature_id</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span><span class="ansi-bold">)</span>        
+<pre>  Assigned discharge timeseries to 26 point(s) (26 unique feature_id(s))        
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>12s<span class="ansi-bold">)</span>                                                           
+<pre>  [✓] COMPLETED (12s)                                                           
 </pre>
 </div>
 </div>
@@ -5656,7 +5650,7 @@ print(sfincs_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">15:30:57</span>                                                 
+<pre>Start Time: 2026-04-30 15:30:57                                                 
 </pre>
 </div>
 </div>
@@ -5670,14 +5664,14 @@ print(sfincs_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Precipitation forcing added from nwm_ana_meteo <span class="ansi-bold">(</span><span class="ansi-yellow-fg">res</span>=<span class="ansi-cyan-intense-fg ansi-bold">512</span> m<span class="ansi-bold">)</span>                    
+<pre>  Precipitation forcing added from nwm_ana_meteo (res=512 m)                    
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>2s<span class="ansi-bold">)</span>                                                            
+<pre>  [✓] COMPLETED (2s)                                                            
 </pre>
 </div>
 </div>
@@ -5698,7 +5692,7 @@ print(sfincs_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">15:31:00</span>                                                 
+<pre>Start Time: 2026-04-30 15:31:00                                                 
 </pre>
 </div>
 </div>
@@ -5712,14 +5706,14 @@ print(sfincs_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Wind forcing added from nwm_ana_meteo <span class="ansi-bold">(</span><span class="ansi-yellow-fg">res</span>=<span class="ansi-cyan-intense-fg ansi-bold">512</span> m<span class="ansi-bold">)</span>                             
+<pre>  Wind forcing added from nwm_ana_meteo (res=512 m)                             
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>4s<span class="ansi-bold">)</span>                                                            
+<pre>  [✓] COMPLETED (4s)                                                            
 </pre>
 </div>
 </div>
@@ -5740,7 +5734,7 @@ print(sfincs_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">15:31:05</span>                                                 
+<pre>Start Time: 2026-04-30 15:31:05                                                 
 </pre>
 </div>
 </div>
@@ -5754,14 +5748,14 @@ print(sfincs_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Atmospheric pressure forcing added from nwm_ana_meteo <span class="ansi-bold">(</span><span class="ansi-yellow-fg">baro</span>=<span class="ansi-cyan-intense-fg ansi-bold">1</span>, <span class="ansi-yellow-fg">res</span>=<span class="ansi-cyan-intense-fg ansi-bold">512</span> m<span class="ansi-bold">)</span>     
+<pre>  Atmospheric pressure forcing added from nwm_ana_meteo (baro=1, res=512 m)     
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>3s<span class="ansi-bold">)</span>                                                            
+<pre>  [✓] COMPLETED (3s)                                                            
 </pre>
 </div>
 </div>
@@ -5782,7 +5776,7 @@ print(sfincs_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">15:31:08</span>                                                 
+<pre>Start Time: 2026-04-30 15:31:08                                                 
 </pre>
 </div>
 </div>
@@ -5796,8 +5790,8 @@ print(sfincs_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Applied <span class="ansi-cyan-intense-fg ansi-bold">4</span> sfincs.inp <span class="ansi-magenta-intense-fg ansi-bold">override</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>: <span class="ansi-bold">{</span><span class="ansi-green-fg">'tspinup'</span>: <span class="ansi-cyan-intense-fg ansi-bold">10800</span>, <span class="ansi-green-fg">'advection'</span>: <span class="ansi-cyan-intense-fg ansi-bold">0</span>,          
-<span class="ansi-green-fg">'viscosity'</span>: <span class="ansi-cyan-intense-fg ansi-bold">0</span>, <span class="ansi-green-fg">'nuvisc'</span>: <span class="ansi-cyan-intense-fg ansi-bold">0.01</span><span class="ansi-bold">}</span>                                                 
+<pre>  Applied 4 sfincs.inp override(s): {'tspinup': 10800, 'advection': 0,          
+'viscosity': 0, 'nuvisc': 0.01}                                                 
 </pre>
 </div>
 </div>
@@ -5805,15 +5799,15 @@ print(sfincs_result)</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
 <pre>  SFINCS model written to                                                       
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/walkthrough/run_sfincs/</span><span class="ansi-magenta-intense-fg">sfinc</span>
-<span class="ansi-magenta-intense-fg">s_model</span>                                                                         
+docs/examples/walkthrough/run_sfincs/sfinc
+s_model                                                                         
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>0s<span class="ansi-bold">)</span>                                                            
+<pre>  [✓] COMPLETED (0s)                                                            
 </pre>
 </div>
 </div>
@@ -5834,7 +5828,7 @@ print(sfincs_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">15:31:08</span>                                                 
+<pre>Start Time: 2026-04-30 15:31:08                                                 
 </pre>
 </div>
 </div>
@@ -5849,7 +5843,7 @@ print(sfincs_result)</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
 <pre>  Running SFINCS via native executable:                                         
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/.pixi/envs/dev/bin/</span><span class="ansi-magenta-intense-fg">sfincs</span>                 
+.pixi/envs/dev/bin/sfincs                 
 </pre>
 </div>
 </div>
@@ -5863,7 +5857,7 @@ print(sfincs_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>1h 0m 1s<span class="ansi-bold">)</span>                                                      
+<pre>  [✓] COMPLETED (1h 0m 1s)                                                      
 </pre>
 </div>
 </div>
@@ -5884,7 +5878,7 @@ print(sfincs_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">16:31:10</span>                                                 
+<pre>Start Time: 2026-04-30 16:31:10                                                 
 </pre>
 </div>
 </div>
@@ -5899,8 +5893,8 @@ print(sfincs_result)</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
 <pre>  Loaded zsmax from                                                             
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/walkthrough/run_sfincs/sfinc</span>
-<span class="ansi-magenta-fg">s_model/</span><span class="ansi-magenta-intense-fg">sfincs_map.nc</span>                                                           
+docs/examples/walkthrough/run_sfincs/sfinc
+s_model/sfincs_map.nc                                                           
 </pre>
 </div>
 </div>
@@ -5908,15 +5902,15 @@ print(sfincs_result)</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
 <pre>  Creating index COG:                                                           
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/walkthrough/run_sfincs/sfinc</span>
-<span class="ansi-magenta-fg">s_model/</span><span class="ansi-magenta-intense-fg">floodmap_index.tif</span>                                                      
+docs/examples/walkthrough/run_sfincs/sfinc
+s_model/floodmap_index.tif                                                      
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Index COG created <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">0.1</span> MB<span class="ansi-bold">)</span>                                                    
+<pre>  Index COG created (0.1 MB)                                                    
 </pre>
 </div>
 </div>
@@ -5937,7 +5931,7 @@ print(sfincs_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Building <span class="ansi-cyan-intense-fg ansi-bold">1</span> overview levels: <span class="ansi-bold">[</span><span class="ansi-cyan-intense-fg ansi-bold">2</span><span class="ansi-bold">]</span>                                               
+<pre>  Building 1 overview levels: [2]                                               
 </pre>
 </div>
 </div>
@@ -5945,8 +5939,8 @@ print(sfincs_result)</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
 <pre>  Flood depth map written:                                                      
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/walkthrough/run_sfincs/sfinc</span>
-<span class="ansi-magenta-fg">s_model/</span><span class="ansi-magenta-intense-fg">floodmap_hmax.tif</span> <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">0.5</span> MB<span class="ansi-bold">)</span>                                              
+docs/examples/walkthrough/run_sfincs/sfinc
+s_model/floodmap_hmax.tif (0.5 MB)                                              
 </pre>
 </div>
 </div>
@@ -5954,15 +5948,15 @@ print(sfincs_result)</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
 <pre>  Flood depth map:                                                              
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/walkthrough/run_sfincs/sfinc</span>
-<span class="ansi-magenta-fg">s_model/</span><span class="ansi-magenta-intense-fg">floodmap_hmax.tif</span>                                                       
+docs/examples/walkthrough/run_sfincs/sfinc
+s_model/floodmap_hmax.tif                                                       
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>1s<span class="ansi-bold">)</span>                                                            
+<pre>  [✓] COMPLETED (1s)                                                            
 </pre>
 </div>
 </div>
@@ -5983,7 +5977,7 @@ print(sfincs_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Start Time: <span class="ansi-cyan-intense-fg ansi-bold">2026</span>-<span class="ansi-cyan-intense-fg ansi-bold">04</span>-<span class="ansi-cyan-intense-fg ansi-bold">30</span> <span class="ansi-green-intense-fg ansi-bold">16:31:11</span>                                                 
+<pre>Start Time: 2026-04-30 16:31:11                                                 
 </pre>
 </div>
 </div>
@@ -6004,57 +5998,28 @@ print(sfincs_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Fetching datum information for <span class="ansi-cyan-intense-fg ansi-bold">1</span> <span class="ansi-magenta-intense-fg ansi-bold">station</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>                                   
+<pre>  Fetching datum information for 1 station(s)                                   
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Fetching data from <span class="ansi-cyan-intense-fg ansi-bold">1</span> <span class="ansi-magenta-intense-fg ansi-bold">station</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>                                               
+<pre>  Fetching data from 1 station(s)                                               
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Matched <span class="ansi-cyan-intense-fg ansi-bold">1</span> observation <span class="ansi-magenta-intense-fg ansi-bold">point</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span> to NOAA <span class="ansi-magenta-intense-fg ansi-bold">station</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>: <span class="ansi-cyan-intense-fg ansi-bold">9416841</span>                    
+<pre>  Matched 1 observation point(s) to NOAA station(s): 9416841                    
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Applied mesh→MSL vdatum offset: <span class="ansi-cyan-intense-fg ansi-bold">-0.9200</span> m                                     
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Loading cached station metadata from cache/coops_stations_metadata.json       
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Requesting water_level data for <span class="ansi-cyan-intense-fg ansi-bold">1</span> <span class="ansi-magenta-intense-fg ansi-bold">station</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span> from <span class="ansi-cyan-intense-fg ansi-bold">20251126</span> <span class="ansi-green-intense-fg ansi-bold">00:00</span> to <span class="ansi-cyan-intense-fg ansi-bold">20251128</span>  
-<span class="ansi-green-intense-fg ansi-bold">02:00</span>                                                                           
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Fetching data from <span class="ansi-cyan-intense-fg ansi-bold">1</span> <span class="ansi-magenta-intense-fg ansi-bold">station</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>                                               
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Successfully retrieved data for <span class="ansi-cyan-intense-fg ansi-bold">1</span> <span class="ansi-magenta-intense-fg ansi-bold">station</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>                                  
+<pre>  Applied mesh→MSL vdatum offset: -0.9200 m                                     
 </pre>
 </div>
 </div>
@@ -6068,44 +6033,73 @@ print(sfincs_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Fetching datum information for <span class="ansi-cyan-intense-fg ansi-bold">1</span> <span class="ansi-magenta-intense-fg ansi-bold">station</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>                                   
+<pre>  Requesting water_level data for 1 station(s) from 20251126 00:00 to 20251128  
+02:00                                                                           
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Fetching data from <span class="ansi-cyan-intense-fg ansi-bold">1</span> <span class="ansi-magenta-intense-fg ansi-bold">station</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>                                               
+<pre>  Fetching data from 1 station(s)                                               
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Saved <span class="ansi-cyan-intense-fg ansi-bold">1</span> comparison <span class="ansi-magenta-intense-fg ansi-bold">figure</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span> to                                               
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/walkthrough/run_sfincs/sfinc</span>
-<span class="ansi-magenta-fg">s_model/</span><span class="ansi-magenta-intense-fg">figs</span>                                                                    
+<pre>  Successfully retrieved data for 1 station(s)                                  
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Including <span class="ansi-cyan-intense-fg ansi-bold">1</span> NOAA <span class="ansi-magenta-intense-fg ansi-bold">gauge</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span> from obs_station_map.json                           
+<pre>  Loading cached station metadata from cache/coops_stations_metadata.json       
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Wrote obs_water_level.parquet with <span class="ansi-cyan-intense-fg ansi-bold">1</span> <span class="ansi-magenta-intense-fg ansi-bold">station</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span> and <span class="ansi-cyan-intense-fg ansi-bold">51</span> <span class="ansi-magenta-intense-fg ansi-bold">timestep</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>            
+<pre>  Fetching datum information for 1 station(s)                                   
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> COMPLETED <span class="ansi-bold">(</span>2s<span class="ansi-bold">)</span>                                                            
+<pre>  Fetching data from 1 station(s)                                               
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
+<pre>  Saved 1 comparison figure(s) to                                               
+docs/examples/walkthrough/run_sfincs/sfinc
+s_model/figs                                                                    
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
+<pre>  Including 1 NOAA gauge(s) from obs_station_map.json                           
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
+<pre>  Wrote obs_water_level.parquet with 1 station(s) and 51 timestep(s)            
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
+<pre>  [✓] COMPLETED (2s)                                                            
 </pre>
 </div>
 </div>
@@ -6126,7 +6120,7 @@ print(sfincs_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Workflow COMPLETED | Total Duration: <span class="ansi-green-intense-fg ansi-bold">1:00:49</span>                                    
+<pre>Workflow COMPLETED | Total Duration: 1:00:49                                    
 </pre>
 </div>
 </div>
@@ -6161,98 +6155,98 @@ print(sfincs_result)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> download: 6s                                                              
+<pre>  [✓] download: 6s                                                              
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> sfincs_symlinks: 0s                                                       
+<pre>  [✓] sfincs_symlinks: 0s                                                       
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> sfincs_data_catalog: 0s                                                   
+<pre>  [✓] sfincs_data_catalog: 0s                                                   
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> sfincs_init: 0s                                                           
+<pre>  [✓] sfincs_init: 0s                                                           
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> sfincs_timing: 0s                                                         
+<pre>  [✓] sfincs_timing: 0s                                                         
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> sfincs_forcing: 14s                                                       
+<pre>  [✓] sfincs_forcing: 14s                                                       
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> sfincs_discharge: 12s                                                     
+<pre>  [✓] sfincs_discharge: 12s                                                     
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> sfincs_precip: 2s                                                         
+<pre>  [✓] sfincs_precip: 2s                                                         
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> sfincs_wind: 4s                                                           
+<pre>  [✓] sfincs_wind: 4s                                                           
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> sfincs_pressure: 3s                                                       
+<pre>  [✓] sfincs_pressure: 3s                                                       
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> sfincs_write: 0s                                                          
+<pre>  [✓] sfincs_write: 0s                                                          
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> sfincs_run: 1h 0m 1s                                                      
+<pre>  [✓] sfincs_run: 1h 0m 1s                                                      
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> sfincs_floodmap: 1s                                                       
+<pre>  [✓] sfincs_floodmap: 1s                                                       
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  <span class="ansi-bold">[</span>✓<span class="ansi-bold">]</span> sfincs_plot: 2s                                                           
+<pre>  [✓] sfincs_plot: 2s                                                           
 </pre>
 </div>
 </div>
@@ -6479,15 +6473,15 @@ print(f"Wrote {len(combined_paths)} comparison figure(s) to {walkthrough_figs}")
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Requesting water_level data for <span class="ansi-cyan-intense-fg ansi-bold">1</span> <span class="ansi-magenta-intense-fg ansi-bold">station</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span> from <span class="ansi-cyan-intense-fg ansi-bold">20251126</span> <span class="ansi-green-intense-fg ansi-bold">00:00</span> to <span class="ansi-cyan-intense-fg ansi-bold">20251128</span>  
-<span class="ansi-green-intense-fg ansi-bold">02:00</span>                                                                           
+<pre>  Requesting water_level data for 1 station(s) from 20251126 00:00 to 20251128  
+02:00                                                                           
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Fetching data from <span class="ansi-cyan-intense-fg ansi-bold">1</span> <span class="ansi-magenta-intense-fg ansi-bold">station</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>                                               
+<pre>  Fetching data from 1 station(s)                                               
 </pre>
 </div>
 </div>
@@ -6503,7 +6497,7 @@ Comparison stations: ['9416841']
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Successfully retrieved data for <span class="ansi-cyan-intense-fg ansi-bold">1</span> <span class="ansi-magenta-intense-fg ansi-bold">station</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>                                  
+<pre>  Successfully retrieved data for 1 station(s)                                  
 </pre>
 </div>
 </div>
@@ -6517,21 +6511,21 @@ Comparison stations: ['9416841']
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Fetching datum information for <span class="ansi-cyan-intense-fg ansi-bold">1</span> <span class="ansi-magenta-intense-fg ansi-bold">station</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>                                   
+<pre>  Fetching datum information for 1 station(s)                                   
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>  Fetching data from <span class="ansi-cyan-intense-fg ansi-bold">1</span> <span class="ansi-magenta-intense-fg ansi-bold">station</span><span class="ansi-bold">(</span>s<span class="ansi-bold">)</span>                                               
+<pre>  Fetching data from 1 station(s)                                               
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>Wrote 1 comparison figure(s) to /Users/tchegini/repos/nwm-coastal-dev/docs/examples/walkthrough/figs
+<pre>Wrote 1 comparison figure(s) to docs/examples/walkthrough/figs
 </pre>
 </div>
 </div>
@@ -6745,8 +6739,8 @@ Video(str(side_by_side), embed=True, width=900)</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
 <pre>wrote                                                                           
-<span class="ansi-magenta-fg">/Users/tchegini/repos/nwm-coastal-dev/docs/examples/walkthrough/figs/</span><span class="ansi-magenta-intense-fg">schism_vs_s</span>
-<span class="ansi-magenta-intense-fg">fincs.mp4</span> <span class="ansi-bold">(</span><span class="ansi-cyan-intense-fg ansi-bold">25</span> frames, <span class="ansi-cyan-intense-fg ansi-bold">8</span> fps, <span class="ansi-yellow-fg">master</span>=<span class="ansi-magenta-fg">left</span><span class="ansi-bold">)</span>                                       
+docs/examples/walkthrough/figs/schism_vs_s
+fincs.mp4 (25 frames, 8 fps, master=left)                                       
 </pre>
 </div>
 </div>

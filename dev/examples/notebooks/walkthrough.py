@@ -140,15 +140,12 @@ import shapely
 
 import coastal_calibration.schism.subsetter as ss
 
-poly = shapely.get_geometry(
-    shapely.from_geojson(Path("extract_poly.geojson").read_text()), 0
-)
+poly = shapely.get_geometry(shapely.from_geojson(Path("extract_poly.geojson").read_text()), 0)
 print(f"Polygon: {poly.geom_type}, bounds={[round(b, 3) for b in poly.bounds]}")
 
 res = ss.extract_mesh("model", poly, ".", output_name="extracted")
 print(
-    f"Extracted: {res.classification.n_side_a:,} nodes, "
-    f"{res.subset.side_a.n_elements:,} elements"
+    f"Extracted: {res.classification.n_side_a:,} nodes, {res.subset.side_a.n_elements:,} elements"
 )
 
 # %% [markdown]
@@ -332,7 +329,7 @@ create_config = SfincsCreateConfig.from_dict(
             "boundary_zmax": -1.0,
             "reset_bounds": True,
             # Drop tiny isolated active cells just above zmin (offshore
-            # bumps that clear the −50 m cutoff but are surrounded by
+            # bumps that clear the -50 m cutoff but are surrounded by
             # deeper inactive cells) so the model is a single connected
             # domain instead of a few floating fragments.
             "keep_largest_only": True,
