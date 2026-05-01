@@ -462,11 +462,28 @@ class TestChainRing:
         # 3 segments * 3 nodes - 3 shared endpoints + 1 closing repeat = 7
         assert len(ring) == 7
 
-    def test_disconnected_segments_break_early(self):
-        # If segments don't share endpoints, the chain stops rather than
-        # emitting a jump-line.
+    def test_disconnected_segments_concatenate(self):
+        # When no greedy match is possible, the chain falls back to
+        # concatenating the next segment in file order — preserving
+        # the pre-greedy behavior so every segment ends up on the
+        # perimeter, even with a one-node visual jump where the gap is.
+        # See test_off_by_one_endpoints_concatenate for the real-world
+        # case this protects (SCHISM hgrid with adjacent-but-not-equal
+        # node IDs at the open/land transition).
         result = _chain_ring([[1, 2, 3], [10, 11, 12]])
-        assert result == [1, 2, 3]
+        assert result == [1, 2, 3, 10, 11, 12]
+
+    def test_off_by_one_endpoints_concatenate(self):
+        # Real SCHISM hgrid files occasionally have spatially-adjacent
+        # but not-identical node IDs at the open/land transition (the
+        # Pacific mesh hits this: open ends at 214834, land starts at
+        # 214833). The chain must include every segment — falling back
+        # to concatenation when greedy matching can't connect them —
+        # rather than ending early and yielding only the first piece.
+        open_b = [1, 2, 3]  # ends at 3
+        land_b = [4, 5, 6, 7, 0]  # starts at 4 (one off from open's last)
+        result = _chain_ring([open_b, land_b])
+        assert result == [1, 2, 3, 4, 5, 6, 7, 0]
 
 
 # ---------------------------------------------------------------------------
