@@ -911,7 +911,7 @@ class CreateDischargeStage(_CreateStageBase):
 
         # Prefer the cleaned AOI when CreateGridStage produced one
         # (aoi_simplify_neck_m > 0 in the config). The cleaned polygon
-        # matches the actual model domain, so flowpath–boundary
+        # matches the actual model domain, so flowpath-boundary
         # intersections line up with cells SFINCS will simulate.
         cleaned_aoi = cfg.output_dir / "aoi_cleaned.geojson"
         aoi_path_for_intersection = cleaned_aoi if cleaned_aoi.exists() else cfg.aoi

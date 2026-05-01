@@ -129,7 +129,7 @@ def _build_domain_polygon(project: Any) -> Any:
     Chains open + exterior land boundary segments into a single
     outer ring (counterclockwise) and uses island boundaries as
     interior holes.  This is faster and more accurate than a
-    concave-hull approximation: ~15× speedup, exact geometry, and
+    concave-hull approximation: ~15x speedup, exact geometry, and
     holes correctly excluded.
 
     Parameters
