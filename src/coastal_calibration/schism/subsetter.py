@@ -331,8 +331,19 @@ class MeshClassifier:
             self.mesh_vertices[idx : idx + chunk_size, 2] = depths_chunk
             idx += chunk_size
 
-        elements_list = list(self.project.iter_elements(self.chunk_size))
-        self.mesh_elements = np.vstack(elements_list) if elements_list else np.array([])
+        # Pre-allocate the destination array and fill it chunk-by-chunk
+        # (mirroring the node loop above). The previous implementation
+        # materialised every chunk in a Python list and then ``np.vstack``-ed
+        # them, doubling peak memory and defeating the point of chunking.
+        self.mesh_elements = np.zeros((self.project.n_elements, 5), dtype=np.int64)
+        idx = 0
+        for elem_chunk in self.project.iter_elements(self.chunk_size):
+            n = len(elem_chunk)
+            self.mesh_elements[idx : idx + n] = elem_chunk
+            idx += n
+        if idx == 0:
+            # Empty mesh: keep behaviour parity with the legacy fallback.
+            self.mesh_elements = np.array([])
 
         logger.info(
             f"Loaded {len(self.mesh_vertices):,} nodes, {len(self.mesh_elements):,} elements"

@@ -1114,31 +1114,41 @@ class SfincsForcingStage(_SfincsStageBase):
         -------
         ndarray, shape (T, M)
             Interpolated values at each target point.
+
+        Notes
+        -----
+        Vectorised over both targets and time. An exact match
+        (``d < 1e-10``) is handled by clamping the distance from below
+        with the same epsilon: the inverse-distance weight then becomes
+        large enough that the exact-match neighbour dominates the
+        normalised weights, exactly matching the single-target fallback
+        path in the previous Python-loop implementation.
         """
         from scipy.spatial import KDTree
 
         k = min(k, len(src_xy))
         tree = KDTree(src_xy)
-        _qresult: Any = tree.query(target_xy, k=k)
-        dists = np.asarray(_qresult[0])
-        idxs = np.asarray(_qresult[1])
+        result: Any = tree.query(target_xy, k=k)
+        # ``target_xy`` is 2-D so ``query`` returns arrays (scalar return
+        # is the 1-D-input edge case); asarray narrows for pyright.
+        dists = np.asarray(result[0], dtype=np.float64)
+        idxs = np.asarray(result[1], dtype=np.int64)
 
-        n_times, _ = values.shape
-        n_targets = len(target_xy)
-        result = np.empty((n_times, n_targets))
+        # KDTree returns 1-D arrays for k=1; promote to (n_targets, 1)
+        # so the downstream broadcast against ``values`` is uniform.
+        if dists.ndim == 1:
+            dists = dists[:, np.newaxis]
+            idxs = idxs[:, np.newaxis]
 
-        for j in range(n_targets):
-            d = np.atleast_1d(dists[j])
-            ix = np.atleast_1d(idxs[j])
-            exact = d < 1e-10
-            if np.any(exact):
-                result[:, j] = values[:, ix[exact][0]]
-            else:
-                weights = 1.0 / d
-                weights /= weights.sum()
-                result[:, j] = np.nansum(values[:, ix] * weights[np.newaxis, :], axis=1)
+        # Clamp distance from below so an exact match does not blow up
+        # to inf; the resulting inverse-distance weight still dominates.
+        weights = 1.0 / np.maximum(dists, 1e-10)
+        weights /= weights.sum(axis=1, keepdims=True)
 
-        return result
+        # gathered shape: (n_times, n_targets, k); broadcast weights
+        # to (1, n_targets, k) and reduce along k.
+        gathered = values[:, idxs]
+        return np.nansum(gathered * weights[np.newaxis, :, :], axis=2)
 
     def _load_geodataset_for_bnd(
         self,
