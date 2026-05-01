@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -17,6 +18,7 @@ from coastal_calibration.data.downloader import (
     _build_nwm_retro_forcing_urls,
     _build_nwm_retro_streamflow_urls,
     _build_stofs_urls,
+    _execute_download,
     _hour_range,
     get_date_range,
     get_default_sources,
@@ -386,6 +388,84 @@ class TestBuildUrls:
         end = datetime(2023, 1, 1, 1)
         urls, _paths = _build_glofs_urls(start, end, tmp_path, "lmhofs")
         assert "lake-michigan-huron" in urls[0]
+
+
+class TestExecuteDownload:
+    """Re-run behavior: existing final files must skip the network call."""
+
+    def test_skips_when_all_finals_exist(self, tmp_path, monkeypatch):
+        finals = [tmp_path / "a.nc", tmp_path / "b.nc"]
+        for f in finals:
+            f.write_bytes(b"cached")
+
+        calls: list[list[str]] = []
+
+        def fake_download(urls, paths, **_kwargs):
+            calls.append(list(urls))
+
+        monkeypatch.setattr("coastal_calibration.data.downloader.download", fake_download)
+
+        result = _execute_download(
+            ["http://example/a", "http://example/b"],
+            finals,
+            "test",
+            timeout=1,
+            raise_on_error=False,
+        )
+
+        assert calls == []  # downloader never invoked
+        assert result.successful == 2
+        assert result.failed == 0
+        assert result.errors == []
+
+    def test_downloads_only_missing(self, tmp_path, monkeypatch):
+        cached = tmp_path / "cached.nc"
+        missing = tmp_path / "missing.nc"
+        cached.write_bytes(b"cached")
+
+        seen_urls: list[str] = []
+
+        def fake_download(urls, paths, **_kwargs):
+            seen_urls.extend(urls)
+            for p in paths:
+                Path(p).write_bytes(b"new")
+
+        monkeypatch.setattr("coastal_calibration.data.downloader.download", fake_download)
+
+        result = _execute_download(
+            ["http://example/cached", "http://example/missing"],
+            [cached, missing],
+            "test",
+            timeout=1,
+            raise_on_error=False,
+        )
+
+        assert seen_urls == ["http://example/missing"]
+        assert result.successful == 2
+        assert result.failed == 0
+        assert missing.exists()
+        assert missing.read_bytes() == b"new"
+
+    def test_zero_byte_file_not_treated_as_cached(self, tmp_path, monkeypatch):
+        empty = tmp_path / "empty.nc"
+        empty.write_bytes(b"")  # zero bytes — not a valid cached file
+
+        seen_urls: list[str] = []
+
+        def fake_download(urls, paths, **_kwargs):
+            seen_urls.extend(urls)
+            for p in paths:
+                Path(p).write_bytes(b"x")
+
+        monkeypatch.setattr("coastal_calibration.data.downloader.download", fake_download)
+
+        result = _execute_download(
+            ["http://example/empty"], [empty], "test", timeout=1, raise_on_error=False
+        )
+
+        assert seen_urls == ["http://example/empty"]
+        assert result.successful == 1
+        assert empty.read_bytes() == b"x"
 
 
 class TestValidateDateRanges:
