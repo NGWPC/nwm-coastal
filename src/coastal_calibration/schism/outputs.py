@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pandas as pd
 import xarray as xr
-from scipy.spatial import cKDTree
+from scipy.spatial import KDTree
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -127,6 +127,88 @@ def _normalise_face_nodes(
     return arr
 
 
+def _load_mesh_geometry(
+    first_block: Path,
+) -> tuple[
+    NDArray[np.float64],
+    NDArray[np.float64],
+    NDArray[np.int64],
+    NDArray[np.float64],
+    pd.Timestamp,
+    str | None,
+]:
+    """Open *first_block* and return the static mesh + base_date + CRS label."""
+    with xr.open_dataset(first_block, decode_times=False) as ds0:
+        node_x = np.asarray(ds0["SCHISM_hgrid_node_x"].to_numpy(), dtype=np.float64)
+        node_y = np.asarray(ds0["SCHISM_hgrid_node_y"].to_numpy(), dtype=np.float64)
+        face_nodes = _normalise_face_nodes(ds0["SCHISM_hgrid_face_nodes"].to_numpy())
+        depth = np.asarray(ds0["depth"].to_numpy(), dtype=np.float64)
+        base_date_attr = ds0["time"].attrs.get("base_date")
+        crs_label = _detect_crs(ds0)
+
+    if base_date_attr is None:
+        raise KeyError(f"Missing 'base_date' attribute on time variable in {first_block.name}")
+    return node_x, node_y, face_nodes, depth, _parse_base_date(str(base_date_attr)), crs_label
+
+
+def _apply_elevation_correction(
+    elevation: NDArray[np.float64],
+    node_x: NDArray[np.float64],
+    node_y: NDArray[np.float64],
+    correction_file: Path,
+) -> NDArray[np.float64]:
+    """Add the per-node geoid-MSL offset interpolated from *correction_file*.
+
+    Reads the boundary-node CSV (``conversion_factor`` column), maps each
+    mesh node to its nearest boundary entry via ``KDTree``, and adds
+    that local offset to every elevation timestep. Returns the corrected
+    elevation array; the caller should use this in place of the original.
+    """
+    corr_df = pd.read_csv(correction_file)
+    corr_lons = corr_df["Field1"].to_numpy()
+    corr_lats = corr_df["Field2"].to_numpy()
+    conv_factors = corr_df["conversion_factor"].to_numpy()
+    tree = KDTree(np.column_stack([corr_lons, corr_lats]))
+    _, nn_idx = tree.query(np.column_stack([node_x, node_y]), k=1)
+    node_conv = conv_factors[nn_idx]
+    return (elevation + node_conv[None, :]).astype(np.float64, copy=False)
+
+
+def _set_dataset_attrs(out: xr.Dataset, *, has_dry_flag: bool) -> None:
+    """Stamp human-readable attributes onto *out* in place."""
+    out["elevation"].attrs.update(
+        {"long_name": "free-surface elevation", "units": "m", "datum": "MSL"}
+    )
+    out["h"].attrs.update(
+        {
+            "long_name": "water depth",
+            "units": "m",
+            "description": "elevation + depth; ~0 at dry nodes",
+        }
+    )
+    out["depth"].attrs.update(
+        {
+            "long_name": "bathymetric depth",
+            "units": "m",
+            "description": "positive when bed is below the datum",
+        }
+    )
+    out["node_x"].attrs.update({"long_name": "node longitude", "units": "degrees_east"})
+    out["node_y"].attrs.update({"long_name": "node latitude", "units": "degrees_north"})
+    out["face_nodes"].attrs.update(
+        {
+            "long_name": "face-node connectivity",
+            "start_index": 0,
+            "_FillValue": -1,
+            "description": "0-based node indices; -1 marks unused vertex of a triangle",
+        }
+    )
+    if has_dry_flag:
+        out["dryFlagNode"].attrs.update(
+            {"long_name": "dry node flag", "description": "1 = dry, 0 = wet"}
+        )
+
+
 def load_schism_elevation(
     run_dir: str | Path,
     *,
@@ -210,18 +292,7 @@ def load_schism_elevation(
 
     raw = xr.concat(per_block, dim="time", data_vars="minimal").sortby("time")
 
-    # ── Mesh geometry + bathymetry from the first block ──
-    with xr.open_dataset(files[0], decode_times=False) as ds0:
-        node_x = np.asarray(ds0["SCHISM_hgrid_node_x"].to_numpy(), dtype=np.float64)
-        node_y = np.asarray(ds0["SCHISM_hgrid_node_y"].to_numpy(), dtype=np.float64)
-        face_nodes = _normalise_face_nodes(ds0["SCHISM_hgrid_face_nodes"].to_numpy())
-        depth = np.asarray(ds0["depth"].to_numpy(), dtype=np.float64)
-        base_date_attr = ds0["time"].attrs.get("base_date")
-        crs_label = _detect_crs(ds0)
-
-    if base_date_attr is None:
-        raise KeyError(f"Missing 'base_date' attribute on time variable in {files[0].name}")
-    base_date = _parse_base_date(str(base_date_attr))
+    node_x, node_y, face_nodes, depth, base_date, crs_label = _load_mesh_geometry(files[0])
 
     # SCHISM writes seconds-since-base_date as the raw time values.
     seconds = raw["time"].to_numpy().astype("float64")
@@ -230,24 +301,12 @@ def load_schism_elevation(
     elevation = raw["elevation"].to_numpy()
 
     # Optionally convert from mesh datum back to MSL by applying the
-    # inverse of the boundary forcing correction.  The CSV holds
-    # ``conversion_factor`` per open-boundary node only; we extrapolate
-    # to interior mesh nodes by nearest-neighbour lookup so each node
-    # receives the local geoid-MSL offset rather than a single domain
-    # mean (which would under-correct nodes whose local offset deviates).
+    # inverse of the boundary forcing correction. See
+    # :func:`_apply_elevation_correction` for the per-node lookup.
     if correction_file is not None:
         corr_path = Path(correction_file)
         if corr_path.exists():
-            corr_df = pd.read_csv(corr_path)
-            corr_lons = corr_df["Field1"].to_numpy()
-            corr_lats = corr_df["Field2"].to_numpy()
-            conv_factors = corr_df["conversion_factor"].to_numpy()
-            corr_pts = np.column_stack([corr_lons, corr_lats])
-            tree = cKDTree(corr_pts)
-            node_pts = np.column_stack([node_x, node_y])
-            _, nn_idx = tree.query(node_pts, k=1)
-            node_conv = conv_factors[nn_idx]
-            elevation = (elevation + node_conv[None, :]).astype(np.float64, copy=False)
+            elevation = _apply_elevation_correction(elevation, node_x, node_y, corr_path)
 
     # Water depth = water surface + bathymetric depth (depth is positive when
     # the bed is below the datum). For dry nodes, SCHISM reports
@@ -282,37 +341,8 @@ def load_schism_elevation(
     )
     if crs_label is not None:
         out.attrs["crs"] = crs_label
-    out["elevation"].attrs.update(
-        {"long_name": "free-surface elevation", "units": "m", "datum": "MSL"}
-    )
-    out["h"].attrs.update(
-        {
-            "long_name": "water depth",
-            "units": "m",
-            "description": "elevation + depth; ~0 at dry nodes",
-        }
-    )
-    out["depth"].attrs.update(
-        {
-            "long_name": "bathymetric depth",
-            "units": "m",
-            "description": "positive when bed is below the datum",
-        }
-    )
-    out["node_x"].attrs.update({"long_name": "node longitude", "units": "degrees_east"})
-    out["node_y"].attrs.update({"long_name": "node latitude", "units": "degrees_north"})
-    out["face_nodes"].attrs.update(
-        {
-            "long_name": "face-node connectivity",
-            "start_index": 0,
-            "_FillValue": -1,
-            "description": "0-based node indices; -1 marks unused vertex of a triangle",
-        }
-    )
-    if "dryFlagNode" in out.data_vars:
-        out["dryFlagNode"].attrs.update(
-            {"long_name": "dry node flag", "description": "1 = dry, 0 = wet"}
-        )
+
+    _set_dataset_attrs(out, has_dry_flag="dryFlagNode" in out.data_vars)
 
     if time_slice is not None:
         out = out.isel(time=time_slice)

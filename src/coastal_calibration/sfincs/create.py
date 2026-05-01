@@ -167,128 +167,7 @@ class CreateGridStage(CreateStage):
     name = "create_grid"
     description = "Create SFINCS grid from AOI"
 
-    def run(self) -> dict[str, Any]:
-        """Initialize SfincsModel and generate the quadtree grid."""
-        from hydromt_sfincs import SfincsModel
-
-        cfg = self.config
-
-        self._update_substep("Initializing SfincsModel")
-        sf = SfincsModel(
-            root=str(cfg.output_dir),
-            mode="w+",
-            write_gis=True,
-            data_libs=cfg.data_catalog.data_libs,
-        )
-
-        self._update_substep("Creating quadtree grid from AOI")
-        self._log(f"AOI: {cfg.aoi}")
-        self._log(f"Resolution: {cfg.grid.resolution} m, CRS: {cfg.grid.crs}")
-
-        # Optional thin-neck cleanup: erode → keep largest → dilate.
-        # Drops sub-regions that connect to the main domain only via
-        # narrow necks; those regions are typically poorly resolved at
-        # the SFINCS quadtree base resolution and produce visible
-        # water-level artifacts. The cleaned polygon is written next
-        # to the model output and reused by the discharge stage.
-        aoi_for_region: Path | str = str(cfg.aoi)
-        if cfg.aoi_simplify_neck_m > 0:
-            cleaned_path = self._simplify_aoi_thin_necks(
-                cfg.aoi, cfg.aoi_simplify_neck_m, cfg.output_dir
-            )
-            aoi_for_region = str(cleaned_path)
-            self._log(f"Using cleaned AOI: {cleaned_path.name}")
-
-        region = {"geom": aoi_for_region}
-
-        # Build refinement GeoDataFrame from config (if any)
-        refinement_gdf = None
-        if cfg.grid.refinement:
-            import geopandas as gpd
-            import pandas as pd
-            from pyproj import CRS
-
-            # HydroMT's quadtree builder compares polygon coordinates
-            # directly against the grid (no CRS reprojection).  Determine
-            # the grid CRS first so we can reproject + buffer in meters.
-            grid_crs_str = cfg.grid.crs
-            if grid_crs_str == "utm":
-                aoi_gdf: gpd.GeoDataFrame = gpd.read_file(str(cfg.aoi))
-                centroid = cast("Point", aoi_gdf.to_crs(4326).geometry.centroid.iloc[0])
-                utm_zone = int((centroid.x + 180) / 6) + 1
-                grid_epsg = 32600 + utm_zone if centroid.y >= 0 else 32700 + utm_zone
-                target_crs = CRS.from_epsg(grid_epsg)
-            else:
-                target_crs: CRS = CRS.from_user_input(grid_crs_str)
-
-            parts: list[gpd.GeoDataFrame] = []
-            for ref in cfg.grid.refinement:
-                gdf: gpd.GeoDataFrame = gpd.read_file(ref.polygon)
-                # Reproject to the grid CRS first (buffer is in meters).
-                if gdf.crs is not None and gdf.crs != target_crs:
-                    gdf = gdf.to_crs(target_crs)
-                # Apply inward buffer (negative = shrink) so that
-                # cells near the grid boundary remain at a coarser
-                # level — needed for valid quadtree transitions.
-                if ref.buffer_m != 0.0:
-                    gdf = gdf.copy()
-                    gdf["geometry"] = gdf.geometry.buffer(ref.buffer_m)
-                    # Drop geometries that collapsed to empty after buffering.
-                    empty = gdf.geometry.is_empty
-                    if empty.any():
-                        n_dropped = int(empty.sum())
-                        self._log(
-                            f"Refinement polygon '{ref.polygon.name}': "
-                            f"{n_dropped} geometry(ies) collapsed to empty after "
-                            f"buffer_m={ref.buffer_m} m — dropped",
-                            "warning",
-                        )
-                        gdf = gdf[~empty]
-                # Inward buffering of polygons with thin necks can split a
-                # single Polygon into a MultiPolygon. hydromt-sfincs's
-                # refinement-polygon code only handles single Polygons
-                # (it calls ``.exterior`` directly), so explode here to
-                # hand each component piece in as its own row.
-                exploded = gdf.explode(index_parts=False, ignore_index=True)
-                if len(exploded) > len(gdf):
-                    self._log(
-                        f"Refinement polygon '{ref.polygon.name}': split into "
-                        f"{len(exploded)} component(s) after buffer_m={ref.buffer_m} m"
-                    )
-                    gdf = exploded
-                if gdf.empty:
-                    continue
-                gdf["refinement_level"] = ref.level
-                parts.append(gdf)
-            if parts:
-                refinement_gdf = gpd.GeoDataFrame(pd.concat(parts, ignore_index=True))
-                self._log(
-                    f"Refinement: {len(parts)} polygon(s), "
-                    f"max level {max(r.level for r in cfg.grid.refinement)}"
-                )
-            else:
-                self._log(
-                    "All refinement polygons collapsed after buffering — building uniform grid",
-                    "warning",
-                )
-
-        with suppress_hydromt_output():
-            sf.quadtree_grid.create_from_region(
-                region=region,
-                res=cfg.grid.resolution,
-                crs=cfg.grid.crs,
-                rotated=cfg.grid.rotated,
-                refinement_polygons=refinement_gdf,
-            )
-
-        _set_model(cfg, sf)
-
-        self._log("Grid created successfully")
-        return {"status": "completed"}
-
-    def _simplify_aoi_thin_necks(
-        self, aoi_path: Path, neck_m: float, output_dir: Path
-    ) -> Path:
+    def _simplify_aoi_thin_necks(self, aoi_path: Path, neck_m: float, output_dir: Path) -> Path:
         """Erode → keep largest → dilate to drop thin-neck-connected sub-regions.
 
         Returns the path to the cleaned-AOI GeoJSON written under
@@ -350,6 +229,142 @@ class CreateGridStage(CreateStage):
             out_path.unlink()  # GeoJSON driver appends if file exists
         cleaned_gdf.to_file(out_path, driver="GeoJSON")
         return out_path
+
+    def _resolve_grid_crs(self, grid_crs_str: str) -> Any:
+        """Return the target ``pyproj.CRS`` for the grid, auto-deriving UTM."""
+        from pyproj import CRS
+
+        if grid_crs_str != "utm":
+            return CRS.from_user_input(grid_crs_str)
+
+        import geopandas as gpd
+
+        aoi_gdf: gpd.GeoDataFrame = gpd.read_file(str(self.config.aoi))
+        centroid = cast("Point", aoi_gdf.to_crs(4326).geometry.centroid.iloc[0])
+        utm_zone = int((centroid.x + 180) / 6) + 1
+        grid_epsg = 32600 + utm_zone if centroid.y >= 0 else 32700 + utm_zone
+        return CRS.from_epsg(grid_epsg)
+
+    def _prepare_refinement_polygon(self, ref: Any, target_crs: Any) -> Any:
+        """Return a (reprojected, buffered, exploded) GDF for one refinement entry.
+
+        Returns ``None`` when the polygon collapses to empty after buffering
+        — the caller should skip empty entries silently.
+        """
+        import geopandas as gpd
+
+        gdf: gpd.GeoDataFrame = gpd.read_file(ref.polygon)
+        if gdf.crs is not None and gdf.crs != target_crs:
+            gdf = gdf.to_crs(target_crs)
+
+        if ref.buffer_m != 0.0:
+            gdf = gdf.copy()
+            gdf["geometry"] = gdf.geometry.buffer(ref.buffer_m)
+            empty = gdf.geometry.is_empty
+            if empty.any():
+                n_dropped = int(empty.sum())
+                self._log(
+                    f"Refinement polygon '{ref.polygon.name}': "
+                    f"{n_dropped} geometry(ies) collapsed to empty after "
+                    f"buffer_m={ref.buffer_m} m — dropped",
+                    "warning",
+                )
+                gdf = gdf[~empty]
+
+        # Inward buffering of polygons with thin necks can split a
+        # single Polygon into a MultiPolygon. hydromt-sfincs's
+        # refinement-polygon code only handles single Polygons
+        # (it calls ``.exterior`` directly), so explode here to
+        # hand each component piece in as its own row.
+        exploded = gdf.explode(index_parts=False, ignore_index=True)
+        if len(exploded) > len(gdf):
+            self._log(
+                f"Refinement polygon '{ref.polygon.name}': split into "
+                f"{len(exploded)} component(s) after buffer_m={ref.buffer_m} m"
+            )
+            gdf = exploded
+        if gdf.empty:
+            return None
+        gdf["refinement_level"] = ref.level
+        return gdf
+
+    def _build_refinement_gdf(self) -> Any:
+        """Build the combined refinement GeoDataFrame from config, or None."""
+        cfg = self.config
+        if not cfg.grid.refinement:
+            return None
+
+        import geopandas as gpd
+        import pandas as pd
+
+        target_crs = self._resolve_grid_crs(cfg.grid.crs)
+
+        parts: list[gpd.GeoDataFrame] = []
+        for ref in cfg.grid.refinement:
+            gdf = self._prepare_refinement_polygon(ref, target_crs)
+            if gdf is not None:
+                parts.append(gdf)
+
+        if not parts:
+            self._log(
+                "All refinement polygons collapsed after buffering — building uniform grid",
+                "warning",
+            )
+            return None
+
+        self._log(
+            f"Refinement: {len(parts)} polygon(s), "
+            f"max level {max(r.level for r in cfg.grid.refinement)}"
+        )
+        return gpd.GeoDataFrame(pd.concat(parts, ignore_index=True))
+
+    def run(self) -> dict[str, Any]:
+        """Initialize SfincsModel and generate the quadtree grid."""
+        from hydromt_sfincs import SfincsModel
+
+        cfg = self.config
+
+        self._update_substep("Initializing SfincsModel")
+        sf = SfincsModel(
+            root=str(cfg.output_dir),
+            mode="w+",
+            write_gis=True,
+            data_libs=cfg.data_catalog.data_libs,
+        )
+
+        self._update_substep("Creating quadtree grid from AOI")
+        self._log(f"AOI: {cfg.aoi}")
+        self._log(f"Resolution: {cfg.grid.resolution} m, CRS: {cfg.grid.crs}")
+
+        # Optional thin-neck cleanup: erode → keep largest → dilate.
+        # Drops sub-regions that connect to the main domain only via
+        # narrow necks; those regions are typically poorly resolved at
+        # the SFINCS quadtree base resolution and produce visible
+        # water-level artifacts. The cleaned polygon is written next
+        # to the model output and reused by the discharge stage.
+        aoi_for_region: Path | str = str(cfg.aoi)
+        if cfg.aoi_simplify_neck_m > 0:
+            cleaned_path = self._simplify_aoi_thin_necks(
+                cfg.aoi, cfg.aoi_simplify_neck_m, cfg.output_dir
+            )
+            aoi_for_region = str(cleaned_path)
+            self._log(f"Using cleaned AOI: {cleaned_path.name}")
+
+        refinement_gdf = self._build_refinement_gdf()
+
+        with suppress_hydromt_output():
+            sf.quadtree_grid.create_from_region(
+                region={"geom": aoi_for_region},
+                res=cfg.grid.resolution,
+                crs=cfg.grid.crs,
+                rotated=cfg.grid.rotated,
+                refinement_polygons=refinement_gdf,
+            )
+
+        _set_model(cfg, sf)
+
+        self._log("Grid created successfully")
+        return {"status": "completed"}
 
 
 class CreateFetchDataStage(_CreateStageBase):
@@ -539,8 +554,18 @@ class CreateMaskStage(_CreateStageBase):
         srcs: list[np.ndarray] = []
         dsts: list[np.ndarray] = []
         for nb in (
-            "mu", "mu1", "mu2", "md", "md1", "md2",
-            "nu", "nu1", "nu2", "nd", "nd1", "nd2",
+            "mu",
+            "mu1",
+            "mu2",
+            "md",
+            "md1",
+            "md2",
+            "nu",
+            "nu1",
+            "nu2",
+            "nd",
+            "nd1",
+            "nd2",
         ):
             if nb not in qt_data:
                 continue
@@ -773,10 +798,54 @@ class CreateDischargeStage(_CreateStageBase):
             last_coord = geom.coords[-1][:2]
         return Point(first_coord), Point(last_coord)
 
+    @staticmethod
+    def _collapse_to_points(crossings: Any) -> list[Any]:
+        """Flatten a shapely intersection result to a list of ``Point``s.
+
+        Accepts ``Point``, ``MultiPoint``, ``LineString`` (tangential
+        overlap — keeps the segment endpoints), and any ``GeometryCollection``
+        containing those types.
+        """
+        from shapely import LineString, MultiPoint, Point
+
+        if isinstance(crossings, Point):
+            return [crossings]
+        if isinstance(crossings, MultiPoint):
+            return list(crossings.geoms)
+        if isinstance(crossings, LineString):
+            return [Point(c[:2]) for c in crossings.coords]
+
+        points: list[Any] = []
+        if hasattr(crossings, "geoms"):
+            for sub in crossings.geoms:
+                if isinstance(sub, Point):
+                    points.append(sub)
+                elif isinstance(sub, LineString):
+                    points.extend(Point(c[:2]) for c in sub.coords)
+        return points
+
     @classmethod
-    def _inflow_intersection_point(
-        cls, geom: Any, aoi_polygon: Any
-    ) -> tuple[float, float] | None:
+    def _pick_upstream_crossing(cls, geom: Any, aoi_polygon: Any, points: list[Any]) -> Any | None:
+        """Pick the crossing closest to the line's upstream endpoint.
+
+        Returns ``None`` when flow direction cannot be inferred from
+        endpoint-in-polygon membership (e.g. the line passes through
+        without terminating inside, or both endpoints land inside).
+        """
+        first_pt, last_pt = cls._line_extreme_endpoints(geom)
+        first_in = aoi_polygon.contains(first_pt)
+        last_in = aoi_polygon.contains(last_pt)
+        if first_in and not last_in:
+            upstream = last_pt
+        elif last_in and not first_in:
+            upstream = first_pt
+        else:
+            return None
+        distances = [upstream.distance(p) for p in points]
+        return points[min(range(len(points)), key=distances.__getitem__)]
+
+    @classmethod
+    def _inflow_intersection_point(cls, geom: Any, aoi_polygon: Any) -> tuple[float, float] | None:
         """Pick the discharge point on (or near) the AOI boundary for *geom*.
 
         Strategy:
@@ -803,64 +872,30 @@ class CreateDischargeStage(_CreateStageBase):
         consult NWM stream order or DEM-derived flow direction. For
         the walkthrough demo data this case does not arise.
         """
-        from shapely import LineString, MultiPoint, Point
-
         if geom is None or geom.is_empty:
             return None
 
         boundary = aoi_polygon.boundary
         crossings = geom.intersection(boundary)
+        points = cls._collapse_to_points(crossings) if not crossings.is_empty else []
 
-        if not crossings.is_empty:
-            # Collapse the intersection result into a flat list of points.
-            points: list[Any] = []
-            if isinstance(crossings, Point):
-                points.append(crossings)
-            elif isinstance(crossings, MultiPoint):
-                points.extend(crossings.geoms)
-            elif hasattr(crossings, "geoms"):
-                for sub in crossings.geoms:
-                    if isinstance(sub, Point):
-                        points.append(sub)
-                    elif isinstance(sub, LineString):
-                        # Tangential overlap (rare) — keep the segment endpoints.
-                        points.extend(Point(c[:2]) for c in sub.coords)
-            elif isinstance(crossings, LineString):
-                points.extend(Point(c[:2]) for c in crossings.coords)
+        if len(points) == 1:
+            p = points[0]
+            return (float(p.x), float(p.y))
 
-            if len(points) == 1:
-                p = points[0]
-                return (float(p.x), float(p.y))
-
-            if len(points) > 1:
-                first_pt, last_pt = cls._line_extreme_endpoints(geom)
-                first_in = aoi_polygon.contains(first_pt)
-                last_in = aoi_polygon.contains(last_pt)
-                if first_in and not last_in:
-                    upstream = last_pt
-                elif last_in and not first_in:
-                    upstream = first_pt
-                else:
-                    # Both inside (line dips out and back in — rare) or
-                    # both outside (line passes through — see TODO).
-                    # No reliable upstream signal: fall through to the
-                    # endpoint-distance fallback below.
-                    upstream = None
-                if upstream is not None:
-                    distances = [upstream.distance(p) for p in points]
-                    chosen = points[
-                        min(range(len(points)), key=distances.__getitem__)
-                    ]
-                    return (float(chosen.x), float(chosen.y))
+        if len(points) > 1:
+            chosen = cls._pick_upstream_crossing(geom, aoi_polygon, points)
+            if chosen is not None:
+                return (float(chosen.x), float(chosen.y))
 
         # No usable boundary crossing — fall back to the line endpoint
         # closest to the boundary. The snap step downstream will move
         # the chosen point onto the nearest active grid cell, or drop
         # it if it is farther than ``max_snap_distance_m``.
         first_pt, last_pt = cls._line_extreme_endpoints(geom)
-        d_first = boundary.distance(first_pt)
-        d_last = boundary.distance(last_pt)
-        closer = first_pt if d_first <= d_last else last_pt
+        closer: Point = (
+            first_pt if boundary.distance(first_pt) <= boundary.distance(last_pt) else last_pt
+        )
         return (float(closer.x), float(closer.y))
 
     def run(self) -> dict[str, Any]:
@@ -933,9 +968,7 @@ class CreateDischargeStage(_CreateStageBase):
         ):
             point = self._inflow_intersection_point(geom, aoi_polygon)
             if point is None:
-                self._log(
-                    f"Flowpath {feature_id}: no usable AOI-boundary crossing, skipping"
-                )
+                self._log(f"Flowpath {feature_id}: no usable AOI-boundary crossing, skipping")
                 continue
             discharge_points.append((point[0], point[1], str(feature_id)))
 
