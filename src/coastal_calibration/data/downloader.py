@@ -597,6 +597,12 @@ def _execute_download(
     crash, network drop, or kill -9 mid-download leaves only ``.tmp``
     debris that the next call cleans up — the canonical ``file_paths``
     are never partial.
+
+    Files that already exist at the final path with non-zero size are
+    skipped without contacting the remote. The atomic rename above
+    guarantees that a present final file is fully written, so a stat()
+    check is sufficient to treat it as cached. This keeps re-runs cheap
+    on shared filesystems where every HTTP HEAD costs a NAT round-trip.
     """
     if not urls:
         return DownloadResult(source=source_name)
@@ -607,7 +613,19 @@ def _execute_download(
         file_paths=list(file_paths),
     )
 
-    tmp_paths = [p.with_suffix(p.suffix + ".tmp") for p in file_paths]
+    pending_urls: list[str] = []
+    pending_finals: list[Path] = []
+    for url, final_path in zip(urls, file_paths, strict=True):
+        if final_path.exists() and final_path.stat().st_size > 0:
+            result.successful += 1
+        else:
+            pending_urls.append(url)
+            pending_finals.append(final_path)
+
+    if not pending_urls:
+        return result
+
+    tmp_paths = [p.with_suffix(p.suffix + ".tmp") for p in pending_finals]
     for tmp_path in tmp_paths:
         tmp_path.parent.mkdir(parents=True, exist_ok=True)
         # Clear any stale .tmp leftover from a previous interrupted run.
@@ -618,12 +636,16 @@ def _execute_download(
     chunk_size = 8 * 1024 * 1024
     try:
         download(
-            urls, tmp_paths, timeout=timeout, raise_status=raise_on_error, chunk_size=chunk_size
+            pending_urls,
+            tmp_paths,
+            timeout=timeout,
+            raise_status=raise_on_error,
+            chunk_size=chunk_size,
         )
     except Exception as e:
         result.errors.append(str(e))
 
-    for url, tmp_path, final_path in zip(urls, tmp_paths, file_paths, strict=True):
+    for url, tmp_path, final_path in zip(pending_urls, tmp_paths, pending_finals, strict=True):
         if not tmp_path.exists() or tmp_path.stat().st_size == 0:
             result.failed += 1
             if not result.errors:
