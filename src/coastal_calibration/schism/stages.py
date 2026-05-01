@@ -409,7 +409,7 @@ class SchismDischargeStage(WorkflowStage):
         work_dir = self.config.paths.work_dir
         sim = self.config.simulation
         paths = self.config.paths
-        prebuilt_dir = self.model.prebuilt_dir
+        prebuilt_dir = self.model.coastal_parm
 
         # 1. Copy discharge file into work_dir as nwmReaches.csv
         self._update_substep("Staging discharge file")
@@ -840,8 +840,8 @@ class SchismPlotStage(WorkflowStage):
         # geoid-MSL offset differs from the domain average; instead we
         # take each station's local ``conversion_factor`` from the nearest
         # boundary node.  The conversion back to MSL is ``msl = mesh + conv``.
-        corr_path = self.model.prebuilt_dir / "elevation_correction.csv"
-        if corr_path.exists():
+        corr_path = self.model.elevation_correction_csv
+        if corr_path is not None:
             try:
                 corr_df = pd.read_csv(corr_path)
                 corr_lons = corr_df["Field1"].to_numpy()
@@ -945,8 +945,9 @@ class SchismPlotStage(WorkflowStage):
             return {"status": "skipped", "reason": "no points"}
 
         self._update_substep("Extracting water level at obs points")
-        corr = self.model.prebuilt_dir / "elevation_correction.csv"
-        ds = load_schism_elevation(work_dir, correction_file=corr if corr.exists() else None)
+        ds = load_schism_elevation(
+            work_dir, correction_file=self.model.elevation_correction_csv
+        )
         validate_points_in_domain(all_points, ds)
         series = extract_water_level_series(ds, all_points, variable="elevation")
 
@@ -977,8 +978,9 @@ class SchismPlotStage(WorkflowStage):
         from coastal_calibration.plotting import animate_water_level
         from coastal_calibration.schism.outputs import load_schism_elevation
 
-        corr = self.model.prebuilt_dir / "elevation_correction.csv"
-        ds = load_schism_elevation(work_dir, correction_file=corr if corr.exists() else None)
+        ds = load_schism_elevation(
+            work_dir, correction_file=self.model.elevation_correction_csv
+        )
         outfile = figs_dir / "water_level.mp4"
         animate_water_level(
             ds,

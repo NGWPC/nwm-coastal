@@ -49,7 +49,7 @@ class UpdateParamsStage(WorkflowStage):
 
         param_file = update_params(
             work_dir=work_dir,
-            prebuilt_dir=self.model.prebuilt_dir,
+            prebuilt_dir=self.model.coastal_parm,
             start_date=sim.start_date,
             duration_hours=sim.duration_hours,
             hot_start_file=self.config.paths.hot_start_file,
@@ -80,7 +80,7 @@ class TPXOBoundaryStage(WorkflowStage):
         self.build_environment()
 
         sim = self.config.simulation
-        prebuilt_dir = self.model.prebuilt_dir
+        prebuilt_dir = self.model.coastal_parm
 
         # Resolve optional elevation correction file and node count
         corr_path = prebuilt_dir / "elevation_correction.csv"
@@ -156,7 +156,7 @@ class STOFSBoundaryStage(WorkflowStage):
         self._log(f"Using STOFS file: {stofs_file}")
 
         sim = self.config.simulation
-        prebuilt_dir = self.model.prebuilt_dir
+        prebuilt_dir = self.model.coastal_parm
 
         # Resolve optional elevation correction file and node count
         corr_path = prebuilt_dir / "elevation_correction.csv"
