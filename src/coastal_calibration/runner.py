@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -15,8 +14,11 @@ from coastal_calibration.logging import (
     generate_log_path,
     silence_third_party_loggers,
 )
+from coastal_calibration.utils import utc_now
 
 if TYPE_CHECKING:
+    from datetime import datetime
+
     from coastal_calibration.base import WorkflowStage
 
 
@@ -266,7 +268,7 @@ class CoastalCalibRunner:
         WorkflowResult
             Result with execution details.
         """
-        start_time = datetime.now()
+        start_time = utc_now()
         stages_completed: list[str] = []
         stages_failed: list[str] = []
         outputs: dict[str, Any] = {}
@@ -281,7 +283,7 @@ class CoastalCalibRunner:
                 success=False,
                 job_id=None,
                 start_time=start_time,
-                end_time=datetime.now(),
+                end_time=utc_now(),
                 stages_completed=[],
                 stages_failed=[],
                 outputs={},
@@ -294,7 +296,7 @@ class CoastalCalibRunner:
                 success=True,
                 job_id=None,
                 start_time=start_time,
-                end_time=datetime.now(),
+                end_time=utc_now(),
                 stages_completed=[],
                 stages_failed=[],
                 outputs={"dry_run": True},
@@ -340,7 +342,7 @@ class CoastalCalibRunner:
             success=success,
             job_id=None,
             start_time=start_time,
-            end_time=datetime.now(),
+            end_time=utc_now(),
             stages_completed=stages_completed,
             stages_failed=stages_failed,
             outputs=outputs,

@@ -280,15 +280,18 @@ def _argmin_per_query(
 ) -> NDArray[np.int64]:
     """Return the index of the nearest cell for each query point.
 
-    Brute-force O(n_cells) per query. Obs-point counts are small in practice
-    (≤ a few hundred), and a per-query ``argmin`` keeps peak memory bounded
-    regardless of mesh size. This avoids pulling in SciPy as a runtime dep.
+    Uses :class:`scipy.spatial.KDTree` for an O(N log N) build and an
+    O(M log N) query, replacing the previous O(M·N) Python loop.
+    SciPy is already a transitive runtime dep (xarray, pandas) and is
+    imported elsewhere in the package, so this adds no new constraint
+    and scales to multi-million-node meshes against thousands of obs
+    points without the per-query allocation overhead.
     """
-    out = np.empty(qx.size, dtype=np.int64)
-    for i in range(qx.size):
-        d2 = (cell_x - qx[i]) ** 2 + (cell_y - qy[i]) ** 2
-        out[i] = int(np.argmin(d2))
-    return out
+    from scipy.spatial import KDTree
+
+    tree = KDTree(np.column_stack([cell_x, cell_y]))
+    _, idx = tree.query(np.column_stack([qx, qy]), k=1)
+    return np.asarray(idx, dtype=np.int64)
 
 
 def _nearest_cell_indices(ds: xr.Dataset, qx: NDArray[np.float64], qy: NDArray[np.float64]) -> Any:

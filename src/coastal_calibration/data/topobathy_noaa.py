@@ -261,13 +261,18 @@ def _localize_vrt(
     int
         Number of tiles retained in the written VRT.
     """
-    import urllib.request
     import xml.etree.ElementTree as ET
+
+    from tiny_retriever import fetch
 
     base_url = vrt_url.rsplit("/", 1)[0]
 
-    with urllib.request.urlopen(vrt_url) as resp:
-        root = ET.fromstring(resp.read())  # noqa: S314
+    # 30 s timeout + 3 retries via tiny-retriever (the project's standard
+    # HTTP layer). The XML is fetched from a trusted NOAA endpoint over
+    # HTTPS, so the stdlib parser is acceptable here (no external DTDs
+    # or entities are resolved by default).
+    xml_text = fetch(vrt_url, return_type="text", timeout=30)
+    root = ET.fromstring(xml_text)  # noqa: S314
 
     # Rewrite relative tile paths to absolute /vsicurl/ URLs.
     for elem in root.iter("SourceFilename"):

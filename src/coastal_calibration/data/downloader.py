@@ -20,6 +20,7 @@ from coastal_calibration.config.schema import (
     PathConfig,
 )
 from coastal_calibration.logging import logger
+from coastal_calibration.utils import to_naive_utc, utc_now
 
 
 def _hour_range(start: datetime, end: datetime) -> range:
@@ -43,6 +44,10 @@ class DateRange:
 
     def validate(self, start: datetime, end: datetime) -> str | None:
         """Validate that the requested period falls within the available range."""
+        # Normalise to naive UTC so comparisons against the naive class
+        # attributes are well-defined and DST-stable.
+        start = to_naive_utc(start)
+        end = to_naive_utc(end)
         end_str = self.end.strftime("%Y-%m-%d") if self.end else "present"
         if start < self.start:
             return (
@@ -60,7 +65,7 @@ class DateRange:
             )
         # For operational sources (end=None means "present"), check that dates aren't in the future
         if self.end is None:
-            today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            today = utc_now().replace(hour=0, minute=0, second=0, microsecond=0)
             if start > today:
                 return (
                     f"{self.description} data is available from "
@@ -585,7 +590,14 @@ def _execute_download(
     timeout: int,
     raise_on_error: bool,
 ) -> DownloadResult:
-    """Download all *urls* to *file_paths* using tiny_retriever."""
+    """Download *urls* to *file_paths* atomically via ``.tmp`` rename.
+
+    Each download writes to ``<path>.tmp`` first and is renamed onto the
+    final path only after the byte stream completes successfully. A
+    crash, network drop, or kill -9 mid-download leaves only ``.tmp``
+    debris that the next call cleans up — the canonical ``file_paths``
+    are never partial.
+    """
     if not urls:
         return DownloadResult(source=source_name)
 
@@ -595,27 +607,30 @@ def _execute_download(
         file_paths=list(file_paths),
     )
 
-    for path in file_paths:
-        path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_paths = [p.with_suffix(p.suffix + ".tmp") for p in file_paths]
+    for tmp_path in tmp_paths:
+        tmp_path.parent.mkdir(parents=True, exist_ok=True)
+        # Clear any stale .tmp leftover from a previous interrupted run.
+        tmp_path.unlink(missing_ok=True)
 
     # 8 mb chunk size is reasonable for large files like STOFS (~12 GB)
     # while not causing too much overhead for smaller files.
     chunk_size = 8 * 1024 * 1024
     try:
         download(
-            urls, file_paths, timeout=timeout, raise_status=raise_on_error, chunk_size=chunk_size
+            urls, tmp_paths, timeout=timeout, raise_status=raise_on_error, chunk_size=chunk_size
         )
     except Exception as e:
         result.errors.append(str(e))
 
-    for url, path in zip(urls, file_paths, strict=False):
-        if not path.exists() or path.stat().st_size == 0:
+    for url, tmp_path, final_path in zip(urls, tmp_paths, file_paths, strict=True):
+        if not tmp_path.exists() or tmp_path.stat().st_size == 0:
             result.failed += 1
             if not result.errors:
                 result.errors.append(f"Failed to download: {url}")
-            if path.exists():
-                path.unlink()
+            tmp_path.unlink(missing_ok=True)
         else:
+            tmp_path.replace(final_path)
             result.successful += 1
 
     return result
@@ -742,8 +757,8 @@ def download_data(
     ...     coastal_source="stofs",
     ... )
     """
-    start = pd.to_datetime(start_time).to_pydatetime()
-    end = pd.to_datetime(end_time).to_pydatetime()
+    start = to_naive_utc(pd.to_datetime(start_time).to_pydatetime())
+    end = to_naive_utc(pd.to_datetime(end_time).to_pydatetime())
     out_dir = Path(output_dir)
     tpxo_path = Path(tpxo_local_path) if tpxo_local_path else None
 

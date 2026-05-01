@@ -337,7 +337,7 @@ def merge_source_sink(  # noqa: PLR0915
     si = np.zeros((count, nsiel + 1))
     for j, line in enumerate(vsink_lines):
         if line:
-            si[j, :] = np.fromstring(line, dtype=float, sep=" ")
+            si[j, :] = np.array(line.split(), dtype=float)
     time = si[:, 0]
     si = si[:, 1:]
 
@@ -346,7 +346,7 @@ def merge_source_sink(  # noqa: PLR0915
     so1 = np.zeros((count, nsoel1 + 1))
     for j, line in enumerate(vsource_lines):
         if line:
-            so1[j, :] = np.fromstring(line, dtype=float, sep=" ")
+            so1[j, :] = np.array(line.split(), dtype=float)
     so1 = so1[:, 1:]
 
     # Read precipitation source
@@ -862,14 +862,15 @@ def make_tpxo_boundary(
                 "install predict_tide via pixi."
             )
         predict_tide_bin = Path(found)
-    result = subprocess.run(
-        [str(predict_tide_bin)],
-        stdin=(work_dir / "setup_tpxo.txt").open(),
-        cwd=work_dir,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    with (work_dir / "setup_tpxo.txt").open() as setup_stdin:
+        result = subprocess.run(
+            [str(predict_tide_bin)],
+            stdin=setup_stdin,
+            cwd=work_dir,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
     if result.returncode != 0:
         raise RuntimeError(
             f"predict_tide failed (exit {result.returncode}): {result.stderr[-2000:]}"
@@ -991,8 +992,18 @@ def make_stofs_boundary(
                 duration_hours=raw_length,
                 tidal_constants_dir=tidal_constants_dir,
             )
-        except Exception:
-            logger.warning("    generate_ocean_tide failed", exc_info=True)
+        except (FileNotFoundError, ValueError, RuntimeError) as exc:
+            # Non-fatal: tidal fill is a best-effort augmentation past
+            # the 180 h STOFS forecast window. Log loudly so the user
+            # knows their boundary is truncated, but continue — the
+            # first 180 h of forcing is still valid.
+            logger.error(
+                "    generate_ocean_tide failed (%s); STOFS boundary "
+                "extends only %d h instead of %d h",
+                exc,
+                180,
+                raw_length,
+            )
 
     # Apply elevation correction if available
     if correction_file is not None and correction_file.exists():
@@ -1002,8 +1013,18 @@ def make_stofs_boundary(
                 correction_file,
                 n_open_boundary_nodes=n_open_boundary_nodes,
             )
-        except Exception:
-            logger.warning("    correct_elevation failed", exc_info=True)
+        except (FileNotFoundError, ValueError, RuntimeError) as exc:
+            # Datum correction is required for accuracy when supplied.
+            # Re-raise so the user sees a clear failure rather than a
+            # silently uncorrected boundary that produces a quiet datum
+            # offset in all downstream comparisons.
+            msg = (
+                f"correct_elevation failed for {output_file} using "
+                f"{correction_file}: {exc}. The STOFS boundary is in "
+                "the wrong vertical datum; remove the correction file "
+                "to skip datum correction or fix the input."
+            )
+            raise RuntimeError(msg) from exc
 
     if not output_file.exists():
         raise RuntimeError("STOFS boundary: elev2D.th.nc was not produced")

@@ -21,7 +21,15 @@ LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 @dataclass
 class SimulationConfig:
-    """Simulation time and domain configuration."""
+    """Simulation time and domain configuration.
+
+    ``start_date`` is normalised to **naive UTC** in ``__post_init__``
+    so the rest of the pipeline can compare and serialise it without
+    crossing the naive/aware boundary. Tz-aware values are converted to
+    UTC then stripped; tz-naive values are passed through (assumed UTC
+    by the project's data contract — NWM/STOFS are published on UTC
+    days).
+    """
 
     start_date: datetime
     duration_hours: int
@@ -47,6 +55,11 @@ class SimulationConfig:
         "atlgulf": "geo_em_CONUS.nc",
         "pacific": "geo_em_CONUS.nc",
     }
+
+    def __post_init__(self) -> None:
+        from coastal_calibration.utils import to_naive_utc
+
+        self.start_date = to_naive_utc(self.start_date)
 
     @property
     def start_pdy(self) -> str:
@@ -108,11 +121,17 @@ class PathConfig:
     nwm_dir: Path | None = None
     otps_dir: Path | None = None
 
-    # Maps coastal_domain → NWM product subdirectory name.
+    # Local filesystem subdirectory under hydro/nwm/ for NWM analysis-and-
+    # assimilation downloads (see ``streamflow_dir``). Distinct from
+    # :attr:`SimulationConfig._NWM_DOMAIN`: that mapping yields the NWM
+    # *product identifier* used in URL paths, whereas this one yields the
+    # download cache subdirectory we land files in. They happen to share
+    # values for some domains (e.g. ``hawaii``) but not all
+    # (``prvi`` → ``puertorico`` here, ``prvi`` there). Domains not listed
+    # here fall back to ``"conus"``.
     _NWM_DOMAIN_DIR: ClassVar[dict[str, str]] = {
         "hawaii": "hawaii",
         "prvi": "puertorico",
-        "alaska": "alaska",
     }
 
     def __post_init__(self) -> None:
@@ -317,8 +336,8 @@ class SchismModelConfig(ModelConfig):
         series to ``obs_water_level.parquet`` in the work directory.
     """
 
-    prebuilt_dir: Path = field(default_factory=Path)
-    geogrid_file: Path = field(default_factory=Path)
+    prebuilt_dir: Path | None = None
+    geogrid_file: Path | None = None
     nodes: int = 2
     ntasks_per_node: int = 18
     exclusive: bool = True
@@ -335,8 +354,10 @@ class SchismModelConfig(ModelConfig):
     runtime_env: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        self.prebuilt_dir = Path(self.prebuilt_dir).expanduser().resolve()
-        self.geogrid_file = Path(self.geogrid_file).expanduser().resolve()
+        if self.prebuilt_dir is not None:
+            self.prebuilt_dir = Path(self.prebuilt_dir).expanduser().resolve()
+        if self.geogrid_file is not None:
+            self.geogrid_file = Path(self.geogrid_file).expanduser().resolve()
         if self.schism_exe is not None:
             self.schism_exe = Path(self.schism_exe).expanduser().resolve()
         if self.discharge_file is not None:
@@ -356,12 +377,35 @@ class SchismModelConfig(ModelConfig):
     @property
     def coastal_parm(self) -> Path:
         """Directory containing prebuilt SCHISM model files."""
+        if self.prebuilt_dir is None:
+            raise ValueError("model_config.prebuilt_dir is not set")
         return self.prebuilt_dir
+
+    @property
+    def geogrid_path(self) -> Path:
+        """WRF geogrid file used for atmospheric regridding."""
+        if self.geogrid_file is None:
+            raise ValueError("model_config.geogrid_file is not set")
+        return self.geogrid_file
 
     @property
     def schism_mesh(self) -> Path:
         """SCHISM ESMF mesh file path."""
-        return self.prebuilt_dir / "hgrid.nc"
+        return self.coastal_parm / "hgrid.nc"
+
+    @property
+    def elevation_correction_csv(self) -> Path | None:
+        """Return ``elevation_correction.csv`` next to the prebuilt model.
+
+        Returns ``None`` when ``prebuilt_dir`` is unset *or* when the
+        correction file is absent. Callers can pass the result straight
+        into readers that accept an optional path without re-doing the
+        ``exists()`` check.
+        """
+        if self.prebuilt_dir is None:
+            return None
+        candidate = self.prebuilt_dir / "elevation_correction.csv"
+        return candidate if candidate.exists() else None
 
     @property
     def stage_order(self) -> list[str]:  # noqa: D102
@@ -406,7 +450,9 @@ class SchismModelConfig(ModelConfig):
         if config.paths.hot_start_file and not config.paths.hot_start_file.exists():
             errors.append(f"Hot start file not found: {config.paths.hot_start_file}")
 
-        if not self.prebuilt_dir.exists():
+        if self.prebuilt_dir is None:
+            errors.append("model_config.prebuilt_dir is required")
+        elif not self.prebuilt_dir.exists():
             errors.append(f"model_config.prebuilt_dir not found: {self.prebuilt_dir}")
         else:
             required = [
@@ -424,7 +470,7 @@ class SchismModelConfig(ModelConfig):
         if self.discharge_file and not self.discharge_file.exists():
             errors.append(f"model_config.discharge_file not found: {self.discharge_file}")
 
-        if self.geogrid_file is None:  # pyright: ignore[reportUnnecessaryComparison]
+        if self.geogrid_file is None:
             errors.append(
                 "model_config.geogrid_file is required for atmospheric forcing regridding"
             )
@@ -472,7 +518,7 @@ class SchismModelConfig(ModelConfig):
 
     def to_dict(self) -> dict[str, Any]:  # noqa: D102
         d: dict[str, Any] = {
-            "prebuilt_dir": str(self.prebuilt_dir),
+            "prebuilt_dir": str(self.prebuilt_dir) if self.prebuilt_dir else None,
             "geogrid_file": str(self.geogrid_file) if self.geogrid_file else None,
             "nodes": self.nodes,
             "ntasks_per_node": self.ntasks_per_node,
@@ -1086,7 +1132,6 @@ class CoastalCalibConfig:
     model_config: SchismModelConfig | SfincsModelConfig
     monitoring: MonitoringConfig = field(default_factory=MonitoringConfig)
     download: DownloadConfig = field(default_factory=DownloadConfig)
-    _base_config: Path | None = field(default=None, repr=False)
 
     @property
     def model(self) -> str:
@@ -1094,19 +1139,15 @@ class CoastalCalibConfig:
         return self.model_config.model_name
 
     @classmethod
-    def from_dict(
-        cls, data: dict[str, Any], base_config_path: Path | None = None
-    ) -> CoastalCalibConfig:
+    def from_dict(cls, data: dict[str, Any]) -> CoastalCalibConfig:
         """Create config from a plain dictionary.
 
         Parameters
         ----------
         data : dict
             Configuration dictionary with the same structure as the YAML
-            file (see :meth:`to_dict` for the expected keys).
-        base_config_path : Path, optional
-            Path to a base configuration file (for YAML inheritance).
-            Only needed when the config was loaded via ``_base`` key.
+            file (see :meth:`to_dict` for the expected keys). The dict
+            is read but not mutated.
 
         Returns
         -------
@@ -1116,7 +1157,8 @@ class CoastalCalibConfig:
             raise ValueError("'model' is required (e.g., model: schism or model: sfincs)")
         model_type: str = data["model"]
 
-        model_config_data = data.pop("model_config", {}) or {}
+        # Read but do not mutate the caller's dict.
+        model_config_data = data.get("model_config") or {}
 
         sim_data = data.get("simulation", {})
         if "start_date" in sim_data:
@@ -1155,7 +1197,6 @@ class CoastalCalibConfig:
             model_config=model_config,  # pyright: ignore[reportArgumentType]
             monitoring=monitoring,
             download=download,
-            _base_config=base_config_path,
         )
 
     @classmethod
@@ -1198,7 +1239,6 @@ class CoastalCalibConfig:
         if data is None:
             raise ValueError(f"Configuration file is empty: {config_path}")
 
-        base_config = None
         if "_base" in data:
             base_path = Path(data.pop("_base"))
             if not base_path.is_absolute():
@@ -1212,7 +1252,7 @@ class CoastalCalibConfig:
         # Interpolate variables after merging
         data = _interpolate_config(data)
 
-        return cls.from_dict(data, base_config_path=config_path if base_config else None)
+        return cls.from_dict(data)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert config to dictionary."""

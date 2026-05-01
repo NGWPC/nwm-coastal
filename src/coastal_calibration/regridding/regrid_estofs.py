@@ -145,6 +145,52 @@ def _write_schism_output(
             time_series_var[t, :, 0, 0] = data
 
 
+def _regrid_timeseries(
+    *,
+    f_in: netCDF4.Dataset,
+    regrid_field: str,
+    src_keep_idx: np.ndarray,
+    field_in: Any,
+    field_out: Any,
+    field_fallback: Any,
+    bilinear: Any,
+    nearest: Any,
+    o_lo: int,
+    o_hi: int,
+    start: int,
+    nt: int,
+    n_dst: int,
+) -> np.ndarray:
+    """Run the BILINEAR + NEAREST_STOD per-timestep loop.
+
+    Returns the ``(nt, n_dst)`` output array filled in the local
+    boundary slice ``[o_lo:o_hi]``. Fill-valued source nodes are zeroed
+    pre-interpolation, then any destination point that ends up
+    fill-valued or non-finite from BILINEAR is back-filled from the
+    NEAREST_STOD result.
+    """
+    output = np.zeros((nt, n_dst))
+    for t in range(start, start + nt):
+        raw = f_in[regrid_field][t]
+        local_data = np.asarray(raw)[src_keep_idx].astype(np.float64, copy=False)
+        # Replace fill values with 0 so they don't pollute bilinear sums
+        local_data[local_data <= MISSING + 1.0] = 0.0
+        field_in.data[...] = local_data
+
+        field_out.data[...] = MISSING
+        field_fallback.data[...] = MISSING
+
+        bilinear(field_in, field_out)
+        nearest(field_in, field_fallback)
+
+        primary = np.asarray(field_out.data[...])
+        backup = np.asarray(field_fallback.data[...])
+        invalid = (primary <= MISSING + 1.0) | ~np.isfinite(primary)
+        primary[invalid] = backup[invalid]
+        output[t - start, o_lo:o_hi] = primary
+    return output
+
+
 def regrid_estofs(
     nc_in: str,
     nc_grid: str,
@@ -253,25 +299,21 @@ def regrid_estofs(
             unmapped_action=ESMF.UnmappedAction.IGNORE,  # pyright: ignore[reportArgumentType]
         )
 
-        output = np.zeros((nt, len(bnd_lons)))
-        for t in range(start, start + nt):
-            raw = f_in[regrid_field][t]
-            local_data = np.asarray(raw)[src_keep_idx].astype(np.float64, copy=False)
-            # Replace fill values with 0 so they don't pollute bilinear sums
-            local_data[local_data <= MISSING + 1.0] = 0.0
-            field_in.data[...] = local_data  # pyright: ignore[reportOptionalSubscript]
-
-            field_out.data[...] = MISSING  # pyright: ignore[reportOptionalSubscript]
-            field_fallback.data[...] = MISSING  # pyright: ignore[reportOptionalSubscript]
-
-            bilinear(field_in, field_out)
-            nearest(field_in, field_fallback)
-
-            primary = np.asarray(field_out.data[...])  # pyright: ignore[reportOptionalSubscript]
-            backup = np.asarray(field_fallback.data[...])  # pyright: ignore[reportOptionalSubscript]
-            invalid = (primary <= MISSING + 1.0) | ~np.isfinite(primary)
-            primary[invalid] = backup[invalid]
-            output[t - start, o_lo:o_hi] = primary
+        output = _regrid_timeseries(
+            f_in=f_in,
+            regrid_field=regrid_field,
+            src_keep_idx=src_keep_idx,
+            field_in=field_in,
+            field_out=field_out,
+            field_fallback=field_fallback,
+            bilinear=bilinear,
+            nearest=nearest,
+            o_lo=o_lo,
+            o_hi=o_hi,
+            start=start,
+            nt=nt,
+            n_dst=len(bnd_lons),
+        )
 
         bilinear.destroy()
         nearest.destroy()

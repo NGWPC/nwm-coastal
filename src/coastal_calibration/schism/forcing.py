@@ -134,7 +134,7 @@ class NWMForcingStage(WorkflowStage):
 
         nwm_forcing_output = self.config.paths.work_dir / "forcing_input"
         coastal_forcing_output = self.config.paths.work_dir / "coastal_forcing_output"
-        geogrid_file = self.model.geogrid_file
+        geogrid_file = self.model.geogrid_path
         schism_mesh = self.model.schism_mesh
 
         cmd = self._build_mpi_command(
@@ -206,7 +206,7 @@ class PostForcingStage(WorkflowStage):
             forcing_input_dir=work_dir / "forcing_input",
             start_date=sim.start_date,
             duration_hours=sim.duration_hours,
-            geogrid_file=self.model.geogrid_file,
+            geogrid_file=self.model.geogrid_path,
         )
 
         # Verify sflux output was produced

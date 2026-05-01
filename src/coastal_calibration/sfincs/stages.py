@@ -24,6 +24,7 @@ from pyproj import Transformer
 
 from coastal_calibration.base import WorkflowStage
 from coastal_calibration.config.schema import SfincsModelConfig
+from coastal_calibration.logging import logger
 from coastal_calibration.sfincs.data_catalog import create_nc_symlinks, generate_data_catalog
 
 if TYPE_CHECKING:
@@ -226,8 +227,10 @@ def _meteo_dst_res(config: CoastalCalibConfig, model: SfincsModel) -> float:
         dy = float(getattr(grid_ds, "attrs", {}).get("dy", 0))
         if dx > 0 and dy > 0:
             return max(dx, dy)
-    except Exception:  # noqa: S110
-        pass
+    except (AttributeError, KeyError, ValueError, TypeError) as exc:
+        # Grid dataset missing or malformed attrs; record at debug level
+        # and fall through to the NWM-native fallback.
+        logger.debug("Could not derive grid dx/dy from model: %s", exc)
 
     # Absolute fallback: NWM native resolution (~1 km).
     return 1000.0
@@ -1111,31 +1114,41 @@ class SfincsForcingStage(_SfincsStageBase):
         -------
         ndarray, shape (T, M)
             Interpolated values at each target point.
+
+        Notes
+        -----
+        Vectorised over both targets and time. An exact match
+        (``d < 1e-10``) is handled by clamping the distance from below
+        with the same epsilon: the inverse-distance weight then becomes
+        large enough that the exact-match neighbour dominates the
+        normalised weights, exactly matching the single-target fallback
+        path in the previous Python-loop implementation.
         """
         from scipy.spatial import KDTree
 
         k = min(k, len(src_xy))
         tree = KDTree(src_xy)
-        _qresult: Any = tree.query(target_xy, k=k)
-        dists = np.asarray(_qresult[0])
-        idxs = np.asarray(_qresult[1])
+        result: Any = tree.query(target_xy, k=k)
+        # ``target_xy`` is 2-D so ``query`` returns arrays (scalar return
+        # is the 1-D-input edge case); asarray narrows for pyright.
+        dists = np.asarray(result[0], dtype=np.float64)
+        idxs = np.asarray(result[1], dtype=np.int64)
 
-        n_times, _ = values.shape
-        n_targets = len(target_xy)
-        result = np.empty((n_times, n_targets))
+        # KDTree returns 1-D arrays for k=1; promote to (n_targets, 1)
+        # so the downstream broadcast against ``values`` is uniform.
+        if dists.ndim == 1:
+            dists = dists[:, np.newaxis]
+            idxs = idxs[:, np.newaxis]
 
-        for j in range(n_targets):
-            d = np.atleast_1d(dists[j])
-            ix = np.atleast_1d(idxs[j])
-            exact = d < 1e-10
-            if np.any(exact):
-                result[:, j] = values[:, ix[exact][0]]
-            else:
-                weights = 1.0 / d
-                weights /= weights.sum()
-                result[:, j] = np.nansum(values[:, ix] * weights[np.newaxis, :], axis=1)
+        # Clamp distance from below so an exact match does not blow up
+        # to inf; the resulting inverse-distance weight still dominates.
+        weights = 1.0 / np.maximum(dists, 1e-10)
+        weights /= weights.sum(axis=1, keepdims=True)
 
-        return result
+        # gathered shape: (n_times, n_targets, k); broadcast weights
+        # to (1, n_targets, k) and reduce along k.
+        gathered = values[:, idxs]
+        return np.nansum(gathered * weights[np.newaxis, :, :], axis=2)
 
     def _load_geodataset_for_bnd(
         self,
@@ -1455,15 +1468,18 @@ class SfincsDischargeStage(_SfincsStageBase):
 
         self._update_substep("Adding discharge source points")
 
-        # When merge=False, clear existing discharge points first
+        # When merge=False, clear existing discharge points first.
+        # Catches the narrow case where ``model.discharge_points`` has
+        # never been populated (HydroMT raises AttributeError or
+        # ValueError there); any other failure should still surface.
         if not self.sfincs.merge_discharge:
             try:
                 existing = model.discharge_points.nr_points
                 if existing > 0:
                     model.discharge_points.clear()
                     self._log(f"Cleared {existing} existing discharge point(s)")
-            except Exception:  # noqa: S110
-                pass  # No existing points to clear
+            except (AttributeError, ValueError) as exc:
+                logger.debug("No existing discharge points to clear: %s", exc)
 
         src_path = self.sfincs.discharge_locations_file
         suffix = src_path.suffix.lower()

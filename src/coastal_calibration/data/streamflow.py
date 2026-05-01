@@ -79,6 +79,8 @@ def _read_from_zarr(
 
     if df.index.duplicated().any():
         df = df[~df.index.duplicated(keep="first")]
+    if not df.index.is_monotonic_increasing:
+        df = df.sort_index()
 
     return df  # pyright: ignore[reportReturnType]
 
@@ -165,6 +167,8 @@ def _read_from_chrtout(
 
     if df.index.duplicated().any():
         df = df[~df.index.duplicated(keep="first")]
+    if not df.index.is_monotonic_increasing:
+        df = df.sort_index()
 
     return df
 
@@ -189,7 +193,9 @@ def read_streamflow(
     feature_ids
         NWM channel reach identifiers to extract.
     start, end
-        Inclusive time bounds.
+        Inclusive time bounds. Tz-aware values are converted to UTC and
+        stripped (NWM data is on UTC days); tz-naive values are passed
+        through unchanged (assumed UTC).
     meteo_source
         ``"nwm_retro"`` reads from the S3 Zarr store (no local files
         needed).  ``"nwm_ana"`` requires *chrtout_files*.
@@ -200,8 +206,13 @@ def read_streamflow(
         Sorted list of local CHRTOUT netCDF paths.  Required when
         *meteo_source* is ``"nwm_ana"``.
     """
+    from coastal_calibration.utils import to_naive_utc
+
     if not feature_ids:
         return pd.DataFrame()
+
+    start = to_naive_utc(start)
+    end = to_naive_utc(end)
 
     if meteo_source == "nwm_retro":
         return _read_from_zarr(feature_ids, start, end, domain=domain)

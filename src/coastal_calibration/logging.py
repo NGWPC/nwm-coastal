@@ -7,7 +7,7 @@ import logging
 import sys
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
@@ -16,7 +16,7 @@ from rich.console import Console
 from rich.logging import RichHandler
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Generator
 
     from coastal_calibration.config.schema import MonitoringConfig
 
@@ -72,7 +72,7 @@ def generate_log_path(work_dir: Path, prefix: str = "coastal-calibration") -> Pa
     Path
         Path to the log file (e.g., <work_dir>/coastal-calibration-20260206-140112.log).
     """
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    timestamp = datetime.now(UTC).replace(tzinfo=None).strftime("%Y%m%d-%H%M%S")
     return work_dir / f"{prefix}-{timestamp}.log"
 
 
@@ -231,7 +231,7 @@ def configure_logger(
         logger.addHandler(_file_handler)
 
         # Flush after each log message for immediate visibility (useful for tail -f)
-        if _file_handler.stream is not None:  # pyright: ignore[reportUnnecessaryComparison]
+        if _file_handler.stream is not None:
             _file_handler.stream.reconfigure(line_buffering=True)
 
         # Disable console logging if file_only is True
@@ -313,7 +313,7 @@ def silence_third_party_loggers(*, file_level: int = logging.DEBUG) -> None:
 
 
 @contextmanager
-def suppress_hydromt_output() -> Iterator[None]:
+def suppress_hydromt_output() -> Generator[None, None, None]:
     """Silence all hydromt / hydromt-sfincs console noise.
 
     Applies two layers:
@@ -334,22 +334,28 @@ def suppress_hydromt_output() -> Iterator[None]:
     # One-time, permanent mutation — safe to call repeatedly.
     silence_third_party_loggers()
 
-    # fd-level redirect (temporary)
+    # fd-level redirect (temporary). Capture saved_fd inside the try so
+    # we always restore stdout even if the Python-level dup-target
+    # below fails to open. saved_fd is sentinel-checked under finally.
     devnull_fd = os.open(os.devnull, os.O_WRONLY)
-    saved_fd = os.dup(1)
-    os.dup2(devnull_fd, 1)
-    os.close(devnull_fd)
-
-    # Python-level redirect (temporary)
+    saved_fd = -1
     saved_stdout = sys.stdout
-    sys.stdout = Path(os.devnull).open("w")  # noqa: SIM115
+    py_devnull = None
     try:
+        saved_fd = os.dup(1)
+        os.dup2(devnull_fd, 1)
+        # Python-level redirect (temporary) for Jupyter compatibility.
+        py_devnull = Path(os.devnull).open("w")  # noqa: SIM115
+        sys.stdout = py_devnull
         yield
     finally:
-        sys.stdout.close()
-        sys.stdout = saved_stdout
-        os.dup2(saved_fd, 1)
-        os.close(saved_fd)
+        os.close(devnull_fd)
+        if py_devnull is not None:
+            sys.stdout = saved_stdout
+            py_devnull.close()
+        if saved_fd >= 0:
+            os.dup2(saved_fd, 1)
+            os.close(saved_fd)
 
 
 class StageStatus(StrEnum):
@@ -380,7 +386,7 @@ class StageProgress:
         if self.start_time and self.end_time:
             return self.end_time - self.start_time
         if self.start_time:
-            return datetime.now() - self.start_time
+            return datetime.now(UTC).replace(tzinfo=None) - self.start_time
         return None
 
     @property
@@ -455,7 +461,7 @@ class WorkflowMonitor:
 
     def start_workflow(self) -> None:
         """Mark workflow as started."""
-        self.workflow_start = datetime.now()
+        self.workflow_start = datetime.now(UTC).replace(tzinfo=None)
         self.logger.info(self.double_divider)
         self.logger.info("Coastal Calibration Workflow")
         self.logger.info(f"Start Time: {self.workflow_start.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -478,7 +484,7 @@ class WorkflowMonitor:
 
     def end_workflow(self, success: bool = True) -> None:
         """Mark workflow as ended."""
-        self.workflow_end = datetime.now()
+        self.workflow_end = datetime.now(UTC).replace(tzinfo=None)
         status = "COMPLETED" if success else "FAILED"
         duration = self.workflow_end - self.workflow_start if self.workflow_start else None
         duration_str = str(duration).split(".")[0] if duration else "-"
@@ -497,7 +503,7 @@ class WorkflowMonitor:
 
         stage = self.stages[name]
         stage.status = StageStatus.RUNNING
-        stage.start_time = datetime.now()
+        stage.start_time = datetime.now(UTC).replace(tzinfo=None)
         stage.message = message
 
         self.logger.info(f"Stage: {name}")
@@ -517,7 +523,7 @@ class WorkflowMonitor:
 
         stage = self.stages[name]
         stage.status = status
-        stage.end_time = datetime.now()
+        stage.end_time = datetime.now(UTC).replace(tzinfo=None)
         if message:
             stage.message = message
 
@@ -586,7 +592,7 @@ class WorkflowMonitor:
         self.logger.debug(message)
 
     @contextmanager
-    def stage_context(self, name: str, message: str = "") -> Iterator[StageProgress]:
+    def stage_context(self, name: str, message: str = "") -> Generator[StageProgress, None, None]:
         """Context manager for stage execution with automatic status updates."""
         # Re-silence third-party loggers in case libraries (e.g. hydromt)
         # re-added console handlers during import or initialization.

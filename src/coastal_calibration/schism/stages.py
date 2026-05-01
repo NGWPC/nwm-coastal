@@ -27,12 +27,15 @@ def _write_station_in(
     lats: list[float],
 ) -> Path:
     """Write a station.in file for SCHISM with multiple stations."""
+    if len(lons) != len(lats):
+        msg = f"Station lons/lats length mismatch: {len(lons)} vs {len(lats)}"
+        raise ValueError(msg)
     n = len(lons)
     lines = [
         "1 0 0 0 0 0 0 0 0",  # only elevation output
         str(n),
     ]
-    for i, (lon, lat) in enumerate(zip(lons, lats, strict=False), start=1):
+    for i, (lon, lat) in enumerate(zip(lons, lats, strict=True), start=1):
         lines.append(f"{i} {lon} {lat} 0.0")
     path = base_dir / "station.in"
     path.write_text("\n".join(lines) + "\n")
@@ -129,7 +132,7 @@ def _build_domain_polygon(project: Any) -> Any:
     Chains open + exterior land boundary segments into a single
     outer ring (counterclockwise) and uses island boundaries as
     interior holes.  This is faster and more accurate than a
-    concave-hull approximation: ~15× speedup, exact geometry, and
+    concave-hull approximation: ~15x speedup, exact geometry, and
     holes correctly excluded.
 
     Parameters
@@ -409,7 +412,7 @@ class SchismDischargeStage(WorkflowStage):
         work_dir = self.config.paths.work_dir
         sim = self.config.simulation
         paths = self.config.paths
-        prebuilt_dir = self.model.prebuilt_dir
+        prebuilt_dir = self.model.coastal_parm
 
         # 1. Copy discharge file into work_dir as nwmReaches.csv
         self._update_substep("Staging discharge file")
@@ -791,6 +794,114 @@ class SchismPlotStage(WorkflowStage):
         obs_ds.attrs["datum"] = "MSL"
         return obs_ds
 
+    def _per_station_datum_offsets(
+        self,
+        station_ids: list[str],
+        corr_path: Path,
+    ) -> np.ndarray | None:
+        """Compute per-station mesh→MSL offsets, or None if unavailable.
+
+        Reads ``elevation_correction.csv`` and, for each station ID,
+        looks up its lon/lat from CO-OPS metadata and uses the nearest
+        boundary-node ``conversion_factor`` as the local offset. Stations
+        not found in CO-OPS fall back to the boundary mean. Returns
+        ``None`` (with a warning) if the CSV columns are malformed.
+        """
+        try:
+            corr_df = pd.read_csv(corr_path)
+            corr_lons = corr_df["Field1"].to_numpy()
+            corr_lats = corr_df["Field2"].to_numpy()
+            conv_factors = corr_df["conversion_factor"].to_numpy()
+        except (KeyError, ValueError) as exc:
+            self._log(
+                f"Could not read elevation correction CSV: {exc}; "
+                "comparison may show a datum offset",
+                "warning",
+            )
+            return None
+        fallback_conv = float(conv_factors.mean()) if conv_factors.size else 0.0
+
+        from coastal_calibration.data.coops_api import COOPSAPIClient
+
+        client = COOPSAPIClient()
+        md = client.stations_metadata
+        md_subset = md[md["station_id"].astype(str).isin(station_ids)]
+        md_by_id = md_subset.set_index(md_subset["station_id"].astype(str))
+        # Vectorised coordinate access via geopandas's .x/.y on the
+        # geometry column avoids per-row scalar indexing issues.
+        sta_lons = md_by_id.geometry.x.to_dict()
+        sta_lats = md_by_id.geometry.y.to_dict()
+
+        per_station_conv = np.full(len(station_ids), fallback_conv)
+        for i, sid in enumerate(station_ids):
+            if sid in sta_lons:
+                slon = float(sta_lons[sid])
+                slat = float(sta_lats[sid])
+                d2 = (corr_lons - slon) ** 2 + (corr_lats - slat) ** 2
+                per_station_conv[i] = float(conv_factors[int(np.argmin(d2))])
+            else:
+                self._log(
+                    f"Station {sid}: no metadata; using boundary mean "
+                    f"{fallback_conv:+.4f} m for datum correction",
+                    "debug",
+                )
+        return per_station_conv
+
+    def _load_station_simulation(
+        self, work_dir: Path
+    ) -> tuple[list[str], np.ndarray, np.ndarray] | None:
+        """Read station IDs + ``staout_1`` and return (ids, sim_times, elev_msl).
+
+        Returns ``None`` when prerequisite files are missing — the caller
+        should surface that as a skipped substep rather than an error.
+        """
+        station_ids_file = work_dir / "station_noaa_ids.txt"
+        staout_path = work_dir / "outputs" / "staout_1"
+
+        if not station_ids_file.exists():
+            self._log("station_noaa_ids.txt not found, skipping station comparison")
+            return None
+        if not staout_path.exists():
+            self._log("outputs/staout_1 not found, skipping station comparison")
+            return None
+
+        station_ids = _read_station_noaa_ids(work_dir)
+        if not station_ids:
+            self._log("No station IDs found, skipping station comparison")
+            return None
+
+        self._update_substep("Reading SCHISM station output")
+        time_seconds, elevation = _read_staout(staout_path)
+
+        if elevation.size == 0:
+            self._log("staout_1 is empty, skipping station comparison")
+            return None
+
+        if elevation.shape[1] != len(station_ids):
+            msg = (
+                f"Station count mismatch: staout_1 has {elevation.shape[1]} "
+                f"columns but station_noaa_ids.txt has {len(station_ids)} IDs. "
+                "This indicates a corrupted run or a station.in / "
+                "station_noaa_ids.txt that is out of sync with the SCHISM run."
+            )
+            raise RuntimeError(msg)
+
+        # Apply per-station datum correction so simulated values are in MSL.
+        corr_path = self.model.elevation_correction_csv
+        if corr_path is not None:
+            offsets = self._per_station_datum_offsets(station_ids, corr_path)
+            if offsets is not None:
+                elevation = elevation + offsets[None, :]
+                self._log(
+                    "Applied per-station datum offset to simulated values "
+                    f"(range {offsets.min():+.4f} to {offsets.max():+.4f} m, "
+                    f"mean {offsets.mean():+.4f} m)"
+                )
+
+        start_ns = np.datetime64(self.config.simulation.start_date, "ns")
+        sim_times = start_ns + (time_seconds * 1e9).astype("timedelta64[ns]")
+        return station_ids, sim_times, elevation
+
     def _run_station_comparison(self, figs_dir: Path) -> dict[str, Any]:
         """Produce CO-OPS station comparison figures. No-op if inputs missing.
 
@@ -798,104 +909,15 @@ class SchismPlotStage(WorkflowStage):
         :class:`SchismModelConfig` in :meth:`run`; the helper itself assumes
         the caller has already checked the gate.
         """
-        work_dir = self.config.paths.work_dir
-
-        station_ids_file = work_dir / "station_noaa_ids.txt"
-        staout_path = work_dir / "outputs" / "staout_1"
-
-        if not station_ids_file.exists():
-            self._log("station_noaa_ids.txt not found, skipping station comparison")
-            return {"status": "skipped", "reason": "no station IDs file"}
-        if not staout_path.exists():
-            self._log("outputs/staout_1 not found, skipping station comparison")
-            return {"status": "skipped", "reason": "no staout_1"}
-
-        station_ids = _read_station_noaa_ids(work_dir)
-        if not station_ids:
-            self._log("No station IDs found, skipping station comparison")
-            return {"status": "skipped", "reason": "empty station IDs"}
-
-        self._update_substep("Reading SCHISM station output")
-        time_seconds, elevation = _read_staout(staout_path)
-
-        if elevation.size == 0:
-            self._log("staout_1 is empty, skipping station comparison")
-            return {"status": "skipped", "reason": "empty staout_1"}
-
-        if elevation.shape[1] != len(station_ids):
-            self._log(
-                f"Station count mismatch: staout_1 has {elevation.shape[1]} columns "
-                f"but {len(station_ids)} station IDs",
-                "warning",
-            )
-            n = min(elevation.shape[1], len(station_ids))
-            elevation = elevation[:, :n]
-            station_ids = station_ids[:n]
-
-        # Apply per-station datum correction so simulated values are in MSL.
-        # ``correct_elevation`` uses per-boundary-node corrections during
-        # forcing setup, so the model interior remains in the mesh's
-        # vertical datum (effectively NAVD88 for CONUS).  Using a single
-        # boundary mean here would over-correct stations whose local
-        # geoid-MSL offset differs from the domain average; instead we
-        # take each station's local ``conversion_factor`` from the nearest
-        # boundary node.  The conversion back to MSL is ``msl = mesh + conv``.
-        corr_path = self.model.prebuilt_dir / "elevation_correction.csv"
-        if corr_path.exists():
-            try:
-                corr_df = pd.read_csv(corr_path)
-                corr_lons = corr_df["Field1"].to_numpy()
-                corr_lats = corr_df["Field2"].to_numpy()
-                conv_factors = corr_df["conversion_factor"].to_numpy()
-                fallback_conv = float(conv_factors.mean()) if conv_factors.size else 0.0
-
-                from coastal_calibration.data.coops_api import COOPSAPIClient
-
-                client = COOPSAPIClient()
-                md = client.stations_metadata
-                md_subset = md[md["station_id"].astype(str).isin(station_ids)]
-                md_by_id = md_subset.set_index(md_subset["station_id"].astype(str))
-                # Vectorised coordinate access via geopandas's .x/.y on the
-                # geometry column avoids per-row scalar indexing issues.
-                sta_lons = md_by_id.geometry.x.to_dict()
-                sta_lats = md_by_id.geometry.y.to_dict()
-
-                per_station_conv = np.full(len(station_ids), fallback_conv)
-                for i, sid in enumerate(station_ids):
-                    if sid in sta_lons:
-                        slon = float(sta_lons[sid])
-                        slat = float(sta_lats[sid])
-                        d2 = (corr_lons - slon) ** 2 + (corr_lats - slat) ** 2
-                        per_station_conv[i] = float(conv_factors[int(np.argmin(d2))])
-                    else:
-                        self._log(
-                            f"Station {sid}: no metadata; using boundary mean "
-                            f"{fallback_conv:+.4f} m for datum correction",
-                            "debug",
-                        )
-
-                elevation = elevation + per_station_conv[None, :]
-                self._log(
-                    "Applied per-station datum offset to simulated values "
-                    f"(range {per_station_conv.min():+.4f} to "
-                    f"{per_station_conv.max():+.4f} m, mean "
-                    f"{per_station_conv.mean():+.4f} m)"
-                )
-            except (KeyError, ValueError) as exc:
-                self._log(
-                    f"Could not apply elevation correction: {exc}; "
-                    "comparison may show a datum offset",
-                    "warning",
-                )
+        loaded = self._load_station_simulation(self.config.paths.work_dir)
+        if loaded is None:
+            return {"status": "skipped"}
+        station_ids, sim_times, elevation = loaded
 
         sim = self.config.simulation
-        start_dt = sim.start_date
-        start_ns = np.datetime64(start_dt, "ns")
-        sim_times = start_ns + (time_seconds * 1e9).astype("timedelta64[ns]")
-
         self._update_substep("Fetching NOAA CO-OPS observations")
-        begin_date = start_dt.strftime("%Y%m%d %H:%M")
-        end_dt = start_dt + timedelta(hours=sim.duration_hours)
+        begin_date = sim.start_date.strftime("%Y%m%d %H:%M")
+        end_dt = sim.start_date + timedelta(hours=sim.duration_hours)
         end_date = end_dt.strftime("%Y%m%d %H:%M")
 
         obs_ds = self._fetch_observations_msl(station_ids, begin_date, end_date)
@@ -945,8 +967,7 @@ class SchismPlotStage(WorkflowStage):
             return {"status": "skipped", "reason": "no points"}
 
         self._update_substep("Extracting water level at obs points")
-        corr = self.model.prebuilt_dir / "elevation_correction.csv"
-        ds = load_schism_elevation(work_dir, correction_file=corr if corr.exists() else None)
+        ds = load_schism_elevation(work_dir, correction_file=self.model.elevation_correction_csv)
         validate_points_in_domain(all_points, ds)
         series = extract_water_level_series(ds, all_points, variable="elevation")
 
@@ -977,8 +998,7 @@ class SchismPlotStage(WorkflowStage):
         from coastal_calibration.plotting import animate_water_level
         from coastal_calibration.schism.outputs import load_schism_elevation
 
-        corr = self.model.prebuilt_dir / "elevation_correction.csv"
-        ds = load_schism_elevation(work_dir, correction_file=corr if corr.exists() else None)
+        ds = load_schism_elevation(work_dir, correction_file=self.model.elevation_correction_csv)
         outfile = figs_dir / "water_level.mp4"
         animate_water_level(
             ds,

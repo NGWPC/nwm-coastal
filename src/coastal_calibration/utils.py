@@ -1,8 +1,8 @@
-"""System information and MPI utilities.
+"""System information, MPI, and time-handling utilities.
 
 Combines CPU detection (:func:`get_cpu_count`), MPI implementation
-detection (:func:`detect_mpi`), and MPI environment/command builders
-into a single module.
+detection (:func:`detect_mpi`), MPI environment/command builders, and
+the project's UTC-normalisation helper (:func:`to_naive_utc`).
 """
 
 from __future__ import annotations
@@ -12,10 +12,51 @@ import os
 import platform
 import re
 import subprocess
+from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 
 from coastal_calibration.logging import logger
+
+# ---------------------------------------------------------------------------
+# Time handling
+# ---------------------------------------------------------------------------
+
+
+def to_naive_utc(dt: datetime) -> datetime:
+    """Return *dt* as a naive UTC ``datetime``.
+
+    All datetime values inside the package are conventionally **naive UTC**:
+    NWM and STOFS data are published on UTC days, NetCDF time axes are
+    written in UTC, and the hard-coded ``DateRange.start`` / ``.end``
+    constants in :mod:`coastal_calibration.data.downloader` are bare
+    ``datetime(YYYY, M, D)`` values that mean "midnight UTC".
+
+    This helper normalises any user-supplied datetime into that
+    convention:
+
+    - tz-aware → converted to UTC, then ``tzinfo`` stripped.
+    - tz-naive → returned unchanged (assumed UTC by contract).
+
+    Use this at every public boundary that accepts a ``datetime`` from
+    the caller (config loading, data-layer queries, etc.) so the rest
+    of the pipeline can compare, subtract, and serialise without ever
+    crossing the naive/aware boundary.
+    """
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(UTC).replace(tzinfo=None)
+    return dt
+
+
+def utc_now() -> datetime:
+    """Return ``datetime.now`` as a naive UTC datetime.
+
+    Same convention as :func:`to_naive_utc`. Use for "now" timestamps
+    (workflow start/end, log filenames, durations) so they are
+    comparable across machines and across the rest of the pipeline.
+    """
+    return datetime.now(UTC).replace(tzinfo=None)
+
 
 # ---------------------------------------------------------------------------
 # CPU detection (was utils/system.py)
@@ -73,6 +114,8 @@ __all__ = [
     "build_mpi_env",
     "detect_mpi",
     "get_cpu_count",
+    "to_naive_utc",
+    "utc_now",
 ]
 
 
