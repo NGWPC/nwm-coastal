@@ -39,13 +39,10 @@
 #
 # The walkthrough runs out of `docs/examples/walkthrough/`. The setup
 # cell below creates that directory and stages every input the
-# notebook needs:
+# notebook needs from the local `docs/examples/pacific/` demo:
 #
-# - **SCHISM mesh + WRF geogrid** — sourced from the cluster paths
-#   (`/ngen-test/coastal/ngwpc-coastal/parm/...`) when they are
-#   available, otherwise from the local `docs/examples/pacific/`
-#   demo. This lets the same notebook run unchanged on the cluster
-#   and on a workstation.
+# - **SCHISM mesh + WRF geogrid** — symlinked from
+#   `pacific/model` and `pacific/geo_em_CONUS.nc`.
 # - **Extract polygon** — the same GeoJSON used by
 #   `schism-pacific-extract.py` so we carve out the same Mendocino
 #   subdomain.
@@ -69,17 +66,9 @@ os.chdir(walkthrough_dir)
 
 pacific_dir = (notebook_dir.parent / "pacific").resolve()
 
-# Cluster paths take precedence when present; otherwise fall back to
-# the local pacific/ demo's symlinks. This branching keeps a single
-# notebook working in both environments without manual edits.
-CLUSTER_MODEL = Path("/ngen-test/coastal/ngwpc-coastal/parm/coastal/pacific")
-CLUSTER_GEOGRID = Path("/ngen-test/coastal/ngwpc-coastal/parm/domain/geo_em_CONUS.nc")
-
 heavy_inputs: dict[str, Path] = {
-    "model": CLUSTER_MODEL if CLUSTER_MODEL.exists() else pacific_dir / "model",
-    "geo_em_CONUS.nc": CLUSTER_GEOGRID
-    if CLUSTER_GEOGRID.exists()
-    else pacific_dir / "geo_em_CONUS.nc",
+    "model": pacific_dir / "model",
+    "geo_em_CONUS.nc": pacific_dir / "geo_em_CONUS.nc",
 }
 for name, src in heavy_inputs.items():
     dst = walkthrough_dir / name
@@ -87,9 +76,8 @@ for name, src in heavy_inputs.items():
         continue
     if not src.exists():
         raise FileNotFoundError(
-            f"Required input missing for {name}: tried cluster path "
-            f"and {pacific_dir / name}. Provide either the cluster mount or the "
-            f"local pacific/ demo setup before running this notebook."
+            f"Required input missing: {src}. Provide the local pacific/ demo "
+            f"setup (symlinks under docs/examples/pacific/) before running."
         )
     dst.symlink_to(src.resolve())
 
@@ -120,7 +108,7 @@ print("Inputs:")
 for name in (*heavy_inputs, *small_inputs):
     p = walkthrough_dir / name
     if p.is_symlink():
-        kind = f"symlink → {p.resolve()}"
+        kind = f"symlink -> {p.resolve()}"
     elif p.is_file():
         kind = f"file ({p.stat().st_size / 1e3:.1f} KB)"
     else:
@@ -206,73 +194,88 @@ print(schism_result)
 # The SFINCS model needs two inputs that are easiest to produce
 # interactively in QGIS using the `nwm_coastal` plugin:
 #
-# 1. **`aoi.geojson`** — a polygon that hugs the SCHISM mesh boundary on
-#    the seaward side and follows the NHF watershed divides on the
-#    landward side, so the SFINCS domain aligns with hydrologic
-#    boundaries.
-# 2. **`discharge_nwm.geojson`** — the NWM flowlines that enter the
-#    domain across that polygon, exported with whatever ID column the
-#    source NHF dataset uses (typically `"ID"`, `"flowpath_id"`, or
-#    `"comid"`). The SFINCS create stage takes the column name as a
-#    config value and normalizes it to `"name"` internally so the run
-#    stage can look up NWM streamflow by integer feature ID.
+# 1. **`aoi.geojson`** — a polygon that aligns the seaward edge of the
+#    SFINCS domain with the SCHISM mesh boundary and snaps the landward
+#    edge to NHF watershed divides.
+# 2. **`discharge_nwm.geojson`** — the NWM flowlines that enter that
+#    polygon, keyed by an integer NWM feature ID (column name passed to
+#    the SFINCS create stage as `nwm_id_column`; the create stage
+#    normalizes it to `"name"` internally so the run stage can look up
+#    NWM streamflow regardless of the source column name).
 #
 # **The walkthrough has these files pre-staged** in
 # `docs/examples/pacific/` (`sfincs_poly.geojson` and
 # `nwm_reaches.geojson`) so Parts 3–5 are runnable today. The steps
 # below document how those files were produced.
 #
-# ### Step 1 — Open the extracted SCHISM mesh
+# ### Step 1 — The toolbar
 #
-# In QGIS, click **Load SCHISM Mesh** in the `nwm_coastal` toolbar and
-# select `extracted/hgrid.gr3` from this walkthrough directory. The
-# plugin streams it into a temporary 2DM and displays it as a mesh
-# layer with the bed-elevation dataset attached.
+# After installing the plugin, restart QGIS. The `nwm_coastal` toolbar
+# appears as the highlighted row of icons below — one icon per pipeline
+# step, ordered roughly left-to-right in the order you use them.
 #
-# ![Load SCHISM mesh](../images/qgis_plugin_window.png)
+# ![nwm_coastal toolbar in QGIS](../images/plugin_window.png)
 #
-# ### Step 2 — Add the basemap
+# ### Step 2 — Add Basemap (NHF + CO-OPS)
 #
-# Click **Add Basemap** in the toolbar. Point the dialog at the
-# National HydroFabric `.gpkg` (or `.gdb`) for this region. The plugin
-# loads OSM, NHF divides, NWM flowpaths, USGS gages, and (when checked)
-# auto-downloads NOAA CO-OPS tide gauges as orange stars.
+# Click **Add Basemap** (first icon). Point the dialog at the National
+# HydroFabric `.gpkg` (or `.gdb`) for this region. Tick the layers you
+# need — Divides, Flowpaths, Gages, Nexus — and check **Include CO-OPS
+# stations** to also auto-download nearby NOAA tide gauges. An optional
+# *Flowpaths Override* lets you swap in an alternate flowpaths source
+# without re-staging the whole NHF dataset.
 #
-# ![Add Basemap dialog](../images/qgis_plugin_basemap.png)
+# ![Add Basemap dialog](../images/plugin_basemap.png)
 #
-# ### Step 3 — Extract the mesh boundary
+# The plugin loads each layer with sensible default styling — flowpaths
+# in blue, divides in light yellow, gages and nexus as point layers,
+# CO-OPS gauges as orange stars — over an OpenStreetMap base.
 #
-# With the SCHISM mesh layer selected, click **Extract Mesh Boundary**.
-# The plugin parses the open / exterior / island boundaries from the
-# original `hgrid.gr3` and creates a polygon layer that exactly matches
-# the SCHISM domain.
+# ![Basemap loaded](../images/plugin_basemap_loaded.png)
 #
-# ![Mesh boundary polygon](../images/qgis_plugin_menu.png)
+# ### Step 3 — Load SCHISM mesh
 #
-# ### Step 4 — Union with NHF divides
+# Click **Load SCHISM Mesh** and select `extracted/hgrid.gr3` from this
+# walkthrough directory. The plugin streams the mesh into QGIS as the
+# `hgrid` triangular mesh layer, ready to overlay on the NHF basemap.
 #
-# Click **Draw Polygon** and trace the seaward edge of the AOI roughly
-# along the mesh boundary; right-click to finish. Then click **Union
-# with NHF Divides** to snap the landward edge to the watershed divide
-# polygons that intersect your sketch. This is what makes the SFINCS
-# domain hydrologically meaningful.
+# ![SCHISM mesh loaded over basemap](../images/plugin_load_schism.png)
 #
-# ![Sketched AOI polygon](../images/qgis_plugin_poly.png)
-# ![After union with NHF divides](../images/qgis_plugin_merge.png)
+# ### Step 4 — Extract mesh boundary
 #
-# ### Step 5 — Save the AOI polygon
+# Click **Extract Mesh Boundary**. The plugin parses the open /
+# exterior / island boundaries from `hgrid.gr3` and adds a
+# `mesh_boundary` polygon layer that traces the SCHISM domain edge
+# exactly. This polygon is the seaward seed for the SFINCS AOI in the
+# next step.
 #
-# Click **Save Polygon** and write `aoi.geojson` into this walkthrough
-# directory. The plugin reprojects to WGS84 on export.
+# ![Mesh boundary polygon over the SCHISM mesh](../images/plugin_schism_mesh.png)
 #
-# ### Step 6 — Pick and export the river discharge flowlines
+# ### Step 5 — Union with NHF divides
 #
-# Use QGIS's selection tool on the `flowpaths` layer to highlight every
-# NWM flowline that crosses the merged AOI polygon. Click **Export
-# Selected Flowpaths** and save as `discharge_nwm.geojson` in this
-# walkthrough directory.
+# Click **Union with NHF Divides**. The plugin extends `mesh_boundary`
+# inland to fully include every NHF watershed divide that the boundary
+# clips, producing a `merged_polygon` layer — the SFINCS AOI. This is
+# what makes the SFINCS domain hydrologically meaningful: every river
+# entering the domain has its full upstream catchment inside the AOI,
+# so NWM discharge sources line up with watershed boundaries.
 #
-# ![NWM flowlines into the domain](../images/qgis_plugin_flowlines.png)
+# ![merged_polygon: SCHISM boundary unioned with NHF divides](../images/plugin_divide_union.png)
+#
+# Select the `merged_polygon` layer then with QGIS' select tool,
+# select the polygon on the map and hit the save *Save Polygon* button from
+# the NWM Coastal plugin to save `aoi.geojson` into this walkthrough directory (WGS84).
+#
+# ### Step 6 — Export discharge flowpaths
+#
+# Click **Export Discharge Flowpaths** (rightmost icon in the toolbar).
+# The plugin auto-selects every flowpath that crosses `merged_polygon`,
+# previews the selection on the map, and prompts for an output path.
+# Save as `discharge_nwm.geojson` — the file keeps the source NHF
+# integer ID column (`ID` for the demo dataset), which is what the
+# SFINCS create stage uses to map flowlines back to NWM streamflow.
+#
+# ![Selected discharge flowpaths inside the AOI](../images/plugin_discharge_flowpath.png)
 #
 # The setup cell at the top of this notebook copies the pre-staged
 # `pacific/sfincs_poly.geojson` to `walkthrough/aoi.geojson` and
