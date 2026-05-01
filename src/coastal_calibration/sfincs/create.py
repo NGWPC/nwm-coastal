@@ -15,7 +15,6 @@ import contextlib
 import json
 import math
 from abc import ABC, abstractmethod
-from datetime import datetime
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
@@ -31,6 +30,7 @@ from coastal_calibration.logging import (
 )
 from coastal_calibration.runner import WorkflowResult
 from coastal_calibration.sfincs._hydromt_compat import apply_all_patches
+from coastal_calibration.utils import utc_now
 
 apply_all_patches()
 
@@ -1486,7 +1486,7 @@ class SfincsCreator:
         WorkflowResult
             Result with execution details.
         """
-        start_time = datetime.now()
+        start_time = utc_now()
         stages_completed: list[str] = []
         stages_failed: list[str] = []
         outputs: dict[str, Any] = {}
@@ -1500,7 +1500,7 @@ class SfincsCreator:
                 success=False,
                 job_id=None,
                 start_time=start_time,
-                end_time=datetime.now(),
+                end_time=utc_now(),
                 stages_completed=[],
                 stages_failed=[],
                 outputs={},
@@ -1513,7 +1513,7 @@ class SfincsCreator:
                 success=True,
                 job_id=None,
                 start_time=start_time,
-                end_time=datetime.now(),
+                end_time=utc_now(),
                 stages_completed=[],
                 stages_failed=[],
                 outputs={"dry_run": True},
@@ -1558,7 +1558,7 @@ class SfincsCreator:
             success=success,
             job_id=None,
             start_time=start_time,
-            end_time=datetime.now(),
+            end_time=utc_now(),
             stages_completed=stages_completed,
             stages_failed=stages_failed,
             outputs=outputs,

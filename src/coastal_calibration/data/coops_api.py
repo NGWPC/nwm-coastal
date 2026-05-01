@@ -11,13 +11,13 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final, Literal, overload
 
 from tiny_retriever import fetch
 
 from coastal_calibration.logging import logger
+from coastal_calibration.utils import utc_now
 
 if TYPE_CHECKING:
     import geopandas as gpd
@@ -747,7 +747,7 @@ def _process_responses(  # noqa: PLR0912, PLR0915
     ds.attrs["units"] = units
     ds.attrs["time_zone"] = time_zone
     ds.attrs["source"] = "NOAA CO-OPS API"
-    ds.attrs["retrieved_at"] = datetime.now().isoformat()
+    ds.attrs["retrieved_at"] = utc_now().isoformat()
 
     ds["time"].attrs["long_name"] = "Time"
     ds["time"].attrs["standard_name"] = "time"

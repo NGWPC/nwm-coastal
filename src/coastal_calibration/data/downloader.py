@@ -20,6 +20,7 @@ from coastal_calibration.config.schema import (
     PathConfig,
 )
 from coastal_calibration.logging import logger
+from coastal_calibration.utils import to_naive_utc, utc_now
 
 
 def _hour_range(start: datetime, end: datetime) -> range:
@@ -43,6 +44,10 @@ class DateRange:
 
     def validate(self, start: datetime, end: datetime) -> str | None:
         """Validate that the requested period falls within the available range."""
+        # Normalise to naive UTC so comparisons against the naive class
+        # attributes are well-defined and DST-stable.
+        start = to_naive_utc(start)
+        end = to_naive_utc(end)
         end_str = self.end.strftime("%Y-%m-%d") if self.end else "present"
         if start < self.start:
             return (
@@ -60,7 +65,7 @@ class DateRange:
             )
         # For operational sources (end=None means "present"), check that dates aren't in the future
         if self.end is None:
-            today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            today = utc_now().replace(hour=0, minute=0, second=0, microsecond=0)
             if start > today:
                 return (
                     f"{self.description} data is available from "
@@ -742,8 +747,8 @@ def download_data(
     ...     coastal_source="stofs",
     ... )
     """
-    start = pd.to_datetime(start_time).to_pydatetime()
-    end = pd.to_datetime(end_time).to_pydatetime()
+    start = to_naive_utc(pd.to_datetime(start_time).to_pydatetime())
+    end = to_naive_utc(pd.to_datetime(end_time).to_pydatetime())
     out_dir = Path(output_dir)
     tpxo_path = Path(tpxo_local_path) if tpxo_local_path else None
 

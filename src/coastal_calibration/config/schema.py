@@ -21,7 +21,15 @@ LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 @dataclass
 class SimulationConfig:
-    """Simulation time and domain configuration."""
+    """Simulation time and domain configuration.
+
+    ``start_date`` is normalised to **naive UTC** in ``__post_init__``
+    so the rest of the pipeline can compare and serialise it without
+    crossing the naive/aware boundary. Tz-aware values are converted to
+    UTC then stripped; tz-naive values are passed through (assumed UTC
+    by the project's data contract — NWM/STOFS are published on UTC
+    days).
+    """
 
     start_date: datetime
     duration_hours: int
@@ -47,6 +55,11 @@ class SimulationConfig:
         "atlgulf": "geo_em_CONUS.nc",
         "pacific": "geo_em_CONUS.nc",
     }
+
+    def __post_init__(self) -> None:
+        from coastal_calibration.utils import to_naive_utc
+
+        self.start_date = to_naive_utc(self.start_date)
 
     @property
     def start_pdy(self) -> str:
