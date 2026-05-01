@@ -334,22 +334,28 @@ def suppress_hydromt_output() -> Generator[None, None, None]:
     # One-time, permanent mutation — safe to call repeatedly.
     silence_third_party_loggers()
 
-    # fd-level redirect (temporary)
+    # fd-level redirect (temporary). Capture saved_fd inside the try so
+    # we always restore stdout even if the Python-level dup-target
+    # below fails to open. saved_fd is sentinel-checked under finally.
     devnull_fd = os.open(os.devnull, os.O_WRONLY)
-    saved_fd = os.dup(1)
-    os.dup2(devnull_fd, 1)
-    os.close(devnull_fd)
-
-    # Python-level redirect (temporary)
+    saved_fd = -1
     saved_stdout = sys.stdout
-    sys.stdout = Path(os.devnull).open("w")  # noqa: SIM115
+    py_devnull = None
     try:
+        saved_fd = os.dup(1)
+        os.dup2(devnull_fd, 1)
+        # Python-level redirect (temporary) for Jupyter compatibility.
+        py_devnull = Path(os.devnull).open("w")  # noqa: SIM115
+        sys.stdout = py_devnull
         yield
     finally:
-        sys.stdout.close()
-        sys.stdout = saved_stdout
-        os.dup2(saved_fd, 1)
-        os.close(saved_fd)
+        os.close(devnull_fd)
+        if py_devnull is not None:
+            sys.stdout = saved_stdout
+            py_devnull.close()
+        if saved_fd >= 0:
+            os.dup2(saved_fd, 1)
+            os.close(saved_fd)
 
 
 class StageStatus(StrEnum):

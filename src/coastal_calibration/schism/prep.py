@@ -862,14 +862,15 @@ def make_tpxo_boundary(
                 "install predict_tide via pixi."
             )
         predict_tide_bin = Path(found)
-    result = subprocess.run(
-        [str(predict_tide_bin)],
-        stdin=(work_dir / "setup_tpxo.txt").open(),
-        cwd=work_dir,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    with (work_dir / "setup_tpxo.txt").open() as setup_stdin:
+        result = subprocess.run(
+            [str(predict_tide_bin)],
+            stdin=setup_stdin,
+            cwd=work_dir,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
     if result.returncode != 0:
         raise RuntimeError(
             f"predict_tide failed (exit {result.returncode}): {result.stderr[-2000:]}"

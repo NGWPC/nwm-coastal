@@ -355,42 +355,41 @@ def patch_quadtree_output_read() -> None:
         n_idx = grid_ds["n"].to_numpy() - 1  # → 0-indexed row
         m_idx = grid_ds["m"].to_numpy() - 1  # → 0-indexed col
 
-        ds_map = xr.open_dataset(fn_map)
-
-        # Build a new dataset with face-indexed variables.
+        # Build a new dataset with face-indexed variables. The context
+        # manager guarantees the underlying NetCDF handle is closed even
+        # if any of the per-variable indexing below raises.
         face_vars: dict[str, xr.DataArray] = {}
-        for _vname, da in ds_map.data_vars.items():
-            vname = str(_vname)
-            if vname in _drop:
-                continue
-            dims = [str(d) for d in da.dims]
+        with xr.open_dataset(fn_map) as ds_map:
+            for _vname, da in ds_map.data_vars.items():
+                vname = str(_vname)
+                if vname in _drop:
+                    continue
+                dims = [str(d) for d in da.dims]
 
-            # Only remap variables that live on the (n, m) grid.
-            if "n" not in dims or "m" not in dims:
-                continue
+                # Only remap variables that live on the (n, m) grid.
+                if "n" not in dims or "m" not in dims:
+                    continue
 
-            vals = da.values  # e.g. (n, m) or (time, n, m)
-            n_pos = dims.index("n")
-            m_pos = dims.index("m")
+                vals = da.values  # e.g. (n, m) or (time, n, m)
+                n_pos = dims.index("n")
+                m_pos = dims.index("m")
 
-            if n_pos == 0 and m_pos == 1 and len(dims) == 2:
-                # (n, m) → (nFaces,)
-                face_data = vals[n_idx, m_idx]
-                face_vars[vname] = xr.DataArray(
-                    face_data,
-                    dims=[face_dim],
-                )
-            elif len(dims) == 3 and n_pos > 0 and m_pos > 0:
-                # (time, n, m) → (time, nFaces)
-                leading_dim = dims[0]
-                face_data = vals[:, n_idx, m_idx]
-                face_vars[vname] = xr.DataArray(
-                    face_data,
-                    dims=[leading_dim, face_dim],
-                    coords={leading_dim: da.coords[leading_dim]},
-                )
-
-        ds_map.close()
+                if n_pos == 0 and m_pos == 1 and len(dims) == 2:
+                    # (n, m) → (nFaces,)
+                    face_data = vals[n_idx, m_idx]
+                    face_vars[vname] = xr.DataArray(
+                        face_data,
+                        dims=[face_dim],
+                    )
+                elif len(dims) == 3 and n_pos > 0 and m_pos > 0:
+                    # (time, n, m) → (time, nFaces)
+                    leading_dim = dims[0]
+                    face_data = vals[:, n_idx, m_idx]
+                    face_vars[vname] = xr.DataArray(
+                        face_data,
+                        dims=[leading_dim, face_dim],
+                        coords={leading_dim: da.coords[leading_dim]},
+                    )
 
         if not face_vars:
             return None
