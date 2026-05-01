@@ -24,6 +24,7 @@ from pyproj import Transformer
 
 from coastal_calibration.base import WorkflowStage
 from coastal_calibration.config.schema import SfincsModelConfig
+from coastal_calibration.logging import logger
 from coastal_calibration.sfincs.data_catalog import create_nc_symlinks, generate_data_catalog
 
 if TYPE_CHECKING:
@@ -226,8 +227,10 @@ def _meteo_dst_res(config: CoastalCalibConfig, model: SfincsModel) -> float:
         dy = float(getattr(grid_ds, "attrs", {}).get("dy", 0))
         if dx > 0 and dy > 0:
             return max(dx, dy)
-    except Exception:  # noqa: S110
-        pass
+    except (AttributeError, KeyError, ValueError, TypeError) as exc:
+        # Grid dataset missing or malformed attrs; record at debug level
+        # and fall through to the NWM-native fallback.
+        logger.debug("Could not derive grid dx/dy from model: %s", exc)
 
     # Absolute fallback: NWM native resolution (~1 km).
     return 1000.0
@@ -1455,15 +1458,18 @@ class SfincsDischargeStage(_SfincsStageBase):
 
         self._update_substep("Adding discharge source points")
 
-        # When merge=False, clear existing discharge points first
+        # When merge=False, clear existing discharge points first.
+        # Catches the narrow case where ``model.discharge_points`` has
+        # never been populated (HydroMT raises AttributeError or
+        # ValueError there); any other failure should still surface.
         if not self.sfincs.merge_discharge:
             try:
                 existing = model.discharge_points.nr_points
                 if existing > 0:
                     model.discharge_points.clear()
                     self._log(f"Cleared {existing} existing discharge point(s)")
-            except Exception:  # noqa: S110
-                pass  # No existing points to clear
+            except (AttributeError, ValueError) as exc:
+                logger.debug("No existing discharge points to clear: %s", exc)
 
         src_path = self.sfincs.discharge_locations_file
         suffix = src_path.suffix.lower()

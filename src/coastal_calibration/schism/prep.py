@@ -992,8 +992,18 @@ def make_stofs_boundary(
                 duration_hours=raw_length,
                 tidal_constants_dir=tidal_constants_dir,
             )
-        except Exception:
-            logger.warning("    generate_ocean_tide failed", exc_info=True)
+        except (FileNotFoundError, ValueError, RuntimeError) as exc:
+            # Non-fatal: tidal fill is a best-effort augmentation past
+            # the 180 h STOFS forecast window. Log loudly so the user
+            # knows their boundary is truncated, but continue — the
+            # first 180 h of forcing is still valid.
+            logger.error(
+                "    generate_ocean_tide failed (%s); STOFS boundary "
+                "extends only %d h instead of %d h",
+                exc,
+                180,
+                raw_length,
+            )
 
     # Apply elevation correction if available
     if correction_file is not None and correction_file.exists():
@@ -1003,8 +1013,18 @@ def make_stofs_boundary(
                 correction_file,
                 n_open_boundary_nodes=n_open_boundary_nodes,
             )
-        except Exception:
-            logger.warning("    correct_elevation failed", exc_info=True)
+        except (FileNotFoundError, ValueError, RuntimeError) as exc:
+            # Datum correction is required for accuracy when supplied.
+            # Re-raise so the user sees a clear failure rather than a
+            # silently uncorrected boundary that produces a quiet datum
+            # offset in all downstream comparisons.
+            msg = (
+                f"correct_elevation failed for {output_file} using "
+                f"{correction_file}: {exc}. The STOFS boundary is in "
+                "the wrong vertical datum; remove the correction file "
+                "to skip datum correction or fix the input."
+            )
+            raise RuntimeError(msg) from exc
 
     if not output_file.exists():
         raise RuntimeError("STOFS boundary: elev2D.th.nc was not produced")

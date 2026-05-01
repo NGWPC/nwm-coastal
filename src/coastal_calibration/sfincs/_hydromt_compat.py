@@ -336,11 +336,17 @@ def patch_quadtree_output_read() -> None:
             return _original(self, fn_map=fn_map, drop=_drop, **kwargs)
 
         # Try the original first — works if UGRID topology is present.
+        # Log the failure at debug level when we fall through so a
+        # reader can see why the manual reconstruction path was taken.
         try:
             return _original(self, fn_map=fn_map, drop=_drop, **kwargs)
-        except Exception:  # noqa: S110
-            # Silently fall through to the manual UGRID reconstruction below.
-            pass
+        except (KeyError, ValueError, AttributeError, RuntimeError) as exc:
+            from coastal_calibration.logging import logger
+
+            logger.debug(
+                "HydroMT-SFINCS read_map_file fell through to manual UGRID reconstruction: %s",
+                exc,
+            )
 
         import xarray as xr
         import xugrid as xu
