@@ -8,7 +8,7 @@ reading, no subprocess invocation.
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import netCDF4
 import numpy as np
@@ -19,18 +19,20 @@ if TYPE_CHECKING:
     from datetime import datetime
     from pathlib import Path
 
+    from numpy.typing import NDArray
+
 
 def _round_down(n: float, decimals: int = 0) -> float:
     multiplier = 10**decimals
     return math.floor(n * multiplier) / multiplier
 
 
-def _slp(
-    temp: np.ndarray,
-    mixing: np.ndarray,
-    height: np.ndarray,
-    press: np.ndarray,
-) -> np.ndarray:
+def _pressure_to_msl(
+    temp: NDArray[np.floating[Any]],
+    mixing: NDArray[np.floating[Any]],
+    height: NDArray[np.floating[Any]],
+    press: NDArray[np.floating[Any]],
+) -> NDArray[np.floating[Any]]:
     """Reduce surface pressure to mean sea level.
 
     Parameters
@@ -58,37 +60,32 @@ def _slp(
     return press / np.exp(-height / H)
 
 
-def make_atmo_sflux(  # noqa: PLR0915
+def make_atmo_sflux(
     forcing_input_dir: Path,
     work_dir: Path,
     start_dt: datetime,
-    duration_hours: int,
     geogrid_file: Path,
 ) -> None:
     """Create SCHISM sflux atmospheric forcing from NWM LDASIN files.
 
     Produces ``<work_dir>/sflux/sflux_air_1.0001.nc`` from the LDASIN
-    files found in *forcing_input_dir*.  The last timestep is duplicated
-    so that SCHISM always has a value at the end of the simulation window.
+    files found in *forcing_input_dir*. The last timestep is duplicated
+    so that SCHISM always has a value at the end of the simulation
+    window. The simulation length is inferred from the number of files
+    on disk; the caller does not need to pass it.
 
     Parameters
     ----------
     forcing_input_dir : Path
         Directory containing ``*LDASIN_DOMAIN1`` input files.
     work_dir : Path
-        SCHISM working directory.  The ``sflux/`` sub-directory will be
+        SCHISM working directory. The ``sflux/`` sub-directory will be
         created if it does not exist.
     start_dt : datetime
         Simulation start (UTC).
-    duration_hours : int
-        Simulation length in hours.  Negative values indicate analysis
-        mode (sign is stripped; only the magnitude is used here).
     geogrid_file : Path
         WRF geogrid file containing ``HGT_M``, ``XLAT_M``, ``XLONG_M``.
     """
-    length_hours = abs(duration_hours)
-
-    # Load geospatial data
     logger.debug("    Loading geogrid data from %s", geogrid_file)
     with netCDF4.Dataset(geogrid_file) as geo:
         height = geo["HGT_M"][0, :]
@@ -105,89 +102,135 @@ def make_atmo_sflux(  # noqa: PLR0915
     sflux_dir.mkdir(parents=True, exist_ok=True)
     out_path = sflux_dir / "sflux_air_1.0001.nc"
 
-    ncout = netCDF4.Dataset(out_path, "w", format="NETCDF4")
-    try:
+    from coastal_calibration._nc_io import create_var, write_var
+
+    base_date_str = start_dt.strftime("%Y-%m-%d")
+    base_date = [
+        np.int32(start_dt.year),
+        np.int32(start_dt.month),
+        np.int32(start_dt.day),
+        np.int32(0),
+    ]
+    field_dims = ("time", "ny_grid", "nx_grid")
+
+    with netCDF4.Dataset(out_path, "w", format="NETCDF4") as ncout:
         ncout.createDimension("time", len(files) + 1)
         ncout.createDimension("ny_grid", lats.shape[0])
         ncout.createDimension("nx_grid", lons.shape[1])
 
-        nctime = ncout.createVariable("time", "f4", ("time",))
-        nclon = ncout.createVariable("lon", "f4", ("ny_grid", "nx_grid"))
-        nclat = ncout.createVariable("lat", "f4", ("ny_grid", "nx_grid"))
-        ncu = ncout.createVariable("uwind", "f4", ("time", "ny_grid", "nx_grid"))
-        ncv = ncout.createVariable("vwind", "f4", ("time", "ny_grid", "nx_grid"))
-        ncp = ncout.createVariable("prmsl", "f4", ("time", "ny_grid", "nx_grid"))
-        nct = ncout.createVariable("stmp", "f4", ("time", "ny_grid", "nx_grid"))
-        ncq = ncout.createVariable("spfh", "f4", ("time", "ny_grid", "nx_grid"))
-
-        # Time axis
+        nctime = create_var(
+            ncout,
+            "time",
+            "f4",
+            ("time",),
+            attrs={
+                "long_name": "Time",
+                "standard_name": "time",
+                "units": f"days since {base_date_str}",
+                "base_date": base_date,
+            },
+        )
         time = np.arange(0, (1 / 24) * (len(files) + 1), 1 / 24)
         time += start_dt.hour / 24.0
         time[0] = _round_down(time[0], 7)
+        write_var(nctime, time)
 
-        base_date_str = start_dt.strftime("%Y-%m-%d")
-        nctime.long_name = "Time"
-        nctime.standard_name = "time"
-        nctime.units = f"days since {base_date_str}"
-        nctime.base_date = [
-            np.int32(start_dt.year),
-            np.int32(start_dt.month),
-            np.int32(start_dt.day),
-            np.int32(0),
-        ]
-        nctime[:] = time
+        nclon = create_var(
+            ncout,
+            "lon",
+            "f4",
+            ("ny_grid", "nx_grid"),
+            attrs={
+                "long_name": "Longitude",
+                "standard_name": "longitude",
+                "units": "degrees_east",
+            },
+        )
+        write_var(nclon, lons)
 
-        # Coordinate metadata
-        nclon.long_name = "Longitude"
-        nclon.standard_name = "longitude"
-        nclon.units = "degrees_east"
-        nclon[:] = lons
+        nclat = create_var(
+            ncout,
+            "lat",
+            "f4",
+            ("ny_grid", "nx_grid"),
+            attrs={
+                "long_name": "Latitude",
+                "standard_name": "latitude",
+                "units": "degrees_north",
+            },
+        )
+        write_var(nclat, lats)
 
-        nclat.long_name = "Latitude"
-        nclat.standard_name = "latitude"
-        nclat.units = "degrees_north"
-        nclat[:] = lats
-
-        ncu.long_name = "Surface Eastward Air Velocity (10m AGL)"
-        ncu.standard_name = "eastward_wind"
-        ncu.units = "m/s"
-
-        ncv.long_name = "Surface Northward Air Velocity (10m AGL)"
-        ncv.standard_name = "northward_wind"
-        ncv.units = "m/s"
-
-        ncp.long_name = "Pressure reduced to MSL"
-        ncp.standard_name = "air_pressure_at_sea_level"
-        ncp.units = "Pa"
-
-        nct.long_name = "Surface Air Temperature (2m AGL)"
-        nct.standard_name = "air_temperature"
-        nct.units = "K"
-
-        ncq.long_name = "Surface Specific Humidity (2m AGL)"
-        ncq.standard_name = "specific_humidity"
-        ncq.units = "kg/kg"
+        nct = create_var(
+            ncout,
+            "stmp",
+            "f4",
+            field_dims,
+            attrs={
+                "long_name": "Surface Air Temperature (2m AGL)",
+                "standard_name": "air_temperature",
+                "units": "K",
+            },
+        )
+        ncq = create_var(
+            ncout,
+            "spfh",
+            "f4",
+            field_dims,
+            attrs={
+                "long_name": "Surface Specific Humidity (2m AGL)",
+                "standard_name": "specific_humidity",
+                "units": "kg/kg",
+            },
+        )
+        ncu = create_var(
+            ncout,
+            "uwind",
+            "f4",
+            field_dims,
+            attrs={
+                "long_name": "Surface Eastward Air Velocity (10m AGL)",
+                "standard_name": "eastward_wind",
+                "units": "m/s",
+            },
+        )
+        ncv = create_var(
+            ncout,
+            "vwind",
+            "f4",
+            field_dims,
+            attrs={
+                "long_name": "Surface Northward Air Velocity (10m AGL)",
+                "standard_name": "northward_wind",
+                "units": "m/s",
+            },
+        )
+        ncp = create_var(
+            ncout,
+            "prmsl",
+            "f4",
+            field_dims,
+            attrs={
+                "long_name": "Pressure reduced to MSL",
+                "standard_name": "air_pressure_at_sea_level",
+                "units": "Pa",
+            },
+        )
 
         for i, file in enumerate(files):
             with netCDF4.Dataset(file) as data:
-                nct[i, :] = data.variables["T2D"][:]
-                ncq[i, :] = data.variables["Q2D"][:]
-                ncu[i, :] = data.variables["U2D"][:]
-                ncv[i, :] = data.variables["V2D"][:]
-                ncp[i, :] = _slp(
-                    np.array(nct[i, :]),
-                    np.array(ncq[i, :]),
-                    height,
-                    np.array(data.variables["PSFC"][:]),
-                )
+                t2d = np.asarray(data.variables["T2D"][0])
+                q2d = np.asarray(data.variables["Q2D"][0])
+                psfc = np.asarray(data.variables["PSFC"][0])
+                write_var(nct, t2d, index=i)
+                write_var(ncq, q2d, index=i)
+                write_var(ncu, np.asarray(data.variables["U2D"][0]), index=i)
+                write_var(ncv, np.asarray(data.variables["V2D"][0]), index=i)
+                write_var(ncp, _pressure_to_msl(t2d, q2d, height, psfc), index=i)
 
         # Duplicate last timestep so SCHISM always has a trailing value
-        ncu[-1] = ncu[-2]
-        ncv[-1] = ncv[-2]
-        ncp[-1] = ncp[-2]
-        nct[-1] = nct[-2]
-        ncq[-1] = ncq[-2]
-    finally:
-        ncout.close()
-
-    _ = length_hours  # consumed by caller when deciding file count
+        write_var(ncu, np.asarray(ncu[-2]), index=-1)
+        write_var(ncv, np.asarray(ncv[-2]), index=-1)
+        write_var(ncp, np.asarray(ncp[-2]), index=-1)
+        write_var(nct, np.asarray(nct[-2]), index=-1)
+        write_var(ncq, np.asarray(ncq[-2]), index=-1)

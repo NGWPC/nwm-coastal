@@ -11,21 +11,112 @@ All functions accept explicit paths/values rather than reading
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import netCDF4
 import numpy as np
 
+from coastal_calibration._nc_io import write_var
 from coastal_calibration.logging import logger
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
 
 
 def _symlink(src: Path, dst: Path) -> None:
     """Create a symlink, replacing an existing one."""
     dst.unlink(missing_ok=True)
     dst.symlink_to(src)
+
+
+def _format_namelist_value(value: Any) -> str:
+    """Render *value* as a Fortran namelist literal."""
+    if isinstance(value, bool):
+        return ".true." if value else ".false."
+    if isinstance(value, (int, float)):
+        return repr(value)
+    return str(value)
+
+
+def _apply_namelist_overrides(text: str, overrides: dict[str, Any]) -> str:
+    """Replace ``key = ...`` lines in a Fortran namelist with new values.
+
+    Keys not already present in *text* are appended just before the
+    closing ``/`` of the most recent namelist block — which is good
+    enough for SCHISM's ``param.nml`` (single ``&PARAM`` block plus an
+    optional ``&SCHOUT``). Raises ``KeyError`` if no namelist block is
+    found at all.
+    """
+    out = text
+    for key, value in overrides.items():
+        rendered = _format_namelist_value(value)
+        new_text, n = re.subn(
+            rf"(?mi)^(\s*){re.escape(key)}\s*=.*$",
+            rf"\g<1>{key} = {rendered}",
+            out,
+        )
+        if n == 0:
+            insert_at = out.rfind("/")
+            if insert_at < 0:
+                raise KeyError(f"No namelist closing '/' found in param.nml; cannot insert {key}")
+            out = out[:insert_at] + f"  {key} = {rendered}\n" + out[insert_at:]
+        else:
+            out = new_text
+    return out
+
+
+def _read_namelist_int(text: str, key: str) -> int | None:
+    """Return the integer value of ``key`` in a Fortran namelist, if present."""
+    m = re.search(rf"(?mi)^\s*{re.escape(key)}\s*=\s*(-?\d+)", text)
+    return int(m.group(1)) if m else None
+
+
+def validate_param_nml(param_path: Path) -> list[str]:
+    """Check the SCHISM-required relationships between output parameters.
+
+    Returns a list of human-readable error strings (empty if the file
+    is internally consistent). Catches the same constraints SCHISM
+    enforces at startup so the user sees the misconfiguration before
+    the MPI binary aborts.
+    """
+    text = param_path.read_text()
+
+    nspool = _read_namelist_int(text, "nspool")
+    ihfskip = _read_namelist_int(text, "ihfskip")
+    nhot = _read_namelist_int(text, "nhot")
+    nhot_write = _read_namelist_int(text, "nhot_write")
+    iout_sta = _read_namelist_int(text, "iout_sta")
+    nspool_sta = _read_namelist_int(text, "nspool_sta")
+
+    errors: list[str] = []
+    if nspool is not None and nspool <= 0:
+        errors.append(f"param.nml: nspool must be > 0 (got {nspool})")
+    if ihfskip is not None and ihfskip <= 0:
+        errors.append(f"param.nml: ihfskip must be > 0 (got {ihfskip})")
+    if nspool is not None and ihfskip is not None and ihfskip % nspool != 0:
+        errors.append(f"param.nml: ihfskip ({ihfskip}) must be a multiple of nspool ({nspool})")
+    if nhot == 1 and nhot_write is not None and ihfskip is not None and nhot_write % ihfskip != 0:
+        errors.append(
+            f"param.nml: nhot_write ({nhot_write}) must be a multiple of ihfskip ({ihfskip}) "
+            "when nhot = 1"
+        )
+    if (
+        iout_sta is not None
+        and iout_sta != 0
+        and nhot_write is not None
+        and nspool_sta is not None
+        and nhot_write % nspool_sta != 0
+    ):
+        errors.append(
+            f"param.nml: nhot_write ({nhot_write}) must be a multiple of nspool_sta "
+            f"({nspool_sta}) when iout_sta = {iout_sta}"
+        )
+    return errors
 
 
 def clean_run_directory(work_dir: Path) -> None:
@@ -128,7 +219,7 @@ def stage_chrtout_files(
     return nwm_output_dir, nwm_ana_dir
 
 
-def _write_th_file(path: Path, data: np.ndarray, tstep: float) -> None:
+def _write_th_file(path: Path, data: NDArray[np.floating[Any]], tstep: float) -> None:
     """Write a SCHISM time-history (.th) file."""
     t = 0.0
     with path.open("w") as f:
@@ -292,7 +383,7 @@ def run_combine_sink_source(work_dir: Path) -> None:
 def merge_source_sink(  # noqa: PLR0915
     *,
     work_dir: Path,
-    element_areas: np.ndarray,
+    element_areas: NDArray[np.floating[Any]],
     prebuilt_dir: Path | None = None,
 ) -> None:
     """Merge river discharge into precipitation source and write ``source.nc``.
@@ -412,13 +503,13 @@ def merge_source_sink(  # noqa: PLR0915
         ncvsis = ncout.createVariable("time_step_vsink", "f4", ("one",))
         ncvmos = ncout.createVariable("time_step_msource", "f4", ("one",))
 
-        ncso[:] = keep
-        ncsi[:] = siel
-        ncvso[:] = so2
-        ncvsi[:] = si
-        nctso[:] = time
-        nctsi[:] = time
-        nctmo[:] = time
+        write_var(ncso, keep)
+        write_var(ncsi, np.asarray(siel))
+        write_var(ncvso, so2)
+        write_var(ncvsi, si)
+        write_var(nctso, time)
+        write_var(nctsi, time)
+        write_var(nctmo, time)
         ncvsos[:] = time[1] - time[0]
         ncvsis[:] = time[1] - time[0]
         ncvmos[:] = time[1] - time[0]
@@ -568,7 +659,6 @@ def make_sflux(
     work_dir: Path,
     forcing_input_dir: Path,
     start_date: datetime,
-    duration_hours: int,
     geogrid_file: Path,
 ) -> Path:
     """Generate sflux atmospheric forcing from LDASIN files.
@@ -601,7 +691,6 @@ def make_sflux(
         forcing_input_dir=forcing_subdir,
         work_dir=work_dir,
         start_dt=start_date,
-        duration_hours=duration_hours,
         geogrid_file=geogrid_file,
     )
 
@@ -611,8 +700,6 @@ def make_sflux(
     # SCHISM expects sflux_air_1.{n}.nc (no leading zeros) but makeAtmo
     # produces sflux_air_1.0001.nc (4-digit zero-padded).  Rename files
     # to match the expected naming convention.
-    import re
-
     for f in sflux_dir.glob("sflux_air_*.nc"):
         m = re.match(r"(sflux_air_\d+)\.(\d+)\.nc", f.name)
         if m and len(m.group(2)) > 1 and m.group(2).startswith("0"):
@@ -631,13 +718,17 @@ def make_sflux(
 # ---------------------------------------------------------------------------
 
 
-def update_params(  # noqa: PLR0915
+def update_params(  # noqa: PLR0912, PLR0915
     *,
     work_dir: Path,
     prebuilt_dir: Path,
     start_date: datetime,
     duration_hours: int,
+    timestep_seconds: int = 200,
     hot_start_file: Path | None = None,
+    output_freq_hours: float = 1.0,
+    single_output_file: bool = False,
+    run_param_overrides: dict[str, Any] | None = None,
 ) -> Path:
     """Create ``param.nml`` and symlink static mesh files.
 
@@ -646,10 +737,26 @@ def update_params(  # noqa: PLR0915
     directory, updates date/time/duration parameters, and symlinks
     mesh files.
 
+    ``timestep_seconds`` is SCHISM's integration timestep (``dt`` in
+    ``param.nml``) and the time unit that ``nspool``/``ihfskip``/
+    ``nhot_write`` are counted in. Defaults to 200, the value used by
+    the Pacific and Hawaii forecast templates.
+
+    ``output_freq_hours`` sets how often SCHISM writes field outputs
+    (translated into ``nspool``). ``single_output_file`` controls
+    whether SCHISM rotates to a new output file after each write
+    (``ihfskip = nspool``, the historical behavior) or keeps appending
+    to one file across the whole run (``ihfskip = total_timesteps``).
+    The latter matters on shared filesystems where every rotation costs
+    an MPI barrier and metadata round-trips.
+
+    ``run_param_overrides`` is applied last and overrides any namelist
+    key set above. Values are written verbatim (no quoting), so callers
+    are responsible for matching the namelist syntax (numbers as
+    numbers, strings without spaces).
+
     Returns the path to the generated ``param.nml``.
     """
-    import re
-
     coastal_parm = prebuilt_dir
 
     # Copy template param.nml
@@ -678,9 +785,43 @@ def update_params(  # noqa: PLR0915
     text = re.sub(r"(?m)^(\s*)start_day\s*=.*$", rf"\g<1>start_day = {start_day}", text)
     text = re.sub(r"(?m)^(\s*)start_hour\s*=.*$", rf"\g<1>start_hour = {start_hour_frac:.2f}", text)
 
-    # Update run parameters
-    text = re.sub(r"(?m)^(\s*)nspool\s*=.*$", r"\g<1>nspool = 18", text)
-    text = re.sub(r"(?m)^(\s*)ihfskip\s*=.*$", r"\g<1>ihfskip = 18", text)
+    # nspool, ihfskip, and nhot_write are counted in timesteps and are
+    # coupled via SCHISM's divisibility constraints, so we resolve them
+    # together: the user's ``run_param_overrides`` (if any) take
+    # precedence for each key, and the auto-derived defaults for the
+    # keys they did *not* override adapt to whatever they did override.
+    # This means ``run_param_overrides={"ihfskip": 324}`` produces a
+    # sensible ``nhot_write`` automatically.
+    overrides_remaining = dict(run_param_overrides) if run_param_overrides else {}
+
+    nspool_default = max(1, round(output_freq_hours * 3600 / timestep_seconds))
+    nspool = int(overrides_remaining.pop("nspool", nspool_default))
+
+    if single_output_file:
+        # Round up so the last write fits inside one file.
+        total_timesteps = -(-int(rnhours) * 3600 // timestep_seconds)
+        ihfskip_default = max(nspool, total_timesteps)
+    else:
+        ihfskip_default = nspool
+    ihfskip = int(overrides_remaining.pop("ihfskip", ihfskip_default))
+
+    # SCHISM requires ``nhot_write`` to be a multiple of ihfskip when
+    # nhot=1. We aim for "hotstart roughly every 18 simulation hours"
+    # at the canonical dt=200 (nhot_target = 324 timesteps) but rescale
+    # for other timesteps so the wall-clock cadence stays similar, then
+    # round up to the next multiple of ihfskip so the constraint holds.
+    # The user can still override ``nhot_write`` directly.
+    nhot_target = max(1, round(18 * 3600 / timestep_seconds))
+    nhot_write_default = max(1, -(-nhot_target // ihfskip)) * ihfskip
+    nhot_write = int(overrides_remaining.pop("nhot_write", nhot_write_default))
+
+    text = re.sub(r"(?m)^(\s*)nspool\s*=.*$", rf"\g<1>nspool = {nspool}", text)
+    text = re.sub(r"(?m)^(\s*)ihfskip\s*=.*$", rf"\g<1>ihfskip = {ihfskip}", text)
+    text = re.sub(
+        r"(?m)^(\s*)nhot_write\s*=.*$",
+        rf"\g<1>nhot_write = {nhot_write} !must be a multiple of ihfskip if nhot=1",
+        text,
+    )
 
     # Use netCDF source/sink forcing
     text = re.sub(r"(?m)^(\s*)if_source\s*=.*$", r"\g<1>if_source = -1", text)
@@ -690,7 +831,7 @@ def update_params(  # noqa: PLR0915
     text = re.sub(r"(?m)^(\s*)rnday\s*=.*$", rf"\g<1>rnday = {rnday:.8f}", text)
 
     # Timestep and atmospheric timestep
-    text = re.sub(r"(?m)^(\s*)dt\s*=.*$", r"\g<1>dt = 200", text)
+    text = re.sub(r"(?m)^(\s*)dt\s*=.*$", rf"\g<1>dt = {timestep_seconds}", text)
     text = re.sub(r"(?m)^(\s*)wtiminc\s*=.*$", r"\g<1>wtiminc = 600", text)
 
     # Hot start handling
@@ -711,6 +852,11 @@ def update_params(  # noqa: PLR0915
             r"\1\n  nbins_veg_vert = 1\n  nmarsh_types = 1",
             text,
         )
+
+    # Apply any remaining user-supplied namelist overrides (those not
+    # consumed earlier by the nspool/ihfskip/nhot_write resolver).
+    if overrides_remaining:
+        text = _apply_namelist_overrides(text, overrides_remaining)
 
     param_path.write_text(text)
 

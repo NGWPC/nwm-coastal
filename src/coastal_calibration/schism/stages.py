@@ -544,6 +544,15 @@ class PreSCHISMStage(WorkflowStage):
             _patch_param_nml(work_dir / "param.nml")
             self._log("Set iout_sta = 1, nspool_sta = 18 in param.nml")
 
+        # 4. Validate the final param.nml against SCHISM's startup
+        #    constraints so misconfigurations surface here with a clear
+        #    message instead of a Fortran abort during schism_run.
+        from coastal_calibration.schism.prep import validate_param_nml
+
+        param_errors = validate_param_nml(work_dir / "param.nml")
+        if param_errors:
+            raise RuntimeError("param.nml validation failed:\n  - " + "\n  - ".join(param_errors))
+
         self._log("SCHISM pre-processing complete")
         return {
             "partition_file": str(work_dir / "partition.prop"),
@@ -806,7 +815,7 @@ class SchismPlotStage(WorkflowStage):
         self,
         station_ids: list[str],
         corr_path: Path,
-    ) -> np.ndarray | None:
+    ) -> NDArray[Any] | None:
         """Compute per-station mesh→MSL offsets, or None if unavailable.
 
         Reads ``elevation_correction.csv`` and, for each station ID,
@@ -857,7 +866,7 @@ class SchismPlotStage(WorkflowStage):
 
     def _load_station_simulation(
         self, work_dir: Path
-    ) -> tuple[list[str], np.ndarray, np.ndarray] | None:
+    ) -> tuple[list[str], NDArray[Any], NDArray[Any]] | None:
         """Read station IDs + ``staout_1`` and return (ids, sim_times, elev_msl).
 
         Returns ``None`` when prerequisite files are missing — the caller

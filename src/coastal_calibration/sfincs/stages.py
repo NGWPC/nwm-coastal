@@ -261,11 +261,11 @@ def _create_meteo_forcing(
     variables : list[str]
         Variable names to select (e.g. ``["wind10_u", "wind10_v"]``).
     dst_res : float
-        Target resolution in metres (model CRS units).
+        Target resolution in meters (model CRS units).
     fill_value : float
         Value used where no data is available after reprojection.
     domain_buffer : float
-        Buffer in metres around the model region for the output grid.
+        Buffer in meters around the model region for the output grid.
         Default 10 km gives SFINCS comfortable interpolation headroom.
 
     Returns
@@ -1121,7 +1121,7 @@ class SfincsForcingStage(_SfincsStageBase):
         (``d < 1e-10``) is handled by clamping the distance from below
         with the same epsilon: the inverse-distance weight then becomes
         large enough that the exact-match neighbour dominates the
-        normalised weights, exactly matching the single-target fallback
+        normalized weights, exactly matching the single-target fallback
         path in the previous Python-loop implementation.
         """
         from scipy.spatial import KDTree
@@ -1687,7 +1687,7 @@ class SfincsWriteStage(WorkflowStage):
         # right before writing so they take final precedence.
         # Parameter name validation is done at config load time in
         # SfincsModelConfig.__post_init__.
-        overrides: dict[str, Any] = getattr(self.config.model_config, "inp_overrides", {})
+        overrides: dict[str, Any] = getattr(self.config.model_config, "run_param_overrides", {})
         if overrides:
             model.config.update(overrides)
             self._log(f"Applied {len(overrides)} sfincs.inp override(s): {overrides}")

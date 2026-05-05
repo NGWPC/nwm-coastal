@@ -52,7 +52,11 @@ class UpdateParamsStage(WorkflowStage):
             prebuilt_dir=self.model.coastal_parm,
             start_date=sim.start_date,
             duration_hours=sim.duration_hours,
+            timestep_seconds=sim.timestep_seconds,
             hot_start_file=self.config.paths.hot_start_file,
+            output_freq_hours=self.model.output_freq_hours,
+            single_output_file=self.model.single_output_file,
+            run_param_overrides=self.model.run_param_overrides,
         )
 
         self._log(f"Parameter file created: {param_file}")
