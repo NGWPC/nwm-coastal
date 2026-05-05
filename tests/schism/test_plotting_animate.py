@@ -164,7 +164,7 @@ class TestEdgeCases:
         out = animate_water_level(ds, tmp_path / "explicit.gif", fps=5, dpi=60, writer="pillow")
         assert out.is_file()
 
-    def test_colour_limits_propagate(self, tmp_path: Path):
+    def test_color_limits_propagate(self, tmp_path: Path):
         ds = _sfincs_regular_dataset(n_time=2)
         out = animate_water_level(
             ds,

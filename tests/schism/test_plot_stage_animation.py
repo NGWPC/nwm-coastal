@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pytest
@@ -25,6 +26,9 @@ from coastal_calibration.config.schema import (
     SimulationConfig,
 )
 from coastal_calibration.schism.stages import SchismPlotStage
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
 
 
 def _have_ffmpeg() -> bool:
@@ -46,7 +50,9 @@ _DEPTH = np.array([5.0, 4.5, 4.0, 3.5, 3.0], dtype=np.float64)
 _FACE_NODES = np.array([[1, 2, 4, 0], [2, 5, 4, 0], [2, 3, 5, 0]], dtype=np.int32)
 
 
-def _write_out2d_block(path: Path, *, seconds: np.ndarray, elev: np.ndarray) -> None:
+def _write_out2d_block(
+    path: Path, *, seconds: NDArray[np.floating[Any]], elev: NDArray[np.floating[Any]]
+) -> None:
     ds = xr.Dataset(
         data_vars={
             "elevation": (("time", "nSCHISM_hgrid_node"), elev.astype(np.float32)),

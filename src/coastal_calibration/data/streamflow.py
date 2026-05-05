@@ -23,6 +23,8 @@ if TYPE_CHECKING:
     from datetime import datetime
     from pathlib import Path
 
+    from numpy.typing import NDArray
+
 # ---------------------------------------------------------------------------
 # Zarr store URLs for NWM Retrospective v3.0 on S3
 # ---------------------------------------------------------------------------
@@ -131,7 +133,7 @@ def _read_from_chrtout(
     fid_to_col = {f: i for i, f in enumerate(fid_list)}
     n_fids = len(fid_list)
 
-    rows: list[tuple[pd.Timestamp, np.ndarray]] = []
+    rows: list[tuple[pd.Timestamp, NDArray[np.floating[Any]]]] = []
 
     for fpath in chrtout_files:
         with netCDF4.Dataset(str(fpath), "r") as ds:

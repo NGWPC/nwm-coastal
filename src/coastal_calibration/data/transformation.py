@@ -299,7 +299,7 @@ def clip_and_reproject(
         rioxarray).
     dst_bounds
         ``(xmin, ymin, xmax, ymax)`` target bounding box in *dst_crs*
-        units (e.g. metres for a UTM zone).
+        units (e.g. meters for a UTM zone).
     dst_crs
         Target CRS (anything accepted by ``rasterio``/``pyproj``).
     dst_res

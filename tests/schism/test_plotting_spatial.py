@@ -264,7 +264,7 @@ class TestWetMask:
 class TestExtendedCmap:
     def test_under_over_pinned(self):
         cmap = _extended_cmap("viridis")
-        # Under colour matches the bottom of the colormap; over matches the top.
+        # Under color matches the bottom of the colormap; over matches the top.
         assert tuple(cmap.get_under()) == tuple(cmap(0.0))
         assert tuple(cmap.get_over()) == tuple(cmap(1.0))
 
@@ -332,7 +332,7 @@ class TestPlotWaterLevelUnstructured:
     def test_percentile_limits_consistent_across_frames(self):
         """Default vmin/vmax should be identical for every frame.
 
-        This is the invariant that keeps animation colours stable across frames.
+        This is the invariant that keeps animation colors stable across frames.
         """
         ds = _schism_dataset()
         _, c0 = plot_water_level(ds, time=0)
@@ -382,13 +382,13 @@ class TestPlotWaterLevelUnstructured:
         plt.close(fig)
 
     def test_out_of_range_values_use_limit_colors(self):
-        """Values outside vmin/vmax render with the under/over colour of the cmap."""
+        """Values outside vmin/vmax render with the under/over color of the cmap."""
         import matplotlib as mpl
 
         ds = _schism_dataset()
         _, coll = plot_water_level(ds, time=0, vmin=10.0, vmax=20.0, cmap="viridis")
         cmap = coll.cmap
-        # Under colour equals cmap(0); over equals cmap(1).
+        # Under color equals cmap(0); over equals cmap(1).
         np.testing.assert_allclose(cmap.get_under(), cmap(0.0))
         np.testing.assert_allclose(cmap.get_over(), cmap(1.0))
         assert isinstance(cmap, mpl.colors.Colormap)

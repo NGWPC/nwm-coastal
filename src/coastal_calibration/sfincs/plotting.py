@@ -16,6 +16,7 @@ import numpy as np
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure, SubFigure
+    from numpy.typing import NDArray
     from pyproj import CRS
 
 __all__ = ["LevelInfo", "SfincsGridInfo", "plot_mesh"]
@@ -56,9 +57,9 @@ class SfincsGridInfo:
     shape: tuple[int, int] | None = None
 
     # Internal arrays for plotting — not part of the public API.
-    _verts: np.ndarray | None = dataclasses.field(default=None, repr=False)
-    _level_per_face: np.ndarray | None = dataclasses.field(default=None, repr=False)
-    _mask: np.ndarray | None = dataclasses.field(default=None, repr=False)
+    _verts: NDArray[Any] | None = dataclasses.field(default=None, repr=False)
+    _level_per_face: NDArray[Any] | None = dataclasses.field(default=None, repr=False)
+    _mask: NDArray[Any] | None = dataclasses.field(default=None, repr=False)
     _grid_extent: tuple[float, float, float, float] | None = dataclasses.field(
         default=None, repr=False
     )

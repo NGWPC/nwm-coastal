@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 import shapely
-from shapely import Point
+from shapely import MultiPolygon, Point
 
 from coastal_calibration.logging import (
     WorkflowMonitor,
@@ -39,6 +39,8 @@ if TYPE_CHECKING:
 
     import geopandas as gpd
     from hydromt_sfincs import SfincsModel
+    from numpy.typing import NDArray
+    from shapely import Polygon
 
     from coastal_calibration.config.create_schema import SfincsCreateConfig
 
@@ -199,9 +201,11 @@ class CreateGridStage(CreateStage):
             raise ValueError(msg)
 
         if eroded.geom_type == "MultiPolygon":
-            from shapely import MultiPolygon, Polygon
-
-            parts: list[Polygon] = list(cast("MultiPolygon", eroded).geoms)
+            # ``Polygon``/``MultiPolygon`` are TYPE_CHECKING-only
+            # imports; the annotation and the cast() are erased at
+            # runtime so the symbol form here costs nothing and lets
+            # vulture see the import as used.
+            parts: list[Polygon] = list(cast(MultiPolygon, eroded).geoms)
             largest = max(parts, key=lambda p: float(p.area))
             n_dropped = len(parts) - 1
             dropped_area = sum(p.area for p in parts) - largest.area
@@ -551,8 +555,8 @@ class CreateMaskStage(_CreateStageBase):
         mask = np.asarray(qt_data["mask"].values)
         n = len(mask)
 
-        srcs: list[np.ndarray] = []
-        dsts: list[np.ndarray] = []
+        srcs: list[NDArray[np.integer[Any]]] = []
+        dsts: list[NDArray[np.integer[Any]]] = []
         for nb in (
             "mu",
             "mu1",

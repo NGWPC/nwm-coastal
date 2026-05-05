@@ -378,7 +378,7 @@ def extract_water_level_series(
     pandas.DataFrame
         Indexed by the dataset's time axis, with one column per input
         point (named by its ``id``). Values are water-surface elevation
-        (metres, MSL) interpolated by nearest-cell lookup in the model
+        (meters, MSL) interpolated by nearest-cell lookup in the model
         mesh.
 
     Notes
