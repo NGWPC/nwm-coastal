@@ -1,94 +1,48 @@
 # Examples
 
-Two sets of notebooks live here:
+Two notebooks cover the client-facing surface of the library:
 
-- **Tutorials** walk through coastal flood modeling workflows end-to-end, from building
-    the model grid to running the simulation and comparing results against NOAA
-    tide-gauge observations.
-- **Post-run Plotting** demos assume an already-run model and exercise the
-    post-processing plotting API (`plot_water_level`, `animate_water_level`,
-    observation-point extraction) with verified numerical analyses.
-
-The SFINCS tutorials cover a three-phase workflow:
-
-1. **Create**: build a SFINCS model from an Area of Interest polygon (grid, elevation,
-    subgrid tables, boundary conditions, observation points).
-1. **Run**: download forcing data, write SFINCS input files, execute the model, and plot
-    simulated vs. observed water levels.
-1. **Flood Map**: downscale SFINCS water surface elevations onto a high-resolution DEM
-    to produce a Cloud Optimized GeoTIFF of maximum flood depth.
-
-The SCHISM tutorial demonstrates the end-to-end workflow with native (container-free)
-execution.
+- **Mendocino Walkthrough** is the headliner — extract a SCHISM subdomain from the
+    Pacific mesh, drive it through the 12-stage SCHISM pipeline, derive the SFINCS AOI
+    from the SCHISM mesh boundary using the `nwm_coastal` QGIS plugin, run SFINCS on the
+    matching domain, then compare both models against a NOAA tide gauge and animate the
+    two water-level fields side-by-side.
+- **Lavaca Bay** is a SFINCS-only "build from an AOI" demo on a different domain. It
+    covers the create + run flow with `SfincsCreator` and `CoastalCalibRunner`, then
+    drives the post-processing plotting API directly (mesh inspection, flood depth map,
+    water-surface/depth/anomaly snapshots, satellite basemap overlay, animation, and
+    time series at user-specified observation points).
 
 !!! note "Prerequisites"
 
-    The SFINCS tutorials require the downloaded forcing data cache
-    (`docs/examples/downloads/`) and a compiled SFINCS executable. See
-    [Compiling SFINCS](../sfincs_compilation.md) for build instructions. The SCHISM tutorial
-    requires a compiled SCHISM binary; see [Compiling SCHISM](../schism_compilation.md). The
-    **Post-run Plotting** demos only need the outputs of an already-completed model run and
-    can be executed directly against any of the tutorial runs once they have finished.
+    Both notebooks need a compiled SFINCS executable; the walkthrough also needs SCHISM.
+    Both binaries are built automatically when activating a pixi environment with the
+    corresponding feature (`schism` or `sfincs`), so no manual build is needed in the
+    standard workflow. See [Compiling SFINCS](../dev/sfincs_compilation.md) for build
+    instructions when not using pixi.
 
-## Tutorials
+## Notebooks
 
 <div class="grid cards" markdown>
-
-- [![Lavaca Bay (SFINCS)](images/lavaca_thumb.png){ loading=lazy }](notebooks/lavaca.ipynb "Lavaca Bay, TX")
-    **Lavaca Bay, TX**
-
-- [![Narragansett Bay (SFINCS)](images/narragansett_thumb.png){ loading=lazy }](notebooks/narragansett.ipynb "Narragansett Bay, RI")
-    **Narragansett Bay, RI**
-
-- [![Hawaii (SCHISM)](images/hawaii_thumb.png){ loading=lazy }](notebooks/schism-hawaii.ipynb "Hawaii")
-    **Hawaii (SCHISM)**
-
-- [![Hawaii mesh subset (SCHISM)](images/hawaii_thumb.png){ loading=lazy }](notebooks/schism-hawaii-subset.ipynb "Hawaii mesh subset")
-    **Hawaii Mesh Subset (SCHISM)**
-
-    Cut the Hawaii SCHISM mesh along a user-supplied line with `divide_mesh`, producing
-    two self-contained sub-projects and the open-boundary, land-boundary, and
-    island-boundary reconstructions on each side.
 
 - [![Mendocino walkthrough (SCHISM + SFINCS)](images/walkthrough_thumb.png){ loading=lazy }](notebooks/walkthrough.ipynb "Mendocino walkthrough — SCHISM + SFINCS comparison")
     **Mendocino Walkthrough (SCHISM + SFINCS)**
 
-    End-to-end side-by-side demo on a single Pacific subdomain. Extract a sub-mesh
-    from the full Pacific SCHISM domain with `extract_mesh`, run a SFINCS quadtree
-    model on the same boundary (level-4 refinement along the SCHISM mesh edge,
-    `mask.keep_largest_only`, tide-stable `inp_overrides`), then compare the two
+    End-to-end side-by-side demo on a single Pacific subdomain. Extract a sub-mesh from
+    the full Pacific SCHISM domain with `extract_mesh`, run a SFINCS quadtree model on
+    the same boundary (level-4 refinement along the SCHISM mesh edge,
+    `mask.keep_largest_only`, tide-stable `run_param_overrides`), then compare the two
     against a shared NOAA gauge in a 3-line plot and render the water-level fields
     side-by-side with a shared colorbar via `animate_water_level_comparison`.
 
-</div>
-
-## Post-run Plotting
-
-Demonstrations of the post-processing plotting API on completed SFINCS and SCHISM runs.
-Each notebook loads the 2-D water-level field, picks quantile-based colour limits from
-wet cells, renders snapshots and a diverging water-level-anomaly view, produces an MP4
-animation, and extracts water-level time series at user-specified observation points.
-
-<div class="grid cards" markdown>
-
-- [![Lavaca Bay post-run](images/plot_sfincs_lavaca_thumb.png){ loading=lazy }](notebooks/plot_sfincs_lavaca.ipynb "Lavaca Bay post-run plotting demo")
+- [![Lavaca Bay (SFINCS)](images/lavaca_thumb.png){ loading=lazy }](notebooks/lavaca.ipynb "Lavaca Bay, TX")
     **Lavaca Bay (SFINCS)**
 
-    Water-surface and depth snapshots, water-level anomaly with the head-to-shelf set-up
-    gradient, and a three-point time series showing the 6-hour tidal phase delay up the
-    bay.
-
-- [![Narragansett Bay post-run](images/plot_sfincs_narragansett_thumb.png){ loading=lazy }](notebooks/plot_sfincs_narragansett.ipynb "Narragansett Bay post-run plotting demo")
-    **Narragansett Bay (SFINCS)**
-
-    Snapshots with a satellite basemap, a water-level anomaly view, and a three-point time
-    series that captures a storm-surge peak near +1.8 m on top of the tide.
-
-- [![Hawaii post-run](images/plot_schism_hawaii_thumb.png){ loading=lazy }](notebooks/plot_schism_hawaii.ipynb "Hawaii post-run plotting demo")
-    **Hawaii (SCHISM)**
-
-    Unstructured-mesh snapshots with wet-cell masking from `dryFlagNode`, a water-level
-    anomaly that shows the M2/S2 beat pattern across the archipelago, and three-point
-    time series.
+    SFINCS-only build-from-AOI workflow: `SfincsCreator` produces a quadtree mesh with
+    elevation, subgrid, and discharge sources from a single AOI polygon, then
+    `CoastalCalibRunner` runs the simulation and validates against NOAA observations.
+    Drives the post-processing plotting API directly to produce mesh and flood-map
+    inspections, water-surface/depth/anomaly snapshots, a satellite-basemap overlay, an
+    animation, and time series at three user-specified observation points.
 
 </div>
