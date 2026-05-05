@@ -42,7 +42,7 @@ reach instead of once at the head of each tributary.
 ## What a robust replacement looks like
 
 `SfincsDischargeStage._inflow_intersection_point`
-([src/coastal_calibration/sfincs/create.py:848](../../src/coastal_calibration/sfincs/create.py))
+([src/coastal_calibration/sfincs/create.py:848](https://github.com/NGWPC/nwm-coastal/blob/development/src/coastal_calibration/sfincs/create.py#L848))
 solves the equivalent problem for SFINCS quadtree models. The same strategy generalizes
 directly to SCHISM:
 
@@ -65,7 +65,8 @@ file handle the shapely details (MultiPoint, GeometryCollection, etc.).
 
 SCHISM **model creation is intentionally out of scope** for `coastal-calibration` — this
 package operates on pre-built SCHISM models supplied by external collaborators. The
-roadmap entry "SCHISM model creation" in the top-level [README.md](../../README.md)
+roadmap entry "SCHISM model creation" in the top-level
+[README.md](https://github.com/NGWPC/nwm-coastal/blob/development/README.md)
 captures this as future work. When that work happens, the discharge source/sink
 generation step needs to use the upstream-crossing strategy above instead of flagging
 every boundary crossing.

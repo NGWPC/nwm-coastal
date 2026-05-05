@@ -91,8 +91,7 @@ coastal-calibration run "${CONFIG_FILE}"
 rm -f "${CONFIG_FILE}"
 ```
 
-Submit with `sbatch my_run.sh`. Complete examples are provided for
-[SCHISM](../examples/slurm/schism.sh) and [SFINCS](../examples/slurm/sfincs.sh).
+Submit with `sbatch my_run.sh`.
 
 !!! tip "Single-quoted heredoc"
 
