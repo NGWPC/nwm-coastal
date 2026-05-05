@@ -2,7 +2,7 @@
 
 Combines CPU detection (:func:`get_cpu_count`), MPI implementation
 detection (:func:`detect_mpi`), MPI environment/command builders, and
-the project's UTC-normalisation helper (:func:`to_naive_utc`).
+the project's UTC-normalization helper (:func:`to_naive_utc`).
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ def to_naive_utc(dt: datetime) -> datetime:
     constants in :mod:`coastal_calibration.data.downloader` are bare
     ``datetime(YYYY, M, D)`` values that mean "midnight UTC".
 
-    This helper normalises any user-supplied datetime into that
+    This helper normalizes any user-supplied datetime into that
     convention:
 
     - tz-aware → converted to UTC, then ``tzinfo`` stripped.
@@ -40,7 +40,7 @@ def to_naive_utc(dt: datetime) -> datetime:
 
     Use this at every public boundary that accepts a ``datetime`` from
     the caller (config loading, data-layer queries, etc.) so the rest
-    of the pipeline can compare, subtract, and serialise without ever
+    of the pipeline can compare, subtract, and serialize without ever
     crossing the naive/aware boundary.
     """
     if dt.tzinfo is not None:
@@ -152,7 +152,7 @@ def detect_mpi(env: dict[str, str] | None = None) -> MpiImpl:
     -------
     MpiImpl
         The detected implementation.  Returns :attr:`MpiImpl.UNKNOWN` when
-        ``mpiexec`` is not found or produces unrecognised output.
+        ``mpiexec`` is not found or produces unrecognized output.
     """
     key = _mpi_cache_key(env)
     if key in _cache:

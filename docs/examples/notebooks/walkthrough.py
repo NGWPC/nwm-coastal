@@ -37,75 +37,43 @@
 # %% [markdown]
 # ## 0. Setup
 #
-# The walkthrough runs out of `docs/examples/walkthrough/`. The setup
-# cell below creates that directory and stages every input the
-# notebook needs from the local `docs/examples/pacific/` demo:
-#
-# - **SCHISM mesh + WRF geogrid** — symlinked from
-#   `pacific/model` and `pacific/geo_em_CONUS.nc`.
-# - **Extract polygon** — the same GeoJSON used by
-#   `schism-pacific-extract.py` so we carve out the same Mendocino
-#   subdomain.
-# - **SFINCS AOI polygon and NWM flowlines** — pre-staged in
-#   `docs/examples/pacific/` (`sfincs_poly.geojson` and
-#   `nwm_reaches.geojson`) so the notebook is fully runnable
-#   end-to-end. Part 2 below documents the QGIS workflow that
-#   produced them.
+# The walkthrough runs out of `docs/examples/walkthrough/`. That
+# directory is committed with the four input GeoJSONs the demo needs
+# (`extract_poly.geojson`, `aoi.geojson`, `refine_poly.geojson`,
+# `discharge_nwm.geojson`); Part 2 below documents the QGIS workflow
+# that produced the SFINCS-side inputs. The full Pacific SCHISM mesh
+# and the WRF geogrid are not redistributable, so they live as
+# symlinks (`model`, `geo_em_CONUS.nc`) pointing at the proprietary
+# data drive — see `docs/examples/README.md` for how to set them up.
 
 # %%
 from __future__ import annotations
 
 import os
-import shutil
 from pathlib import Path
 
 notebook_dir = Path.cwd()  # assumes run from docs/examples/notebooks/
 walkthrough_dir = (notebook_dir.parent / "walkthrough").resolve()
-walkthrough_dir.mkdir(exist_ok=True)
 os.chdir(walkthrough_dir)
 
-pacific_dir = (notebook_dir.parent / "pacific").resolve()
-
-heavy_inputs: dict[str, Path] = {
-    "model": pacific_dir / "model",
-    "geo_em_CONUS.nc": pacific_dir / "geo_em_CONUS.nc",
-}
-for name, src in heavy_inputs.items():
-    dst = walkthrough_dir / name
-    if dst.exists() or dst.is_symlink():
-        continue
-    if not src.exists():
-        raise FileNotFoundError(
-            f"Required input missing: {src}. Provide the local pacific/ demo "
-            f"setup (symlinks under docs/examples/pacific/) before running."
-        )
-    dst.symlink_to(src.resolve())
-
-# Copy the small lightweight inputs (extract polygon, SFINCS AOI,
-# refinement polygon, and NWM flowlines) so the walkthrough directory
-# is self-contained.
-small_inputs: dict[str, str] = {
-    "extract_poly.geojson": "pacific_poly.geojson",
-    "aoi.geojson": "sfincs_poly.geojson",
-    "refine_poly.geojson": "schism_poly.geojson",
-    "discharge_nwm.geojson": "nwm_reaches.geojson",
-}
-for dst_name, src_name in small_inputs.items():
-    src = pacific_dir / src_name
-    dst = walkthrough_dir / dst_name
-    if dst.exists():
-        continue
-    if not src.exists():
-        raise FileNotFoundError(
-            f"{src} is missing. The walkthrough expects pre-staged inputs in "
-            f"docs/examples/pacific/ (see Part 2 for the QGIS workflow that "
-            f"produced sfincs_poly.geojson and nwm_reaches.geojson)."
-        )
-    shutil.copyfile(src, dst)
+required = (
+    "model",  # symlink to proprietary Pacific SCHISM mesh
+    "geo_em_CONUS.nc",  # symlink to proprietary WRF geogrid
+    "extract_poly.geojson",  # SCHISM subset polygon
+    "aoi.geojson",  # SFINCS AOI (mesh boundary unioned with NHF divides)
+    "refine_poly.geojson",  # SFINCS quadtree refinement zone
+    "discharge_nwm.geojson",  # NWM flowlines crossing the AOI
+)
+missing = [n for n in required if not (walkthrough_dir / n).exists()]
+if missing:
+    raise FileNotFoundError(
+        f"Required walkthrough inputs missing: {missing}. "
+        "See docs/examples/README.md for setup instructions."
+    )
 
 print(f"Working directory: {walkthrough_dir}")
 print("Inputs:")
-for name in (*heavy_inputs, *small_inputs):
+for name in required:
     p = walkthrough_dir / name
     if p.is_symlink():
         kind = f"symlink -> {p.resolve()}"
@@ -160,7 +128,6 @@ schism_config = CoastalCalibConfig.from_dict(
             "duration_hours": 50,
             "coastal_domain": "pacific",
             "meteo_source": "nwm_ana",
-            "timestep_seconds": 300,
         },
         "boundary": {"source": "stofs"},
         "paths": {
@@ -204,9 +171,9 @@ print(schism_result)
 #    NWM streamflow regardless of the source column name).
 #
 # **The walkthrough has these files pre-staged** in
-# `docs/examples/pacific/` (`sfincs_poly.geojson` and
-# `nwm_reaches.geojson`) so Parts 3–5 are runnable today. The steps
-# below document how those files were produced.
+# `docs/examples/walkthrough/` (`aoi.geojson` and `discharge_nwm.geojson`)
+# so Parts 3–5 are runnable today. The steps below document how those
+# files were produced.
 #
 # ### Step 1 — The toolbar
 #
@@ -277,12 +244,12 @@ print(schism_result)
 #
 # ![Selected discharge flowpaths inside the AOI](../images/plugin_discharge_flowpath.png)
 #
-# The setup cell at the top of this notebook copies the pre-staged
-# `pacific/sfincs_poly.geojson` to `walkthrough/aoi.geojson` and
-# `pacific/nwm_reaches.geojson` to `walkthrough/discharge_nwm.geojson`,
-# so this section can be skipped end-to-end on a re-run. To use a
-# different domain, regenerate the two GeoJSONs with the steps above
-# and drop them into `docs/examples/pacific/` under the same names.
+# The setup cell at the top of this notebook expects `aoi.geojson` and
+# `discharge_nwm.geojson` to live in `docs/examples/walkthrough/` —
+# both are committed alongside the notebook so this section can be
+# skipped end-to-end on a re-run. To use a different domain, regenerate
+# the two GeoJSONs with the steps above and drop them into the
+# walkthrough directory under the same names.
 
 # %% [markdown]
 # ## 3. Build & run the SFINCS model
@@ -399,7 +366,7 @@ sfincs_run_config = CoastalCalibConfig.from_dict(
             # transitions); a small constant viscosity damps residual
             # high-frequency noise. Same family of settings as the
             # Lavaca demo (``docs/examples/notebooks/lavaca.py``).
-            "inp_overrides": {
+            "run_param_overrides": {
                 "tspinup": 10800,
                 "advection": 0,
                 "viscosity": 0,

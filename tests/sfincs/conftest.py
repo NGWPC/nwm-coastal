@@ -19,10 +19,8 @@ from coastal_calibration.config.schema import (
     SimulationConfig,
 )
 
-# Path to the pre-built SFINCS model archive
-_TEXAS_ZIP = (
-    Path(__file__).resolve().parent.parent.parent / "docs" / "examples" / "slurm" / "texas.zip"
-)
+# Path to the pre-built SFINCS model archive (test-local fixture)
+_TEXAS_ZIP = Path(__file__).resolve().parent / "fixtures" / "texas.zip"
 
 
 @pytest.fixture

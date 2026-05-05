@@ -84,7 +84,7 @@ class TestSimulationConfig:
             coastal_domain="pacific",
             meteo_source="nwm_retro",
         )
-        assert sim.timestep_seconds == 3600
+        assert sim.timestep_seconds == 200
 
 
 class TestBoundaryConfig:

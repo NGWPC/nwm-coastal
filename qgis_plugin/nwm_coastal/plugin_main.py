@@ -1337,7 +1337,7 @@ class NWMCoastalPlugin:
         """Parse ``nwmReaches.csv`` into ``[(label, [(elem_id, comid), ...]), ...]``.
 
         SCHISM convention: the first block is sources, the second is sinks.
-        Any further blocks are labelled ``block_N`` and treated like sinks
+        Any further blocks are labeled ``block_N`` and treated like sinks
         for styling purposes.
         """
         blocks: list[list[tuple[int, int]]] = []

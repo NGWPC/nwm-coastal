@@ -205,7 +205,6 @@ class PostForcingStage(WorkflowStage):
             work_dir=work_dir,
             forcing_input_dir=work_dir / "forcing_input",
             start_date=sim.start_date,
-            duration_hours=sim.duration_hours,
             geogrid_file=self.model.geogrid_path,
         )
 

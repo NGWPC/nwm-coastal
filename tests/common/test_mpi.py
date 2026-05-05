@@ -58,7 +58,7 @@ class TestDetectMpi:
         with patch("subprocess.run", side_effect=FileNotFoundError):
             assert detect_mpi() is MpiImpl.UNKNOWN
 
-    def test_unrecognised_output(self):
+    def test_unrecognized_output(self):
         result = subprocess.CompletedProcess(
             args=[], returncode=0, stdout="some custom mpi v1.0", stderr=""
         )

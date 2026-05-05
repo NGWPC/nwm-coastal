@@ -32,6 +32,7 @@ from coastal_calibration.plotting.spatial import (
 if TYPE_CHECKING:
     import xarray as xr
     from matplotlib.animation import AbstractMovieWriter
+    from numpy.typing import NDArray
 
 _log = logging.getLogger(__name__)
 
@@ -91,7 +92,7 @@ def _make_updater(
     coll: Any,
     ds: xr.Dataset,
     variable: str,
-    time_indices: np.ndarray,
+    time_indices: NDArray[np.integer[Any]],
     *,
     mask_dry: bool,
     dry_threshold: float,
@@ -182,7 +183,7 @@ def animate_water_level(
         Canonical dataset from a ``load_*`` reader in
         :mod:`coastal_calibration.schism.outputs` /
         :mod:`coastal_calibration.sfincs.outputs`. Must carry a
-        ``mesh_type`` attribute that :func:`plot_water_level` recognises.
+        ``mesh_type`` attribute that :func:`plot_water_level` recognizes.
     outfile : str or pathlib.Path
         Destination path. The suffix selects the writer:
         ``.mp4`` / ``.mov`` / ``.avi`` use ``FFMpegWriter`` (requires an
@@ -227,7 +228,7 @@ def animate_water_level(
         If an ``.mp4``/``.mov``/``.avi`` is requested but ``ffmpeg`` is not
         on PATH.
     ValueError
-        If the output suffix is unrecognised and no explicit *writer* was
+        If the output suffix is unrecognized and no explicit *writer* was
         given.
 
     Notes
@@ -249,7 +250,7 @@ def animate_water_level(
     if variable is None:
         variable = _auto_variable(ds)
 
-    # Compute shared colour limits on the *masked* dataset so dry-cell
+    # Compute shared color limits on the *masked* dataset so dry-cell
     # outliers do not stretch the colormap. The original ds is untouched
     # by _apply_wet_mask (it returns a shallow copy).
     ds_for_limits = _apply_wet_mask(ds, variable, dry_threshold) if mask_dry else ds
@@ -336,7 +337,9 @@ def _trim_to_common_window(
     return ds_left.sel(time=slice(start, end)), ds_right.sel(time=slice(start, end))
 
 
-def _nearest_index_array(target_times: np.ndarray, lookup_times: np.ndarray) -> np.ndarray:
+def _nearest_index_array(
+    target_times: NDArray[np.datetime64], lookup_times: NDArray[np.datetime64]
+) -> NDArray[np.int64]:
     """For each *target_times* entry return the index of the nearest *lookup_times* entry.
 
     Both inputs must be sorted (xarray time coords always are after the
@@ -423,7 +426,7 @@ def animate_water_level_comparison(
         Canonical datasets from a ``load_*`` reader in
         :mod:`coastal_calibration.schism.outputs` /
         :mod:`coastal_calibration.sfincs.outputs`. Each must carry a
-        ``mesh_type`` attribute that :func:`plot_water_level` recognises.
+        ``mesh_type`` attribute that :func:`plot_water_level` recognizes.
     outfile : str or pathlib.Path
         Destination path. Suffix selects the writer; see
         :func:`animate_water_level`.
@@ -516,7 +519,7 @@ def animate_water_level_comparison(
 
     fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=figsize)
 
-    # Build first frame on each axes; suppress per-axes colorbars in favour
+    # Build first frame on each axes; suppress per-axes colorbars in favor
     # of the single shared one we attach below.
     _, coll_left = plot_water_level(
         ds_l,

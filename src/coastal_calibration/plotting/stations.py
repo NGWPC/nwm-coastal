@@ -140,7 +140,7 @@ def plot_station_comparison(
     finite value at that station. Stations with no data anywhere are
     silently skipped.
 
-    Runs are drawn on top of observations. Colours are drawn from the
+    Runs are drawn on top of observations. Colors are drawn from the
     ``tab10`` colormap (cycling at 10 runs); markers cycle through a
     10-shape palette independently.
     """

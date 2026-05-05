@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import netCDF4
 import numpy as np
@@ -18,12 +18,14 @@ from coastal_calibration.data.streamflow import (
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from numpy.typing import NDArray
+
 
 def _create_chrtout_file(
     path: Path,
     timestamp: datetime,
-    feature_ids: np.ndarray,
-    streamflow: np.ndarray,
+    feature_ids: NDArray[np.integer[Any]],
+    streamflow: NDArray[np.floating[Any]],
 ) -> None:
     """Write a minimal NWM-like CHRTOUT netCDF file."""
     with netCDF4.Dataset(str(path), "w") as ds:
@@ -37,13 +39,12 @@ def _create_chrtout_file(
         sf_var[:] = streamflow
 
         t_var = ds.createVariable("time", "f8", ("time",))
-        t_var.units = "minutes since 1970-01-01 00:00:00"
-        t_var.calendar = "standard"
+        t_var.setncatts({"units": "minutes since 1970-01-01 00:00:00", "calendar": "standard"})
         t_var[:] = netCDF4.date2num(timestamp, units=t_var.units, calendar=t_var.calendar)
 
 
 @pytest.fixture
-def chrtout_dir(tmp_path: Path) -> tuple[list[Path], np.ndarray]:
+def chrtout_dir(tmp_path: Path) -> tuple[list[Path], NDArray[np.int64]]:
     """Create a directory with 3 hourly CHRTOUT files."""
     feature_ids = np.array([100, 200, 300, 400, 500], dtype=np.int64)
     files: list[Path] = []
@@ -62,7 +63,7 @@ def chrtout_dir(tmp_path: Path) -> tuple[list[Path], np.ndarray]:
 class TestReadFromChrtout:
     """Tests for the netCDF4 direct-read path."""
 
-    def test_basic_read(self, chrtout_dir: tuple[list[Path], np.ndarray]) -> None:
+    def test_basic_read(self, chrtout_dir: tuple[list[Path], NDArray[np.int64]]) -> None:
         files, _feature_ids = chrtout_dir
         df = _read_from_chrtout(files, [100, 300, 500])
 
@@ -72,14 +73,14 @@ class TestReadFromChrtout:
         assert df.iloc[0, 0] == pytest.approx(10.0)
         assert df.iloc[2, 0] == pytest.approx(12.0)
 
-    def test_subset_feature_ids(self, chrtout_dir: tuple[list[Path], np.ndarray]) -> None:
+    def test_subset_feature_ids(self, chrtout_dir: tuple[list[Path], NDArray[np.int64]]) -> None:
         files, _ = chrtout_dir
         df = _read_from_chrtout(files, [200])
 
         assert list(df.columns) == [200]
         assert len(df) == 3
 
-    def test_missing_feature_ids(self, chrtout_dir: tuple[list[Path], np.ndarray]) -> None:
+    def test_missing_feature_ids(self, chrtout_dir: tuple[list[Path], NDArray[np.int64]]) -> None:
         files, _ = chrtout_dir
         df = _read_from_chrtout(files, [999999])
 
@@ -114,7 +115,7 @@ class TestReadFromChrtout:
 class TestReadStreamflow:
     """Tests for the public read_streamflow interface."""
 
-    def test_nwm_ana_with_files(self, chrtout_dir: tuple[list[Path], np.ndarray]) -> None:
+    def test_nwm_ana_with_files(self, chrtout_dir: tuple[list[Path], NDArray[np.int64]]) -> None:
         files, _ = chrtout_dir
         df = read_streamflow(
             [100, 300],

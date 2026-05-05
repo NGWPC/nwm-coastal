@@ -23,8 +23,8 @@ LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 class SimulationConfig:
     """Simulation time and domain configuration.
 
-    ``start_date`` is normalised to **naive UTC** in ``__post_init__``
-    so the rest of the pipeline can compare and serialise it without
+    ``start_date`` is normalized to **naive UTC** in ``__post_init__``
+    so the rest of the pipeline can compare and serialize it without
     crossing the naive/aware boundary. Tz-aware values are converted to
     UTC then stripped; tz-naive values are passed through (assumed UTC
     by the project's data contract — NWM/STOFS are published on UTC
@@ -35,7 +35,13 @@ class SimulationConfig:
     duration_hours: int
     coastal_domain: CoastalDomain
     meteo_source: MeteoSource
-    timestep_seconds: int = 3600
+    # Model integration timestep in seconds: SCHISM's ``dt`` and the
+    # tick that ``nspool``/``ihfskip``/``nhot_write`` are counted in.
+    # Also used as the cadence for TPXO OTPS predictions on the open
+    # boundary. The default (200) matches the Pacific/Hawaii forecast
+    # templates and is a stable choice for coastal mesh resolutions of
+    # ~100-1000 m.
+    timestep_seconds: int = 200
 
     _INLAND_DOMAIN: ClassVar[dict[str, str]] = {
         "prvi": "domain_puertorico",
@@ -334,6 +340,25 @@ class SchismModelConfig(ModelConfig):
         at each point (and at any NOAA CO-OPS gauges when
         ``include_noaa_gages`` is enabled) and writes the combined time
         series to ``obs_water_level.parquet`` in the work directory.
+    output_freq_hours : float
+        How often SCHISM writes field outputs, in hours. Translated into
+        the ``nspool`` parameter of ``param.nml``. Defaults to 1.0
+        (hourly output, matching the previous hardcoded behavior).
+    single_output_file : bool
+        When True, set ``ihfskip`` to the full simulation length so
+        SCHISM keeps appending to a single output file instead of
+        rotating to a new file every ``nspool`` steps. Useful on shared
+        filesystems where each file rotation costs an MPI barrier and
+        metadata round-trips. Defaults to False (matching the previous
+        ``ihfskip = nspool`` behavior).
+    run_param_overrides : dict
+        Arbitrary key/value pairs written into ``param.nml`` after the
+        template values, ``output_freq_hours``, and ``single_output_file``
+        have been applied. Use this to override any other namelist
+        parameter (e.g. ``{"dt": 100, "iwbl": 1}``). Mirrors the SFINCS
+        ``run_param_overrides`` option. Validation catches mismatches
+        between ``ihfskip``, ``nhot_write``, and ``nspool_sta`` before
+        SCHISM is launched.
     """
 
     prebuilt_dir: Path | None = None
@@ -351,6 +376,9 @@ class SchismModelConfig(ModelConfig):
     animation_fps: int = 10
     animation_time_stride: int = 1
     obs_points_csv: Path | None = None
+    output_freq_hours: float = 1.0
+    single_output_file: bool = False
+    run_param_overrides: dict[str, Any] = field(default_factory=dict)
     runtime_env: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -425,7 +453,9 @@ class SchismModelConfig(ModelConfig):
         ]
 
     def build_environment(  # noqa: D102
-        self, env: dict[str, str], config: CoastalCalibConfig
+        self,
+        env: dict[str, str],
+        config: CoastalCalibConfig,  # noqa: ARG002
     ) -> dict[str, str]:
         from coastal_calibration.utils import build_mpi_env
 
@@ -533,6 +563,9 @@ class SchismModelConfig(ModelConfig):
             "animation_fps": self.animation_fps,
             "animation_time_stride": self.animation_time_stride,
             "obs_points_csv": (str(self.obs_points_csv) if self.obs_points_csv else None),
+            "output_freq_hours": self.output_freq_hours,
+            "single_output_file": self.single_output_file,
+            "run_param_overrides": self.run_param_overrides,
             "runtime_env": self.runtime_env,
         }
         return d
@@ -617,12 +650,12 @@ class SfincsModelConfig(ModelConfig):
         cores on the current machine (see :func:`~coastal_calibration.utils.get_cpu_count`).
         On HPC nodes this auto-detects correctly; on a local laptop it
         avoids over-subscribing the system.
-    inp_overrides : dict
+    run_param_overrides : dict
         Arbitrary key/value pairs written to ``sfincs.inp`` just before the
         model is written to disk.  Use this to override physics parameters
         that HydroMT-SFINCS sets by default (e.g. ``advection: 0``,
         ``nuvisc: 0.01``).  Keys must be valid ``sfincs.inp`` parameter
-        names.
+        names.  Mirrors the SCHISM ``run_param_overrides`` option.
     create_water_level_animation : bool
         When True, the ``sfincs_plot`` stage loads the time-dependent
         water level field from ``sfincs_map.nc`` and renders an MP4
@@ -645,8 +678,8 @@ class SfincsModelConfig(ModelConfig):
 
     # Known sfincs.inp parameter names parsed by the SFINCS binary
     # (extracted from SFINCS/source/src/sfincs_input.f90).  Used to
-    # catch typos in ``inp_overrides`` early — SFINCS silently ignores
-    # unrecognized parameters.
+    # catch typos in ``run_param_overrides`` early — SFINCS silently
+    # ignores unrecognized parameters.
     _KNOWN_INP_PARAMS: ClassVar[frozenset[str]] = frozenset(
         {
             "advection",
@@ -842,7 +875,7 @@ class SfincsModelConfig(ModelConfig):
     vdatum_mesh_to_msl_m: float = 0.0
     sfincs_exe: Path | None = None
     omp_num_threads: int = field(default=0)
-    inp_overrides: dict[str, Any] = field(default_factory=dict)
+    run_param_overrides: dict[str, Any] = field(default_factory=dict)
     floodmap_dem: Path | None = None
     floodmap_hmin: float = 0.05
     floodmap_enabled: bool = True
@@ -895,11 +928,13 @@ class SfincsModelConfig(ModelConfig):
         ]
 
     def build_environment(  # noqa: D102
-        self, env: dict[str, str], config: CoastalCalibConfig
+        self,
+        env: dict[str, str],
+        config: CoastalCalibConfig,  # noqa: ARG002
     ) -> dict[str, str]:
         return env
 
-    def validate(self, config: CoastalCalibConfig) -> list[str]:  # noqa: D102
+    def validate(self, config: CoastalCalibConfig) -> list[str]:  # noqa: D102, ARG002
         errors: list[str] = []
 
         if not self.prebuilt_dir.exists():
@@ -920,8 +955,8 @@ class SfincsModelConfig(ModelConfig):
         if self.sfincs_exe and not self.sfincs_exe.exists():
             errors.append(f"model_config.sfincs_exe not found: {self.sfincs_exe}")
 
-        if self.inp_overrides:
-            unknown = sorted(set(self.inp_overrides) - self._KNOWN_INP_PARAMS)
+        if self.run_param_overrides:
+            unknown = sorted(set(self.run_param_overrides) - self._KNOWN_INP_PARAMS)
             if unknown:
                 errors.append(
                     f"Unrecognized sfincs.inp parameter(s): {', '.join(unknown)}. "
@@ -982,7 +1017,7 @@ class SfincsModelConfig(ModelConfig):
             "vdatum_mesh_to_msl_m": self.vdatum_mesh_to_msl_m,
             "sfincs_exe": (str(self.sfincs_exe) if self.sfincs_exe else None),
             "omp_num_threads": self.omp_num_threads,
-            "inp_overrides": self.inp_overrides,
+            "run_param_overrides": self.run_param_overrides,
             "floodmap_dem": (str(self.floodmap_dem) if self.floodmap_dem else None),
             "floodmap_hmin": self.floodmap_hmin,
             "floodmap_enabled": self.floodmap_enabled,

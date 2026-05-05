@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from matplotlib.axes import Axes
     from matplotlib.collections import Collection
     from matplotlib.tri import Triangulation
+    from numpy.typing import NDArray
 
 #: Valid ``shading`` argument for :meth:`matplotlib.axes.Axes.pcolormesh`.
 PColorShading = Literal["flat", "nearest", "gouraud", "auto"]
@@ -58,8 +59,8 @@ def _auto_variable(ds: xr.Dataset) -> str:
 
 
 def triangulate_faces_indexed(
-    face_nodes: np.ndarray,
-) -> tuple[np.ndarray, np.ndarray]:
+    face_nodes: NDArray[np.integer[Any]],
+) -> tuple[NDArray[np.int64], NDArray[np.int64]]:
     """Split mixed triangle/quad connectivity into triangles, tracking source faces.
 
     Each quadrilateral face ``(a, b, c, d)`` becomes two triangles
@@ -109,7 +110,7 @@ def triangulate_faces_indexed(
     return triangles, triangle_face
 
 
-def triangulate_faces(face_nodes: np.ndarray) -> np.ndarray:
+def triangulate_faces(face_nodes: NDArray[np.integer[Any]]) -> NDArray[np.int64]:
     """Flatten mixed triangle/quad connectivity into a pure triangle array.
 
     Thin wrapper around :func:`triangulate_faces_indexed` that discards the
@@ -132,11 +133,11 @@ def _build_triangulation(ds: xr.Dataset) -> Triangulation:
 def _extended_cmap(name: str) -> Any:
     """Return a copy of *name* with ``set_under`` / ``set_over`` pinned.
 
-    Matplotlib's default behaviour for out-of-range values depends on the
-    colormap instance; by explicitly pinning the under/over colours we
+    Matplotlib's default behavior for out-of-range values depends on the
+    colormap instance; by explicitly pinning the under/over colors we
     guarantee that data falling below *vmin* or above *vmax* renders with
-    the nearest limit colour (rather than a transparent "bad" slot or a
-    different colour chosen by the colormap's defaults).
+    the nearest limit color (rather than a transparent "bad" slot or a
+    different color chosen by the colormap's defaults).
     """
     import matplotlib.pyplot as plt
 
@@ -146,7 +147,7 @@ def _extended_cmap(name: str) -> Any:
     return cmap
 
 
-def _colorbar_extend(values: np.ndarray, vmin: float, vmax: float) -> str:
+def _colorbar_extend(values: NDArray[np.floating[Any]], vmin: float, vmax: float) -> str:
     """Return the ``extend`` argument for :func:`~matplotlib.figure.Figure.colorbar`.
 
     The arrow caps on the colorbar advertise that data exists below or above

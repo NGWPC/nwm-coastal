@@ -91,8 +91,7 @@ coastal-calibration run "${CONFIG_FILE}"
 rm -f "${CONFIG_FILE}"
 ```
 
-Submit with `sbatch my_run.sh`. Complete examples are provided for
-[SCHISM](../examples/slurm/schism.sh) and [SFINCS](../examples/slurm/sfincs.sh).
+Submit with `sbatch my_run.sh`.
 
 !!! tip "Single-quoted heredoc"
 
@@ -216,6 +215,7 @@ pixi r -e dev coastal-calibration run config.yaml --stop-after schism_sflux
 - Learn about [Configuration Options](../user-guide/configuration.md)
 - Explore [Workflow Stages](../user-guide/workflow-stages.md)
 - See the [CLI Reference](../user-guide/cli.md)
-- Try the example notebooks:
-    [Narragansett Bay (SFINCS)](../examples/notebooks/narragansett.ipynb) and
-    [Hawaii (SCHISM)](../examples/notebooks/schism-hawaii.ipynb)
+- Try the example notebooks: the
+    [Mendocino Walkthrough](../examples/notebooks/walkthrough.ipynb) (end-to-end SCHISM
+    \+ SFINCS comparison) and the [Lavaca Bay SFINCS](../examples/notebooks/lavaca.ipynb)
+    tutorial

@@ -212,7 +212,6 @@ class TestWriteFloodmapCog:
             hmin=0.05,
             reproj_method="nearest",
             nrmax=500,
-            log_fn=lambda m: None,
         )
 
         with rasterio.open(out) as src:
@@ -241,7 +240,6 @@ class TestWriteFloodmapCog:
             hmin=0.05,
             reproj_method="nearest",
             nrmax=500,
-            log_fn=lambda m: None,
         )
 
         with rasterio.open(out) as src:
@@ -270,7 +268,6 @@ class TestWriteFloodmapCog:
             hmin=0.05,
             reproj_method="nearest",
             nrmax=500,
-            log_fn=lambda m: None,
         )
 
         with rasterio.open(out) as src:
@@ -308,7 +305,6 @@ class TestWriteFloodmapCog:
             hmin=0.05,
             reproj_method="nearest",
             nrmax=500,
-            log_fn=lambda m: None,
         )
 
         with rasterio.open(out) as src:
@@ -333,7 +329,6 @@ class TestWriteFloodmapCog:
             hmin=0.05,
             reproj_method="nearest",
             nrmax=500,
-            log_fn=lambda m: None,
         )
 
         with rasterio.open(out) as src:
@@ -360,7 +355,6 @@ class TestWriteFloodmapCog:
             hmin=0.05,
             reproj_method="nearest",
             nrmax=500,
-            log_fn=lambda m: None,
         )
 
         with rasterio.open(out) as src:

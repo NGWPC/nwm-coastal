@@ -7,6 +7,7 @@ that replaced the former bash scripts.
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import numpy as np
@@ -19,7 +20,11 @@ from coastal_calibration.schism.prep import (
     stage_chrtout_files,
     stage_ldasin_files,
     update_params,
+    validate_param_nml,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # stage_chrtout_files
@@ -375,3 +380,207 @@ class TestUpdateParams:
 
         text = (work_dir / "param.nml").read_text()
         assert "if_source = -1" in text
+
+    def test_default_output_freq_writes_hourly(self, tmp_path):
+        work_dir = tmp_path / "run"
+        work_dir.mkdir()
+        prebuilt = tmp_path / "prebuilt"
+        self._create_template(prebuilt)
+
+        update_params(
+            work_dir=work_dir,
+            prebuilt_dir=prebuilt,
+            start_date=datetime(2020, 8, 26),
+            duration_hours=6,
+        )
+
+        text = (work_dir / "param.nml").read_text()
+        assert "nspool = 18" in text
+        assert "ihfskip = 18" in text
+        assert "nhot_write = 324" in text  # template default preserved
+
+    def test_single_output_file_extends_ihfskip(self, tmp_path):
+        work_dir = tmp_path / "run"
+        work_dir.mkdir()
+        prebuilt = tmp_path / "prebuilt"
+        self._create_template(prebuilt)
+
+        update_params(
+            work_dir=work_dir,
+            prebuilt_dir=prebuilt,
+            start_date=datetime(2020, 8, 26),
+            duration_hours=50,
+            single_output_file=True,
+        )
+
+        text = (work_dir / "param.nml").read_text()
+        # 50h * 3600 / dt(200) = 900 timesteps
+        assert "ihfskip = 900" in text
+        assert "nhot_write = 900" in text  # rounded up to a multiple of 900
+
+    def test_output_freq_hours_scales_nspool(self, tmp_path):
+        work_dir = tmp_path / "run"
+        work_dir.mkdir()
+        prebuilt = tmp_path / "prebuilt"
+        self._create_template(prebuilt)
+
+        update_params(
+            work_dir=work_dir,
+            prebuilt_dir=prebuilt,
+            start_date=datetime(2020, 8, 26),
+            duration_hours=6,
+            output_freq_hours=2.0,
+        )
+
+        text = (work_dir / "param.nml").read_text()
+        assert "nspool = 36" in text  # 2h * 3600 / 200 = 36
+        assert "ihfskip = 36" in text  # not single-file mode, ihfskip == nspool
+
+    def test_run_param_overrides_replace_existing_keys(self, tmp_path):
+        work_dir = tmp_path / "run"
+        work_dir.mkdir()
+        prebuilt = tmp_path / "prebuilt"
+        self._create_template(prebuilt)
+
+        update_params(
+            work_dir=work_dir,
+            prebuilt_dir=prebuilt,
+            start_date=datetime(2020, 8, 26),
+            duration_hours=6,
+            run_param_overrides={"dt": 100, "wtiminc": 300},
+        )
+
+        text = (work_dir / "param.nml").read_text()
+        assert "dt = 100" in text
+        assert "wtiminc = 300" in text
+
+    def test_run_param_overrides_insert_new_key(self, tmp_path):
+        work_dir = tmp_path / "run"
+        work_dir.mkdir()
+        prebuilt = tmp_path / "prebuilt"
+        self._create_template(prebuilt)
+
+        update_params(
+            work_dir=work_dir,
+            prebuilt_dir=prebuilt,
+            start_date=datetime(2020, 8, 26),
+            duration_hours=6,
+            run_param_overrides={"iwbl": 1},
+        )
+
+        text = (work_dir / "param.nml").read_text()
+        assert "iwbl = 1" in text
+
+    def test_ihfskip_override_rederives_nhot_write(self, tmp_path):
+        # Pacific forecast template: ihfskip=324 (18 hourly outputs per
+        # file) and nhot_write=324. Overriding ihfskip alone should
+        # produce a matching nhot_write so the SCHISM divisibility
+        # constraint stays satisfied without the user setting both.
+        work_dir = tmp_path / "run"
+        work_dir.mkdir()
+        prebuilt = tmp_path / "prebuilt"
+        self._create_template(prebuilt)
+
+        update_params(
+            work_dir=work_dir,
+            prebuilt_dir=prebuilt,
+            start_date=datetime(2020, 8, 26),
+            duration_hours=6,
+            run_param_overrides={"ihfskip": 324},
+        )
+
+        text = (work_dir / "param.nml").read_text()
+        assert "ihfskip = 324" in text
+        assert "nhot_write = 324" in text  # auto-bumped to a multiple of 324
+
+    def test_timestep_seconds_drives_dt_and_nspool(self, tmp_path):
+        # dt should be written into param.nml verbatim, and nspool
+        # should rescale so the wall-clock output cadence stays the
+        # same (default output_freq_hours=1.0 → hourly snapshots).
+        work_dir = tmp_path / "run"
+        work_dir.mkdir()
+        prebuilt = tmp_path / "prebuilt"
+        self._create_template(prebuilt)
+
+        update_params(
+            work_dir=work_dir,
+            prebuilt_dir=prebuilt,
+            start_date=datetime(2020, 8, 26),
+            duration_hours=6,
+            timestep_seconds=100,  # half the default; nspool should double
+        )
+
+        text = (work_dir / "param.nml").read_text()
+        assert "dt = 100" in text
+        assert "nspool = 36" in text  # 1h * 3600 / 100 = 36
+        assert "ihfskip = 36" in text  # default single_output_file=False
+
+    def test_ihfskip_and_nhot_write_overrides_both_respected(self, tmp_path):
+        work_dir = tmp_path / "run"
+        work_dir.mkdir()
+        prebuilt = tmp_path / "prebuilt"
+        self._create_template(prebuilt)
+
+        update_params(
+            work_dir=work_dir,
+            prebuilt_dir=prebuilt,
+            start_date=datetime(2020, 8, 26),
+            duration_hours=6,
+            run_param_overrides={"ihfskip": 864, "nhot_write": 8640},
+        )
+
+        text = (work_dir / "param.nml").read_text()
+        assert "ihfskip = 864" in text
+        assert "nhot_write = 8640" in text
+
+
+class TestValidateParamNml:
+    def _write(self, tmp_path, body: str) -> Path:
+        p = tmp_path / "param.nml"
+        p.write_text(body)
+        return p
+
+    def test_consistent_namelist_passes(self, tmp_path):
+        p = self._write(
+            tmp_path,
+            "&CORE\n  nspool = 18\n  ihfskip = 18\n/\n"
+            "&SCHOUT\n  iout_sta = 1\n  nspool_sta = 18\n  nhot = 1\n  nhot_write = 324\n/\n",
+        )
+        assert validate_param_nml(p) == []
+
+    def test_nhot_write_not_multiple_of_ihfskip(self, tmp_path):
+        p = self._write(
+            tmp_path,
+            "&CORE\n  nspool = 18\n  ihfskip = 900\n/\n"
+            "&SCHOUT\n  nhot = 1\n  nhot_write = 324\n/\n",
+        )
+        errors = validate_param_nml(p)
+        assert any("nhot_write" in e and "ihfskip" in e for e in errors)
+
+    def test_ihfskip_not_multiple_of_nspool(self, tmp_path):
+        p = self._write(
+            tmp_path,
+            "&CORE\n  nspool = 18\n  ihfskip = 25\n/\n&SCHOUT\n  nhot = 0\n/\n",
+        )
+        errors = validate_param_nml(p)
+        assert any("ihfskip" in e and "nspool" in e for e in errors)
+
+    def test_nhot_write_not_multiple_of_nspool_sta(self, tmp_path):
+        p = self._write(
+            tmp_path,
+            "&CORE\n  nspool = 18\n  ihfskip = 18\n/\n"
+            "&SCHOUT\n  iout_sta = 1\n  nspool_sta = 25\n  nhot = 1\n  nhot_write = 324\n/\n",
+        )
+        errors = validate_param_nml(p)
+        # Multiple constraints could fire here; pick out the nspool_sta one.
+        assert any("nspool_sta" in e for e in errors)
+
+    def test_nhot_zero_skips_nhot_write_check(self, tmp_path):
+        # nhot_write doesn't have to be a multiple of ihfskip when nhot=0
+        p = self._write(
+            tmp_path,
+            "&CORE\n  nspool = 18\n  ihfskip = 900\n/\n"
+            "&SCHOUT\n  nhot = 0\n  nhot_write = 324\n/\n",
+        )
+        # nspool divides ihfskip cleanly here, so no errors expected
+        assert validate_param_nml(p) == []

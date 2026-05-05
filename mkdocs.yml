@@ -63,16 +63,15 @@ theme:
   - toc.integrate
 
 exclude_docs: |
+  examples/README.md
+  dev/README.md
   examples/downloads/
-  examples/hawaii/run/
-  examples/hawaii/cache/
+  examples/hawaii/
   examples/lavaca-tx/run/
   examples/lavaca-tx/cache/
-  examples/narragansett-ri/cache/
+  examples/narragansett-ri/
   examples/walkthrough/
-  examples/pacific/extracted/
-  examples/pacific/run_extract/
-  examples/pacific/cache/
+  examples/pacific/
 
 hooks:
 - docs/hooks.py
@@ -176,16 +175,13 @@ nav:
   - Workflow Stages: user-guide/workflow-stages.md
 - Examples:
   - Overview: examples/index.md
-  - Tutorials:
-    - Lavaca Bay: examples/notebooks/lavaca.ipynb
-    - Narragansett Bay: examples/notebooks/narragansett.ipynb
-    - Hawaii: examples/notebooks/schism-hawaii.ipynb
-    - Hawaii Mesh Subset: examples/notebooks/schism-hawaii-subset.ipynb
-    - Mendocino Walkthrough: examples/notebooks/walkthrough.ipynb
-  - Post-run Plotting:
-    - Lavaca Bay (SFINCS): examples/notebooks/plot_sfincs_lavaca.ipynb
-    - Narragansett Bay (SFINCS): examples/notebooks/plot_sfincs_narragansett.ipynb
-    - Hawaii (SCHISM): examples/notebooks/plot_schism_hawaii.ipynb
+  - Mendocino Walkthrough: examples/notebooks/walkthrough.ipynb
+  - Lavaca Bay: examples/notebooks/lavaca.ipynb
+- Developer Notes:
+  - SFINCS Compilation: dev/sfincs_compilation.md
+  - HydroMT-SFINCS Issues: dev/hydromt_sfincs_issues.md
+  - SCHISM Sink/Source Issue: dev/schism_sink_source_issue.md
+  - STOFS/TPXO Improvements: dev/stofs_tpxo_improvements.md
 - Design: DESIGN.md
 - Reference:
   - API Reference: reference/api.md

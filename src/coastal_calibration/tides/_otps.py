@@ -97,42 +97,33 @@ def otps_to_open_bnds(
     )
     nsteps = math.floor((end - start).total_seconds() / _TIME_STEP_S) + 1
 
-    with netCDF4.Dataset(elev_output_file, "w", format="NETCDF4") as f_out:
-        f_out.createDimension("time", None)
-        f_out.createDimension("nOpenBndNodes", len(coords))
-        f_out.createDimension("nLevels", 1)
-        f_out.createDimension("nComponents", 1)
-        f_out.createDimension("one", 1)
+    from coastal_calibration._nc_io import write_elev2d_th
 
-        time_step_var = f_out.createVariable("time_step", "f8", ("one",))
-        time_var = f_out.createVariable("time", "f8", ("time",))
-        time_series_var = f_out.createVariable(
-            "time_series",
-            "f8",
-            ("time", "nOpenBndNodes", "nLevels", "nComponents"),
-            fill_value=_MISSING,
-            zlib=True,
-        )
+    # Build the (nt, n_open_bnd_nodes) elevation matrix from the parsed
+    # OTPS DataFrame, one column per boundary node.
+    series = np.zeros((nsteps, len(coords)))
+    for c, coord in enumerate(coords):
+        lon_c, lat_c = coord[0], coord[1]
+        df_selected = tpxo.df[
+            tpxo.df["Lat"].between(lat_c - 0.0001, lat_c + 0.0001)
+            & tpxo.df["Lon"].between(lon_c - 0.0001, lon_c + 0.0001)
+        ]
+        if not df_selected.empty:
+            series[:, c] = df_selected["z(m)"].to_numpy()[:nsteps]
 
-        time_var.long_name = "model time"
-        time_var.standard_name = "time"
-        time_var.units = (
-            f"seconds since {start.strftime('%Y-%m-%d %H:%M:%S')}        ! NCDASE - BASE_DAT"
-        )
-        time_var.base_date = f"{start.strftime('%Y-%m-%d %H:%M:%S')}        ! NCDASE - BASE_DATE"
-        time_var.start_time = 0.0
-
-        time_step_var[:] = np.array([_TIME_STEP_S])
-        time_var[:] = np.arange(0, nsteps * _TIME_STEP_S, _TIME_STEP_S)
-
-        for c in range(len(coords)):
-            df_selected = tpxo.df[
-                tpxo.df["Lat"].between(coords[c][1] - 0.0001, coords[c][1] + 0.0001)
-                & tpxo.df["Lon"].between(coords[c][0] - 0.0001, coords[c][0] + 0.0001)
-            ]
-            if not df_selected.empty:
-                data = df_selected["z(m)"]
-                data = np.where(data > _MISSING, data, 0)
-                time_series_var[:, c, 0, 0] = data[0:nsteps]
-            else:
-                time_series_var[:, c, 0, 0] = 0
+    base = start.strftime("%Y-%m-%d %H:%M:%S")
+    write_elev2d_th(
+        elev_output_file,
+        n_open_bnd_nodes=len(coords),
+        time_seconds=np.arange(0, nsteps * _TIME_STEP_S, _TIME_STEP_S),
+        time_step_seconds=_TIME_STEP_S,
+        time_series=series,
+        time_attrs={
+            "long_name": "model time",
+            "standard_name": "time",
+            "units": f"seconds since {base}        ! NCDASE - BASE_DAT",
+            "base_date": f"{base}        ! NCDASE - BASE_DATE",
+            "start_time": 0.0,
+        },
+        missing=_MISSING,
+    )

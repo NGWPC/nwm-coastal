@@ -6,20 +6,22 @@ A synthetic two-block SCHISM output is built on the fly from a tiny
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pytest
 import xarray as xr
 
 from coastal_calibration.schism.outputs import (
-    _normalise_face_nodes,
+    _normalize_face_nodes,
     _parse_base_date,
     load_schism_elevation,
 )
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from numpy.typing import NDArray
 
 # ---------------------------------------------------------------------------
 # Synthetic out2d_<iblock>.nc builder
@@ -48,17 +50,17 @@ _DEPTH = np.array([5.0, 4.5, 4.0, 3.5, 3.0], dtype=np.float64)
 def _write_out2d(
     path: Path,
     *,
-    seconds: np.ndarray,
-    elev: np.ndarray,
+    seconds: NDArray[np.floating[Any]],
+    elev: NDArray[np.floating[Any]],
     base_date: str = "2020 1 1 0 0",
-    depth: np.ndarray | None = None,
-    dry_flag: np.ndarray | None = None,
+    depth: NDArray[np.floating[Any]] | None = None,
+    dry_flag: NDArray[np.integer[Any]] | None = None,
     crs_grid_mapping: str | None = None,
 ) -> None:
     """Write a minimal out2d_*.nc file mimicking SCHISM's schema."""
     if depth is None:
         depth = _DEPTH
-    data_vars: dict[str, tuple[tuple[str, ...], np.ndarray]] = {
+    data_vars: dict[str, tuple[tuple[str, ...], NDArray[Any]]] = {
         "elevation": (("time", "nSCHISM_hgrid_node"), elev.astype(np.float32)),
         "depth": (("nSCHISM_hgrid_node",), depth.astype(np.float64)),
         "SCHISM_hgrid_node_x": (("nSCHISM_hgrid_node",), _NODE_X),
@@ -113,7 +115,7 @@ def two_block_run(tmp_path: Path) -> Path:
 class TestNormaliseFaceNodes:
     def test_triangles_get_minus_one(self):
         """Valid vertices become 0-based; padding (0) becomes -1."""
-        out = _normalise_face_nodes(_FACE_NODES_1BASED)
+        out = _normalize_face_nodes(_FACE_NODES_1BASED)
         # All non-zero entries shift by -1; zeros become -1.
         expected = np.array(
             [
@@ -128,7 +130,7 @@ class TestNormaliseFaceNodes:
     def test_large_negative_fill(self):
         """Large negative _FillValue should also collapse to -1."""
         raw = np.array([[1, 2, 3, -999999]], dtype=np.int64)
-        out = _normalise_face_nodes(raw)
+        out = _normalize_face_nodes(raw)
         np.testing.assert_array_equal(out, np.array([[0, 1, 2, -1]]))
 
 

@@ -202,5 +202,6 @@ junit*.xml
 cache
 .cache/
 
-### Local model data (symlinks to user-specific paths)
-docs/examples/hawaii/
+# Per-domain runtime artifacts under docs/examples/ are gitignored by
+# docs/examples/.gitignore (cache/, run/, model symlinks, etc.) so the
+# committed inputs at the top of each domain dir stay tracked.

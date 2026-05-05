@@ -9,13 +9,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import hydromt  # noqa: F401  # pyright: ignore[reportUnusedImport]  # registers the ``DataArray.raster`` accessor used below
 import numpy as np
-import numpy.typing as npt
 
 from coastal_calibration.logging import logger as _log
 
 if TYPE_CHECKING:
     from hydromt_sfincs import SfincsModel
+    from numpy.typing import NDArray
 
 __all__ = ["create_flood_depth_map"]
 
@@ -49,7 +50,7 @@ def _ensure_overviews(tif_path: Path, log: Any) -> None:
         src.update_tags(ns="rio_overview", resampling="average")
 
 
-def _reduce_zsmax(zsmax: Any) -> tuple[Any, npt.NDArray[np.float32]]:
+def _reduce_zsmax(zsmax: Any) -> tuple[Any, NDArray[np.float32]]:
     """Reduce zsmax to max over the time dimension and return a flat array.
 
     Returns ``(zsmax_reduced, zs_flat)`` where *zsmax_reduced* is the
@@ -67,7 +68,7 @@ def _reduce_zsmax(zsmax: Any) -> tuple[Any, npt.NDArray[np.float32]]:
         zsmax = zsmax.max(timedim)  # pyright: ignore[reportCallIssue, reportOptionalCall]
 
     if isinstance(zsmax, xu.UgridDataArray):
-        zs_flat: npt.NDArray[np.float32] = np.asarray(
+        zs_flat: NDArray[np.float32] = np.asarray(
             zsmax.to_numpy(),  # pyright: ignore[reportCallIssue, reportOptionalCall]
             dtype=np.float32,
         )
@@ -136,7 +137,6 @@ def _write_floodmap_cog(
     hmin: float,
     reproj_method: str,
     nrmax: int,
-    log_fn: Any,
 ) -> None:
     """Write a flood-depth COG at the full DEM resolution.
 
@@ -366,7 +366,6 @@ def create_flood_depth_map(
         hmin=hmin,
         reproj_method=reproj_method,
         nrmax=nrmax,
-        log_fn=_info,
     )
 
     _ensure_overviews(output_path, _info)

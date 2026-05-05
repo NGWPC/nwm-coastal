@@ -108,27 +108,29 @@ def _generate_tidal_levels(  # noqa: PLR0915
         tide = Tide(model=model, radians=False)
         wl[:, i] = tide.at(pred_times) / 100.0
 
-    mode = "a" if Path(output_file).exists() else "w"
-    with netCDF4.Dataset(output_file, mode, format="NETCDF4") as ncout:
-        if mode == "w":
-            ncout.createDimension("time", None)
-            ncout.createDimension("nOpenBndNodes", amp.shape[0])
-            nctime = ncout.createVariable("time", "f8", ("time",))
-            ncwl = ncout.createVariable("time_series", "f8", ("time", "nOpenBndNodes"))
-            nctime[:] = np.arange(651600.0, 865000, 3600.0)
-            ncwl[:] = wl
-            start = 0
-        else:
-            nctime = ncout["time"]
-            ncwl = ncout["time_series"]
-            start = 181
+    # Append the >180h tidal-only fill to the existing canonical 4-D
+    # ``elev2D.th.nc`` produced upstream by ``regrid_estofs``. The
+    # function used to also create the file from scratch with a 2-D
+    # ``time_series`` schema — that path produced a malformed file
+    # (SCHISM requires the 4-D shape) and never ran in practice
+    # (``regrid_estofs`` always runs first), so it has been removed.
+    if not Path(output_file).exists():
+        raise FileNotFoundError(
+            f"{output_file} does not exist. generate_ocean_tide is a "
+            "tidal-fill step that must run after regrid_estofs has "
+            "created the canonical 4-D elev2D.th.nc."
+        )
 
-        t_step = 3600
-        t_start = start * t_step
-        t_end = (start + total_hours.stop) * t_step
-        new_times = np.arange(t_start, t_end, t_step)
-        nctime[start:] = new_times
-        ncwl[start:] = wl
+    start = 181  # tidal fill begins where the STOFS forecast ends
+    t_step = 3600
+    nt = wl.shape[0]
+    new_times = np.arange(start * t_step, (start + total_hours.stop) * t_step, t_step)
+
+    with netCDF4.Dataset(output_file, "a", format="NETCDF4") as ncout:
+        ncout["time"][start:] = new_times
+        # ``time_series`` is 4-D (time, nOpenBndNodes, nLevels=1,
+        # nComponents=1); reshape the (nt, nb) tidal block to match.
+        ncout["time_series"][start : start + nt] = wl[:, :, np.newaxis, np.newaxis]
 
 
 def generate_ocean_tide(

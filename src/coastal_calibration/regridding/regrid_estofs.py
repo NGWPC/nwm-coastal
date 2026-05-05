@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import esmpy as ESMF
 import netCDF4
@@ -41,6 +41,9 @@ import numpy as np
 from cftime import num2date
 
 from coastal_calibration.logging import logger
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
 
 from .esmf_utils import (
     Regridder,
@@ -62,7 +65,7 @@ def _determine_time_range(
     cycle_date: str,
     cycle_time: str,
     length_hrs: int,
-) -> tuple[int, int, np.ndarray, dict[str, Any]]:
+) -> tuple[int, int, NDArray[Any], dict[str, Any]]:
     """Determine the time slice to extract from the ESTOFS input.
 
     Parameters
@@ -110,46 +113,11 @@ def _determine_time_range(
     return start, len(times), times, time_atts
 
 
-def _write_schism_output(
-    nc_out: str,
-    output: np.ndarray,
-    times: np.ndarray,
-    time_atts: dict[str, Any],
-    n_bnd_nodes: int,
-):
-    """Write regridded data in SCHISM elev2D.th.nc format."""
-    nt = len(times)
-    with netCDF4.Dataset(nc_out, "w", format="NETCDF4") as f_out:
-        f_out.createDimension("time", None)
-        f_out.createDimension("nOpenBndNodes", n_bnd_nodes)
-        f_out.createDimension("nLevels", 1)
-        f_out.createDimension("nComponents", 1)
-        f_out.createDimension("one", 1)
-
-        time_step_var = f_out.createVariable("time_step", "f8", ("one",))
-        time_var = f_out.createVariable("time", "f8", ("time",))
-        time_var.setncatts(time_atts)
-        time_var.start_time = times[0]
-        time_series_var = f_out.createVariable(
-            "time_series",
-            "f8",
-            ("time", "nOpenBndNodes", "nLevels", "nComponents"),
-            fill_value=MISSING,
-            zlib=True,
-        )
-
-        time_step_var[:] = np.array([TIME_STEP])
-        time_var[:] = np.arange(0, nt * TIME_STEP, TIME_STEP)
-        for t in range(nt):
-            data = np.where(output[t] > MISSING, output[t], 0)
-            time_series_var[t, :, 0, 0] = data
-
-
 def _regrid_timeseries(
     *,
     f_in: netCDF4.Dataset,
     regrid_field: str,
-    src_keep_idx: np.ndarray,
+    src_keep_idx: NDArray[np.integer[Any]],
     field_in: Any,
     field_out: Any,
     field_fallback: Any,
@@ -160,7 +128,7 @@ def _regrid_timeseries(
     start: int,
     nt: int,
     n_dst: int,
-) -> np.ndarray:
+) -> NDArray[np.float64]:
     """Run the BILINEAR + NEAREST_STOD per-timestep loop.
 
     Returns the ``(nt, n_dst)`` output array filled in the local
@@ -330,7 +298,18 @@ def regrid_estofs(
         if output is None:
             msg = "gather_reduce returned None on root rank"
             raise RuntimeError(msg)
-        _write_schism_output(nc_out, output, times, time_atts, len(bnd_coords))
+        from coastal_calibration._nc_io import write_elev2d_th
+
+        nt = len(times)
+        write_elev2d_th(
+            nc_out,
+            n_open_bnd_nodes=len(bnd_coords),
+            time_seconds=np.arange(0, nt * TIME_STEP, TIME_STEP),
+            time_step_seconds=TIME_STEP,
+            time_series=output,  # (nt, n_bnd_nodes); helper reshapes to 4-D
+            time_attrs={**time_atts, "start_time": times[0]},
+            missing=MISSING,
+        )
 
 
 def main() -> None:

@@ -324,7 +324,7 @@ class SfincsCreateConfig:
         return stages
 
     # ------------------------------------------------------------------
-    # Serialisation / deserialisation
+    # Serialization / deserialization
     # ------------------------------------------------------------------
 
     @classmethod
@@ -563,7 +563,7 @@ class SfincsCreateConfig:
         return errors
 
     # ------------------------------------------------------------------
-    # Serialisation
+    # Serialization
     # ------------------------------------------------------------------
 
     def to_dict(self) -> dict[str, Any]:

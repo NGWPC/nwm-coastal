@@ -44,7 +44,7 @@ class DateRange:
 
     def validate(self, start: datetime, end: datetime) -> str | None:
         """Validate that the requested period falls within the available range."""
-        # Normalise to naive UTC so comparisons against the naive class
+        # Normalize to naive UTC so comparisons against the naive class
         # attributes are well-defined and DST-stable.
         start = to_naive_utc(start)
         end = to_naive_utc(end)

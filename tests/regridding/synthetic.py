@@ -271,8 +271,7 @@ def make_esmfmesh_nc(path: Path, mesh_nx: int = 12, mesh_ny: int = 10) -> None:
     num_nodes_per_elem = np.full(n_elems, 3, dtype="i1")
 
     with netCDF4.Dataset(path, "w", format="NETCDF4") as ds:
-        ds.gridType = "unstructured mesh"
-        ds.version = "0.9"
+        ds.setncatts({"gridType": "unstructured mesh", "version": "0.9"})
 
         ds.createDimension("nodeCount", n_nodes)
         ds.createDimension("elementCount", n_elems)

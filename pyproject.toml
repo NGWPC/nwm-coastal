@@ -46,6 +46,7 @@ dependencies = [
   "rich-click",
   "rioxarray>=0.17",
   "s3fs",
+  "scipy>=1.13",
   "shapely>=2",
   "tiny-retriever>=0.3",
   "xarray>=2024.1",
@@ -92,6 +93,7 @@ optional-dependencies.test = [
   "pytest-sugar",
 ]
 optional-dependencies.typecheck = [
+  "numpy",
   "pandas-stubs",
   "pyright",
   "scipy-stubs",
@@ -134,15 +136,15 @@ changelog = "git cliff -c pyproject.toml --unreleased"
 # Update CHANGELOG.md with all unreleased commits
 changelog-update = "git cliff -c pyproject.toml -o CHANGELOG.md"
 # Sync all percent-format .py scripts → paired .ipynb files
-nb-sync = "jupytext --sync docs/examples/*.py"
+nb-sync = "jupytext --sync docs/examples/notebooks/*.py"
 # Execute all notebooks in-place (requires .ipynb to exist; run nb-sync first)
-nb-execute = "jupyter nbconvert --to notebook --execute --inplace docs/examples/*.ipynb"
+nb-execute = "jupyter nbconvert --to notebook --execute --inplace docs/examples/notebooks/*.ipynb"
 # Full workflow: sync .py → .ipynb, then execute — use before building docs or committing
 nb-run = { depends-on = [ "nb-sync", "nb-execute" ] }
 # Pair an existing .ipynb with a .py counterpart (one-time setup for imported notebooks)
-nb-pair = "jupytext --set-formats 'ipynb,py:percent' docs/examples/*.ipynb"
+nb-pair = "jupytext --set-formats 'ipynb,py:percent' docs/examples/notebooks/*.ipynb"
 # Strip all cell outputs from .ipynb files (keeps repo diff clean)
-nb-clear = "jupyter nbconvert --ClearOutputPreprocessor.enabled=True --to notebook --inplace docs/examples/*.ipynb"
+nb-clear = "jupyter nbconvert --ClearOutputPreprocessor.enabled=True --to notebook --inplace docs/examples/notebooks/*.ipynb"
 
 [tool.pixi.feature.docs.tasks]
 docs-build = "mkdocs build --strict"
@@ -198,26 +200,32 @@ sfincs = { path = "coastal_models/sfincs" }
 hydromt-sfincs = { git = "https://github.com/Deltares/hydromt_sfincs", rev = "41aac0a3980fc2714ec28eafb0463d40abfc979a" }
 
 [tool.pixi.feature.test-common.tasks]
+# Each per-env task writes its coverage data into a uniquely-named file
+# (.coverage.common / .coverage.schism / .coverage.sfincs) so a CI
+# matrix can aggregate them via `coverage combine`. Within a single
+# env the `report` and `html` tasks read that env's own file.
 test-common = { cmd = [
   "pytest",
   "tests/common",
   "--cov",
   "--cov-branch",
-  "--cov-report=xml",
   "--junitxml=junit-common.xml",
   "--durations=5",
-] }
-report = { cmd = [ "coverage", "report" ], depends-on = [ "test-common" ] }
-html = { cmd = [ "coverage", "html" ], depends-on = [ "report" ] }
+], env = { COVERAGE_FILE = ".coverage.common" } }
+report = { cmd = "coverage report", env = { COVERAGE_FILE = ".coverage.common" }, depends-on = [ "test-common" ] }
+html = { cmd = "coverage html", env = { COVERAGE_FILE = ".coverage.common" }, depends-on = [ "report" ] }
 
 [tool.pixi.feature.test-schism.tasks]
 test-schism = { cmd = [
   "pytest",
   "tests/schism",
-  "--no-cov",
+  "--cov",
+  "--cov-branch",
   "--junitxml=junit-schism.xml",
   "--durations=5",
-] }
+], env = { COVERAGE_FILE = ".coverage.schism" } }
+report = { cmd = "coverage report", env = { COVERAGE_FILE = ".coverage.schism" }, depends-on = [ "test-schism" ] }
+html = { cmd = "coverage html", env = { COVERAGE_FILE = ".coverage.schism" }, depends-on = [ "report" ] }
 
 [tool.pixi.feature.test-sfincs.tasks]
 test-sfincs = { cmd = [
@@ -225,34 +233,41 @@ test-sfincs = { cmd = [
   "tests/sfincs",
   "--cov",
   "--cov-branch",
-  "--cov-report=xml",
   "--junitxml=junit-sfincs.xml",
   "--durations=5",
-] }
+], env = { COVERAGE_FILE = ".coverage.sfincs" } }
+report = { cmd = "coverage report", env = { COVERAGE_FILE = ".coverage.sfincs" }, depends-on = [ "test-sfincs" ] }
+html = { cmd = "coverage html", env = { COVERAGE_FILE = ".coverage.sfincs" }, depends-on = [ "report" ] }
 
 [tool.pixi.feature.test311.tasks]
+# `test` runs every test suite at once against an env that has all
+# features (schism + sfincs + plot) installed, producing a single
+# .coverage file. `report` and `html` then chain off it so that
+# `pixi r html` runs tests + report + html in one go.
 test = { cmd = [
   "pytest",
   "tests/",
   "--ignore=tests/legacy_scripts",
-  "--no-cov",
+  "--cov",
+  "--cov-branch",
   "--junitxml=junit.xml",
   "--durations=5",
 ] }
-report = { cmd = [ "coverage", "report" ], depends-on = [ "test" ] }
-html = { cmd = [ "coverage", "html" ], depends-on = [ "report" ] }
+report = { cmd = "coverage report && coverage xml", depends-on = [ "test" ] }
+html = { cmd = "coverage html", depends-on = [ "report" ] }
 
 [tool.pixi.feature.test313.tasks]
 test = { cmd = [
   "pytest",
   "tests/",
   "--ignore=tests/legacy_scripts",
-  "--no-cov",
+  "--cov",
+  "--cov-branch",
   "--junitxml=junit.xml",
   "--durations=5",
 ] }
-report = { cmd = [ "coverage", "report" ], depends-on = [ "test" ] }
-html = { cmd = [ "coverage", "html" ], depends-on = [ "report" ] }
+report = { cmd = "coverage report && coverage xml", depends-on = [ "test" ] }
+html = { cmd = "coverage html", depends-on = [ "report" ] }
 
 [tool.pixi.feature.typecheck.pypi-dependencies]
 hydromt-sfincs = { git = "https://github.com/Deltares/hydromt_sfincs", rev = "41aac0a3980fc2714ec28eafb0463d40abfc979a" }
@@ -278,6 +293,8 @@ include = [
 ]
 exclude = [ "docs/examples/notebooks/*.py", "legacy-coastal", "tests/legacy_scripts/**/*.py" ]
 lint.select = [
+  # flake8-unused-arguments
+  "ARG",
   # flake8-bugbear
   "B",
   # flake8-comprehensions
@@ -362,6 +379,10 @@ lint.ignore = [
   # shell command
   "S605",
   "S607",
+  # cast() string-arg style — conflicts with vulture's ability to see
+  # the symbol as used; both forms are runtime no-ops with TYPE_CHECKING
+  # imports anyway.
+  "TC006",
   # custom exception
   "TRY003",
 ]
@@ -385,11 +406,21 @@ lint.per-file-ignores."src/coastal_calibration/schism/subsetter.py" = [
   "PLR0915",
 ]
 lint.per-file-ignores."src/coastal_calibration/tides/pytides/*.py" = [
+  # vendored: unused-arg checks would be noisy across the legacy API surface
+  "ARG001",
+  "ARG002",
   # scientific naming conventions (tidal constituents: f_M2, u_K1, etc.)
   "N802",
   "N806",
 ]
 lint.per-file-ignores."tests/**/*.py" = [
+  # pytest fixtures, monkeypatch lambdas, and signature-matching mocks
+  # routinely accept parameters they don't use; ARG would fire on every
+  # `tmp_path` or `lambda *a, **kw: ...`.
+  "ARG001",
+  "ARG002",
+  "ARG004",
+  "ARG005",
   "D100",
   "D101",
   "D102",
@@ -487,6 +518,49 @@ report.ignore_errors = true
 report.omit = [
   "**/__init__.py",
   "*/legacy_scripts/*",
+  "src/coastal_calibration/tides/*",
+]
+
+[tool.vulture]
+# Dead-code detection. Pre-commit runs `vulture --quiet` and reads this
+# config; raise the bar to >=80% confidence so it stays signal, not
+# noise. Drop the threshold (e.g. `pixi r -e dev python -m vulture
+# --min-confidence=60 src tests`) for an exploratory sweep.
+min_confidence = 80
+paths = [ "src", "tests" ]
+exclude = [
+  # Frozen reference implementations from the pre-pixi era; not part of
+  # the live codebase.
+  "tests/legacy_scripts/",
+  # Vendored upstream library; rewrites here would diverge from upstream.
+  "src/coastal_calibration/tides/pytides/",
+  # Notebook .py files are jupytext mirrors of .ipynb; cell-level dead
+  # code is intentional (e.g. final-cell expressions for display).
+  "docs/examples/notebooks/",
+]
+ignore_decorators = [
+  # pytest fixtures and parametrize args look unused but are wired up
+  # by pytest at collection time.
+  "@pytest.fixture",
+  "@pytest.mark.*",
+  # rich-click subcommands are registered via decorator and dispatched
+  # by name from the CLI entry point.
+  "@*.command",
+  "@*.group",
+  # Properties may be invoked dynamically (getattr / dataclass / pydantic).
+  "@property",
+]
+ignore_names = [
+  # pytest naming conventions.
+  "test_*",
+  "setUp",
+  "tearDown",
+  # Dataclass / NamedTuple fields aren't "called" but are accessed via
+  # attribute lookup that vulture can't always trace.
+  "model_config",
+  # CLI command callbacks share a `ctx` parameter that goes unused
+  # whenever the subcommand doesn't need click's context.
+  "ctx",
 ]
 
 [tool.jupytext]

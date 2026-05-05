@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import esmpy as ESMF
 import netCDF4
@@ -40,6 +41,9 @@ from .esmf_utils import (
     gather_reduce,
     gatherv_1d,
 )
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
 
 
 def _pick_time_var(ds: netCDF4.Dataset) -> str:
@@ -58,11 +62,11 @@ def _pick_time_var(ds: netCDF4.Dataset) -> str:
 
 
 def sea_level_pressure(
-    temp: np.ndarray,
-    mixing: np.ndarray,
-    height: np.ndarray,
-    press: np.ndarray,
-) -> np.ndarray:
+    temp: NDArray[np.floating[Any]],
+    mixing: NDArray[np.floating[Any]],
+    height: NDArray[np.floating[Any]],
+    press: NDArray[np.floating[Any]],
+) -> NDArray[np.floating[Any]]:
     """Compute sea-level pressure from surface pressure via hypsometric equation.
 
     Parameters
@@ -179,16 +183,18 @@ class CoastalForcingRegridder:
 
     def _init_vsource_nc(self, ds: netCDF4.Dataset, ntimes: int):
         """Create dimensions and variables for the SCHISM vsource file."""
+        from coastal_calibration._nc_io import create_var, write_var
+
         ds.createDimension("time_vsource", ntimes)
         ds.createDimension("nsources", self.total_elements)
         ds.createDimension("one", 1)
 
-        eso = ds.createVariable("source_elem", "i4", ("nsources",))
-        ds.createVariable("vsource", "f8", ("time_vsource", "nsources"), zlib=True)
-        ds.createVariable("time_vsource", "f8", ("time_vsource",))
-        vts = ds.createVariable("time_step_vsource", "f4", ("one",))
+        eso = create_var(ds, "source_elem", "i4", ("nsources",))
+        create_var(ds, "vsource", "f8", ("time_vsource", "nsources"), zlib=True)
+        create_var(ds, "time_vsource", "f8", ("time_vsource",))
+        vts = create_var(ds, "time_step_vsource", "f4", ("one",))
 
-        eso[:] = np.arange(1, self.total_elements + 1)
+        write_var(eso, np.arange(1, self.total_elements + 1))
         vts[:] = 3600
 
     def _regrid_to_schism(self, input_file: Path, vsource_ds: netCDF4.Dataset | None):
@@ -263,37 +269,54 @@ class CoastalForcingRegridder:
         self, output_ds: netCDF4.Dataset, nlats: int, nlons: int, input_ds: netCDF4.Dataset
     ):
         """Create dimensions, coordinates, and time variable for lat-lon output."""
+        from coastal_calibration._nc_io import create_var
+
         output_ds.createDimension(dimname="lat", size=nlats)
         output_ds.createDimension(dimname="lon", size=nlons)
         output_ds.createDimension(dimname="time", size=0)
 
-        lat_coord = output_ds.createVariable(
-            varname="lat", dimensions=("lat",), datatype=self.lats.dtype
+        create_var(
+            output_ds,
+            "lat",
+            self.lats.dtype,
+            ("lat",),
+            attrs={
+                "long_name": "latitude",
+                "units": "degrees_north",
+                "standard_name": "latitude",
+                "axis": "Y",
+            },
         )
-        lat_coord.long_name = "latitude"
-        lat_coord.units = "degrees_north"
-        lat_coord.standard_name = "latitude"
-        lat_coord.axis = "Y"
-
-        lon_coord = output_ds.createVariable(
-            varname="lon", dimensions=("lon",), datatype=self.lons.dtype
+        create_var(
+            output_ds,
+            "lon",
+            self.lons.dtype,
+            ("lon",),
+            attrs={
+                "long_name": "longitude",
+                "units": "degrees_east",
+                "standard_name": "longitude",
+                "axis": "X",
+            },
         )
-        lon_coord.long_name = "longitude"
-        lon_coord.units = "degrees_east"
-        lon_coord.standard_name = "longitude"
-        lon_coord.axis = "X"
-
         in_time = input_ds.variables[_pick_time_var(input_ds)]
-        time_coord = output_ds.createVariable(
-            varname="time", dimensions=("time",), datatype=in_time.datatype
+        create_var(
+            output_ds,
+            "time",
+            in_time.datatype,
+            ("time",),
+            attrs={
+                "long_name": "valid output time",
+                "units": in_time.units,
+                "calendar": "standard",
+                "standard_name": "time",
+            },
         )
-        time_coord.long_name = "valid output time"
-        time_coord.units = in_time.units
-        time_coord.calendar = "standard"
-        time_coord.standard_name = "time"
 
     def _regrid_to_latlon(self, input_file: Path, apply_slp: bool = True):  # noqa: PLR0912, PLR0915
         """Regrid atmospheric variables to a regular lat-lon grid."""
+        from coastal_calibration._nc_io import create_var, write_var
+
         with netCDF4.Dataset(input_file) as input_ds:
             nlons, nlats = self.out_grid.max_index
 
@@ -337,11 +360,13 @@ class CoastalForcingRegridder:
                         if output_ds is None:
                             msg = "output_ds is None on root rank"
                             raise RuntimeError(msg)
-                        new_var = output_ds.createVariable(
-                            varname=var_name, datatype="f4", dimensions=("time", "lat", "lon")
+                        create_var(
+                            output_ds,
+                            var_name,
+                            "f4",
+                            ("time", "lat", "lon"),
+                            attrs=var_attrs,
                         )
-                        for attr, val in var_attrs.items():
-                            setattr(new_var, attr, val)
 
                     # Populate source field with local partition slice
                     in_field = ESMF.Field(grid=self.in_grid, name=f"{variable}-in")
@@ -387,9 +412,12 @@ class CoastalForcingRegridder:
                     if output_ds is None:
                         msg = "output_ds is None on root rank"
                         raise RuntimeError(msg)
-                    output_ds.variables["lat"][:] = self.lats
-                    output_ds.variables["lon"][:] = self.lons
-                    output_ds.variables["time"][:] = input_ds.variables[_pick_time_var(input_ds)][:]
+                    write_var(output_ds.variables["lat"], self.lats)
+                    write_var(output_ds.variables["lon"], self.lons)
+                    write_var(
+                        output_ds.variables["time"],
+                        input_ds.variables[_pick_time_var(input_ds)][:],
+                    )
             finally:
                 if output_ds is not None:
                     output_ds.close()

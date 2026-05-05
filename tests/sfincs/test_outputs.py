@@ -7,7 +7,7 @@ No external fixtures, no SFINCS binary, no HydroMT.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
@@ -21,6 +21,8 @@ from coastal_calibration.sfincs.outputs import (
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from numpy.typing import NDArray
 
 # ---------------------------------------------------------------------------
 # Fixture builders
@@ -51,7 +53,7 @@ def _write_regular_map(
     yy, xx = np.meshgrid(y, x, indexing="ij")
     zb = -1.0 - 0.001 * (yy + xx)  # negative => below datum
 
-    data_vars: dict[str, tuple[tuple[str, ...], np.ndarray]] = {
+    data_vars: dict[str, tuple[tuple[str, ...], NDArray[Any]]] = {
         "zs": (("time", "y", "x"), zs.astype(np.float32)),
         "zb": (("y", "x"), zb.astype(np.float32)),
     }
@@ -96,7 +98,7 @@ def _write_ugrid_quadtree_map(path: Path, *, include_msk: bool = False) -> xr.Da
     zs = np.outer(np.arange(1.0, 4.0), np.arange(1.0, 5.0)).astype(np.float32)
     zb = np.array([-2.0, -1.5, -1.0, -0.5], dtype=np.float32)  # bed below datum
 
-    data_vars: dict[str, tuple[tuple[str, ...], np.ndarray]] = {
+    data_vars: dict[str, tuple[tuple[str, ...], NDArray[Any]]] = {
         "zs": (("time", "nmesh2d_face"), zs),
         "zb": (("nmesh2d_face",), zb),
         "mesh2d_node_x": (("nmesh2d_node",), node_x),

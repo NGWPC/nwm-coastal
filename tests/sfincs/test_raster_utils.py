@@ -97,7 +97,7 @@ class TestClipAndReproject:
         assert result.sizes[result.raster.dims[1]] > 0
 
     def test_projected_source_crs(self) -> None:
-        """Source in a projected CRS (metres) also works correctly."""
+        """Source in a projected CRS (meters) also works correctly."""
         src = _make_raster(
             bounds=(150_000.0, 3_100_000.0, 350_000.0, 3_400_000.0),
             res=1_000.0,

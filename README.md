@@ -28,15 +28,15 @@ execution to validation against NOAA tide gauges.
     and flood depth mapping
 
 <p align="center">
-  <img src="docs/examples/images/qgis_plugin_merge.png" alt="QGIS Plugin: model domain with watershed boundaries" width="70%">
+  <img src="docs/examples/images/plugin_divide_union.png" alt="QGIS Plugin: model domain with watershed boundaries" width="70%">
   <br>
   <em>QGIS plugin: defining the model domain aligned to watershed boundaries</em>
 </p>
 
 <p align="center">
-  <img src="docs/examples/images/narragansett_thumb.png" alt="Flood depth map, Narragansett Bay" width="45%">
+  <img src="docs/examples/images/lavaca_thumb.png" alt="Flood depth map, Lavaca Bay" width="45%">
   <br>
-  <em>Flood depth map from a SFINCS simulation of Narragansett Bay, RI</em>
+  <em>Flood depth map from a SFINCS simulation of Lavaca Bay, TX</em>
 </p>
 
 ## Supported Models
@@ -179,19 +179,58 @@ The AOI polygon and discharge points can be created interactively using the QGIS
 - **SCHISM model creation**: integrate the existing SCHISM mesh subsetting capability
     into the package, providing an automated create workflow for SCHISM similar to what
     SFINCS already has. This will allow users to extract a regional subdomain from a
-    larger SCHISM mesh using the same QGIS plugin and API.
+    larger SCHISM mesh using the same QGIS plugin and API. When this lands, the
+    discharge source/sink generation step needs to use the upstream-crossing strategy
+    described in
+    [docs/dev/schism_sink_source_issue.md](docs/dev/schism_sink_source_issue.md) rather
+    than the per-crossing classification used to build the current pre-built
+    Pacific/Hawaii meshes (which produces multiple spurious source/sink points along
+    each river inside the domain).
+- **STOFS-aware TPXO fallback**: the boundary pipeline currently overwrites STOFS data
+    with TPXO tidal predictions whenever the simulation exceeds 180 hours, which
+    silently loses storm surge / wind setup / pressure effects on retrospective runs
+    where STOFS data is available for the full window. Replace the unconditional
+    `>180h → TPXO` switch in `make_stofs_boundary` with a data-availability check; only
+    fall back when STOFS doesn't cover the requested window (i.e. prospective forecasts
+    beyond the latest available cycle). Smaller, lower-risk fix that should land before
+    the larger multi-cycle/Python-TPXO work below. See
+    [docs/dev/stofs_tpxo_improvements.md](docs/dev/stofs_tpxo_improvements.md) Phase 1.
 - **Improved tidal boundary conditions**: replace the current 8-constituent TPXO
     implementation with a pure-Python module supporting all 32+ constituents and minor
-    constituent inference, removing the dependency on an external Fortran binary
+    constituent inference, removing the dependency on an external Fortran binary. See
+    [docs/dev/stofs_tpxo_improvements.md](docs/dev/stofs_tpxo_improvements.md) Phase 4
+    for the detailed plan and the suspected nodal-correction bugs in the OTPS Fortran
+    code.
 - **Multi-cycle STOFS stitching**: download and stitch multiple STOFS forecast cycles to
     cover simulations of any duration, eliminating the current 180-hour single-cycle
-    limit
+    limit. See
+    [docs/dev/stofs_tpxo_improvements.md](docs/dev/stofs_tpxo_improvements.md) Phase 2.
 - **Regional STOFS subsetting**: spatially subset the global STOFS output to the model
     domain before download, reducing data transfer from ~12 GB per cycle to a few
-    hundred MB
+    hundred MB. See
+    [docs/dev/stofs_tpxo_improvements.md](docs/dev/stofs_tpxo_improvements.md) Phase 3.
+- **Re-evaluate `hydromt-sfincs` / `hydromt` patches**: 14 upstream bugs are documented
+    in [docs/dev/hydromt_sfincs_issues.md](docs/dev/hydromt_sfincs_issues.md) and worked
+    around by monkey-patches in `src/coastal_calibration/sfincs/_hydromt_compat.py`. The
+    fixes have been shared with the Deltares `hydromt-sfincs` maintainers; the
+    dependency is pinned in `pyproject.toml` to commit
+    [`41aac0a`](https://github.com/Deltares/hydromt_sfincs/commit/41aac0a3980fc2714ec28eafb0463d40abfc979a)
+    so the patches stay aligned with the upstream API they were written against. Once
+    upstream releases land, audit each patch in `_hydromt_compat.py`, drop the ones that
+    are no longer needed, and bump the pin (or unpin entirely once all 14 are upstream).
 - **PyPI and conda-forge**: publish the package on PyPI and conda-forge so users can
     install with `pip install coastal-calibration` or
     `conda install coastal-calibration` without cloning the repository
+- **Run-mode-aware output defaults**: introduce a `simulation.run_mode` config key
+    (`"forecast"` for short-duration operational runs, `"retrospective"` for long
+    hindcasts) that selects sensible default write cadences for both SCHISM (`nspool`,
+    `ihfskip`, `nhot_write`) and SFINCS (`dtmapout`, `dtrstout`, `dthisout`, `dtmaxout`)
+    when the user does not explicitly override them. Forecast mode would mirror the
+    per-domain Pacific/Hawaii template stacks (hourly snapshots in 18-48h files,
+    frequent restarts); retrospective mode would favor a single output file and
+    infrequent restarts to reduce storage and metadata pressure on long runs. The
+    existing `run_param_overrides` keys would still take precedence so per-run tuning is
+    unaffected.
 
 ## Credits
 

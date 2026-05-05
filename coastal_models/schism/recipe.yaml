@@ -22,6 +22,7 @@ requirements:
   - netcdf-fortran * mpi_openmpi_*
   - hdf5 * mpi_openmpi_*
   - openmpi
+  - libgfortran
   run:
   - openmpi
 

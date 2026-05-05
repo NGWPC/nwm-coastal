@@ -1,7 +1,7 @@
 """Integration tests for the SFINCS workflow stages.
 
 These tests exercise the real HydroMT-SFINCS model stages against the
-pre-built Texas quadtree mesh (``docs/examples/texas.tar.gz``).  External
+pre-built Texas quadtree mesh (``tests/sfincs/fixtures/texas.zip``). External
 I/O (data downloads, SFINCS binary, NOAA CO-OPS API) is mocked so that
 the tests run in seconds and without network access.
 
@@ -161,7 +161,7 @@ def _create_fake_stofs_nc(
 
     rng = np.random.default_rng(seed)
 
-    # Small water level signal (metres)
+    # Small water level signal (meters)
     wl = rng.normal(0.2, 0.05, (2, n_nodes)).astype(np.float32)
 
     ds = xr.Dataset(

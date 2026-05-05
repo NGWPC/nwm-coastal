@@ -284,16 +284,18 @@ class TestSfincsCreateConfig:
 
     def test_keep_largest_only_round_trip(self, aoi_file: Path, output_dir: Path) -> None:
         """`mask.keep_largest_only` must survive the to_dict/from_dict round-trip."""
-        cfg = SfincsCreateConfig.from_dict({
-            "aoi": str(aoi_file),
-            "output_dir": str(output_dir),
-            "mask": {
-                "zmin": -50.0,
-                "boundary_zmax": -1.0,
-                "reset_bounds": True,
-                "keep_largest_only": True,
-            },
-        })
+        cfg = SfincsCreateConfig.from_dict(
+            {
+                "aoi": str(aoi_file),
+                "output_dir": str(output_dir),
+                "mask": {
+                    "zmin": -50.0,
+                    "boundary_zmax": -1.0,
+                    "reset_bounds": True,
+                    "keep_largest_only": True,
+                },
+            }
+        )
         assert cfg.mask.keep_largest_only is True
         d = cfg.to_dict()
         assert d["mask"]["keep_largest_only"] is True
@@ -302,11 +304,13 @@ class TestSfincsCreateConfig:
 
     def test_aoi_simplify_neck_m_round_trip(self, aoi_file: Path, output_dir: Path) -> None:
         """`aoi_simplify_neck_m` must survive the to_dict/from_dict round-trip."""
-        cfg = SfincsCreateConfig.from_dict({
-            "aoi": str(aoi_file),
-            "output_dir": str(output_dir),
-            "aoi_simplify_neck_m": 750.0,
-        })
+        cfg = SfincsCreateConfig.from_dict(
+            {
+                "aoi": str(aoi_file),
+                "output_dir": str(output_dir),
+                "aoi_simplify_neck_m": 750.0,
+            }
+        )
         assert cfg.aoi_simplify_neck_m == 750.0
         d = cfg.to_dict()
         assert d["aoi_simplify_neck_m"] == 750.0
@@ -1240,10 +1244,12 @@ class TestDischargeStageRun:
         gdf = gpd.GeoDataFrame(
             {"id": [3001]},
             geometry=[
-                MultiLineString([
-                    [(-95.7, 29.25), (-95.5, 29.25)],
-                    [(-95.5, 29.25), (-95.2, 29.3)],
-                ])
+                MultiLineString(
+                    [
+                        [(-95.7, 29.25), (-95.5, 29.25)],
+                        [(-95.5, 29.25), (-95.2, 29.3)],
+                    ]
+                )
             ],
             crs="EPSG:4326",
         )
@@ -1383,13 +1389,15 @@ class TestDischargeStageRun:
         # the upstream-most crossing is therefore the first one at
         # (-95.5, 29.10).
         geojson = tmp_path / "multi_cross.geojson"
-        line = LineString([
-            (-95.70, 29.05),  # outside (upstream)
-            (-95.30, 29.10),  # inside
-            (-95.70, 29.20),  # outside again
-            (-95.30, 29.40),  # inside again
-            (-95.20, 29.45),  # ends inside (downstream)
-        ])
+        line = LineString(
+            [
+                (-95.70, 29.05),  # outside (upstream)
+                (-95.30, 29.10),  # inside
+                (-95.70, 29.20),  # outside again
+                (-95.30, 29.40),  # inside again
+                (-95.20, 29.45),  # ends inside (downstream)
+            ]
+        )
         gdf = gpd.GeoDataFrame({"id": [4001]}, geometry=[line], crs="EPSG:4326")
         gdf.to_file(geojson, driver="GeoJSON")
 
@@ -1465,9 +1473,7 @@ class TestDischargeStageRun:
         src_line = src_file.read_text().strip()
         x_written, y_written = (float(v) for v in src_line.split()[:2])
         # Snapped onto the supplied face grid (UTM 15N).
-        assert 256000 <= x_written <= 292000, (
-            f"Snapped x={x_written} should be inside the grid"
-        )
+        assert 256000 <= x_written <= 292000, f"Snapped x={x_written} should be inside the grid"
         assert 3_210_000 <= y_written <= 3_266_000, (
             f"Snapped y={y_written} should be inside the grid"
         )
