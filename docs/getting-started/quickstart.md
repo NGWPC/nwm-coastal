@@ -216,6 +216,7 @@ pixi r -e dev coastal-calibration run config.yaml --stop-after schism_sflux
 - Learn about [Configuration Options](../user-guide/configuration.md)
 - Explore [Workflow Stages](../user-guide/workflow-stages.md)
 - See the [CLI Reference](../user-guide/cli.md)
-- Try the example notebooks:
-    [Narragansett Bay (SFINCS)](../examples/notebooks/narragansett.ipynb) and
-    [Hawaii (SCHISM)](../examples/notebooks/schism-hawaii.ipynb)
+- Try the example notebooks: the
+    [Mendocino Walkthrough](../examples/notebooks/walkthrough.ipynb) (end-to-end SCHISM
+    \+ SFINCS comparison) and the [Lavaca Bay SFINCS](../examples/notebooks/lavaca.ipynb)
+    tutorial
