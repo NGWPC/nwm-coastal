@@ -41,7 +41,7 @@ model_config:
   # The sfincs_floodmap stage downscales zsmax onto this DEM to produce a
   # Cloud Optimized GeoTIFF of maximum flood depth.
   floodmap_dem: ../downloads/lavaca_grid/noaa_3m.tif
-  inp_overrides:
+  run_param_overrides:
     tspinup: 10800                  # 3 h spin-up
     advection: 0                    # disable momentum advection
     viscosity: 0                    # disable SFINCS built-in viscosity model
