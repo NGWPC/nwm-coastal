@@ -10,7 +10,7 @@ Run with::
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import geopandas as gpd
 import numpy as np
@@ -24,10 +24,12 @@ from coastal_calibration.data.transformation import compute_aoi_coverage
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from numpy.typing import NDArray
+
 
 def _write_raster(
     path: Path,
-    data: np.ndarray,
+    data: NDArray[np.floating[Any]],
     *,
     bounds: tuple[float, float, float, float] = (-95.3, 29.1, -95.1, 29.4),
     crs: str = "EPSG:4326",

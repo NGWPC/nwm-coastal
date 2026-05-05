@@ -94,7 +94,7 @@ def patch_serialize_crs() -> None:
 
 
 def patch_boundary_conditions_index_dim() -> None:
-    """Fix hydromt-sfincs ``_validate_and_prepare_gdf`` not normalising index name.
+    """Fix hydromt-sfincs ``_validate_and_prepare_gdf`` not normalizing index name.
 
     ``BoundaryConditionComponent._create_dummy_dataset`` hard-codes
     ``dims=("time", "index")``, but ``GeoDataset.from_gdf`` derives
@@ -133,7 +133,7 @@ def patch_meteo_write_gridded() -> None:
     """Avoid OOM in ``write_gridded`` by keeping dask arrays lazy.
 
     ``SfincsMeteo.write_gridded`` calls ``self.data.load()`` which
-    materialises the entire lazy dask dataset into memory.  For a
+    materializes the entire lazy dask dataset into memory.  For a
     typical NWM forcing setup (precip + wind + pressure) this can
     exceed 90 GB — far more than a login-node's 32 GB.
 
@@ -179,8 +179,9 @@ def patch_meteo_write_gridded() -> None:
         time_vals = ds["time"].to_numpy()
         var_names = list(ds.data_vars)
 
-        nc = netCDF4.Dataset(str(out_path), "w", format="NETCDF4")
-        try:
+        from coastal_calibration._nc_io import create_var, write_var
+
+        with netCDF4.Dataset(str(out_path), "w", format="NETCDF4") as nc:
             # --- dimensions ---
             nc.createDimension("time", None)  # unlimited
             for dim in ds.dims:
@@ -188,23 +189,23 @@ def patch_meteo_write_gridded() -> None:
                     nc.createDimension(dim, ds.sizes[dim])
 
             # --- time variable ---
-            time_var: Any = nc.createVariable("time", "f8", ("time",))
-            time_var.units = f"minutes since {tref_str}"
+            time_var: Any = create_var(
+                nc, "time", "f8", ("time",), attrs={"units": f"minutes since {tref_str}"}
+            )
 
             # --- spatial coordinate variables ---
             for coord in ds.coords:
                 if coord == "time":
                     continue
                 arr = ds.coords[coord].to_numpy()
-                nc_coord = nc.createVariable(coord, arr.dtype, ds.coords[coord].dims)
-                nc_coord[:] = arr
+                nc_coord = create_var(nc, coord, arr.dtype, ds.coords[coord].dims)
+                write_var(nc_coord, arr)
 
             # --- data variables (float32: SFINCS reads forcing as real*4) ---
-            nc_vars = {}
-            for vname in var_names:
-                da = ds[vname]
-                dims = tuple(str(d) for d in da.dims)
-                nc_vars[vname] = nc.createVariable(vname, "f4", dims)
+            nc_vars = {
+                vname: create_var(nc, vname, "f4", tuple(str(d) for d in ds[vname].dims))
+                for vname in var_names
+            }
 
             # --- write one time-step at a time ---
             t0 = np.datetime64(tref_str)
@@ -214,8 +215,6 @@ def patch_meteo_write_gridded() -> None:
                 for vname in var_names:
                     nc_vars[vname][i, :] = chunk[vname].to_numpy()
                 del chunk
-        finally:
-            nc.close()
 
     SfincsMeteo.write_gridded = _write_gridded_lazy  # pyright: ignore[reportAttributeAccessIssue]
     SfincsMeteo.write_gridded._patched = True  # pyright: ignore[reportFunctionMemberAccess]
@@ -548,7 +547,7 @@ def patch_make_index_cog() -> None:  # noqa: PLR0915
     3. Passes DEM coordinates directly to ``get_indices_at_points``
        without reprojecting them to the model CRS.  When the DEM is in
        a geographic CRS (e.g. EPSG:4269, degrees) and the model is in a
-       projected CRS (e.g. EPSG:32614, metres), every point falls
+       projected CRS (e.g. EPSG:32614, meters), every point falls
        outside the grid and the entire index COG is filled with nodata.
     """
     try:

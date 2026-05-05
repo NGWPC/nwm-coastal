@@ -14,7 +14,7 @@ Design principles (from xESMF):
 from __future__ import annotations
 
 import warnings
-from typing import Any, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 import esmpy as ESMF
 
@@ -24,6 +24,9 @@ ESMF.Manager(debug=False)  # pyright: ignore[reportCallIssue]
 
 import numpy as np
 from mpi4py import MPI
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
 
 comm = MPI.COMM_WORLD
 
@@ -47,10 +50,10 @@ class GridBounds(NamedTuple):
 
 
 def build_grid(
-    lon: np.ndarray,
-    lat: np.ndarray,
-    lon_corners: np.ndarray | None = None,
-    lat_corners: np.ndarray | None = None,
+    lon: NDArray[np.floating[Any]],
+    lat: NDArray[np.floating[Any]],
+    lon_corners: NDArray[np.floating[Any]] | None = None,
+    lat_corners: NDArray[np.floating[Any]] | None = None,
 ) -> tuple[ESMF.Grid, GridBounds]:
     """Create an ESMF Grid from 2D lon/lat arrays.
 
@@ -126,15 +129,15 @@ def build_grid(
 
 
 def build_unstructured_mesh(
-    lon: np.ndarray,
-    lat: np.ndarray,
-    elements: np.ndarray,
+    lon: NDArray[np.floating[Any]],
+    lat: NDArray[np.floating[Any]],
+    elements: NDArray[np.integer[Any]],
     *,
     start_index: int = 0,
     bbox: tuple[float, float, float, float] | None = None,
     bbox_buffer_deg: float = 1.0,
-    node_mask: np.ndarray | None = None,
-) -> tuple[ESMF.Mesh, np.ndarray]:
+    node_mask: NDArray[Any] | None = None,
+) -> tuple[ESMF.Mesh, NDArray[np.integer[Any]]]:
     """Create an ESMF Mesh from an unstructured triangular grid.
 
     Used for BILINEAR-style regridding from unstructured sources where
@@ -229,7 +232,7 @@ def build_unstructured_mesh(
     # esmpy passes these arrays through ctypes to the ESMF C++ layer;
     # use the default Python ``int`` / ``float`` dtypes (matching the
     # official esmpy mesh-creation examples) to avoid undefined-
-    # behaviour crashes that occur with explicit int32 dtypes.
+    # behavior crashes that occur with explicit int32 dtypes.
     node_ids = np.arange(1, n_local_nodes + 1)
     node_coords = np.empty(n_local_nodes * 2)
     node_coords[0::2] = lon[keep_idx]
@@ -273,7 +276,9 @@ def build_unstructured_mesh(
     return mesh, keep_idx
 
 
-def build_locstream(lon: np.ndarray, lat: np.ndarray) -> ESMF.LocStream:
+def build_locstream(
+    lon: NDArray[np.floating[Any]], lat: NDArray[np.floating[Any]]
+) -> ESMF.LocStream:
     """Create an ESMF LocStream from 1D **global** coordinate arrays.
 
     The *global* array is partitioned across MPI ranks so that each rank
@@ -441,10 +446,10 @@ class MaskedRegridder:
 
 
 def gather_reduce(
-    local_data: np.ndarray,
+    local_data: NDArray[Any],
     global_shape: tuple[int, ...],
     root: int = 0,
-) -> np.ndarray | None:
+) -> NDArray[Any] | None:
     """Sum-reduce distributed field data to a single rank.
 
     Each MPI rank contributes its local partition of the data. The root
@@ -469,10 +474,10 @@ def gather_reduce(
 
 
 def gatherv_1d(
-    local_data: np.ndarray,
+    local_data: NDArray[Any],
     local_count: int,
     root: int = 0,
-) -> np.ndarray | None:
+) -> NDArray[Any] | None:
     """Gather variable-length 1D data from all ranks to root.
 
     Parameters
@@ -498,7 +503,7 @@ def gatherv_1d(
     return result
 
 
-def allreduce_minmax(values: np.ndarray) -> tuple[float, float]:
+def allreduce_minmax(values: NDArray[Any]) -> tuple[float, float]:
     """Compute global min and max of an array across all MPI ranks.
 
     Parameters

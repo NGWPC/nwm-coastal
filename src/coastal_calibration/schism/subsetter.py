@@ -333,7 +333,7 @@ class MeshClassifier:
 
         # Pre-allocate the destination array and fill it chunk-by-chunk
         # (mirroring the node loop above). The previous implementation
-        # materialised every chunk in a Python list and then ``np.vstack``-ed
+        # materialized every chunk in a Python list and then ``np.vstack``-ed
         # them, doubling peak memory and defeating the point of chunking.
         self.mesh_elements = np.zeros((self.project.n_elements, 5), dtype=np.int64)
         idx = 0
@@ -342,7 +342,7 @@ class MeshClassifier:
             self.mesh_elements[idx : idx + n] = elem_chunk
             idx += n
         if idx == 0:
-            # Empty mesh: keep behaviour parity with the legacy fallback.
+            # Empty mesh: keep behavior parity with the legacy fallback.
             self.mesh_elements = np.array([])
 
         logger.info(
@@ -1281,38 +1281,55 @@ class MeshSubsetter:
             num_element_conn = np.full(len(conn), np.int8(3), dtype=np.int8)
 
         logger.debug(f"Writing {output_nc_file.name}...")
+        from coastal_calibration._nc_io import create_var, write_var
+
         with netCDF4.Dataset(str(output_nc_file), "w", format="NETCDF4") as nc:
             nc.createDimension("nodeCount", project.n_nodes)
             nc.createDimension("elementCount", project.n_elements)
             nc.createDimension("maxNodePElement", project.max_nodes_per_element)
             nc.createDimension("coordDim", 2)
 
-            node_coords_var = nc.createVariable("nodeCoords", "f8", ("nodeCount", "coordDim"))
-            node_coords_var[:] = project.nodes_coordinates
-            node_coords_var.units = "degrees"
+            node_coords_var = create_var(
+                nc,
+                "nodeCoords",
+                "f8",
+                ("nodeCount", "coordDim"),
+                attrs={"units": "degrees"},
+            )
+            write_var(node_coords_var, project.nodes_coordinates)
 
-            element_conn_var = nc.createVariable(
+            element_conn_var = create_var(
+                nc,
                 "elementConn",
                 "i4",
                 ("elementCount", "maxNodePElement"),
+                attrs={
+                    "long_name": "Node Indices that define the element connectivity",
+                    "start_index": np.int8(0),
+                },
                 fill_value=np.int32(-1),
             )
-            element_conn_var[:] = project.element_connections
-            element_conn_var.long_name = "Node Indices that define the element connectivity"
-            element_conn_var.start_index = np.int8(0)
+            write_var(element_conn_var, project.element_connections)
 
-            num_element_conn_var = nc.createVariable("numElementConn", "i1", ("elementCount",))
-            num_element_conn_var[:] = num_element_conn
-            num_element_conn_var.long_name = "Number of nodes per element"
-
-            center_coords_var = nc.createVariable(
-                "centerCoords", "f8", ("elementCount", "coordDim")
+            num_element_conn_var = create_var(
+                nc,
+                "numElementConn",
+                "i1",
+                ("elementCount",),
+                attrs={"long_name": "Number of nodes per element"},
             )
-            center_coords_var[:] = project.elements_centroid
-            center_coords_var.units = "degrees"
+            write_var(num_element_conn_var, num_element_conn)
 
-            nc.gridType = "unstructured"
-            nc.version = "0.9"
+            center_coords_var = create_var(
+                nc,
+                "centerCoords",
+                "f8",
+                ("elementCount", "coordDim"),
+                attrs={"units": "degrees"},
+            )
+            write_var(center_coords_var, project.elements_centroid)
+
+            nc.setncatts({"gridType": "unstructured", "version": "0.9"})
 
         # Write open boundaries NetCDF file (open_bnds_hgrid.nc)
         n_open_bnd_nodes = 0
@@ -1335,35 +1352,64 @@ class MeshSubsetter:
                 nc.createDimension("elementCount", project.n_elements)
                 nc.createDimension("maxNodePElement", project.max_nodes_per_element)
 
-                node_coords_var = nc.createVariable("nodeCoords", "f8", ("nodeCount", "coordDim"))
-                node_coords_var[:] = project.nodes_coordinates
-                node_coords_var.units = "degrees"
-
-                open_nodes_var = nc.createVariable("openBndNodes", "i4", ("openBndNodeCount",))
-                open_nodes_var[:] = all_open_nodes
-                open_nodes_var.long_name = "Open boundary node indices (0-based)"
-                open_nodes_var.start_index = 0
-
-                element_conn_var = nc.createVariable(
-                    "elementConn", "i4", ("elementCount", "maxNodePElement")
+                node_coords_var = create_var(
+                    nc,
+                    "nodeCoords",
+                    "f8",
+                    ("nodeCount", "coordDim"),
+                    attrs={"units": "degrees"},
                 )
-                element_conn_var[:] = project.element_connections
-                element_conn_var.long_name = "Node indices that define the element connectivity"
-                element_conn_var.start_index = 0
+                write_var(node_coords_var, project.nodes_coordinates)
 
-                num_element_conn_var = nc.createVariable("numElementConn", "i1", ("elementCount",))
-                num_element_conn_var[:] = num_element_conn
-                num_element_conn_var.long_name = "Number of nodes per element"
-
-                center_coords_var = nc.createVariable(
-                    "centerCoords", "f8", ("elementCount", "coordDim")
+                open_nodes_var = create_var(
+                    nc,
+                    "openBndNodes",
+                    "i4",
+                    ("openBndNodeCount",),
+                    attrs={
+                        "long_name": "Open boundary node indices (0-based)",
+                        "start_index": 0,
+                    },
                 )
-                center_coords_var[:] = project.elements_centroid
-                center_coords_var.units = "degrees"
+                write_var(open_nodes_var, all_open_nodes)
 
-                nc.gridType = "unstructured"
-                nc.version = "0.9"
-                nc.n_open_boundary_segments = boundary_set.n_open
+                element_conn_var = create_var(
+                    nc,
+                    "elementConn",
+                    "i4",
+                    ("elementCount", "maxNodePElement"),
+                    attrs={
+                        "long_name": "Node indices that define the element connectivity",
+                        "start_index": 0,
+                    },
+                )
+                write_var(element_conn_var, project.element_connections)
+
+                num_element_conn_var = create_var(
+                    nc,
+                    "numElementConn",
+                    "i1",
+                    ("elementCount",),
+                    attrs={"long_name": "Number of nodes per element"},
+                )
+                write_var(num_element_conn_var, num_element_conn)
+
+                center_coords_var = create_var(
+                    nc,
+                    "centerCoords",
+                    "f8",
+                    ("elementCount", "coordDim"),
+                    attrs={"units": "degrees"},
+                )
+                write_var(center_coords_var, project.elements_centroid)
+
+                nc.setncatts(
+                    {
+                        "gridType": "unstructured",
+                        "version": "0.9",
+                        "n_open_boundary_segments": boundary_set.n_open,
+                    }
+                )
 
             logger.info(
                 f"Open boundaries: {n_open_bnd_nodes:,} nodes in {boundary_set.n_open} segments"
@@ -1548,8 +1594,6 @@ class MeshSubsetter:
 
 def _subset_elevation_correction(
     corr_file: Path,
-    project: NWMSCHISMProject,
-    subset_result: SubsetResult,
     output_dir_a: Path,
     output_dir_b: Path,
 ) -> None:
@@ -1658,7 +1702,7 @@ def _subset_elevation_correction(
                 unanchored_slices.append((start, end))
                 continue
             # Nearest original (in traversal index) for each cut node;
-            # ties broken in favour of the earlier original.
+            # ties broken in favor of the earlier original.
             diffs = np.abs(seg_cut_pos[:, None] - seg_orig_pos[None, :])
             anchor_seg_pos = seg_orig_pos[np.argmin(diffs, axis=1)]
             anchor_global = start + anchor_seg_pos
@@ -1895,8 +1939,6 @@ def split_mesh(
         logger.info("Subsetting elevation correction files...")
         _subset_elevation_correction(
             project.elev_corr_file,
-            project,
-            subset_result,
             output_dir_a,
             output_dir_b,
         )
@@ -2294,12 +2336,6 @@ def extract_mesh(
         logger.info("Subsetting elevation correction files...")
         _subset_elevation_correction(
             project.elev_corr_file,
-            project,
-            SubsetResult(
-                side_a=subset_result.side_a,
-                side_b=SideData(nodes=np.array([], dtype=np.int64), elements=np.array([])),
-                shared_nodes=shared,
-            ),
             out,
             out,  # only one output dir
         )

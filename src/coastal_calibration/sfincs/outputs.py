@@ -25,7 +25,7 @@ quadtree-model* files is not yet handled here — a clear
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import xarray as xr
@@ -128,14 +128,14 @@ def _detect_layout(ds: xr.Dataset) -> str:
     return "unknown"
 
 
-def _normalise_face_nodes_1based(
+def _normalize_face_nodes_1based(
     raw: NDArray[np.floating] | NDArray[np.integer],
 ) -> NDArray[np.int64]:
     """Convert SFINCS ``mesh2d_face_nodes`` to 0-based int64 with ``-1`` fill.
 
     SFINCS writes face-node connectivity as 1-based integers (sometimes
     stored as ``float64``) with ``0`` as the padding value for sub-quad
-    cells. We normalise to the same convention used by
+    cells. We normalize to the same convention used by
     :func:`coastal_calibration.schism.outputs.load_schism_elevation`:
     0-based indices with ``-1`` for fill. NaN entries (from decoded
     ``_FillValue``) are treated as padding.
@@ -183,10 +183,10 @@ def _build_quadtree(ds: xr.Dataset) -> xr.Dataset:
 
     node_x = np.asarray(ds["mesh2d_node_x"].to_numpy(), dtype=np.float64)
     node_y = np.asarray(ds["mesh2d_node_y"].to_numpy(), dtype=np.float64)
-    face_nodes = _normalise_face_nodes_1based(ds["mesh2d_face_nodes"].to_numpy())
+    face_nodes = _normalize_face_nodes_1based(ds["mesh2d_face_nodes"].to_numpy())
     times = np.asarray(zs_da["time"].to_numpy())
 
-    data_vars: dict[str, tuple[tuple[str, ...], np.ndarray]] = {
+    data_vars: dict[str, tuple[tuple[str, ...], NDArray[Any]]] = {
         "zs": (("time", "face"), zs),
         "h": (("time", "face"), h),
         "zb": (("face",), zb),
@@ -242,7 +242,7 @@ def _build_regular(ds: xr.Dataset) -> xr.Dataset:
     y = np.asarray(ds["y"].to_numpy(), dtype=np.float64)
     x = np.asarray(ds["x"].to_numpy(), dtype=np.float64)
 
-    data_vars: dict[str, tuple[tuple[str, ...], np.ndarray]] = {
+    data_vars: dict[str, tuple[tuple[str, ...], NDArray[Any]]] = {
         "zs": (("time", "y", "x"), zs),
         "h": (("time", "y", "x"), h),
         "zb": (("y", "x"), zb),
@@ -351,7 +351,7 @@ def load_sfincs_water_level(
             out = _build_regular(ds)
         else:
             msg = (
-                f"Unrecognised SFINCS map layout in {map_file.name}. "
+                f"Unrecognized SFINCS map layout in {map_file.name}. "
                 f"Dims: {sorted(str(d) for d in ds.dims)}"
             )
             raise ValueError(msg)

@@ -18,7 +18,7 @@ the ``dryFlagNode`` array (preferred when present) or via the derived ``h``.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
@@ -96,10 +96,10 @@ def _detect_crs(ds0: xr.Dataset) -> str | None:
     return None
 
 
-def _normalise_face_nodes(
+def _normalize_face_nodes(
     face_nodes_raw: NDArray[np.floating] | NDArray[np.integer],
 ) -> NDArray[np.int64]:
-    """Normalise SCHISM face_nodes to 0-based with ``-1`` fill for triangles.
+    """Normalize SCHISM face_nodes to 0-based with ``-1`` fill for triangles.
 
     SCHISM writes 1-based indices with a variety of fill values (commonly 0,
     ``-999999``, or NetCDF ``_FillValue``). When xarray auto-decodes the
@@ -141,7 +141,7 @@ def _load_mesh_geometry(
     with xr.open_dataset(first_block, decode_times=False) as ds0:
         node_x = np.asarray(ds0["SCHISM_hgrid_node_x"].to_numpy(), dtype=np.float64)
         node_y = np.asarray(ds0["SCHISM_hgrid_node_y"].to_numpy(), dtype=np.float64)
-        face_nodes = _normalise_face_nodes(ds0["SCHISM_hgrid_face_nodes"].to_numpy())
+        face_nodes = _normalize_face_nodes(ds0["SCHISM_hgrid_face_nodes"].to_numpy())
         depth = np.asarray(ds0["depth"].to_numpy(), dtype=np.float64)
         base_date_attr = ds0["time"].attrs.get("base_date")
         crs_label = _detect_crs(ds0)
@@ -313,7 +313,7 @@ def load_schism_elevation(
     # ``elevation = -depth + h_min``, so h ≈ 0 there.
     h = elevation + depth[np.newaxis, :]
 
-    data_vars: dict[str, tuple[tuple[str, ...], np.ndarray]] = {
+    data_vars: dict[str, tuple[tuple[str, ...], NDArray[Any]]] = {
         "elevation": (("time", "node"), elevation),
         "h": (("time", "node"), h),
         "depth": (("node",), depth),

@@ -17,6 +17,7 @@ from __future__ import annotations
 import sys
 import textwrap
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import netCDF4
 import numpy as np
@@ -30,6 +31,9 @@ from .conftest import (
     have_stofs_data,
     run_mpi,
 )
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -89,7 +93,7 @@ def _run_new(
     run_mpi(nprocs, [sys.executable, "-c", runner], cycle_env)
 
 
-def _load_time_series(nc_path: Path) -> np.ndarray:
+def _load_time_series(nc_path: Path) -> NDArray[np.floating[Any]]:
     with netCDF4.Dataset(nc_path) as f:
         return f["time_series"][:].data
 
