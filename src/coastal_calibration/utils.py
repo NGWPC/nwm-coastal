@@ -185,29 +185,17 @@ def detect_mpi(env: dict[str, str] | None = None) -> MpiImpl:
     return impl
 
 
-def _has_efa() -> bool:
-    """Return True when AWS EFA devices are present."""
-    sys_ib = Path("/sys/class/infiniband")
-    if not sys_ib.exists():
-        return False
-    try:
-        return any(p.name.startswith("efa") for p in sys_ib.iterdir())
-    except OSError:
-        logger.debug("Unable to read %s; assuming no EFA", sys_ib)
-        return False
-
-
 def build_mpi_env(env: dict[str, str]) -> dict[str, str]:
     """Add MPI-tuning environment variables to *env* (mutating).
 
-    Applies three layers of configuration:
-
-    1. **General** — safe on any cluster (NFS, Lustre, local).
-    2. **EFA / OFI fabric** — only when AWS EFA devices are detected
-       (``/sys/class/infiniband/efa*``).  These force libfabric as the
-       transport and tune buffer sizes for reliable multi-node MPI.
-    3. **Implementation-specific** — OpenMPI MCA or MPICH env vars,
-       gated on the detected MPI flavour *and* fabric availability.
+    Applies only general, implementation-specific tuning that is safe
+    on any cluster (NFS, Lustre, local).  Fabric-specific tuning (EFA,
+    Slingshot, InfiniBand, etc.) is intentionally NOT auto-detected:
+    it varies too widely across clusters and a wrong guess can deadlock
+    multi-node MPI in subtle ways.  Users supply the cluster-specific
+    transport / OFI / UCX env vars via the ``runtime_env`` field on
+    their model config; those overrides are applied after this
+    function and so always win.
 
     Parameters
     ----------
@@ -220,9 +208,7 @@ def build_mpi_env(env: dict[str, str]) -> dict[str, str]:
         The same *env* dict, updated in place.
     """
     impl = detect_mpi(env)
-    efa = _has_efa()
 
-    # ── General (all clusters) ────────────────────────────────────
     if impl is MpiImpl.OPENMPI:
         # Suppress noisy OpenMPI warnings on NFS home directories.
         env.setdefault("OMPI_MCA_mpi_warn_on_fork", "0")
@@ -235,19 +221,6 @@ def build_mpi_env(env: dict[str, str]) -> dict[str, str]:
         env["MPICH_OFI_STARTUP_CONNECT"] = "1"
         env["MPICH_COLL_SYNC"] = "MPI_Bcast"
         env["MPICH_REDUCE_NO_SMP"] = "1"
-
-    # ── EFA / OFI fabric (AWS c5n, hpc6a, etc.) ──────────────────
-    if efa:
-        # Libfabric tuning for EFA.
-        env["FI_OFI_RXM_SAR_LIMIT"] = "3145728"
-        env["FI_MR_CACHE_MAX_COUNT"] = "0"
-        env["FI_EFA_RECVWIN_SIZE"] = "65536"
-
-        if impl is MpiImpl.OPENMPI:
-            # Force OFI transport layer for EFA.
-            env["OMPI_MCA_mtl"] = "ofi"
-            env["OMPI_MCA_pml"] = "cm"
-            env["OMPI_MCA_btl"] = "^openib"
 
     return env
 
