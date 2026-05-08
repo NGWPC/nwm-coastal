@@ -66,10 +66,10 @@ file handle the shapely details (MultiPoint, GeometryCollection, etc.).
 SCHISM **model creation is intentionally out of scope** for `coastal-calibration` — this
 package operates on pre-built SCHISM models supplied by external collaborators. The
 roadmap entry "SCHISM model creation" in the top-level
-[README.md](https://github.com/NGWPC/nwm-coastal/blob/development/README.md)
-captures this as future work. When that work happens, the discharge source/sink
-generation step needs to use the upstream-crossing strategy above instead of flagging
-every boundary crossing.
+[README.md](https://github.com/NGWPC/nwm-coastal/blob/development/README.md) captures
+this as future work. When that work happens, the discharge source/sink generation step
+needs to use the upstream-crossing strategy above instead of flagging every boundary
+crossing.
 
 For the existing pre-built meshes, the duplication produces a small but real bias in the
 inland streamflow injection — most coastal gauges are downstream and dominated by tidal
