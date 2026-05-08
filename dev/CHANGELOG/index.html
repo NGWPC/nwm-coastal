@@ -1598,6 +1598,7 @@ on <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a>, and this
 </ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">#</a></h3>
 <ul>
+<li>Remove backward-compatibility shims</li>
 <li>Switch to numpy.typing.NDArray annotations and tidy spelling</li>
 <li><strong>io</strong>: Centralize netCDF helpers and roll them out across writers</li>
 <li><strong>downloader</strong>: Skip files already cached on disk</li>
@@ -1645,6 +1646,8 @@ on <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a>, and this
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">#</a></h3>
 <ul>
+<li><strong>mpi</strong>: Propagate runtime_env into make_stofs_boundary</li>
+<li><strong>mpi</strong>: Remove EFA auto-detection from build_mpi_env</li>
 <li><strong>stages</strong>: Apply runtime_env in regrid forcing and predict_tide</li>
 <li><strong>schism</strong>: Chain ring falls back to concat on endpoint mismatch</li>
 <li>Tighten correctness checks across SCHISM and data layers</li>
