@@ -114,12 +114,26 @@ class NWMForcingStage(WorkflowStage):
         )
         return cmd
 
+    def _build_run_env(self) -> dict[str, str]:
+        """Build the subprocess environment for the regrid command.
+
+        Combines :meth:`build_environment` (which applies HDF5 / OMP /
+        MPI tuning via ``build_mpi_env``) with the user-supplied
+        ``runtime_env`` overrides on the model config.  Extracted as a
+        testable seam so the env-build can be exercised without
+        running the full pipeline.
+        """
+        env = self.build_environment()
+        if self.model.runtime_env:
+            env.update(self.model.runtime_env)
+        return env
+
     def run(self) -> dict[str, Any]:
         """Execute NWM forcing generation with MPI."""
         import subprocess
 
         self._update_substep("Building environment")
-        env = self.build_environment()
+        env = self._build_run_env()
 
         self._update_substep("Setting up forcing parameters")
         sim = self.config.simulation

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+from datetime import datetime
 
 import pytest
 
@@ -167,6 +168,93 @@ class TestStageNames:
     def test_post_schism_stage(self, sample_config):
         stage = PostSCHISMStage(sample_config)
         assert stage.name == "schism_postprocess"
+
+
+class TestRuntimeEnvPlumbing:
+    """Regression tests for ``runtime_env`` propagation.
+
+    ``runtime_env`` must be merged into the subprocess environment for
+    every stage that spawns one, so users can override MPI / fabric
+    env vars on a per-cluster basis without monkey-patching the
+    package.
+    """
+
+    def test_nwm_forcing_stage_applies_runtime_env(self, sample_config):
+        """NWMForcingStage's subprocess env must include model.runtime_env.
+
+        Exercised via the ``_build_run_env`` seam to avoid having to set
+        up the full forcing-generation fixture stack.
+        """
+        sample_config.model_config.runtime_env = {
+            "OMPI_MCA_btl": "self,tcp",
+            "OMPI_MCA_mtl": "^ofi",
+            "OMPI_MCA_pml": "ob1",
+        }
+        stage = NWMForcingStage(sample_config)
+        env = stage._build_run_env()
+
+        assert env["OMPI_MCA_btl"] == "self,tcp"
+        assert env["OMPI_MCA_mtl"] == "^ofi"
+        assert env["OMPI_MCA_pml"] == "ob1"
+        # base build_environment vars still present:
+        assert env["HDF5_USE_FILE_LOCKING"] == "FALSE"
+
+    def test_nwm_forcing_stage_runtime_env_empty_is_safe(self, sample_config):
+        """No runtime_env override should leave build_environment intact."""
+        # default runtime_env is {} (empty)
+        stage = NWMForcingStage(sample_config)
+        env = stage._build_run_env()
+        assert env["HDF5_USE_FILE_LOCKING"] == "FALSE"
+
+    def test_sfincs_forcing_stage_applies_runtime_env(self, tmp_path):
+        """SFINCS forcing stage must merge sfincs.runtime_env.
+
+        Specifically, ``_run_predict_tide`` must pass an env to
+        subprocess.run that includes the user-supplied overrides on
+        ``SfincsModelConfig.runtime_env``.
+        """
+        from coastal_calibration.config.schema import (
+            BoundaryConfig,
+            CoastalCalibConfig,
+            DownloadConfig,
+            MonitoringConfig,
+            PathConfig,
+            SfincsModelConfig,
+            SimulationConfig,
+        )
+        from coastal_calibration.sfincs.stages import SfincsForcingStage
+
+        prebuilt = tmp_path / "model"
+        prebuilt.mkdir()
+        config = CoastalCalibConfig(
+            simulation=SimulationConfig(
+                start_date=datetime(2021, 6, 11, 0, 0, 0),
+                duration_hours=3,
+                coastal_domain="pacific",
+                meteo_source="nwm_retro",
+            ),
+            boundary=BoundaryConfig(source="tpxo"),
+            paths=PathConfig(
+                work_dir=tmp_path / "work",
+                raw_download_dir=tmp_path / "downloads",
+            ),
+            model_config=SfincsModelConfig(
+                prebuilt_dir=prebuilt,
+                runtime_env={
+                    "OMPI_MCA_btl": "self,tcp",
+                    "OMPI_MCA_mtl": "^ofi",
+                },
+            ),
+            monitoring=MonitoringConfig(),
+            download=DownloadConfig(enabled=False),
+        )
+
+        stage = SfincsForcingStage(config)
+        env = stage._build_run_env()
+
+        assert env["OMPI_MCA_btl"] == "self,tcp"
+        assert env["OMPI_MCA_mtl"] == "^ofi"
+        assert env["HDF5_USE_FILE_LOCKING"] == "FALSE"
 
 
 class TestSchismRunCommandConstruction:

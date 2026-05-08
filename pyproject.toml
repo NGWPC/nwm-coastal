@@ -451,7 +451,7 @@ lint.isort.required-imports = [ "from __future__ import annotations" ]
 lint.pydocstyle.convention = "numpy"
 
 [tool.codespell]
-skip = "__pycache__,_build,.git,./htmlcov,pixi.lock,./site,./cache,*.ipynb,./legacy-coastal/"
+skip = "__pycache__,_build,.git,./htmlcov,pixi.lock,./site,./cache,*.ipynb,./legacy-coastal/,CHANGELOG.md"
 ignore-words-list = "gages,parm,oce,gage,nd"
 
 [tool.pyproject-fmt]
@@ -460,9 +460,7 @@ expand_tables = [ "tool.pixi", "tool.git-cliff" ]
 [tool.pyright]
 pythonVersion = "3.11"
 include = [ "src" ]
-ignore = [
-  "src/coastal_calibration/tides/pytides/*.py",
-]
+ignore = [ "src/coastal_calibration/tides/pytides/*.py", "tests/" ]
 typeCheckingMode = "strict"
 reportMissingSuperCall = false
 reportMissingTypeStubs = false
