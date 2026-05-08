@@ -74,10 +74,7 @@ class TestWorkflowStageBase:
 
         stage = ConcreteStage(sample_config, None)
 
-        with (
-            patch("coastal_calibration.utils.detect_mpi", return_value=MpiImpl.MPICH),
-            patch("coastal_calibration.utils._has_efa", return_value=False),
-        ):
+        with patch("coastal_calibration.utils.detect_mpi", return_value=MpiImpl.MPICH):
             env = stage.build_environment()
             assert env["MPICH_OFI_STARTUP_CONNECT"] == "1"
 
