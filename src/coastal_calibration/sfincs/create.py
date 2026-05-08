@@ -506,10 +506,6 @@ class CreateFetchDataStage(_CreateStageBase):
         return {"status": "completed", "fetched": fetched}
 
 
-# Backward-compatible alias.
-CreateFetchElevationStage = CreateFetchDataStage
-
-
 class CreateElevationStage(_CreateStageBase):
     """Add elevation / bathymetry data to the model grid."""
 
@@ -1335,8 +1331,6 @@ class CreateWriteStage(_CreateStageBase):
 STAGE_CLASSES: dict[str, type[CreateStage]] = {
     "create_grid": CreateGridStage,
     "create_fetch_data": CreateFetchDataStage,
-    # Backward-compatible alias for saved status files.
-    "create_fetch_elevation": CreateFetchDataStage,
     "create_elevation": CreateElevationStage,
     "create_mask": CreateMaskStage,
     "create_boundary": CreateBoundaryStage,
