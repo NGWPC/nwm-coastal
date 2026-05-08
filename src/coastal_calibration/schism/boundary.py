@@ -183,6 +183,7 @@ class STOFSBoundaryStage(WorkflowStage):
             mpi_tasks=1,
             correction_file=correction_file,
             n_open_boundary_nodes=n_open_boundary_nodes,
+            runtime_env=self.model.runtime_env,
         )
 
         self._log(f"STOFS boundary file created: {elev_file}")
