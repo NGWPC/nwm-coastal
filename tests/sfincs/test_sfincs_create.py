@@ -33,7 +33,6 @@ from coastal_calibration.sfincs.create import (
     CreateDischargeStage,
     CreateElevationStage,
     CreateFetchDataStage,
-    CreateFetchElevationStage,
     CreateGridStage,
     CreateMaskStage,
     CreateStage,
@@ -116,7 +115,7 @@ def full_config_dict(aoi_file: Path, output_dir: Path) -> dict[str, Any]:
         },
         "subgrid": {
             "nr_subgrid_pixels": 10,
-            "lulc_dataset": "esa_worldcover_2021",
+            "lulc_dataset": "esa_worldcover",
             "manning_land": 0.05,
             "manning_sea": 0.025,
         },
@@ -409,11 +408,6 @@ class TestSfincsCreateConfig:
         )
         errors = cfg.validate()
         assert any("lulc_source must be one of" in e for e in errors)
-
-    def test_esa_worldcover_2021_normalized(self) -> None:
-        """Backward compat: esa_worldcover_2021 → esa_worldcover."""
-        sc = SubgridConfig(lulc_dataset="esa_worldcover_2021")
-        assert sc.lulc_dataset == "esa_worldcover"
 
     def test_noaa_dataset_without_source_fails(self, aoi_file: Path, output_dir: Path) -> None:
         cfg = SfincsCreateConfig(
@@ -753,10 +747,6 @@ class TestCreateStages:
         assert result["status"] == "completed"
         mock_fetch.assert_not_called()
         _clear_model(cfg)
-
-    def test_backward_compat_alias(self) -> None:
-        """CreateFetchElevationStage should be an alias for CreateFetchDataStage."""
-        assert CreateFetchElevationStage is CreateFetchDataStage
 
     def test_create_stages_helper(self, minimal_create_config: SfincsCreateConfig) -> None:
         stages_dict = create_stages(minimal_create_config)

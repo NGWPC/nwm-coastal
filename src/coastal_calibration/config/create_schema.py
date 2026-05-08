@@ -164,9 +164,6 @@ class SubgridConfig:
     def __post_init__(self) -> None:
         if self.reclass_table is not None:
             self.reclass_table = Path(self.reclass_table).expanduser().resolve()
-        # Backward compatibility: normalize legacy name.
-        if self.lulc_dataset == "esa_worldcover_2021":
-            self.lulc_dataset = "esa_worldcover"
 
 
 @dataclass
