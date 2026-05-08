@@ -463,13 +463,13 @@ Each dataset entry:
 
 #### Subgrid Settings (`subgrid`)
 
-| Parameter           | Type  | Default               | Description                          |
-| ------------------- | ----- | --------------------- | ------------------------------------ |
-| `nr_subgrid_pixels` | int   | 5                     | Number of subgrid pixels per cell    |
-| `lulc_dataset`      | str   | `esa_worldcover`      | Land-use/land-cover dataset          |
-| `reclass_table`     | path  | null                  | Custom reclassification table CSV    |
-| `manning_land`      | float | 0.04                  | Default Manning coefficient for land |
-| `manning_sea`       | float | 0.02                  | Default Manning coefficient for sea  |
+| Parameter           | Type  | Default          | Description                          |
+| ------------------- | ----- | ---------------- | ------------------------------------ |
+| `nr_subgrid_pixels` | int   | 5                | Number of subgrid pixels per cell    |
+| `lulc_dataset`      | str   | `esa_worldcover` | Land-use/land-cover dataset          |
+| `reclass_table`     | path  | null             | Custom reclassification table CSV    |
+| `manning_land`      | float | 0.04             | Default Manning coefficient for land |
+| `manning_sea`       | float | 0.02             | Default Manning coefficient for sea  |
 
 #### Data Catalog (`data_catalog`)
 
