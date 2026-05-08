@@ -1061,11 +1061,20 @@ def make_stofs_boundary(
     mpi_tasks: int,
     correction_file: Path | None = None,
     n_open_boundary_nodes: int | None = None,
+    runtime_env: dict[str, str] | None = None,
 ) -> Path:
     """Generate boundary forcing from STOFS data via ESMF regridding.
 
     Runs ``regrid_estofs.py`` via MPI and optionally ``makeOceanTide.py``
     for medium-range runs.
+
+    Parameters
+    ----------
+    runtime_env : dict[str, str], optional
+        Cluster-specific env-var overrides (typically MPI / fabric
+        tuning supplied via ``SchismModelConfig.runtime_env``). Applied
+        on top of the default ``os.environ`` + ``HDF5_USE_FILE_LOCKING``,
+        so user values always win.
 
     Returns the path to ``elev2D.th.nc``.
     """
@@ -1092,6 +1101,8 @@ def make_stofs_boundary(
 
     env = os.environ.copy()
     env.setdefault("HDF5_USE_FILE_LOCKING", "FALSE")
+    if runtime_env:
+        env.update(runtime_env)
 
     from coastal_calibration.utils import build_mpi_cmd
 

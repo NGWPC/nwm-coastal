@@ -38,6 +38,7 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project ad
 
 ### Changed
 
+- Remove backward-compatibility shims
 - Switch to numpy.typing.NDArray annotations and tidy spelling
 - **io**: Centralize netCDF helpers and roll them out across writers
 - **downloader**: Skip files already cached on disk
@@ -85,6 +86,8 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project ad
 
 ### Fixed
 
+- **mpi**: Propagate runtime_env into make_stofs_boundary
+- **mpi**: Remove EFA auto-detection from build_mpi_env
 - **stages**: Apply runtime_env in regrid forcing and predict_tide
 - **schism**: Chain ring falls back to concat on endpoint mismatch
 - Tighten correctness checks across SCHISM and data layers

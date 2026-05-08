@@ -1113,9 +1113,6 @@ def _build_interpolation_context(data: dict[str, Any]) -> dict[str, Any]:
     # Resolve ${user} from $USER env var for default path templates.
     if "user" not in context:
         context["user"] = os.environ.get("USER", "unknown")
-    # Backward compat: old templates may still reference ${slurm.user}.
-    if "slurm.user" not in context:
-        context["slurm.user"] = context["user"]
     return context
 
 

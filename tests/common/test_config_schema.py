@@ -449,8 +449,8 @@ class TestInterpolation:
         # $USER env var is injected automatically
         assert "user" in ctx
 
-    def test_build_interpolation_context_backward_compat(self):
-        """Legacy slurm.user key in YAML still populates context."""
+    def test_build_interpolation_context_nested_section(self):
+        """Nested YAML sections flatten to dotted keys in the context."""
         data = {
             "slurm": {"user": "john", "partition": "default"},
             "simulation": {"coastal_domain": "hawaii"},
@@ -466,16 +466,6 @@ class TestInterpolation:
         }
         result = _interpolate_config(data)
         assert result["paths"]["work_dir"].endswith("/hawaii")
-
-    def test_interpolate_config_legacy_slurm_user(self):
-        """Backward compat: ${slurm.user} still works in templates."""
-        data = {
-            "slurm": {"user": "john"},
-            "simulation": {"coastal_domain": "hawaii"},
-            "paths": {"work_dir": "/data/${slurm.user}/${simulation.coastal_domain}"},
-        }
-        result = _interpolate_config(data)
-        assert result["paths"]["work_dir"] == "/data/john/hawaii"
 
     def test_model_variable_interpolation(self):
         data = {
