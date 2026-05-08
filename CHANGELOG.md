@@ -85,6 +85,7 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project ad
 
 ### Fixed
 
+- **stages**: Apply runtime_env in regrid forcing and predict_tide
 - **schism**: Chain ring falls back to concat on endpoint mismatch
 - Tighten correctness checks across SCHISM and data layers
 - **config**: Require explicit prebuilt_dir / geogrid_file paths
