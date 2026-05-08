@@ -860,6 +860,19 @@ class SfincsForcingStage(_SfincsStageBase):
             link_target.symlink_to(tpxo_data_dir)
             self._log(f"Symlinked {tpxo_data_dir} -> {link_target}")
 
+    def _build_run_env(self) -> dict[str, str]:
+        """Build the subprocess environment for OTPS ``predict_tide``.
+
+        Combines :meth:`build_environment` with any user-supplied
+        ``runtime_env`` overrides on the SFINCS model config.  Extracted
+        as a testable seam so the env-build can be exercised without
+        running the full predict-tide subprocess.
+        """
+        env = self.build_environment()
+        if self.sfincs.runtime_env:
+            env.update(self.sfincs.runtime_env)
+        return env
+
     def _run_predict_tide(self, model_root: Path) -> Path:
         """Run the OTPS ``predict_tide`` binary.
 
@@ -867,7 +880,7 @@ class SfincsForcingStage(_SfincsStageBase):
         The ``predict_tide`` binary is expected on ``$PATH``
         (pixi installs it to ``$CONDA_PREFIX/bin``).
         """
-        env = self.build_environment()
+        env = self._build_run_env()
 
         if self.config.paths.otps_dir is not None:
             predict_tide_bin = str(self.config.paths.otps_dir / "predict_tide")
