@@ -638,6 +638,10 @@ conventional_commits = true
 filter_unconventional = true
 split_commits = false
 commit_parsers = [
+  # Skip cherry-picks so backports don't duplicate the original entries
+  # when the backport branch is later merged back. Relies on
+  # `git cherry-pick -x` adding the trailer.
+  { message = "cherry picked from commit", skip = true },
   { message = "^feat", group = "Added" },
   { message = "^fix", group = "Fixed" },
   { message = "^perf", group = "Changed" },

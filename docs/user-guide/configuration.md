@@ -325,6 +325,85 @@ download:
 | `raise_on_error` | bool | true    | Fail workflow on download errors |
 | `limit_per_host` | int  | 4       | Concurrent downloads per host    |
 
+## Cluster-Specific Tuning (`runtime_env`)
+
+By default the package ships with **no cluster-specific MPI or fabric tuning**. It works
+out of the box on a laptop or any consumer workstation. On HPC clusters where
+performance matters, the cluster admin (or end user) supplies a `runtime_env` block in
+the `model_config` to tune MPI transport, NUMA placement, etc.
+
+Whatever keys are in `runtime_env` are merged into the subprocess environment after the
+package's own setup, so they always win.
+
+### When you might need this
+
+- **Consumer workstation / single node**: nothing needed. Empty / absent `runtime_env`
+    is correct.
+- **NUMA-heavy multi-rank workloads** (SCHISM on big nodes): enable OpenMP thread
+    pinning so each MPI rank's threads stay on the same NUMA node.
+- **Cluster MPI fabrics** that need specific transport selection (AWS EFA, Cray
+    Slingshot, InfiniBand): set the relevant transport MCA variables.
+
+### Examples
+
+#### AWS c5n.9xlarge with healthy EFA
+
+```yaml
+model_config:
+  runtime_env:
+    OMPI_MCA_pml: cm
+    OMPI_MCA_mtl: ofi
+    OMPI_MCA_btl: ^openib
+    FI_OFI_RXM_SAR_LIMIT: '3145728'
+    FI_EFA_RECVWIN_SIZE: '65536'
+    OMP_PROC_BIND: close
+    OMP_PLACES: cores
+```
+
+#### AWS c5n.9xlarge falling back to TCP
+
+If EFA is misbehaving and you want TCP-over-ENA instead:
+
+```yaml
+model_config:
+  runtime_env:
+    OMPI_MCA_pml: ob1
+    OMPI_MCA_btl: self,tcp
+    OMPI_MCA_btl_tcp_if_exclude: lo,docker0
+```
+
+#### NOAA WCOSS (Cray MPICH on Slingshot)
+
+```yaml
+model_config:
+  runtime_env:
+    MPICH_OFI_STARTUP_CONNECT: '1'
+    MPICH_COLL_SYNC: MPI_Bcast
+    MPICH_REDUCE_NO_SMP: '1'
+```
+
+#### Single-process OpenMP workloads (SFINCS, post-processing)
+
+Single-process workloads usually run best with **no** thread pinning, so the kernel can
+spread OpenMP threads across whatever cores the process has access to. Leave
+`runtime_env` empty for these unless you have a measured reason to pin.
+
+### SLURM allocation gotcha
+
+`srun --pty bash` creates an interactive step with **one CPU per task**, even when the
+parent allocation has many more. A workflow started inside that bash inherits the narrow
+CPU mask, and any single-process OpenMP workload (e.g. SFINCS) gets pinned to one core.
+
+`CoastalCalibRunner` detects the situation (current affinity narrower than
+`SLURM_CPUS_ON_NODE`) and expands the mask automatically with a log line.
+
+To avoid relying on the runner's recovery, prefer one of:
+
+- Run the workflow **directly from the `salloc` shell on the login node**, without
+    `srun --pty bash` in between.
+- Use `srun --cpus-per-task=N --pty bash` so the step gets the full CPU set.
+- Wrap the workflow in `taskset -c 0-N nwm-coastal-py ...`.
+
 ## Configuration Inheritance
 
 Use `_base` to inherit settings from another configuration file:
@@ -463,13 +542,13 @@ Each dataset entry:
 
 #### Subgrid Settings (`subgrid`)
 
-| Parameter           | Type  | Default               | Description                          |
-| ------------------- | ----- | --------------------- | ------------------------------------ |
-| `nr_subgrid_pixels` | int   | 5                     | Number of subgrid pixels per cell    |
-| `lulc_dataset`      | str   | `esa_worldcover_2021` | Land-use/land-cover dataset          |
-| `reclass_table`     | path  | null                  | Custom reclassification table CSV    |
-| `manning_land`      | float | 0.04                  | Default Manning coefficient for land |
-| `manning_sea`       | float | 0.02                  | Default Manning coefficient for sea  |
+| Parameter           | Type  | Default          | Description                          |
+| ------------------- | ----- | ---------------- | ------------------------------------ |
+| `nr_subgrid_pixels` | int   | 5                | Number of subgrid pixels per cell    |
+| `lulc_dataset`      | str   | `esa_worldcover` | Land-use/land-cover dataset          |
+| `reclass_table`     | path  | null             | Custom reclassification table CSV    |
+| `manning_land`      | float | 0.04             | Default Manning coefficient for land |
+| `manning_sea`       | float | 0.02             | Default Manning coefficient for sea  |
 
 #### Data Catalog (`data_catalog`)
 

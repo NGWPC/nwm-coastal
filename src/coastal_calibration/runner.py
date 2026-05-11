@@ -14,7 +14,7 @@ from coastal_calibration.logging import (
     generate_log_path,
     silence_third_party_loggers,
 )
-from coastal_calibration.utils import utc_now
+from coastal_calibration.utils import expand_cpu_affinity_if_constrained, utc_now
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -139,6 +139,11 @@ class CoastalCalibRunner:
 
         # Silence noisy third-party loggers (HydroMT, xarray, ...)
         silence_third_party_loggers()
+
+        # Recover from `srun --pty bash` constraining the step to one CPU:
+        # if SLURM allocated more than the inherited mask allows, expand
+        # so OpenMP threads can actually spread.  No-op outside SLURM.
+        expand_cpu_affinity_if_constrained()
 
         self.monitor = WorkflowMonitor(config.monitoring)
         self._stages: dict[str, WorkflowStage] = {}

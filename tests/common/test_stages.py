@@ -55,8 +55,11 @@ class TestWorkflowStageBase:
         # Core runtime variables set by WorkflowStage
         assert env["HDF5_USE_FILE_LOCKING"] == "FALSE"
         assert "OMP_NUM_THREADS" in env
-        assert env["OMP_PLACES"] == "cores"
-        assert env["OMP_PROC_BIND"] == "close"
+        # Thread-pinning policy is intentionally NOT a default — users
+        # supply OMP_PROC_BIND / OMP_PLACES via runtime_env when their
+        # cluster benefits from NUMA pinning. Confirm we don't set them.
+        assert "OMP_PLACES" not in env or env["OMP_PLACES"] != "cores"
+        assert "OMP_PROC_BIND" not in env or env["OMP_PROC_BIND"] != "close"
         assert "PATH" in env
 
     def test_build_environment_schism_mpi_vars(self, sample_config):
@@ -74,10 +77,7 @@ class TestWorkflowStageBase:
 
         stage = ConcreteStage(sample_config, None)
 
-        with (
-            patch("coastal_calibration.utils.detect_mpi", return_value=MpiImpl.MPICH),
-            patch("coastal_calibration.utils._has_efa", return_value=False),
-        ):
+        with patch("coastal_calibration.utils.detect_mpi", return_value=MpiImpl.MPICH):
             env = stage.build_environment()
             assert env["MPICH_OFI_STARTUP_CONNECT"] == "1"
 
@@ -255,6 +255,51 @@ class TestRuntimeEnvPlumbing:
         assert env["OMPI_MCA_btl"] == "self,tcp"
         assert env["OMPI_MCA_mtl"] == "^ofi"
         assert env["HDF5_USE_FILE_LOCKING"] == "FALSE"
+
+    def test_make_stofs_boundary_applies_runtime_env(self, tmp_path, monkeypatch):
+        """make_stofs_boundary launches MPI; runtime_env must reach its env.
+
+        ``STOFSBoundaryStage`` calls this helper for the elev2D regrid
+        and previously built env from ``os.environ.copy()`` only,
+        bypassing ``model.runtime_env`` entirely. This regression test
+        captures the env passed to subprocess.run via a stub.
+        """
+        import subprocess as sp
+        from datetime import datetime as _dt
+
+        from coastal_calibration.schism.prep import make_stofs_boundary
+
+        captured: dict[str, dict[str, str]] = {}
+
+        def fake_run(cmd, *, env, **kwargs):
+            captured["env"] = env
+            (tmp_path / "elev2D.th.nc").touch()
+            return sp.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+        monkeypatch.setattr(sp, "run", fake_run)
+
+        stofs = tmp_path / "stofs.nc"
+        stofs.touch()
+        prebuilt = tmp_path / "prebuilt"
+        prebuilt.mkdir()
+
+        make_stofs_boundary(
+            work_dir=tmp_path,
+            start_date=_dt(2025, 11, 26),
+            duration_hours=50,
+            stofs_file=stofs,
+            prebuilt_dir=prebuilt,
+            mpi_tasks=1,
+            runtime_env={
+                "OMPI_MCA_btl": "self,tcp",
+                "FI_PROVIDER": "tcp",
+            },
+        )
+
+        assert captured["env"]["OMPI_MCA_btl"] == "self,tcp"
+        assert captured["env"]["FI_PROVIDER"] == "tcp"
+        # baseline HDF5 var still present:
+        assert captured["env"]["HDF5_USE_FILE_LOCKING"] == "FALSE"
 
 
 class TestSchismRunCommandConstruction:

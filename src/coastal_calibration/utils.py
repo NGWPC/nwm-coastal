@@ -103,6 +103,56 @@ def get_cpu_count() -> int:
     return os.cpu_count() or 1
 
 
+def expand_cpu_affinity_if_constrained() -> None:
+    """Expand process CPU affinity to all SLURM-allocated cores.
+
+    ``srun --pty bash`` typically creates a step with one task and
+    therefore one CPU, even when the parent allocation has many more.
+    A Python process started inside that step inherits the narrow
+    affinity mask, and any single-process OpenMP workload it launches
+    (e.g. SFINCS) ends up with every thread pinned to the same CPU.
+
+    This helper detects the case (SLURM allocation reports more CPUs
+    than the current process is allowed to use) and expands the mask
+    to all SLURM-allocated cores. It is a no-op outside SLURM, on
+    systems without ``os.sched_setaffinity`` (macOS, Windows), or when
+    affinity is already adequate.
+
+    Failures are logged at WARNING but never raised — this is a
+    best-effort fix-up, not a precondition.
+    """
+    if not hasattr(os, "sched_getaffinity"):
+        return
+    slurm_cpus_str = os.environ.get("SLURM_CPUS_ON_NODE")
+    if not slurm_cpus_str:
+        return
+    try:
+        slurm_cpus = int(slurm_cpus_str)
+    except ValueError:
+        return
+    try:
+        # sched_*affinity are Linux-only; the hasattr guard above keeps
+        # this branch unreachable on macOS / Windows, but pyright doesn't
+        # know that and complains about the attribute access.
+        allowed = os.sched_getaffinity(0)  # pyright: ignore[reportAttributeAccessIssue]
+    except OSError:
+        return
+    if len(allowed) >= slurm_cpus:
+        return
+    try:
+        os.sched_setaffinity(0, range(slurm_cpus))  # pyright: ignore[reportAttributeAccessIssue]
+    except OSError as err:
+        logger.warning("Could not expand CPU affinity: %s", err)
+        return
+    logger.info(
+        "Expanded CPU affinity from %d to %d core(s) "
+        "(SLURM_CPUS_ON_NODE=%d, was inheriting narrow step mask).",
+        len(allowed),
+        slurm_cpus,
+        slurm_cpus,
+    )
+
+
 # ---------------------------------------------------------------------------
 # MPI implementation detection and environment (was utils/mpi.py)
 # ---------------------------------------------------------------------------
@@ -113,6 +163,7 @@ __all__ = [
     "build_mpi_cmd",
     "build_mpi_env",
     "detect_mpi",
+    "expand_cpu_affinity_if_constrained",
     "get_cpu_count",
     "to_naive_utc",
     "utc_now",
@@ -185,29 +236,17 @@ def detect_mpi(env: dict[str, str] | None = None) -> MpiImpl:
     return impl
 
 
-def _has_efa() -> bool:
-    """Return True when AWS EFA devices are present."""
-    sys_ib = Path("/sys/class/infiniband")
-    if not sys_ib.exists():
-        return False
-    try:
-        return any(p.name.startswith("efa") for p in sys_ib.iterdir())
-    except OSError:
-        logger.debug("Unable to read %s; assuming no EFA", sys_ib)
-        return False
-
-
 def build_mpi_env(env: dict[str, str]) -> dict[str, str]:
     """Add MPI-tuning environment variables to *env* (mutating).
 
-    Applies three layers of configuration:
-
-    1. **General** — safe on any cluster (NFS, Lustre, local).
-    2. **EFA / OFI fabric** — only when AWS EFA devices are detected
-       (``/sys/class/infiniband/efa*``).  These force libfabric as the
-       transport and tune buffer sizes for reliable multi-node MPI.
-    3. **Implementation-specific** — OpenMPI MCA or MPICH env vars,
-       gated on the detected MPI flavour *and* fabric availability.
+    Applies only general, implementation-specific tuning that is safe
+    on any cluster (NFS, Lustre, local).  Fabric-specific tuning (EFA,
+    Slingshot, InfiniBand, etc.) is intentionally NOT auto-detected:
+    it varies too widely across clusters and a wrong guess can deadlock
+    multi-node MPI in subtle ways.  Users supply the cluster-specific
+    transport / OFI / UCX env vars via the ``runtime_env`` field on
+    their model config; those overrides are applied after this
+    function and so always win.
 
     Parameters
     ----------
@@ -220,9 +259,7 @@ def build_mpi_env(env: dict[str, str]) -> dict[str, str]:
         The same *env* dict, updated in place.
     """
     impl = detect_mpi(env)
-    efa = _has_efa()
 
-    # ── General (all clusters) ────────────────────────────────────
     if impl is MpiImpl.OPENMPI:
         # Suppress noisy OpenMPI warnings on NFS home directories.
         env.setdefault("OMPI_MCA_mpi_warn_on_fork", "0")
@@ -235,19 +272,6 @@ def build_mpi_env(env: dict[str, str]) -> dict[str, str]:
         env["MPICH_OFI_STARTUP_CONNECT"] = "1"
         env["MPICH_COLL_SYNC"] = "MPI_Bcast"
         env["MPICH_REDUCE_NO_SMP"] = "1"
-
-    # ── EFA / OFI fabric (AWS c5n, hpc6a, etc.) ──────────────────
-    if efa:
-        # Libfabric tuning for EFA.
-        env["FI_OFI_RXM_SAR_LIMIT"] = "3145728"
-        env["FI_MR_CACHE_MAX_COUNT"] = "0"
-        env["FI_EFA_RECVWIN_SIZE"] = "65536"
-
-        if impl is MpiImpl.OPENMPI:
-            # Force OFI transport layer for EFA.
-            env["OMPI_MCA_mtl"] = "ofi"
-            env["OMPI_MCA_pml"] = "cm"
-            env["OMPI_MCA_btl"] = "^openib"
 
     return env
 
@@ -304,7 +328,8 @@ def build_isolated_env(
     HDF5, and NetCDF libraries, then layers on:
 
     1. ``HDF5_USE_FILE_LOCKING=FALSE`` (NFS reliability)
-    2. OpenMP pinning (``OMP_NUM_THREADS``, ``OMP_PLACES``, ``OMP_PROC_BIND``)
+    2. ``OMP_NUM_THREADS`` (thread count only; pinning policy is the
+       user's responsibility via ``runtime_env``)
     3. MPI implementation-specific tuning (auto-detected)
     4. User-supplied ``runtime_env`` overrides (applied last)
 
@@ -331,10 +356,10 @@ def build_isolated_env(
     # HDF5 NFS reliability
     env.setdefault("HDF5_USE_FILE_LOCKING", "FALSE")
 
-    # OpenMP pinning
+    # OpenMP thread count.  Thread-pinning policy (OMP_PROC_BIND,
+    # OMP_PLACES) is intentionally NOT set here: users supply it via
+    # ``runtime_env`` when their cluster benefits from NUMA pinning.
     env["OMP_NUM_THREADS"] = str(omp_num_threads)
-    env["OMP_PLACES"] = "cores"
-    env["OMP_PROC_BIND"] = "close"
 
     # MPI tuning (auto-detected from system mpiexec)
     build_mpi_env(env)

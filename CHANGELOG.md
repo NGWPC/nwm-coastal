@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file. The format 
 on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [3.1.2.0.0-rc1] - 2026-05-08
 
 ### Added
 
@@ -423,6 +423,6 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project ad
 - @cheginit made their first contribution
 - @cmaynard-ngwpc made their first contribution
 - @jduckerOWP made their first contribution
-- @christophertubbs made their first contribution \[unreleased\]:
-    <https://github.com/NGWPC/nwm-coastal/compare/3.1.1.0.0...HEAD> \[3.1.1.0.0\]:
-    <https://github.com/NGWPC/nwm-coastal/releases/tag/3.1.1.0.0>
+- @christophertubbs made their first contribution \[3.1.2.0.0-rc1\]:
+    <https://github.com/NGWPC/nwm-coastal/compare/3.1.1.0.0...3.1.2.0.0-rc1>
+    \[3.1.1.0.0\]: <https://github.com/NGWPC/nwm-coastal/releases/tag/3.1.1.0.0>
