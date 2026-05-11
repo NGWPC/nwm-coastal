@@ -103,6 +103,56 @@ def get_cpu_count() -> int:
     return os.cpu_count() or 1
 
 
+def expand_cpu_affinity_if_constrained() -> None:
+    """Expand process CPU affinity to all SLURM-allocated cores.
+
+    ``srun --pty bash`` typically creates a step with one task and
+    therefore one CPU, even when the parent allocation has many more.
+    A Python process started inside that step inherits the narrow
+    affinity mask, and any single-process OpenMP workload it launches
+    (e.g. SFINCS) ends up with every thread pinned to the same CPU.
+
+    This helper detects the case (SLURM allocation reports more CPUs
+    than the current process is allowed to use) and expands the mask
+    to all SLURM-allocated cores. It is a no-op outside SLURM, on
+    systems without ``os.sched_setaffinity`` (macOS, Windows), or when
+    affinity is already adequate.
+
+    Failures are logged at WARNING but never raised — this is a
+    best-effort fix-up, not a precondition.
+    """
+    if not hasattr(os, "sched_getaffinity"):
+        return
+    slurm_cpus_str = os.environ.get("SLURM_CPUS_ON_NODE")
+    if not slurm_cpus_str:
+        return
+    try:
+        slurm_cpus = int(slurm_cpus_str)
+    except ValueError:
+        return
+    try:
+        # sched_*affinity are Linux-only; the hasattr guard above keeps
+        # this branch unreachable on macOS / Windows, but pyright doesn't
+        # know that and complains about the attribute access.
+        allowed = os.sched_getaffinity(0)  # pyright: ignore[reportAttributeAccessIssue]
+    except OSError:
+        return
+    if len(allowed) >= slurm_cpus:
+        return
+    try:
+        os.sched_setaffinity(0, range(slurm_cpus))  # pyright: ignore[reportAttributeAccessIssue]
+    except OSError as err:
+        logger.warning("Could not expand CPU affinity: %s", err)
+        return
+    logger.info(
+        "Expanded CPU affinity from %d to %d core(s) "
+        "(SLURM_CPUS_ON_NODE=%d, was inheriting narrow step mask).",
+        len(allowed),
+        slurm_cpus,
+        slurm_cpus,
+    )
+
+
 # ---------------------------------------------------------------------------
 # MPI implementation detection and environment (was utils/mpi.py)
 # ---------------------------------------------------------------------------
@@ -113,6 +163,7 @@ __all__ = [
     "build_mpi_cmd",
     "build_mpi_env",
     "detect_mpi",
+    "expand_cpu_affinity_if_constrained",
     "get_cpu_count",
     "to_naive_utc",
     "utc_now",
@@ -277,7 +328,8 @@ def build_isolated_env(
     HDF5, and NetCDF libraries, then layers on:
 
     1. ``HDF5_USE_FILE_LOCKING=FALSE`` (NFS reliability)
-    2. OpenMP pinning (``OMP_NUM_THREADS``, ``OMP_PLACES``, ``OMP_PROC_BIND``)
+    2. ``OMP_NUM_THREADS`` (thread count only; pinning policy is the
+       user's responsibility via ``runtime_env``)
     3. MPI implementation-specific tuning (auto-detected)
     4. User-supplied ``runtime_env`` overrides (applied last)
 
@@ -304,10 +356,10 @@ def build_isolated_env(
     # HDF5 NFS reliability
     env.setdefault("HDF5_USE_FILE_LOCKING", "FALSE")
 
-    # OpenMP pinning
+    # OpenMP thread count.  Thread-pinning policy (OMP_PROC_BIND,
+    # OMP_PLACES) is intentionally NOT set here: users supply it via
+    # ``runtime_env`` when their cluster benefits from NUMA pinning.
     env["OMP_NUM_THREADS"] = str(omp_num_threads)
-    env["OMP_PLACES"] = "cores"
-    env["OMP_PROC_BIND"] = "close"
 
     # MPI tuning (auto-detected from system mpiexec)
     build_mpi_env(env)
