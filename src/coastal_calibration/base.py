@@ -58,10 +58,13 @@ class WorkflowStage(ABC):
         # already set the variable.
         env.setdefault("HDF5_USE_FILE_LOCKING", "FALSE")
 
-        # OpenMP thread pinning — common to all models.
+        # OpenMP thread count.  Note we deliberately do NOT set
+        # OMP_PROC_BIND or OMP_PLACES here: thread-pinning policy is
+        # cluster-specific and a wrong default can pin every thread
+        # of a single-process OpenMP workload (e.g. SFINCS) to the
+        # one CPU the parent shell happens to hold.  Users / cluster
+        # admins can supply policy via ``runtime_env``.
         env["OMP_NUM_THREADS"] = str(self.config.model_config.omp_num_threads)
-        env["OMP_PLACES"] = "cores"
-        env["OMP_PROC_BIND"] = "close"
 
         # Delegate model-specific variables (MPI tuning, etc.)
         self.config.model_config.build_environment(env, self.config)

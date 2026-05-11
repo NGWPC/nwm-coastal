@@ -13,6 +13,7 @@ from coastal_calibration.utils import (
     build_mpi_cmd,
     build_mpi_env,
     detect_mpi,
+    expand_cpu_affinity_if_constrained,
 )
 
 
@@ -164,9 +165,10 @@ class TestBuildIsolatedEnv:
             env = build_isolated_env(omp_num_threads=8)
 
         assert env["OMP_NUM_THREADS"] == "8"
-        assert env["OMP_PLACES"] == "cores"
-        assert env["OMP_PROC_BIND"] == "close"
         assert env["HDF5_USE_FILE_LOCKING"] == "FALSE"
+        # Pinning policy is the user's responsibility, not a default.
+        assert env.get("OMP_PLACES") != "cores"
+        assert env.get("OMP_PROC_BIND") != "close"
 
     def test_sets_mpi_tuning(self):
         with patch("coastal_calibration.utils.detect_mpi", return_value=MpiImpl.MPICH):
@@ -192,3 +194,60 @@ class TestBuildIsolatedEnv:
             env = build_isolated_env(omp_num_threads=4)
 
         assert env["PATH"] == "/usr/bin:/usr/local/bin"
+
+
+# ── expand_cpu_affinity_if_constrained ────────────────────────────────
+
+
+class TestExpandCpuAffinity:
+    """Tests for the CPU-affinity expansion helper.
+
+    ``os.sched_*affinity`` only exist on Linux, so the patches use
+    ``create=True`` to let these tests run on macOS / Windows too. The
+    function itself is hasattr-guarded, so on platforms without those
+    APIs it is a real no-op regardless of env vars.
+    """
+
+    def test_noop_outside_slurm(self, monkeypatch):
+        """No SLURM env vars -> nothing happens, no errors raised."""
+        monkeypatch.delenv("SLURM_CPUS_ON_NODE", raising=False)
+        with patch("os.sched_setaffinity", create=True) as mock_set:
+            expand_cpu_affinity_if_constrained()
+            mock_set.assert_not_called()
+
+    def test_noop_when_affinity_already_adequate(self, monkeypatch):
+        """SLURM allocation matches current mask -> no expansion."""
+        monkeypatch.setenv("SLURM_CPUS_ON_NODE", "8")
+        with (
+            patch("os.sched_getaffinity", return_value=set(range(8)), create=True),
+            patch("os.sched_setaffinity", create=True) as mock_set,
+        ):
+            expand_cpu_affinity_if_constrained()
+            mock_set.assert_not_called()
+
+    def test_expands_when_constrained(self, monkeypatch):
+        """SLURM allocation wider than mask -> expand to allocation size."""
+        monkeypatch.setenv("SLURM_CPUS_ON_NODE", "18")
+        with (
+            patch("os.sched_getaffinity", return_value={0}, create=True),
+            patch("os.sched_setaffinity", create=True) as mock_set,
+        ):
+            expand_cpu_affinity_if_constrained()
+            mock_set.assert_called_once_with(0, range(18))
+
+    def test_swallows_oserror(self, monkeypatch):
+        """Permission errors from cgroup-enforced affinity are logged not raised."""
+        monkeypatch.setenv("SLURM_CPUS_ON_NODE", "18")
+        with (
+            patch("os.sched_getaffinity", return_value={0}, create=True),
+            patch("os.sched_setaffinity", side_effect=PermissionError, create=True),
+        ):
+            # Should not raise.
+            expand_cpu_affinity_if_constrained()
+
+    def test_handles_malformed_slurm_var(self, monkeypatch):
+        """Non-integer SLURM_CPUS_ON_NODE -> silent no-op."""
+        monkeypatch.setenv("SLURM_CPUS_ON_NODE", "not-a-number")
+        with patch("os.sched_setaffinity", create=True) as mock_set:
+            expand_cpu_affinity_if_constrained()
+            mock_set.assert_not_called()

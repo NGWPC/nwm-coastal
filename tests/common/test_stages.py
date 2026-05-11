@@ -55,8 +55,11 @@ class TestWorkflowStageBase:
         # Core runtime variables set by WorkflowStage
         assert env["HDF5_USE_FILE_LOCKING"] == "FALSE"
         assert "OMP_NUM_THREADS" in env
-        assert env["OMP_PLACES"] == "cores"
-        assert env["OMP_PROC_BIND"] == "close"
+        # Thread-pinning policy is intentionally NOT a default — users
+        # supply OMP_PROC_BIND / OMP_PLACES via runtime_env when their
+        # cluster benefits from NUMA pinning. Confirm we don't set them.
+        assert "OMP_PLACES" not in env or env["OMP_PLACES"] != "cores"
+        assert "OMP_PROC_BIND" not in env or env["OMP_PROC_BIND"] != "close"
         assert "PATH" in env
 
     def test_build_environment_schism_mpi_vars(self, sample_config):
