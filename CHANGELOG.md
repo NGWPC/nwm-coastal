@@ -1,10 +1,14 @@
 # Changelog
 
-All notable changes to this project will be documented in this file. The format is based
-on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
-[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+All notable changes to this project will be documented in this file.
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Added
+
+- **sfincs**: Add NOAA CRM topobathy and make obs-point snap configurable
 
 ### Changed
 
@@ -85,7 +89,7 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project ad
 - **sfincs**: Replace Singularity container with native binary execution
 - Fix lint errors from pre-commit hooks
 - Apply ssort reordering and ruff formatting
-- **qgis-plugin**: Extract helpers from \_on_union_divides
+- **qgis-plugin**: Extract helpers from _on_union_divides
 - Fix typos
 - Rewrite NOAA station matching with spatial KDTree lookup
 - Rewrite observation point snapping for quadtree grids
@@ -122,7 +126,7 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project ad
 - Assorted source fixes for demo workflow
 - Address PR review comments
 - Scope data catalog globs to exact simulation months
-- **ci**: Pin mkdocs-jupyter\<0.26 to fix missing CSS template
+- **ci**: Pin mkdocs-jupyter<0.26 to fix missing CSS template
 - **ci**: Set JUPYTER_PLATFORM_DIRS=1 for mkdocs builds
 - Handle empty staout and non-fatal QUICKSEARCH errors
 - Clean all generated files before fresh SCHISM workflow runs
@@ -167,7 +171,6 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project ad
 - **docs**: Resolve LICENSE rendering and add manual version deploy
 - Address PR review comments for SFINCS creation workflow
 - Remove duplicate [0.2.0] section from CHANGELOG auto-merge
-
 ## [3.1.1.0.0] - 2026-02-26
 
 ### Added
@@ -177,11 +180,9 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project ad
 - Add a new config for passing forcing vdatum adjustment (**breaking**)
 - Add quiet flag and log output to mark_stage_completed
 - Add support for tpxo for sfincs
-- Patch hydromt-sfincs to use chunked writing in the write step and reducing memory
-    footprint
+- Patch hydromt-sfincs to use chunked writing in the write step and reducing memory footprint
 - Add the missing divider in the log message after slurm job steps
-- Make sfincs datum adjusment configurable since navd88 conversion is difficult to
-    automate.
+- Make sfincs datum adjusment configurable since navd88 conversion is difficult to automate.
 - Filter stations without obs/sim data and adjust the plot setting for better plots.
 - Filter stations without obs/sim data and adjust the plot setting for better plots.
 - Add a new stage for adding stations to schism and comparison with noaa gages
@@ -190,8 +191,7 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project ad
 - Add observation points from noaa coops
 - Make model field required in YAML config and add it to schism init template
 - Refactor the sfincs runner to integrate with the existing codebase. (**breaking**)
-- Use a custom runner for running sfincs for better integration with the existing
-    codebase.
+- Use a custom runner for running sfincs for better integration with the existing codebase.
 - Move the workflow and time utilities to the main utils module. (**breaking**)
 - Make the output arg of the init subcommand mandatory. (**breaking**)
 - Read the username from the env and use that by default.
@@ -205,11 +205,9 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project ad
 - Add a new config for passing forcing vdatum adjustment (**breaking**)
 - Add quiet flag and log output to mark_stage_completed
 - Add support for tpxo for sfincs
-- Patch hydromt-sfincs to use chunked writing in the write step and reducing memory
-    footprint
+- Patch hydromt-sfincs to use chunked writing in the write step and reducing memory footprint
 - Add the missing divider in the log message after slurm job steps
-- Make sfincs datum adjusment configurable since navd88 conversion is difficult to
-    automate.
+- Make sfincs datum adjusment configurable since navd88 conversion is difficult to automate.
 - Filter stations without obs/sim data and adjust the plot setting for better plots.
 - Filter stations without obs/sim data and adjust the plot setting for better plots.
 - Add a new stage for adding stations to schism and comparison with noaa gages
@@ -218,8 +216,7 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project ad
 - Add observation points from noaa coops
 - Make model field required in YAML config and add it to schism init template
 - Refactor the sfincs runner to integrate with the existing codebase. (**breaking**)
-- Use a custom runner for running sfincs for better integration with the existing
-    codebase.
+- Use a custom runner for running sfincs for better integration with the existing codebase.
 - Move the workflow and time utilities to the main utils module. (**breaking**)
 - Make the output arg of the init subcommand mandatory. (**breaking**)
 - Read the username from the env and use that by default.
@@ -227,9 +224,8 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project ad
 ### Changed
 
 - Remove duplicate domain mappings in runner.py
-- Move singularity_image to SchismModelConfig, make sif_path required, and make
-    slurm.user optional (**breaking**)
-- Fix meteo grid inflation and forcing pipeline, cutting runtime from 15h+ to \<15min
+- Move singularity_image to SchismModelConfig, make sif_path required, and make slurm.user optional (**breaking**)
+- Fix meteo grid inflation and forcing pipeline, cutting runtime from 15h+ to <15min
 - Use apply_all_patches() for hydromt compatibility patches
 - Derive DownloadStage description dynamically from config
 - Add logging, improve docs, and add apply_all_patches helper
@@ -242,9 +238,8 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project ad
 - Add 2-space indentation to workflow log messages
 - Remove submit execution path and SlurmConfig
 - Remove duplicate domain mappings in runner.py
-- Move singularity_image to SchismModelConfig, make sif_path required, and make
-    slurm.user optional (**breaking**)
-- Fix meteo grid inflation and forcing pipeline, cutting runtime from 15h+ to \<15min
+- Move singularity_image to SchismModelConfig, make sif_path required, and make slurm.user optional (**breaking**)
+- Fix meteo grid inflation and forcing pipeline, cutting runtime from 15h+ to <15min
 - Use apply_all_patches() for hydromt compatibility patches
 - Derive DownloadStage description dynamically from config
 - Add logging, improve docs, and add apply_all_patches helper
@@ -292,26 +287,23 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project ad
 - Explicitly set the boundary format to the new nc
 - Explicitly set the boundary format to the new nc
 - Address the time pasing issue for tpxo
-- Use the correct path to tpxo data for sfincs since it runs the data processing on
-    login node
+- Use the correct path to tpxo data for sfincs since it runs the data processing on login node
 - Use the correct package name for click
 - Add a preprocessor to avoid the regular grid issue
 - Use 4326 for stofs data and drop adcirc related vars
 - Replace the code object so pydantic picks it up
-- Monkey patch hydromt's \_serialize_crs for cases where crs is proj without authority
+- Monkey patch hydromt's _serialize_crs for cases where crs is proj without authority
 - Add crs info for all supported data sources
 - Add the missing cd step for submit for sfincs models
 - When submit was used for a sfincs model, the container download step was not run
 - Pass the package name so version is identified correctly
-- For the prvi domain prefer nwm_ana over nwm_retro due to a known schism issue with
-    retro
+- For the prvi domain prefer nwm_ana over nwm_retro due to a known schism issue with retro
 - Exclude noaa stations where datum is not available.
 - Add the divider line only in the end_stage.
 - Patch the nspool_sta value to be a multiple 18 for all cases.
 - Use the correct path for hgrid.gr3 when querying noaa gages.
 - Modify the stage ordering so noaa query occurs after hgrid file is available.
-- For nwm_ana use the nwm_retro naing convention to avoid the overwrite issue for
-    multiple days.
+- For nwm_ana use the nwm_retro naing convention to avoid the overwrite issue for multiple days.
 - Let hydromt handle the projection detection
 - Let hydromt handle the projection detection
 - Use the symlink workaround only for nwm_retro.
@@ -322,24 +314,20 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project ad
 - Resolve the relative paths provided in config prior to using them.
 - Fix the order of setting log level to avoid suppressing them.
 - Do not write wind entry into the config if it doesn't exists.
-- Use a more robust approach for determining corrupt download files and redirect all
-    sfincs logs to a file.
-- For large files the default 600s timeout for download is not enough for stofs and a
-    size validation is needed.
-- For now pin pyproject formatter for 2.12 since the new version messes up the pixi
-    blocks.
+- Use a more robust approach for determining corrupt download files and redirect all sfincs logs to a file.
+- For large files the default 600s timeout for download is not enough for stofs and a size validation is needed.
+- For now pin pyproject formatter for 2.12 since the new version messes up the pixi blocks.
 - Add a logic for cold-start models to set a ram up time to avoid the boundary issues.
 - Remove the duplicate key.
 - Use soft wrap to avoid the log msg dangling issues.
 - Adjust the start date to 2021 for hawaii since we need sub-hourly data.
 - Use a more robust approach for find the stofs path when an old file still exists.
-- Include the date for stofs in the download path since when the start date is changed
-    using skip would have caused using a stale stofs file.
+- Include the date for stofs in the download path since when the start date is changed using skip would have caused using a stale stofs file.
 - Fix the dates for nwm_ana. There were changes in the file names at certain periods.
 - **sfincs**: Avoid RuntimeWarning from NaN-to-int cast in face node indexing
 - Rename the data module since data folder is in gitignore
 - **noaa-dem**: Reduce statement count and branches in noaa_dem.py
-- **compat**: Patch quadtree subgrid setter and \_parse_river_list crash
+- **compat**: Patch quadtree subgrid setter and _parse_river_list crash
 - Use non-interactive matplotlib backend in SchismPlotStage
 - Deduplicate observation points by spatial proximity
 - Resolve all ty type-checker diagnostics
@@ -380,26 +368,23 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project ad
 - Explicitly set the boundary format to the new nc
 - Explicitly set the boundary format to the new nc
 - Address the time pasing issue for tpxo
-- Use the correct path to tpxo data for sfincs since it runs the data processing on
-    login node
+- Use the correct path to tpxo data for sfincs since it runs the data processing on login node
 - Use the correct package name for click
 - Add a preprocessor to avoid the regular grid issue
 - Use 4326 for stofs data and drop adcirc related vars
 - Replace the code object so pydantic picks it up
-- Monkey patch hydromt's \_serialize_crs for cases where crs is proj without authority
+- Monkey patch hydromt's _serialize_crs for cases where crs is proj without authority
 - Add crs info for all supported data sources
 - Add the missing cd step for submit for sfincs models
 - When submit was used for a sfincs model, the container download step was not run
 - Pass the package name so version is identified correctly
-- For the prvi domain prefer nwm_ana over nwm_retro due to a known schism issue with
-    retro
+- For the prvi domain prefer nwm_ana over nwm_retro due to a known schism issue with retro
 - Exclude noaa stations where datum is not available.
 - Add the divider line only in the end_stage.
 - Patch the nspool_sta value to be a multiple 18 for all cases.
 - Use the correct path for hgrid.gr3 when querying noaa gages.
 - Modify the stage ordering so noaa query occurs after hgrid file is available.
-- For nwm_ana use the nwm_retro naing convention to avoid the overwrite issue for
-    multiple days.
+- For nwm_ana use the nwm_retro naing convention to avoid the overwrite issue for multiple days.
 - Let hydromt handle the projection detection
 - Let hydromt handle the projection detection
 - Use the symlink workaround only for nwm_retro.
@@ -410,20 +395,17 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project ad
 - Resolve the relative paths provided in config prior to using them.
 - Fix the order of setting log level to avoid suppressing them.
 - Do not write wind entry into the config if it doesn't exists.
-- Use a more robust approach for determining corrupt download files and redirect all
-    sfincs logs to a file.
-- For large files the default 600s timeout for download is not enough for stofs and a
-    size validation is needed.
-- For now pin pyproject formatter for 2.12 since the new version messes up the pixi
-    blocks.
+- Use a more robust approach for determining corrupt download files and redirect all sfincs logs to a file.
+- For large files the default 600s timeout for download is not enough for stofs and a size validation is needed.
+- For now pin pyproject formatter for 2.12 since the new version messes up the pixi blocks.
 - Add a logic for cold-start models to set a ram up time to avoid the boundary issues.
 - Remove the duplicate key.
 - Use soft wrap to avoid the log msg dangling issues.
 - Adjust the start date to 2021 for hawaii since we need sub-hourly data.
 - Use a more robust approach for find the stofs path when an old file still exists.
-- Include the date for stofs in the download path since when the start date is changed
-    using skip would have caused using a stale stofs file.
+- Include the date for stofs in the download path since when the start date is changed using skip would have caused using a stale stofs file.
 - Fix the dates for nwm_ana. There were changes in the file names at certain periods.
-    \[unreleased\]: <https://github.com///compare/3.1.2.0.0-rc1...HEAD>
-    \[3.1.2.0.0-rc1\]: <https://github.com///compare/3.1.1.0.0...3.1.2.0.0-rc1>
-    \[3.1.1.0.0\]: <https://github.com///releases/tag/3.1.1.0.0>
+[unreleased]: <https://github.com///compare/3.1.2.0.0-rc1...HEAD>
+[3.1.2.0.0-rc1]: <https://github.com///compare/3.1.1.0.0...3.1.2.0.0-rc1>
+[3.1.1.0.0]: <https://github.com///releases/tag/3.1.1.0.0>
+

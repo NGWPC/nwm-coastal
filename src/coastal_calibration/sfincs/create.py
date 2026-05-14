@@ -270,7 +270,7 @@ class CreateGridStage(CreateStage):
                 self._log(
                     f"Refinement polygon '{ref.polygon.name}': "
                     f"{n_dropped} geometry(ies) collapsed to empty after "
-                    f"buffer_m={ref.buffer_m} m — dropped",
+                    f"buffer_m={ref.buffer_m} m; dropped",
                     "warning",
                 )
                 gdf = gdf[~empty]
@@ -311,7 +311,7 @@ class CreateGridStage(CreateStage):
 
         if not parts:
             self._log(
-                "All refinement polygons collapsed after buffering — building uniform grid",
+                "All refinement polygons collapsed after buffering; building uniform grid",
                 "warning",
             )
             return None
@@ -443,6 +443,16 @@ class CreateFetchDataStage(_CreateStageBase):
 
                 self._update_substep(f"Fetching Copernicus DEM 30m for '{catalog_name}'")
                 _, cat_path, _ = fetch_copdem30(
+                    aoi=cfg.aoi,
+                    output_dir=dl_dir,
+                    catalog_name=catalog_name,
+                    log=self._log,
+                )
+            elif ds.source == "noaa_crm":
+                from coastal_calibration.data.crm_noaa import fetch_crm
+
+                self._update_substep(f"Fetching NOAA CRM topobathy for '{catalog_name}'")
+                _, cat_path, _ = fetch_crm(
                     aoi=cfg.aoi,
                     output_dir=dl_dir,
                     catalog_name=catalog_name,
@@ -765,7 +775,7 @@ class CreateDischargeStage(_CreateStageBase):
             dist_m = dist_crs * unit_to_m
             if dist_m > max_snap_distance_m:
                 self._log(
-                    f"  {name}: DROPPED — nearest active cell is {dist_m:.0f} m away "
+                    f"  {name}: DROPPED, nearest active cell is {dist_m:.0f} m away "
                     f"(exceeds max_snap_distance_m={max_snap_distance_m:.0f})",
                     level="warning",
                 )
@@ -1024,11 +1034,6 @@ class CreateObservationPointsStage(_CreateStageBase):
     name = "create_obs"
     description = "Add observation points"
 
-    #: Bed-elevation threshold (m): cells at or above this are "dry".
-    _SNAP_DEPTH_THRESHOLD: float = -0.1
-    #: Maximum search radius (m) when looking for a replacement wet cell.
-    _SNAP_SEARCH_RADIUS_M: float = 1000.0
-
     # ------------------------------------------------------------------
     # NOAA CO-OPS helpers
     # ------------------------------------------------------------------
@@ -1116,8 +1121,8 @@ class CreateObservationPointsStage(_CreateStageBase):
         """
         from scipy.spatial import KDTree
 
-        depth_threshold = self._SNAP_DEPTH_THRESHOLD
-        search_radius = self._SNAP_SEARCH_RADIUS_M
+        depth_threshold = self.config.obs_snap_depth_threshold
+        search_radius = self.config.obs_snap_search_radius_m
 
         obs_gdf = model.observation_points.data
         if obs_gdf is None or obs_gdf.empty:  # pyright: ignore[reportUnnecessaryComparison]
@@ -1134,7 +1139,7 @@ class CreateObservationPointsStage(_CreateStageBase):
         wet_active = (z_elev < depth_threshold) & (mask_arr > 0)
         wet_idx = np.where(wet_active)[0]
         if len(wet_idx) == 0:
-            self._log("No active wet cells in grid — cannot snap observation points", "warning")
+            self._log("No active wet cells in grid; cannot snap observation points", "warning")
             return 0
         tree_wet = KDTree(np.column_stack([fx[wet_idx], fy[wet_idx]]))
 

@@ -219,7 +219,7 @@ def detect_mpi(env: dict[str, str] | None = None) -> MpiImpl:
         )
         output = (result.stdout + result.stderr).lower()
     except FileNotFoundError:
-        logger.warning("mpiexec not found on PATH — MPI implementation unknown")
+        logger.warning("mpiexec not found on PATH; MPI implementation unknown")
         _cache[key] = MpiImpl.UNKNOWN
         return _cache[key]
 

@@ -400,7 +400,7 @@ def plot_floodmap(
     floodmap_path = Path(floodmap_path)
     if not floodmap_path.exists():
         raise FileNotFoundError(
-            f"Flood map not found: {floodmap_path} — "
+            f"Flood map not found: {floodmap_path}; "
             "ensure floodmap_dem is set and sfincs_map.nc contains zsmax."
         )
 
