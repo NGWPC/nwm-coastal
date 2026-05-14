@@ -448,6 +448,16 @@ class CreateFetchDataStage(_CreateStageBase):
                     catalog_name=catalog_name,
                     log=self._log,
                 )
+            elif ds.source == "noaa_crm":
+                from coastal_calibration.data.crm_noaa import fetch_crm
+
+                self._update_substep(f"Fetching NOAA CRM topobathy for '{catalog_name}'")
+                _, cat_path, _ = fetch_crm(
+                    aoi=cfg.aoi,
+                    output_dir=dl_dir,
+                    catalog_name=catalog_name,
+                    log=self._log,
+                )
             elif ds.source == "gebco_15arcs":
                 from coastal_calibration.data.gebco_wms import fetch_gebco
 
@@ -1024,11 +1034,6 @@ class CreateObservationPointsStage(_CreateStageBase):
     name = "create_obs"
     description = "Add observation points"
 
-    #: Bed-elevation threshold (m): cells at or above this are "dry".
-    _SNAP_DEPTH_THRESHOLD: float = -0.1
-    #: Maximum search radius (m) when looking for a replacement wet cell.
-    _SNAP_SEARCH_RADIUS_M: float = 1000.0
-
     # ------------------------------------------------------------------
     # NOAA CO-OPS helpers
     # ------------------------------------------------------------------
@@ -1116,8 +1121,8 @@ class CreateObservationPointsStage(_CreateStageBase):
         """
         from scipy.spatial import KDTree
 
-        depth_threshold = self._SNAP_DEPTH_THRESHOLD
-        search_radius = self._SNAP_SEARCH_RADIUS_M
+        depth_threshold = self.config.obs_snap_depth_threshold
+        search_radius = self.config.obs_snap_search_radius_m
 
         obs_gdf = model.observation_points.data
         if obs_gdf is None or obs_gdf.empty:  # pyright: ignore[reportUnnecessaryComparison]

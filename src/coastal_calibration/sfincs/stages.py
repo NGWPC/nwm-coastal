@@ -530,6 +530,11 @@ class SfincsInitStage(_SfincsStageBase):
         "sfincs_subgrid.nc",
         "sfincs.src",
         "sfincs.dis",
+        # Post-processing reads this to sample obs points from sfincs_map.nc;
+        # if it's left stale from a previous create with different obs
+        # locations, the parquet output will sample the wrong cells even
+        # though the model itself uses the fresh sfincs.obs.
+        "obs_station_map.json",
     )
 
     def _remove_stale_outputs(self, root: Path) -> None:
