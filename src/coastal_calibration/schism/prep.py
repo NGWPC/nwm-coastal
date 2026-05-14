@@ -522,7 +522,7 @@ def merge_source_sink(  # noqa: PLR0915
         ncvmo[:, 1, :] = fill_val
         ncout.sync()
     logger.info(
-        "    Wrote source.nc — %d sources (from %d), %d sinks, %d timesteps",
+        "    Wrote source.nc: %d sources (from %d), %d sinks, %d timesteps",
         len(keep),
         so2.shape[1],
         nsiel,

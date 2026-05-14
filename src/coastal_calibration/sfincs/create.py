@@ -270,7 +270,7 @@ class CreateGridStage(CreateStage):
                 self._log(
                     f"Refinement polygon '{ref.polygon.name}': "
                     f"{n_dropped} geometry(ies) collapsed to empty after "
-                    f"buffer_m={ref.buffer_m} m — dropped",
+                    f"buffer_m={ref.buffer_m} m; dropped",
                     "warning",
                 )
                 gdf = gdf[~empty]
@@ -311,7 +311,7 @@ class CreateGridStage(CreateStage):
 
         if not parts:
             self._log(
-                "All refinement polygons collapsed after buffering — building uniform grid",
+                "All refinement polygons collapsed after buffering; building uniform grid",
                 "warning",
             )
             return None
@@ -775,7 +775,7 @@ class CreateDischargeStage(_CreateStageBase):
             dist_m = dist_crs * unit_to_m
             if dist_m > max_snap_distance_m:
                 self._log(
-                    f"  {name}: DROPPED — nearest active cell is {dist_m:.0f} m away "
+                    f"  {name}: DROPPED, nearest active cell is {dist_m:.0f} m away "
                     f"(exceeds max_snap_distance_m={max_snap_distance_m:.0f})",
                     level="warning",
                 )
@@ -1139,7 +1139,7 @@ class CreateObservationPointsStage(_CreateStageBase):
         wet_active = (z_elev < depth_threshold) & (mask_arr > 0)
         wet_idx = np.where(wet_active)[0]
         if len(wet_idx) == 0:
-            self._log("No active wet cells in grid — cannot snap observation points", "warning")
+            self._log("No active wet cells in grid; cannot snap observation points", "warning")
             return 0
         tree_wet = KDTree(np.column_stack([fx[wet_idx], fy[wet_idx]]))
 

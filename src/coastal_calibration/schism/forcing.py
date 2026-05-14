@@ -48,7 +48,7 @@ class PreForcingStage(WorkflowStage):
             nwm_forcing_dir=nwm_forcing_dir,
         )
 
-        self._log(f"Pre-forcing complete — output dir: {coastal_forcing_output}")
+        self._log(f"Pre-forcing complete. Output dir: {coastal_forcing_output}")
         return {
             "forcing_output_dir": str(coastal_forcing_output),
             "status": "completed",
@@ -228,5 +228,5 @@ class PostForcingStage(WorkflowStage):
             raise RuntimeError(f"post_forcing: no sflux files produced in {sflux_dir}")
 
         n_sflux = sum(1 for _ in sflux_dir.iterdir())
-        self._log(f"Post-processing complete — {n_sflux} sflux file(s) produced")
+        self._log(f"Post-processing complete. {n_sflux} sflux file(s) produced.")
         return {"status": "completed"}

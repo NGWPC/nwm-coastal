@@ -960,7 +960,7 @@ class SfincsModelConfig(ModelConfig):
             if unknown:
                 errors.append(
                     f"Unrecognized sfincs.inp parameter(s): {', '.join(unknown)}. "
-                    "SFINCS silently ignores unknown parameters — check for typos."
+                    "SFINCS silently ignores unknown parameters; check for typos."
                 )
 
         return errors

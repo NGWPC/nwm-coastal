@@ -1451,7 +1451,7 @@ class SfincsDischargeStage(_SfincsStageBase):
 
         if not valid_fids:
             self._log(
-                f"No matching feature_ids — all {len(missing_fids)} point(s) keep zero discharge"
+                f"No matching feature_ids; all {len(missing_fids)} point(s) keep zero discharge"
             )
             return
 
@@ -2327,7 +2327,7 @@ class SfincsSymlinksStage(WorkflowStage):
         """Create ``.nc`` symlinks for NWM LDASIN and CHRTOUT files."""
         download_dir = self.config.paths.download_dir
         if not download_dir.exists():
-            self._log(f"Download dir {download_dir} does not exist — skipping symlinks")
+            self._log(f"Download dir {download_dir} does not exist; skipping symlinks")
             return {
                 "meteo_symlinks": 0,
                 "streamflow_symlinks": 0,
@@ -2385,7 +2385,7 @@ class SfincsDataCatalogStage(WorkflowStage):
         """Generate a HydroMT data catalog YAML for downloaded data."""
         download_dir = self.config.paths.download_dir
         if not download_dir.exists():
-            self._log(f"Download dir {download_dir} does not exist — skipping catalog generation")
+            self._log(f"Download dir {download_dir} does not exist; skipping catalog generation")
             return {"catalog_path": None, "entries": [], "status": "skipped"}
 
         self._update_substep("Generating data catalog")
