@@ -155,7 +155,7 @@ def _frame_title(ds: xr.Dataset, variable: str, frame_idx: int, prefix: str | No
     else:
         t_str = str(t)
     base = f"{variable} @ {t_str}"
-    return f"{prefix} — {base}" if prefix else base
+    return f"{prefix}: {base}" if prefix else base
 
 
 def animate_water_level(
@@ -262,7 +262,7 @@ def animate_water_level(
         raise ValueError(msg)
     time_indices = np.arange(0, ds.sizes["time"], stride, dtype=np.int64)
     if time_indices.size == 0:
-        msg = "No frames to animate — time dimension is empty."
+        msg = "No frames to animate: time dimension is empty."
         raise ValueError(msg)
 
     fig, ax = plt.subplots(figsize=figsize)
@@ -504,7 +504,7 @@ def animate_water_level_comparison(
         master_ds = ds_r
         master_indices = np.arange(0, ds_r.sizes["time"], stride, dtype=np.int64)
     if master_indices.size == 0:
-        msg = "No frames to animate — master clock is empty after striding."
+        msg = "No frames to animate: master clock is empty after striding."
         raise ValueError(msg)
     master_times = np.asarray(master_ds["time"].to_numpy())[master_indices]
 
@@ -585,12 +585,12 @@ def animate_water_level_comparison(
         artists_l = update_left(i)
         artists_r = update_right(i)
         t_str = _format_time(master_times[i])
-        suptitle = f"{title_prefix} — {t_str}" if title_prefix else t_str
+        suptitle = f"{title_prefix}: {t_str}" if title_prefix else t_str
         fig.suptitle(suptitle)
         return artists_l + artists_r
 
     fig.suptitle(
-        f"{title_prefix} — {_format_time(master_times[0])}"
+        f"{title_prefix}: {_format_time(master_times[0])}"
         if title_prefix
         else _format_time(master_times[0])
     )

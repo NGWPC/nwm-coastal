@@ -77,7 +77,7 @@ hooks:
 - docs/hooks.py
 
 plugins:
-- search
+- material/search
 - mkdocs-jupyter:
     include: ['*.ipynb']
     include_source: true

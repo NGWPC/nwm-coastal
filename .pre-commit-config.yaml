@@ -41,14 +41,14 @@ repos:
     exclude: ^docs/examples/notebooks/.*\.py$
 
 - repo: https://github.com/mwouts/jupytext
-  rev: v1.19.1
+  rev: v1.19.2
   hooks:
   - id: jupytext
     args: [--sync]
     files: ^docs/examples/notebooks/.*\.(py|ipynb)$
 
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.15.12
+  rev: v0.15.13
   hooks:
   - id: ruff
     name: Linting with Ruff

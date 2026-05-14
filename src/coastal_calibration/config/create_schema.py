@@ -73,6 +73,8 @@ class ElevationDataset:
     #:
     #: - ``"nws_30m"`` — NWS 30 m topo-bathymetric DEM from icechunk (S3)
     #: - ``"noaa_3m"`` — NOAA ~3 m coastal topobathy DEM from S3
+    #: - ``"noaa_crm"`` — NOAA Coastal Relief Model 3 arc-sec (~90 m) topobathy
+    #:   from NCEI THREDDS (U.S. coastal coverage)
     #: - ``"copdem_30m"`` — Copernicus DEM 30 m from AWS S3
     #: - ``"gebco_15arcs"`` — GEBCO 15 arc-second bathymetry (~450 m) via CEDA
     #:
@@ -258,12 +260,29 @@ class SfincsCreateConfig:
     #: Whether to merge with pre-existing observation points.
     merge_observations: bool = False
 
+    #: Maximum bed elevation (m, model datum) of cells eligible as snap
+    #: targets for observation points.  Cells with ``zb >= threshold``
+    #: are skipped, which prevents stations from being snapped to cells
+    #: that go dry at low tide and report a flat ``zs = zb`` instead of
+    #: the true water level.  Default -2.0 m gives ~1 m of margin below
+    #: typical low-tide minimums on the U.S. coast; tighten for areas
+    #: with larger tidal ranges and loosen for shallow estuaries.
+    obs_snap_depth_threshold: float = -2.0
+
+    #: Maximum search radius (m) when relocating each observation point
+    #: to the nearest eligible wet cell.  Stations whose nearest
+    #: qualifying cell sits farther than this are left in place with a
+    #: warning logged.  Default 1000 m.
+    obs_snap_search_radius_m: float = 1000.0
+
     # ------------------------------------------------------------------
     # Validation
     # ------------------------------------------------------------------
 
     #: Valid ``ElevationDataset.source`` values.
-    _VALID_ELEV_SOURCES = frozenset({"nws_30m", "noaa_3m", "copdem_30m", "gebco_15arcs"})
+    _VALID_ELEV_SOURCES = frozenset(
+        {"nws_30m", "noaa_3m", "noaa_crm", "copdem_30m", "gebco_15arcs"}
+    )
 
     #: Valid ``SubgridConfig.lulc_source`` values.
     _VALID_LULC_SOURCES = frozenset({"esa_worldcover"})
@@ -388,6 +407,8 @@ class SfincsCreateConfig:
         observation_locations_file = Path(obs_file_raw) if obs_file_raw else None
         merge_observations = data.get("merge_observations", False)
         aoi_simplify_neck_m = float(data.get("aoi_simplify_neck_m", 0.0))
+        obs_snap_depth_threshold = float(data.get("obs_snap_depth_threshold", -2.0))
+        obs_snap_search_radius_m = float(data.get("obs_snap_search_radius_m", 1000.0))
 
         return cls(
             aoi=Path(aoi),
@@ -405,6 +426,8 @@ class SfincsCreateConfig:
             observation_points=observation_points,
             observation_locations_file=observation_locations_file,
             merge_observations=merge_observations,
+            obs_snap_depth_threshold=obs_snap_depth_threshold,
+            obs_snap_search_radius_m=obs_snap_search_radius_m,
         )
 
     @staticmethod
@@ -636,6 +659,8 @@ class SfincsCreateConfig:
                 str(self.observation_locations_file) if self.observation_locations_file else None
             ),
             "merge_observations": self.merge_observations,
+            "obs_snap_depth_threshold": self.obs_snap_depth_threshold,
+            "obs_snap_search_radius_m": self.obs_snap_search_radius_m,
         }
 
     def to_yaml(self, path: Path | str) -> None:

@@ -70,7 +70,7 @@ class DownloadStage(WorkflowStage):
         if errors and download_cfg.raise_on_error:
             raise RuntimeError(f"Download failed: {'; '.join(errors)}")
 
-        self._log(f"Download complete — raw files stored in {output_dir}")
+        self._log(f"Download complete. Raw files stored in {output_dir}")
 
         return {
             "output_dir": str(output_dir),
