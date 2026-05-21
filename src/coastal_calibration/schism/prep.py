@@ -654,19 +654,58 @@ def stage_ldasin_files(
 # ---------------------------------------------------------------------------
 
 
+def _read_hgrid_bbox(hgrid_path: Path) -> tuple[float, float, float, float]:
+    """Return ``(lon_min, lat_min, lon_max, lat_max)`` of nodes in a SCHISM hgrid file.
+
+    Reads the node block of a ``.gr3``/``.ll`` mesh file and returns the
+    coordinate extent.  Used by :func:`make_sflux` to subset NWM
+    atmospheric forcing to the SCHISM mesh footprint.  Coordinates are
+    interpreted as ``(lon, lat)`` — the caller is expected to point at a
+    geographic mesh (``hgrid.ll`` for projected setups).
+    """
+    with hgrid_path.open("r") as f:
+        f.readline()  # description line
+        header = f.readline().split()
+        if len(header) < 2:
+            raise ValueError(f"Malformed hgrid header in {hgrid_path}: {header!r}")
+        n_nodes = int(header[1])
+        coords = np.zeros((n_nodes, 2), dtype=np.float64)
+        for i in range(n_nodes):
+            parts = f.readline().split()
+            coords[i, 0] = float(parts[1])
+            coords[i, 1] = float(parts[2])
+    return (
+        float(coords[:, 0].min()),
+        float(coords[:, 1].min()),
+        float(coords[:, 0].max()),
+        float(coords[:, 1].max()),
+    )
+
+
 def make_sflux(
     *,
     work_dir: Path,
     forcing_input_dir: Path,
     start_date: datetime,
     geogrid_file: Path,
+    bbox_buffer_deg: float = 0.5,
 ) -> Path:
     """Generate sflux atmospheric forcing from LDASIN files.
 
-    This is the pure-Python equivalent of ``makeAtmo.py`` — reads
-    LDASIN files and writes ``sflux/sflux_air_1.0001.nc``.
+    This is the pure-Python equivalent of ``makeAtmo.py`` — reads LDASIN
+    files and writes ``sflux/sflux_air_1.0001.nc``.
 
-    Returns the path to the sflux output file.
+    The output is subset to the SCHISM mesh footprint when an hgrid file
+    (``hgrid.ll`` preferred, then ``hgrid.gr3``) is present in
+    *work_dir*.  This avoids writing the full CONUS forcing grid into
+    sflux for mesh subdomains, which can be a 100x I/O reduction on
+    multi-node MPI runs that read the file concurrently from NFS.  Set
+    *bbox_buffer_deg* to control the padding around the mesh extent.
+
+    When no hgrid file is found a warning is logged and the full
+    geogrid is written (the historical behavior).
+
+    Returns the path to the sflux output directory.
     """
     pdy = start_date.strftime("%Y%m%d")
     cyc = start_date.strftime("%H")
@@ -685,6 +724,21 @@ def make_sflux(
         if not dst.exists():
             _symlink(precip_nc, dst)
 
+    mesh_bbox: tuple[float, float, float, float] | None = None
+    hgrid_ll = work_dir / "hgrid.ll"
+    hgrid_gr3 = work_dir / "hgrid.gr3"
+    if hgrid_ll.exists():
+        mesh_bbox = _read_hgrid_bbox(hgrid_ll)
+        logger.info("    Subsetting sflux to hgrid.ll extent: %s", mesh_bbox)
+    elif hgrid_gr3.exists():
+        mesh_bbox = _read_hgrid_bbox(hgrid_gr3)
+        logger.info("    Subsetting sflux to hgrid.gr3 extent: %s", mesh_bbox)
+    else:
+        logger.warning(
+            "    No hgrid.ll or hgrid.gr3 in %s; writing full geogrid (no subsetting).",
+            work_dir,
+        )
+
     from coastal_calibration.schism.sflux import make_atmo_sflux
 
     make_atmo_sflux(
@@ -692,6 +746,8 @@ def make_sflux(
         work_dir=work_dir,
         start_dt=start_date,
         geogrid_file=geogrid_file,
+        mesh_bbox=mesh_bbox,
+        bbox_buffer_deg=bbox_buffer_deg,
     )
 
     if not sflux_out.exists():
