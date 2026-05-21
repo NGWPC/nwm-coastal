@@ -81,9 +81,7 @@ def _stage_atlas_layout(tidal_model: str, atlas_dir: Path, root: Path) -> None:
     db = pyTMD.io.load_database()
     known = list(db.keys())
     if tidal_model not in known:
-        examples = ", ".join(
-            sorted(k for k in known if "atlas-nc" in k or "nc" in k.lower())[:10]
-        )
+        examples = ", ".join(sorted(k for k in known if "atlas-nc" in k or "nc" in k.lower())[:10])
         raise ValueError(
             f"Unknown tidal_model {tidal_model!r}. Examples of supported "
             f"netcdf models: {examples}, ..."
@@ -319,9 +317,7 @@ def extend_schism_boundary(
     appends rows; it never reshapes or recreates the file.
     """
     if duration_hours < fill_from_hour + 1:
-        logger.debug(
-            "Duration %dh < %dh, skipping tidal fill", duration_hours, fill_from_hour + 1
-        )
+        logger.debug("Duration %dh < %dh, skipping tidal fill", duration_hours, fill_from_hour + 1)
         return
 
     if not Path(output_file).exists():
