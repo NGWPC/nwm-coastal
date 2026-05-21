@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from coastal_calibration.base import WorkflowStage
 from coastal_calibration.data.downloader import download_data
+
+if TYPE_CHECKING:
+    from coastal_calibration.data.downloader import CoastalSource
 
 
 class DownloadStage(WorkflowStage):
@@ -35,13 +38,16 @@ class DownloadStage(WorkflowStage):
 
         domain = sim.coastal_domain
         meteo_source = sim.meteo_source
-        coastal_source = cfg.boundary.source
+        # BoundaryConfig.__post_init__ normalizes the deprecated "tpxo"
+        # alias to "harmonic", so by the time we get here the value is
+        # a member of CoastalSource. The cast lets pyright see that.
+        coastal_source = cast("CoastalSource", cfg.boundary.source)
 
         end_time = sim.start_date + timedelta(hours=sim.duration_hours + 1)
         output_dir = paths.download_dir
 
-        # TPXO data directory path (only needed when using TPXO source)
-        tpxo_data_path = paths.tpxo_data_dir if coastal_source == "tpxo" else None
+        # Tidal atlas directory (only needed when source is harmonic)
+        atlas_path = paths.tidal_atlas_dir if coastal_source == "harmonic" else None
 
         self._update_substep("Downloading data")
         results = download_data(
@@ -52,7 +58,7 @@ class DownloadStage(WorkflowStage):
             meteo_source=meteo_source,
             hydro_source="nwm",
             coastal_source=coastal_source,
-            tpxo_local_path=tpxo_data_path,
+            tidal_atlas_path=atlas_path,
             timeout=download_cfg.timeout,
             raise_on_error=download_cfg.raise_on_error,
         )

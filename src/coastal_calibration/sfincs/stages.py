@@ -354,7 +354,12 @@ def _waterlevel_geodataset(config: CoastalCalibConfig) -> str | None:
     if catalog_path is None:
         return None
     coastal_source = config.boundary.source
-    return f"{coastal_source}_waterlevel" if coastal_source != "tpxo" else "tpxo_tidal"
+    if coastal_source == "harmonic":
+        # Harmonic tides are handled directly by SfincsForcingStage via
+        # pyTMD; the catalog entry is a stub so the data-catalog loader
+        # picks the right code path.
+        return "harmonic_tides"
+    return f"{coastal_source}_waterlevel"
 
 
 # ---------------------------------------------------------------------------
@@ -661,21 +666,24 @@ class SfincsTimingStage(WorkflowStage):
 class SfincsForcingStage(_SfincsStageBase):
     """Add water level boundary forcing.
 
-    When ``boundary.source`` is ``"tpxo"``, tide predictions are generated
-    using the OTPS ``predict_tide`` Fortran binary inside the SCHISM
-    Singularity container and then injected into the HydroMT model.
-    For all other sources the standard HydroMT geodataset path is used.
+    When ``boundary.source`` is ``"harmonic"``, tides are predicted in
+    Python via pyTMD against the atlas at ``paths.tidal_atlas_dir`` and
+    injected into the HydroMT model. For all other sources the standard
+    HydroMT geodataset path is used, with a pyTMD fallback appended
+    whenever the geodataset coverage ends before the model's ``tstop``.
     """
 
     name = "sfincs_forcing"
     description = "Add water level forcing"
 
-    # Hourly OTPS predictions, interpolated to this interval (seconds)
-    _TPXO_RAW_DT = 3600
-    _TPXO_INTERP_DT = 600
+    # Cadence (seconds) used when predicting tides directly with pyTMD
+    # for the harmonic-source path. Harmonic synthesis is cheap, so we
+    # evaluate at the SFINCS target cadence rather than predicting
+    # hourly and linearly interpolating.
+    _TIDE_DT_S = 600
 
     # ------------------------------------------------------------------
-    # TPXO tidal forcing via OTPS predict_tide
+    # Harmonic tidal forcing via pyTMD
     # ------------------------------------------------------------------
 
     @staticmethod
@@ -825,140 +833,6 @@ class SfincsForcingStage(_SfincsStageBase):
         )
 
     @staticmethod
-    def _write_otps_input(
-        otps_path: Path,
-        lonlats: list[tuple[float, float]],
-        tstart: Any,
-        tstop: Any,
-        dt_seconds: int,
-    ) -> None:
-        """Write the ``otps_lat_lon_time.txt`` input file for ``predict_tide``.
-
-        Each boundary point gets one line per timestep in the format
-        ``lat  lon  YYYY MM DD HH MM SS`` expected by the OTPS binary.
-        """
-        from datetime import timedelta as _td
-
-        dt = _td(seconds=dt_seconds)
-        with otps_path.open("w") as f:
-            for lon, lat in lonlats:
-                current = tstart
-                while current <= tstop:
-                    f.write(f"{lat:12.6f}  {lon:12.6f}  {current.strftime('%Y %m %d %H %M %S')}\n")
-                    current += dt
-
-    def _prepare_tpxo_files(self, model_root: Path) -> None:
-        """Copy OTPS setup files and symlink the TPXO atlas data."""
-        import shutil as _shutil
-
-        from coastal_calibration.tides import TIDES_DATA_DIR
-
-        for fname in ("setup_tpxo.txt", "Model_tpxo10_atlas"):
-            src = TIDES_DATA_DIR / fname
-            dst = model_root / fname
-            if not dst.exists():
-                _shutil.copy2(src, dst)
-
-        tpxo_data_dir = self.config.paths.tpxo_data_dir
-        link_target = model_root / "TPXO10_atlas_v2_nc"
-        if not link_target.exists():
-            link_target.symlink_to(tpxo_data_dir)
-            self._log(f"Symlinked {tpxo_data_dir} -> {link_target}")
-
-    def _build_run_env(self) -> dict[str, str]:
-        """Build the subprocess environment for OTPS ``predict_tide``.
-
-        Combines :meth:`build_environment` with any user-supplied
-        ``runtime_env`` overrides on the SFINCS model config.  Extracted
-        as a testable seam so the env-build can be exercised without
-        running the full predict-tide subprocess.
-        """
-        env = self.build_environment()
-        if self.sfincs.runtime_env:
-            env.update(self.sfincs.runtime_env)
-        return env
-
-    def _run_predict_tide(self, model_root: Path) -> Path:
-        """Run the OTPS ``predict_tide`` binary.
-
-        Returns the path to the ``otps_out.txt`` output file.
-        The ``predict_tide`` binary is expected on ``$PATH``
-        (pixi installs it to ``$CONDA_PREFIX/bin``).
-        """
-        env = self._build_run_env()
-
-        if self.config.paths.otps_dir is not None:
-            predict_tide_bin = str(self.config.paths.otps_dir / "predict_tide")
-        else:
-            predict_tide_bin = "predict_tide"
-
-        result = subprocess.run(
-            ["bash", "-c", f"cd {model_root} && {predict_tide_bin} < setup_tpxo.txt"],
-            cwd=model_root,
-            env=env,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if result.returncode != 0:
-            self._log(f"predict_tide failed: {result.stderr[-2000:]}", "error")
-            raise RuntimeError(
-                f"predict_tide failed (exit {result.returncode}): {result.stderr[-2000:]}"
-            )
-
-        otps_out = model_root / "otps_out.txt"
-        if not otps_out.exists():
-            raise FileNotFoundError(
-                f"predict_tide did not produce {otps_out}.  "
-                "Check that the TPXO atlas data and OTPS binary are present."
-            )
-        return otps_out
-
-    @staticmethod
-    def _parse_otps_output(
-        otps_out: Path,
-        lonlats: list[tuple[float, float]],
-    ) -> Any:
-        """Parse ``otps_out.txt`` into a wide DataFrame (time x points).
-
-        Returns a :class:`~pandas.DataFrame` with a ``DatetimeIndex`` and
-        one integer column per boundary point.
-
-        The OTPS output has a 3-line header followed by a column header::
-
-            Lat       Lon     mm.dd.yyyy  hh:mm:ss   z(m)
-
-        We let :func:`pandas.read_csv` merge the date and time columns
-        into a single ``datetime`` column via ``parse_dates``.
-        """
-        import pandas as pd
-
-        # Column header names from OTPS: Lat, Lon, mm.dd.yyyy, hh:mm:ss, z(m)
-        df_raw = pd.read_csv(
-            otps_out,
-            sep=r"\s+",
-            header=3,
-            on_bad_lines="skip",
-        )
-        df_raw["datetime"] = pd.to_datetime(df_raw["mm.dd.yyyy"] + " " + df_raw["hh:mm:ss"])
-
-        point_dfs: list[pd.Series] = []
-        for idx, (lon, lat) in enumerate(lonlats):
-            mask = ((df_raw["Lat"] - lat).abs() < 0.01) & ((df_raw["Lon"] - lon).abs() < 0.01)
-            subset = df_raw.loc[mask].sort_values("datetime")
-            if subset.empty:
-                raise ValueError(
-                    f"No OTPS output for boundary point {idx} (lat={lat:.4f}, lon={lon:.4f})"
-                )
-            series = subset.set_index("datetime")["z(m)"].astype(np.float64)
-            series.name = idx
-            point_dfs.append(series)
-
-        df_ts = pd.concat(point_dfs, axis=1)
-        df_ts.index.name = "time"
-        return df_ts
-
-    @staticmethod
     def _write_bnd_file(bnd_path: Path, gdf_bnd: Any) -> None:
         """Write a ``sfincs.bnd`` file from a boundary-point GeoDataFrame.
 
@@ -998,7 +872,7 @@ class SfincsForcingStage(_SfincsStageBase):
         _wl_init: Any = model.water_level.data
 
         # Anchor the forcing signal to the mesh datum.  For tidal-only
-        # sources (e.g. TPXO) this places the mean water level at the
+        # sources (e.g. harmonic tide predictions) this places the mean water level at the
         # correct geodetic height on the mesh.
         forcing_offset = self.sfincs.forcing_to_mesh_offset_m
         if forcing_offset != 0.0:
@@ -1044,19 +918,28 @@ class SfincsForcingStage(_SfincsStageBase):
         model.water_level.write()
         self._log(f"Wrote boundary forcing to {nc_name}")
 
-    def _create_tpxo_forcing(self, model: SfincsModel) -> None:
-        """Synthesize water-level forcing from TPXO tidal constituents.
+    def _create_tidal_forcing(self, model: SfincsModel) -> None:
+        """Synthesize SFINCS water-level forcing via pyTMD harmonic prediction.
 
-        The workflow mirrors the SCHISM ``make_tpxo_ocean.bash`` script:
-        read boundary locations, generate OTPS input, run ``predict_tide``
-        inside the Singularity container, parse and interpolate the output,
-        then inject into the HydroMT model via ``water_level.set()``.
+        Reads boundary locations from the SFINCS mesh, predicts elevations
+        at ``_TIDE_DT_S`` cadence against ``boundary.tidal_model`` at
+        ``paths.tidal_atlas_dir``, and injects via HydroMT's
+        ``water_level`` component. pyTMD's harmonic synthesis is
+        evaluated directly at the target cadence — no intermediate
+        hourly prediction + linear resample step.
         """
         from datetime import datetime as _dt
 
         import geopandas as gpd
+        import pandas as pd
 
-        model_root = get_model_root(self.config)
+        from coastal_calibration.data.tides import predict_tide_at_points
+
+        atlas_dir = self.config.paths.tidal_atlas_dir
+        if atlas_dir is None:
+            raise RuntimeError(
+                "paths.tidal_atlas_dir is required when boundary.source is 'harmonic'"
+            )
 
         # 1. Read boundary points (sfincs.bnd or quadtree mask fallback)
         bnd_points = self._get_boundary_points(model)
@@ -1072,8 +955,10 @@ class SfincsForcingStage(_SfincsStageBase):
         lonlats = cast(
             "list[tuple[float, float]]", gdf_bnd.to_crs(4326).get_coordinates().values.tolist()
         )
+        lons = np.array([ll[0] for ll in lonlats], dtype=np.float64)
+        lats = np.array([ll[1] for ll in lonlats], dtype=np.float64)
 
-        # 4. Generate OTPS input file
+        # 4. Build the prediction time array at the target cadence
         tstart = model.config.data.tstart
         tstop = model.config.data.tstop
         if isinstance(tstart, str):
@@ -1081,32 +966,33 @@ class SfincsForcingStage(_SfincsStageBase):
         if isinstance(tstop, str):
             tstop = _dt.fromisoformat(tstop)
 
-        otps_input_path = model_root / "otps_lat_lon_time.txt"
-        self._write_otps_input(otps_input_path, lonlats, tstart, tstop, self._TPXO_RAW_DT)
-        self._log(f"Wrote OTPS input ({len(lonlats)} points) to {otps_input_path}")
+        dt_s = self._TIDE_DT_S
+        n_steps = int((tstop - tstart).total_seconds()) // dt_s + 1
+        times = [tstart + timedelta(seconds=i * dt_s) for i in range(n_steps)]
 
-        # 5. Copy setup files and symlink atlas data
-        self._prepare_tpxo_files(model_root)
+        # 5. Predict via pyTMD directly at the target cadence
+        self._update_substep("Predicting tides via pyTMD")
+        elev = predict_tide_at_points(
+            lons=lons,
+            lats=lats,
+            times=times,
+            atlas_dir=atlas_dir,
+            tidal_model=self.config.boundary.tidal_model,
+        )  # (n_points, n_steps)
+        self._log(
+            f"pyTMD predicted {n_steps} timesteps at {dt_s}s cadence x "
+            f"{len(lonlats)} points (model={self.config.boundary.tidal_model})"
+        )
 
-        # 6. Run predict_tide
-        self._update_substep("Running OTPS predict_tide")
-        otps_out = self._run_predict_tide(model_root)
-        self._log("predict_tide completed successfully")
+        # 6. Wrap into a DataFrame indexed by time, columns 0..n_points-1
+        df_ts = pd.DataFrame(
+            elev.T,  # (n_steps, n_points)
+            index=pd.DatetimeIndex(times, name="time"),
+            columns=list(range(len(lonlats))),
+        )
 
-        # 7. Parse output
-        self._update_substep("Parsing TPXO output")
-        df_ts = self._parse_otps_output(otps_out, lonlats)
-        n_points = len(lonlats)
-        self._log(f"Parsed {len(df_ts)} timesteps x {n_points} points from otps_out.txt")
-
-        # 8. Interpolate to finer resolution
-        interp_freq = f"{self._TPXO_INTERP_DT}s"
-        df_fine = df_ts.resample(interp_freq).interpolate(method="linear")
-        df_fine = df_fine.loc[df_ts.index[0] : df_ts.index[-1]]
-        self._log(f"Interpolated to {interp_freq}: {len(df_fine)} timesteps")
-
-        # 10. Inject into HydroMT model
-        self._inject_water_level(model, df_fine, gdf_bnd)
+        # 7. Inject into HydroMT model
+        self._inject_water_level(model, df_ts, gdf_bnd)
 
     @staticmethod
     def _idw_interpolate(
@@ -1228,6 +1114,91 @@ class SfincsForcingStage(_SfincsStageBase):
         df_ts.index.name = "time"
         return df_ts
 
+    def _extend_with_tide(
+        self,
+        df_ts: Any,
+        bnd_points: list[tuple[float, float, str]],
+        model: SfincsModel,
+    ) -> Any:
+        """Append pyTMD tidal predictions when the geodataset window is short.
+
+        Mirrors the SCHISM STOFS→tidal fallback (``extend_schism_boundary``
+        called from ``make_stofs_boundary``): if the loaded geodataset
+        ends before the model's ``tstop`` (STOFS only publishes 180 h,
+        runs may exceed that), predict tides for the missing tail with
+        pyTMD at the same cadence and concatenate. Works against any
+        atlas in pyTMD's database, not only TPXO.
+
+        The fallback is silently skipped when ``paths.tidal_atlas_dir``
+        is unset or the dataset already covers the full window; the
+        forcing is simply truncated in the former case, with a
+        warning. Both behaviors match SCHISM.
+        """
+        import geopandas as gpd
+        import pandas as pd
+
+        from coastal_calibration.data.tides import predict_tide_at_points
+
+        if len(df_ts) < 2:
+            return df_ts  # cadence undefined; nothing meaningful to fill
+
+        tstop_dt = pd.Timestamp(model.get_model_time()[1]).to_pydatetime()
+        last_data = pd.Timestamp(df_ts.index[-1]).to_pydatetime()
+        cadence_s = int(pd.Timedelta(df_ts.index[1] - df_ts.index[0]).total_seconds())
+        if cadence_s <= 0:
+            return df_ts
+
+        # No gap if the last data point is within one cadence of tstop.
+        if last_data >= tstop_dt - timedelta(seconds=cadence_s):
+            return df_ts
+
+        atlas_dir = self.config.paths.tidal_atlas_dir
+        if atlas_dir is None:
+            self._log(
+                f"Geodataset ends at {last_data.isoformat()} but model needs "
+                f"forcing through {tstop_dt.isoformat()}; pyTMD fall-back is "
+                "unavailable (paths.tidal_atlas_dir unset). Boundary forcing "
+                "will be truncated.",
+                "warning",
+            )
+            return df_ts
+
+        fill_start = last_data + timedelta(seconds=cadence_s)
+        n_fill = int((tstop_dt - fill_start).total_seconds() // cadence_s) + 1
+        if n_fill <= 0:
+            return df_ts
+        fill_times = [fill_start + timedelta(seconds=i * cadence_s) for i in range(n_fill)]
+
+        # Boundary lon/lat — same transformation as the harmonic path.
+        xx, yy, _ = zip(*bnd_points, strict=True)
+        gdf = gpd.GeoDataFrame(  # ty: ignore[no-matching-overload]
+            geometry=gpd.points_from_xy(list(xx), list(yy), crs=model.crs),
+        )
+        lonlats = gdf.to_crs(4326).get_coordinates().values
+        lons = np.asarray(lonlats[:, 0], dtype=np.float64)
+        lats = np.asarray(lonlats[:, 1], dtype=np.float64)
+
+        self._update_substep(f"Extending {n_fill} steps past geodataset window with pyTMD")
+        elev = predict_tide_at_points(
+            lons=lons,
+            lats=lats,
+            times=fill_times,
+            atlas_dir=atlas_dir,
+            tidal_model=self.config.boundary.tidal_model,
+        )  # (n_bnd, n_fill)
+
+        df_fill = pd.DataFrame(
+            elev.T,
+            index=pd.DatetimeIndex(fill_times, name="time"),
+            columns=df_ts.columns,
+        )
+        self._log(
+            f"Extended geodataset with {n_fill} pyTMD tide predictions "
+            f"({fill_start.isoformat()} → {tstop_dt.isoformat()}, "
+            f"cadence={cadence_s}s, model={self.config.boundary.tidal_model})"
+        )
+        return pd.concat([df_ts, df_fill])
+
     def _create_geodataset_forcing(self, model: SfincsModel, geodataset_name: str) -> None:
         """Create water-level forcing by interpolating a geodataset to boundary points.
 
@@ -1241,7 +1212,10 @@ class SfincsForcingStage(_SfincsStageBase):
         2. Loads the geodataset (e.g. STOFS water levels).
         3. Spatially interpolates the geodataset to the boundary points
            using inverse-distance weighting from the nearest source nodes.
-        4. Injects the result into HydroMT the same way the TPXO path does.
+        4. Falls back to pyTMD tidal predictions when the geodataset
+           ends before the model's simulation window (mirrors SCHISM's
+           STOFS→tidal >180 h fill).
+        5. Injects the result into HydroMT the same way the harmonic path does.
         """
         import geopandas as gpd
 
@@ -1259,25 +1233,28 @@ class SfincsForcingStage(_SfincsStageBase):
             f"Interpolated {geodataset_name} to {n_bnd} boundary points ({len(df_ts)} time steps)"
         )
 
-        # 4. Build GeoDataFrame for boundary locations (model CRS)
+        # 4. Extend with pyTMD if the geodataset doesn't cover the full window
+        df_ts = self._extend_with_tide(df_ts, bnd_points, model)
+
+        # 5. Build GeoDataFrame for boundary locations (model CRS)
         xx, yy, names = zip(*bnd_points, strict=True)
         gdf_bnd = gpd.GeoDataFrame(  # ty: ignore[no-matching-overload]
             {"name": list(names)},
             geometry=gpd.points_from_xy(list(xx), list(yy), crs=model.crs),
         )
 
-        # 5. Inject into HydroMT model (same approach as TPXO path)
+        # 6. Inject into HydroMT model (same approach as harmonic path)
         self._inject_water_level(model, df_ts, gdf_bnd)
 
     def run(self) -> dict[str, Any]:
         """Add water level boundary forcing."""
         model = _get_model(self.config)
 
-        if self.config.boundary.source == "tpxo":
-            self._update_substep("Creating TPXO tidal forcing")
-            self._create_tpxo_forcing(model)
-            self._log("Water level forcing added from TPXO predict_tide")
-            return {"status": "completed", "source": "tpxo"}
+        if self.config.boundary.source == "harmonic":
+            self._update_substep("Creating harmonic tidal forcing")
+            self._create_tidal_forcing(model)
+            self._log(f"Water level forcing added from pyTMD ({self.config.boundary.tidal_model})")
+            return {"status": "completed", "source": "harmonic"}
 
         wl_geodataset = _waterlevel_geodataset(self.config)
         if wl_geodataset is None:

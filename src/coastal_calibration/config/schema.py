@@ -13,8 +13,12 @@ import pandas as pd
 import yaml
 
 MeteoSource = Literal["nwm_retro", "nwm_ana"]
-CoastalDomain = Literal["prvi", "hawaii", "atlgulf", "pacific"]
-BoundarySource = Literal["tpxo", "stofs"]
+CoastalDomain = Literal["prvi", "hawaii", "atlgulf", "pacific", "alaska"]
+# ``harmonic`` predicts boundary elevations from harmonic constituents via
+# pyTMD against ``tidal_atlas_dir`` (TPXO, FES, GOT, EOT, ...). ``tpxo``
+# is accepted for backward compatibility with older config files and is
+# normalized to ``harmonic`` in :meth:`BoundaryConfig.__post_init__`.
+BoundarySource = Literal["harmonic", "tpxo", "stofs"]
 ModelType = Literal["schism", "sfincs"]
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
@@ -37,10 +41,11 @@ class SimulationConfig:
     meteo_source: MeteoSource
     # Model integration timestep in seconds: SCHISM's ``dt`` and the
     # tick that ``nspool``/``ihfskip``/``nhot_write`` are counted in.
-    # Also used as the cadence for TPXO OTPS predictions on the open
-    # boundary. The default (200) matches the Pacific/Hawaii forecast
-    # templates and is a stable choice for coastal mesh resolutions of
-    # ~100-1000 m.
+    # The default (200) matches the Pacific/Hawaii forecast templates
+    # and is a stable choice for coastal mesh resolutions of ~100-1000 m.
+    # Note: the tidal boundary (``make_tidal_boundary``) writes
+    # ``elev2D.th.nc`` at a separate cadence (default 3600 s); SCHISM
+    # interpolates from that file to its own ``dt`` at runtime.
     timestep_seconds: int = 200
 
     _INLAND_DOMAIN: ClassVar[dict[str, str]] = {
@@ -48,18 +53,21 @@ class SimulationConfig:
         "hawaii": "domain_hawaii",
         "atlgulf": "domain",
         "pacific": "domain",
+        "alaska": "domain_alaska",
     }
     _NWM_DOMAIN: ClassVar[dict[str, str]] = {
         "prvi": "prvi",
         "hawaii": "hawaii",
         "atlgulf": "conus",
         "pacific": "conus",
+        "alaska": "alaska",
     }
     _GEO_GRID: ClassVar[dict[str, str]] = {
         "prvi": "geo_em_PRVI.nc",
         "hawaii": "geo_em_HI.nc",
         "atlgulf": "geo_em_CONUS.nc",
         "pacific": "geo_em_CONUS.nc",
+        "alaska": "geo_em_AK.nc",
     }
 
     def __post_init__(self) -> None:
@@ -95,12 +103,37 @@ class SimulationConfig:
 
 @dataclass
 class BoundaryConfig:
-    """Boundary condition configuration."""
+    """Boundary condition configuration.
 
-    source: BoundarySource = "tpxo"
+    Parameters
+    ----------
+    source : {"harmonic", "stofs"}
+        Boundary forcing source. ``harmonic`` predicts tides locally
+        via pyTMD against the atlas at
+        :attr:`PathConfig.tidal_atlas_dir`; ``stofs`` regrids the NOAA
+        STOFS product (and falls back to ``harmonic`` past the STOFS
+        180 h window when the simulation runs longer).
+        ``"tpxo"`` is accepted as a deprecated alias for ``"harmonic"``
+        and is normalized at construction time.
+    stofs_file : Path, optional
+        STOFS NetCDF (only used when ``source == "stofs"``).
+    tidal_model : str
+        pyTMD model identifier (see ``pyTMD.io.load_database()``).
+        Defaults to TPXO10-atlas-v2 in netcdf form. Set to e.g.
+        ``"FES2014"`` or ``"GOT4.10"`` to predict against another atlas
+        without code changes — only the files under
+        :attr:`PathConfig.tidal_atlas_dir` change.
+    """
+
+    source: BoundarySource = "harmonic"
     stofs_file: Path | None = None
+    tidal_model: str = "TPXO10-atlas-v2-nc"
 
     def __post_init__(self) -> None:
+        # Normalize the deprecated "tpxo" alias upfront so every consumer
+        # downstream only ever has to check for "harmonic".
+        if self.source == "tpxo":
+            self.source = "harmonic"
         if self.stofs_file is not None:
             self.stofs_file = Path(self.stofs_file).expanduser().resolve()
 
@@ -109,9 +142,8 @@ class BoundaryConfig:
 class PathConfig:
     """Path configuration for data and executables.
 
-    Only ``work_dir`` is required.  All other fields are optional and
-    only needed by specific workflow stages (e.g. the *create* workflow
-    for SCHISM or SFINCS boundary processing that uses TPXO/OTPSnc).
+    Only ``work_dir`` is required. All other fields are optional and
+    only needed by specific workflow stages.
     """
 
     METEO_SUBDIR: ClassVar[str] = "meteo"
@@ -125,7 +157,12 @@ class PathConfig:
     # Legacy create-workflow fields — not used by the run workflow.
     parm_dir: Path | None = None
     nwm_dir: Path | None = None
-    otps_dir: Path | None = None
+    # Directory containing the pyTMD tidal atlas files for
+    # :attr:`BoundaryConfig.tidal_model`. The path is read directly:
+    # users point at whatever folder holds the atlas constituent + grid
+    # netCDFs, regardless of the subdirectory convention pyTMD's
+    # bundled database uses internally.
+    tidal_atlas_dir: Path | None = None
 
     # Local filesystem subdirectory under hydro/nwm/ for NWM analysis-and-
     # assimilation downloads (see ``streamflow_dir``). Distinct from
@@ -138,6 +175,7 @@ class PathConfig:
     _NWM_DOMAIN_DIR: ClassVar[dict[str, str]] = {
         "hawaii": "hawaii",
         "prvi": "puertorico",
+        "alaska": "alaska",
     }
 
     def __post_init__(self) -> None:
@@ -150,15 +188,8 @@ class PathConfig:
             self.parm_dir = Path(self.parm_dir).expanduser().resolve()
         if self.nwm_dir is not None:
             self.nwm_dir = Path(self.nwm_dir).expanduser().resolve()
-        if self.otps_dir is not None:
-            self.otps_dir = Path(self.otps_dir).expanduser().resolve()
-
-    @property
-    def tpxo_data_dir(self) -> Path:
-        """TPXO tidal atlas data directory (requires ``parm_dir``)."""
-        if self.parm_dir is None:
-            raise ValueError("paths.parm_dir is required for TPXO data lookup")
-        return self.parm_dir / "TPXO10_atlas_v2_nc"
+        if self.tidal_atlas_dir is not None:
+            self.tidal_atlas_dir = Path(self.tidal_atlas_dir).expanduser().resolve()
 
     @property
     def parm_nwm(self) -> Path:
@@ -291,17 +322,31 @@ class SchismModelConfig(ModelConfig):
         Path to the WRF geogrid file (e.g. ``geo_em_HI.nc``) used by
         the atmospheric forcing regridding stage.
     nodes : int
-        Number of SLURM nodes.
+        Number of SLURM nodes. Defaults to ``1``; set higher for multi-node
+        HPC jobs.
     ntasks_per_node : int
-        MPI tasks per node.
+        MPI tasks per node. When ``<= 0`` (the default), this is auto-set
+        to ``get_cpu_count() // omp_num_threads`` so a single-node run
+        fills the available physical cores
+        (see :func:`~coastal_calibration.utils.get_cpu_count`).
     exclusive : bool
         Request exclusive node access.
     nscribes : int
-        Number of SCHISM scribe processes.
+        Number of SCHISM scribe processes. When ``<= 0`` (the default),
+        this is auto-detected from the prebuilt's ``param.nml``: a count
+        of uncommented ``iof_*(N) = 1`` flags plus one for ``iout_sta``
+        when ``include_noaa_gages`` is enabled. SCHISM aborts at init
+        when nscribes is below the actual number of output variables.
     omp_num_threads : int
-        OpenMP threads per MPI rank.
+        OpenMP threads per MPI rank. Defaults to ``2`` (typical SCHISM
+        hybrid layout); combined with the auto-detected ``ntasks_per_node``
+        this fills one node's physical cores.
     oversubscribe : bool
-        Allow MPI oversubscription.
+        Pass ``--oversubscribe`` to ``mpiexec``. Only honored under
+        OpenMPI; silently ignored under MPICH (see
+        :func:`~coastal_calibration.utils.build_mpi_cmd`). Defaults to
+        ``False``; set ``True`` when intentionally launching more MPI
+        ranks than physical cores.
     schism_exe : Path, optional
         Path to a compiled SCHISM executable.  When set, the
         ``schism_run`` stage uses this binary instead of discovering
@@ -363,10 +408,10 @@ class SchismModelConfig(ModelConfig):
 
     prebuilt_dir: Path | None = None
     geogrid_file: Path | None = None
-    nodes: int = 2
-    ntasks_per_node: int = 18
+    nodes: int = 1
+    ntasks_per_node: int = 0
     exclusive: bool = True
-    nscribes: int = 2
+    nscribes: int = 0
     omp_num_threads: int = 2
     oversubscribe: bool = False
     schism_exe: Path | None = None
@@ -392,6 +437,19 @@ class SchismModelConfig(ModelConfig):
             self.discharge_file = Path(self.discharge_file).expanduser().resolve()
         if self.obs_points_csv is not None:
             self.obs_points_csv = Path(self.obs_points_csv).expanduser().resolve()
+        if self.ntasks_per_node <= 0:
+            from coastal_calibration.utils import get_cpu_count
+
+            self.ntasks_per_node = max(get_cpu_count() // max(self.omp_num_threads, 1), 1)
+        if self.nscribes <= 0:
+            from coastal_calibration.schism.prep import count_required_scribes
+
+            detected: int | None = None
+            if self.prebuilt_dir is not None:
+                detected = count_required_scribes(
+                    self.prebuilt_dir / "param.nml", self.include_noaa_gages
+                )
+            self.nscribes = detected if detected and detected > 0 else 2
 
     @property
     def model_name(self) -> str:  # noqa: D102
@@ -420,6 +478,31 @@ class SchismModelConfig(ModelConfig):
     def schism_mesh(self) -> Path:
         """SCHISM ESMF mesh file path."""
         return self.coastal_parm / "hgrid.nc"
+
+    @property
+    def resolved_discharge_file(self) -> Path | None:
+        """Resolve the NWM-reaches discharge CSV, or ``None`` to skip discharge.
+
+        Resolution order:
+
+        1. ``discharge_file`` explicitly set → use it if it exists, else
+           ``None``. An explicit configuration is treated as exclusive: it
+           does not silently fall back to the prebuilt-directory convention.
+        2. ``discharge_file`` unset → look for ``nwmReaches.csv`` next to
+           the prebuilt model (matching the Pacific/Hawaii/PRVI/AtlGulf
+           convention). Use it if present.
+        3. Otherwise → ``None`` (river forcing is skipped and SCHISM is
+           configured with ``if_source = 0``).
+
+        A missing optional file degrades gracefully — the caller skips
+        discharge rather than aborting.
+        """
+        if self.discharge_file is not None:
+            return self.discharge_file if self.discharge_file.exists() else None
+        if self.prebuilt_dir is None:
+            return None
+        candidate = self.prebuilt_dir / "nwmReaches.csv"
+        return candidate if candidate.exists() else None
 
     @property
     def elevation_correction_csv(self) -> Path | None:
@@ -472,7 +555,15 @@ class SchismModelConfig(ModelConfig):
             errors.append("model_config.ntasks_per_node must be at least 1")
 
         if self.nscribes >= self.total_tasks:
-            errors.append("model_config.nscribes must be less than total MPI tasks")
+            errors.append(
+                f"model_config: nscribes ({self.nscribes}) leaves no compute ranks "
+                f"with total MPI tasks {self.total_tasks} "
+                f"(nodes={self.nodes} * ntasks_per_node={self.ntasks_per_node}). "
+                "Either lower omp_num_threads (typical: 1) to widen ntasks_per_node, "
+                "raise ntasks_per_node explicitly (set oversubscribe: true if it "
+                "exceeds physical cores), or reduce iof_* outputs in the prebuilt "
+                "param.nml."
+            )
 
         if self.schism_exe and not self.schism_exe.exists():
             errors.append(f"model_config.schism_exe not found: {self.schism_exe}")
@@ -619,7 +710,7 @@ class SfincsModelConfig(ModelConfig):
         Vertical offset in meters *added* to the boundary-condition water
         levels before they enter SFINCS.
 
-        Tidal-only sources such as TPXO provide oscillations centered on
+        Tidal-only sources (harmonic prediction) provide oscillations centered on
         zero (MSL) but carry no information about where MSL sits on the
         mesh's vertical datum.  This parameter anchors the forcing signal
         to the correct geodetic height on the mesh.  Set it to the
@@ -1300,6 +1391,7 @@ class CoastalCalibConfig:
             "boundary": {
                 "source": self.boundary.source,
                 "stofs_file": (str(self.boundary.stofs_file) if self.boundary.stofs_file else None),
+                "tidal_model": self.boundary.tidal_model,
             },
             "paths": {
                 "work_dir": str(self.paths.work_dir),
@@ -1311,7 +1403,11 @@ class CoastalCalibConfig:
                 ),
                 **({"parm_dir": str(self.paths.parm_dir)} if self.paths.parm_dir else {}),
                 **({"nwm_dir": str(self.paths.nwm_dir)} if self.paths.nwm_dir else {}),
-                **({"otps_dir": str(self.paths.otps_dir)} if self.paths.otps_dir else {}),
+                **(
+                    {"tidal_atlas_dir": str(self.paths.tidal_atlas_dir)}
+                    if self.paths.tidal_atlas_dir
+                    else {}
+                ),
             },
             "model_config": self.model_config.to_dict(),
             "monitoring": {
@@ -1357,16 +1453,13 @@ class CoastalCalibConfig:
             ):
                 errors.append(f"STOFS file not found: {self.boundary.stofs_file}")
 
-        # TPXO data directory is derived from paths.parm_dir
-        elif (
-            self.boundary.source == "tpxo"
-            and self.paths.parm_dir is not None
-            and not self.paths.tpxo_data_dir.exists()
-        ):
-            errors.append(
-                f"TPXO data directory not found: {self.paths.tpxo_data_dir}. "
-                "TPXO tidal atlas data requires local installation."
-            )
+        elif self.boundary.source == "harmonic":
+            if self.paths.tidal_atlas_dir is None:
+                errors.append(
+                    "paths.tidal_atlas_dir is required when boundary.source is 'harmonic'"
+                )
+            elif not self.paths.tidal_atlas_dir.exists():
+                errors.append(f"Tidal atlas directory not found: {self.paths.tidal_atlas_dir}")
 
         return errors
 

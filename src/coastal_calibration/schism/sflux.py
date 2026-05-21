@@ -27,6 +27,39 @@ def _round_down(n: float, decimals: int = 0) -> float:
     return math.floor(n * multiplier) / multiplier
 
 
+def _compute_subset_indices(
+    lats: NDArray[np.floating[Any]],
+    lons: NDArray[np.floating[Any]],
+    mesh_bbox: tuple[float, float, float, float],
+    buffer_deg: float,
+) -> tuple[int, int, int, int]:
+    """Return ``(j0, j1, i0, i1)`` slice bounds covering *mesh_bbox* on the geogrid.
+
+    The bounds are expanded by *buffer_deg* on all sides and returned as a
+    contiguous rectangle in geogrid index space.  Raises ``ValueError`` when
+    the buffered bbox has no overlap with the geogrid.
+    """
+    lon_min, lat_min, lon_max, lat_max = mesh_bbox
+    mask = (
+        (lats >= lat_min - buffer_deg)
+        & (lats <= lat_max + buffer_deg)
+        & (lons >= lon_min - buffer_deg)
+        & (lons <= lon_max + buffer_deg)
+    )
+    if not mask.any():
+        geo_lon_min, geo_lon_max = float(lons.min()), float(lons.max())
+        geo_lat_min, geo_lat_max = float(lats.min()), float(lats.max())
+        raise ValueError(
+            f"Mesh bbox (lon=[{lon_min}, {lon_max}], lat=[{lat_min}, {lat_max}]) "
+            f"with buffer {buffer_deg} deg has no overlap with the geogrid "
+            f"(lon=[{geo_lon_min}, {geo_lon_max}], lat=[{geo_lat_min}, {geo_lat_max}]). "
+            "Wrong geogrid file for this mesh?"
+        )
+    rows = np.where(mask.any(axis=1))[0]
+    cols = np.where(mask.any(axis=0))[0]
+    return int(rows.min()), int(rows.max()) + 1, int(cols.min()), int(cols.max()) + 1
+
+
 def _pressure_to_msl(
     temp: NDArray[np.floating[Any]],
     mixing: NDArray[np.floating[Any]],
@@ -60,11 +93,14 @@ def _pressure_to_msl(
     return press / np.exp(-height / H)
 
 
-def make_atmo_sflux(
+def make_atmo_sflux(  # noqa: PLR0915
     forcing_input_dir: Path,
     work_dir: Path,
     start_dt: datetime,
     geogrid_file: Path,
+    *,
+    mesh_bbox: tuple[float, float, float, float] | None = None,
+    bbox_buffer_deg: float = 0.5,
 ) -> None:
     """Create SCHISM sflux atmospheric forcing from NWM LDASIN files.
 
@@ -73,6 +109,14 @@ def make_atmo_sflux(
     so that SCHISM always has a value at the end of the simulation
     window. The simulation length is inferred from the number of files
     on disk; the caller does not need to pass it.
+
+    When *mesh_bbox* is provided, the geogrid and every LDASIN slab are
+    cropped to the smallest contiguous index rectangle covering the
+    buffered bbox before being written to disk.  This avoids carrying
+    the full CONUS forcing grid into a sflux file when the SCHISM mesh
+    only spans a small subdomain, which dominates I/O on multi-node MPI
+    runs that read the file concurrently from NFS.  Pass ``None`` to
+    write the full geogrid (the historical behavior).
 
     Parameters
     ----------
@@ -85,12 +129,37 @@ def make_atmo_sflux(
         Simulation start (UTC).
     geogrid_file : Path
         WRF geogrid file containing ``HGT_M``, ``XLAT_M``, ``XLONG_M``.
+    mesh_bbox : tuple of float, optional
+        ``(lon_min, lat_min, lon_max, lat_max)`` of the SCHISM mesh in
+        degrees.  When set, the output is cropped to this bbox plus
+        *bbox_buffer_deg* on each side.  Raises ``ValueError`` when the
+        buffered bbox has no overlap with the geogrid.
+    bbox_buffer_deg : float, optional
+        Pad applied to *mesh_bbox* on each side, in degrees.  Defaults to
+        0.5 degrees so coastal cells just outside the mesh extent are
+        retained for safety.  Ignored when *mesh_bbox* is ``None``.
     """
     logger.debug("    Loading geogrid data from %s", geogrid_file)
     with netCDF4.Dataset(geogrid_file) as geo:
-        height = geo["HGT_M"][0, :]
-        lats = geo["XLAT_M"][0, :]
-        lons = geo["XLONG_M"][0, :]
+        height = np.asarray(geo["HGT_M"][0, :])
+        lats = np.asarray(geo["XLAT_M"][0, :])
+        lons = np.asarray(geo["XLONG_M"][0, :])
+
+    if mesh_bbox is not None:
+        j0, j1, i0, i1 = _compute_subset_indices(lats, lons, mesh_bbox, bbox_buffer_deg)
+        logger.info(
+            "    Subsetting geogrid to mesh bbox: ny %d→%d, nx %d→%d",
+            lats.shape[0],
+            j1 - j0,
+            lons.shape[1],
+            i1 - i0,
+        )
+        height = height[j0:j1, i0:i1]
+        lats = lats[j0:j1, i0:i1]
+        lons = lons[j0:j1, i0:i1]
+    else:
+        j0, j1 = 0, lats.shape[0]
+        i0, i1 = 0, lons.shape[1]
 
     files = sorted(str(p) for p in forcing_input_dir.glob("*LDASIN_DOMAIN1"))
     if not files:
@@ -219,13 +288,15 @@ def make_atmo_sflux(
 
         for i, file in enumerate(files):
             with netCDF4.Dataset(file) as data:
-                t2d = np.asarray(data.variables["T2D"][0])
-                q2d = np.asarray(data.variables["Q2D"][0])
-                psfc = np.asarray(data.variables["PSFC"][0])
+                t2d = np.asarray(data.variables["T2D"][0])[j0:j1, i0:i1]
+                q2d = np.asarray(data.variables["Q2D"][0])[j0:j1, i0:i1]
+                psfc = np.asarray(data.variables["PSFC"][0])[j0:j1, i0:i1]
+                u2d = np.asarray(data.variables["U2D"][0])[j0:j1, i0:i1]
+                v2d = np.asarray(data.variables["V2D"][0])[j0:j1, i0:i1]
                 write_var(nct, t2d, index=i)
                 write_var(ncq, q2d, index=i)
-                write_var(ncu, np.asarray(data.variables["U2D"][0]), index=i)
-                write_var(ncv, np.asarray(data.variables["V2D"][0]), index=i)
+                write_var(ncu, u2d, index=i)
+                write_var(ncv, v2d, index=i)
                 write_var(ncp, _pressure_to_msl(t2d, q2d, height, psfc), index=i)
 
         # Duplicate last timestep so SCHISM always has a trailing value

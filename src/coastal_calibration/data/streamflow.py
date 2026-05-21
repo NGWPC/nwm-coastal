@@ -34,6 +34,7 @@ _ZARR_STORES: dict[str, str] = {
     "pacific": "s3://noaa-nwm-retrospective-3-0-pds/CONUS/zarr/chrtout.zarr",
     "hawaii": "s3://noaa-nwm-retrospective-3-0-pds/Hawaii/zarr/chrtout.zarr",
     "prvi": "s3://noaa-nwm-retrospective-3-0-pds/PR/zarr/chrtout.zarr",
+    "alaska": "s3://noaa-nwm-retrospective-3-0-pds/Alaska/zarr/chrtout.zarr",
 }
 
 

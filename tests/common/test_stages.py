@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import importlib.util
-from datetime import datetime
 
 import pytest
 
@@ -204,56 +203,6 @@ class TestRuntimeEnvPlumbing:
         # default runtime_env is {} (empty)
         stage = NWMForcingStage(sample_config)
         env = stage._build_run_env()
-        assert env["HDF5_USE_FILE_LOCKING"] == "FALSE"
-
-    def test_sfincs_forcing_stage_applies_runtime_env(self, tmp_path):
-        """SFINCS forcing stage must merge sfincs.runtime_env.
-
-        Specifically, ``_run_predict_tide`` must pass an env to
-        subprocess.run that includes the user-supplied overrides on
-        ``SfincsModelConfig.runtime_env``.
-        """
-        from coastal_calibration.config.schema import (
-            BoundaryConfig,
-            CoastalCalibConfig,
-            DownloadConfig,
-            MonitoringConfig,
-            PathConfig,
-            SfincsModelConfig,
-            SimulationConfig,
-        )
-        from coastal_calibration.sfincs.stages import SfincsForcingStage
-
-        prebuilt = tmp_path / "model"
-        prebuilt.mkdir()
-        config = CoastalCalibConfig(
-            simulation=SimulationConfig(
-                start_date=datetime(2021, 6, 11, 0, 0, 0),
-                duration_hours=3,
-                coastal_domain="pacific",
-                meteo_source="nwm_retro",
-            ),
-            boundary=BoundaryConfig(source="tpxo"),
-            paths=PathConfig(
-                work_dir=tmp_path / "work",
-                raw_download_dir=tmp_path / "downloads",
-            ),
-            model_config=SfincsModelConfig(
-                prebuilt_dir=prebuilt,
-                runtime_env={
-                    "OMPI_MCA_btl": "self,tcp",
-                    "OMPI_MCA_mtl": "^ofi",
-                },
-            ),
-            monitoring=MonitoringConfig(),
-            download=DownloadConfig(enabled=False),
-        )
-
-        stage = SfincsForcingStage(config)
-        env = stage._build_run_env()
-
-        assert env["OMPI_MCA_btl"] == "self,tcp"
-        assert env["OMPI_MCA_mtl"] == "^ofi"
         assert env["HDF5_USE_FILE_LOCKING"] == "FALSE"
 
     def test_make_stofs_boundary_applies_runtime_env(self, tmp_path, monkeypatch):
