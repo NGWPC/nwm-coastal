@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **tides**: Replace ambiguous multiplication sign in log strings
 - **tides**: Apply ruff-format to data/tides.py
 - **sfincs**: Switch boundary forcing to pyTMD harmonic predictor
 - **tides**: Replace pytides+OTPSnc with pyTMD predictor; consolidate pixi envs
