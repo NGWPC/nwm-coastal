@@ -93,3 +93,28 @@ class TestCLIRun:
     def test_run_nonexistent_config(self, runner, tmp_path):
         result = runner.invoke(cli, ["run", str(tmp_path / "nope.yaml")])
         assert result.exit_code != 0
+
+
+class TestCLIPrepareSchismMesh:
+    def test_command_registered(self, runner):
+        result = runner.invoke(cli, ["prepare-schism-mesh", "--help"])
+        assert result.exit_code == 0
+        assert "hgrid.nc" in result.output
+        assert "open_bnds_hgrid.nc" in result.output
+
+    def test_missing_hgrid_gr3(self, runner, tmp_path):
+        result = runner.invoke(cli, ["prepare-schism-mesh", str(tmp_path)])
+        assert result.exit_code != 0
+        assert "hgrid.gr3 not found" in result.output
+
+    def test_refuses_existing_without_force(self, runner, tmp_path):
+        (tmp_path / "hgrid.gr3").write_text("stub")
+        (tmp_path / "hgrid.nc").write_bytes(b"stub")
+        result = runner.invoke(cli, ["prepare-schism-mesh", str(tmp_path)])
+        assert result.exit_code != 0
+        assert "already exist" in result.output
+        assert "--force" in result.output
+
+    def test_nonexistent_dir(self, runner, tmp_path):
+        result = runner.invoke(cli, ["prepare-schism-mesh", str(tmp_path / "nope")])
+        assert result.exit_code != 0
