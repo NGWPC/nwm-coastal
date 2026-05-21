@@ -8,10 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **schism**: Wire pyTMD harmonic boundary; add scribes counting and discharge gating
+- **alaska**: Add initial Alaska domain support
+- **sflux**: Subset atmospheric forcing to SCHISM mesh footprint
 - **sfincs**: Add NOAA CRM topobathy and make obs-point snap configurable
 
 ### Changed
 
+- **tides**: Apply ruff-format to data/tides.py
+- **sfincs**: Switch boundary forcing to pyTMD harmonic predictor
+- **tides**: Replace pytides+OTPSnc with pyTMD predictor; consolidate pixi envs
 - **mpi**: Make thread-pinning user-supplied and self-heal SLURM affinity
 - Remove backward-compatibility shims
 
@@ -19,7 +25,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **mpi**: Propagate runtime_env into make_stofs_boundary
 - **mpi**: Remove EFA auto-detection from build_mpi_env
-
 ## [3.1.2.0.0-rc1] - 2026-05-08
 
 ### Added
