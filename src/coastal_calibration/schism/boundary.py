@@ -57,6 +57,7 @@ class UpdateParamsStage(WorkflowStage):
             output_freq_hours=self.model.output_freq_hours,
             single_output_file=self.model.single_output_file,
             run_param_overrides=self.model.run_param_overrides,
+            discharge_enabled=self.model.resolved_discharge_file is not None,
         )
 
         self._log(f"Parameter file created: {param_file}")
@@ -66,19 +67,24 @@ class UpdateParamsStage(WorkflowStage):
         }
 
 
-class TPXOBoundaryStage(WorkflowStage):
-    """Generate boundary conditions from TPXO tidal atlas."""
+class TidalBoundaryStage(WorkflowStage):
+    """Generate boundary conditions by predicting tides via pyTMD.
 
-    name = "tpxo_boundary"
-    description = "Create boundary forcing from TPXO"
+    Works against any tidal atlas pyTMD's database supports (TPXO, FES,
+    GOT, EOT, ...); the atlas is selected by ``boundary.tidal_model``
+    and read from ``paths.tidal_atlas_dir``.
+    """
+
+    name = "tidal_boundary"
+    description = "Create boundary forcing from harmonic tide predictions"
 
     def __init__(self, config: CoastalCalibConfig, monitor: WorkflowMonitor | None = None) -> None:
         super().__init__(config, monitor)
         self.model: SchismModelConfig = cast("SchismModelConfig", config.model_config)
 
     def run(self) -> dict[str, Any]:
-        """Generate tidal boundary conditions from TPXO atlas."""
-        from coastal_calibration.schism.prep import make_tpxo_boundary
+        """Generate tidal boundary conditions via pyTMD."""
+        from coastal_calibration.schism.prep import make_tidal_boundary
 
         self._update_substep("Building environment")
         self.build_environment()
@@ -91,22 +97,26 @@ class TPXOBoundaryStage(WorkflowStage):
         correction_file = corr_path if corr_path.exists() else None
         n_open_boundary_nodes = _get_open_boundary_node_count(prebuilt_dir)
 
-        self._log("Generating tidal boundary from TPXO atlas")
-        self._update_substep("Running make_tpxo_ocean")
+        self._log(f"Predicting tidal boundary via pyTMD ({self.config.boundary.tidal_model})")
+        self._update_substep("Predicting tides")
 
-        elev_file = make_tpxo_boundary(
+        if self.config.paths.tidal_atlas_dir is None:
+            raise RuntimeError(
+                "paths.tidal_atlas_dir is required when boundary.source is 'harmonic'"
+            )
+
+        elev_file = make_tidal_boundary(
             work_dir=self.config.paths.work_dir,
             start_date=sim.start_date,
             duration_hours=sim.duration_hours,
-            timestep_seconds=sim.timestep_seconds,
             prebuilt_dir=prebuilt_dir,
-            otps_dir=self.config.paths.otps_dir,
-            tpxo_data_dir=self.config.paths.tpxo_data_dir,
+            atlas_dir=self.config.paths.tidal_atlas_dir,
+            tidal_model=self.config.boundary.tidal_model,
             correction_file=correction_file,
             n_open_boundary_nodes=n_open_boundary_nodes,
         )
 
-        self._log(f"TPXO boundary file created: {elev_file}")
+        self._log(f"Tidal boundary file created: {elev_file}")
         return {
             "elev2d_file": str(elev_file),
             "status": "completed",
@@ -184,6 +194,8 @@ class STOFSBoundaryStage(WorkflowStage):
             correction_file=correction_file,
             n_open_boundary_nodes=n_open_boundary_nodes,
             runtime_env=self.model.runtime_env,
+            atlas_dir=self.config.paths.tidal_atlas_dir,
+            tidal_model=self.config.boundary.tidal_model,
         )
 
         self._log(f"STOFS boundary file created: {elev_file}")
@@ -205,15 +217,15 @@ class STOFSBoundaryStage(WorkflowStage):
 
 
 class BoundaryConditionStage(WorkflowStage):
-    """Wrapper stage that selects TPXO or STOFS based on config."""
+    """Wrapper stage that selects the harmonic or STOFS path."""
 
     name = "schism_boundary"
     description = "Generate boundary conditions"
 
     def run(self) -> dict[str, Any]:
         """Execute appropriate boundary condition stage."""
-        if self.config.boundary.source == "tpxo":
-            stage = TPXOBoundaryStage(self.config, self.monitor)
+        if self.config.boundary.source == "harmonic":
+            stage = TidalBoundaryStage(self.config, self.monitor)
         else:
             stage = STOFSBoundaryStage(self.config, self.monitor)
 
