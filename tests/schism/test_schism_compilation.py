@@ -1,12 +1,12 @@
 """Tests for pixi-compiled SCHISM binaries.
 
-These tests require the ``schism`` pixi environment to be active
-(``pixi run -e schism ...``) so that pschism, metis_prep, gpmetis,
+These tests require an active pixi env that builds the SCHISM package
+(``dev`` or ``test{311,313}``) so that pschism, metis_prep, gpmetis,
 combine_hotstart7, and combine_sink_source are on ``$CONDA_PREFIX/bin``.
 
 Run with::
 
-    pixi run -e schism test-schism
+    pixi r -e dev test-schism
 """
 
 from __future__ import annotations

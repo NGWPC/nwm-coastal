@@ -381,6 +381,24 @@ class TestUpdateParams:
         text = (work_dir / "param.nml").read_text()
         assert "if_source = -1" in text
 
+    def test_if_source_disabled_when_no_discharge(self, tmp_path):
+        work_dir = tmp_path / "run"
+        work_dir.mkdir()
+        prebuilt = tmp_path / "prebuilt"
+        self._create_template(prebuilt)
+
+        update_params(
+            work_dir=work_dir,
+            prebuilt_dir=prebuilt,
+            start_date=datetime(2020, 8, 26),
+            duration_hours=6,
+            discharge_enabled=False,
+        )
+
+        text = (work_dir / "param.nml").read_text()
+        assert "if_source = 0" in text
+        assert "if_source = -1" not in text
+
     def test_default_output_freq_writes_hourly(self, tmp_path):
         work_dir = tmp_path / "run"
         work_dir.mkdir()
