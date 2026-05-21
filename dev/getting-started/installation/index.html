@@ -1592,28 +1592,18 @@ git submodules). Subsequent activations skip the build if dependencies have not 
 <tbody>
 <tr>
 <td><code>dev</code></td>
-<td>Development with all tools</td>
+<td>Every binary and dev tool</td>
 <td><code>pixi r -e dev &lt;cmd&gt;</code></td>
 </tr>
 <tr>
 <td><code>test311</code></td>
-<td>Testing with Python 3.11</td>
+<td>CI matrix on Python 3.11</td>
 <td><code>pixi r -e test311 test</code></td>
 </tr>
 <tr>
 <td><code>test313</code></td>
-<td>Testing with Python 3.13</td>
+<td>CI matrix on Python 3.13</td>
 <td><code>pixi r -e test313 test</code></td>
-</tr>
-<tr>
-<td><code>schism</code></td>
-<td>Development with SCHISM I/O</td>
-<td><code>pixi r -e schism &lt;cmd&gt;</code></td>
-</tr>
-<tr>
-<td><code>sfincs</code></td>
-<td>Development with HydroMT-SFINCS</td>
-<td><code>pixi r -e sfincs &lt;cmd&gt;</code></td>
 </tr>
 <tr>
 <td><code>typecheck</code></td>
@@ -1632,9 +1622,9 @@ git submodules). Subsequent activations skip the build if dependencies have not 
 </tr>
 </tbody>
 </table>
-<p>The <code>dev</code> environment includes everything needed for both SCHISM and SFINCS workflows.
-The model-specific environments (<code>schism</code>, <code>sfincs</code>) are lighter alternatives for
-working on a single model.</p>
+<p><code>dev</code> installs every binary (SCHISM, SFINCS, predict_tide) and every Python dependency
+needed to develop, test, and run the package. The <code>test311</code> / <code>test313</code> envs mirror it
+for the CI Python-version matrix.</p>
 <h2 id="qgis-plugin">QGIS Plugin<a class="headerlink" href="#qgis-plugin" title="Permanent link">#</a></h2>
 <p>The repository includes a QGIS plugin for interactive domain definition. See the
 <a href="../../user-guide/qgis-plugin/">QGIS Plugin guide</a> for installation and usage
