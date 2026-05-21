@@ -34,7 +34,7 @@ HydroSource = Literal["nwm", "ngen"]
 # are downloaded from NOAA. ``tpxo`` is accepted as the deprecated
 # upstream alias for ``harmonic`` and normalized at the schema boundary.
 CoastalSource = Literal["stofs", "harmonic", "glofs"]
-Domain = Literal["conus", "hawaii", "prvi", "atlgulf", "pacific"]
+Domain = Literal["conus", "hawaii", "prvi", "atlgulf", "pacific", "alaska"]
 GLOFSModel = Literal["leofs", "loofs", "lsofs", "lmhofs"]
 
 
@@ -236,7 +236,7 @@ def get_default_sources(
     ----------
     domain : CoastalDomain
         Model domain: ``"prvi"``, ``"hawaii"``, ``"atlgulf"``,
-        or ``"pacific"``.
+        ``"pacific"``, or ``"alaska"``.
 
     Returns
     -------
@@ -323,6 +323,7 @@ _DOMAIN_MAP_RETRO = {
     "pacific": "CONUS",
     "hawaii": "Hawaii",
     "prvi": "PR",
+    "alaska": "Alaska",
 }
 
 _DOMAIN_MAP_ANA = {

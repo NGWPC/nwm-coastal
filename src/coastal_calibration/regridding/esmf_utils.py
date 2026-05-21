@@ -198,13 +198,14 @@ def build_unstructured_mesh(
     # Optional bbox filter to keep the mesh small
     if bbox is not None:
         lon_min, lat_min, lon_max, lat_max = bbox
-        node_mask = (
-            (lon >= lon_min - bbox_buffer_deg)
-            & (lon <= lon_max + bbox_buffer_deg)
-            & (lat >= lat_min - bbox_buffer_deg)
-            & (lat <= lat_max + bbox_buffer_deg)
-        )
-        keep_idx = np.where(node_mask)[0]
+        lat_in = (lat >= lat_min - bbox_buffer_deg) & (lat <= lat_max + bbox_buffer_deg)
+        if lon_min <= lon_max:
+            lon_in = (lon >= lon_min - bbox_buffer_deg) & (lon <= lon_max + bbox_buffer_deg)
+        else:
+            # bbox wraps the antimeridian (e.g. Aleutians): union of the
+            # two longitude segments either side of +/-180.
+            lon_in = (lon >= lon_min - bbox_buffer_deg) | (lon <= lon_max + bbox_buffer_deg)
+        keep_idx = np.where(lon_in & lat_in)[0]
     else:
         keep_idx = np.arange(n_global, dtype=np.int64)
 

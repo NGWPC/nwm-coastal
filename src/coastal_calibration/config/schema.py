@@ -13,7 +13,7 @@ import pandas as pd
 import yaml
 
 MeteoSource = Literal["nwm_retro", "nwm_ana"]
-CoastalDomain = Literal["prvi", "hawaii", "atlgulf", "pacific"]
+CoastalDomain = Literal["prvi", "hawaii", "atlgulf", "pacific", "alaska"]
 # ``harmonic`` predicts boundary elevations from harmonic constituents via
 # pyTMD against ``tidal_atlas_dir`` (TPXO, FES, GOT, EOT, ...). ``tpxo``
 # is accepted for backward compatibility with older config files and is
@@ -53,18 +53,21 @@ class SimulationConfig:
         "hawaii": "domain_hawaii",
         "atlgulf": "domain",
         "pacific": "domain",
+        "alaska": "domain_alaska",
     }
     _NWM_DOMAIN: ClassVar[dict[str, str]] = {
         "prvi": "prvi",
         "hawaii": "hawaii",
         "atlgulf": "conus",
         "pacific": "conus",
+        "alaska": "alaska",
     }
     _GEO_GRID: ClassVar[dict[str, str]] = {
         "prvi": "geo_em_PRVI.nc",
         "hawaii": "geo_em_HI.nc",
         "atlgulf": "geo_em_CONUS.nc",
         "pacific": "geo_em_CONUS.nc",
+        "alaska": "geo_em_AK.nc",
     }
 
     def __post_init__(self) -> None:
@@ -172,6 +175,7 @@ class PathConfig:
     _NWM_DOMAIN_DIR: ClassVar[dict[str, str]] = {
         "hawaii": "hawaii",
         "prvi": "puertorico",
+        "alaska": "alaska",
     }
 
     def __post_init__(self) -> None:
