@@ -46,20 +46,18 @@ Commands:
 
 ## Available Environments
 
-| Environment | Description                     | Command                         |
-| ----------- | ------------------------------- | ------------------------------- |
-| `dev`       | Development with all tools      | `pixi r -e dev <cmd>`           |
-| `test311`   | Testing with Python 3.11        | `pixi r -e test311 test`        |
-| `test313`   | Testing with Python 3.13        | `pixi r -e test313 test`        |
-| `schism`    | Development with SCHISM I/O     | `pixi r -e schism <cmd>`        |
-| `sfincs`    | Development with HydroMT-SFINCS | `pixi r -e sfincs <cmd>`        |
-| `typecheck` | Type checking                   | `pixi r -e typecheck typecheck` |
-| `lint`      | Linting with pre-commit         | `pixi r lint`                   |
-| `docs`      | Documentation building          | `pixi r -e docs docs-serve`     |
+| Environment | Description               | Command                         |
+| ----------- | ------------------------- | ------------------------------- |
+| `dev`       | Every binary and dev tool | `pixi r -e dev <cmd>`           |
+| `test311`   | CI matrix on Python 3.11  | `pixi r -e test311 test`        |
+| `test313`   | CI matrix on Python 3.13  | `pixi r -e test313 test`        |
+| `typecheck` | Type checking             | `pixi r -e typecheck typecheck` |
+| `lint`      | Linting with pre-commit   | `pixi r lint`                   |
+| `docs`      | Documentation building    | `pixi r -e docs docs-serve`     |
 
-The `dev` environment includes everything needed for both SCHISM and SFINCS workflows.
-The model-specific environments (`schism`, `sfincs`) are lighter alternatives for
-working on a single model.
+`dev` installs every binary (SCHISM, SFINCS, predict_tide) and every Python dependency
+needed to develop, test, and run the package. The `test311` / `test313` envs mirror it
+for the CI Python-version matrix.
 
 ## QGIS Plugin
 

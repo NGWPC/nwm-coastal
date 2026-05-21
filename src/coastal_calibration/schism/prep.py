@@ -15,7 +15,6 @@ import re
 import shutil
 import subprocess
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import netCDF4
@@ -25,6 +24,8 @@ from coastal_calibration._nc_io import write_var
 from coastal_calibration.logging import logger
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from numpy.typing import NDArray
 
 
@@ -654,19 +655,58 @@ def stage_ldasin_files(
 # ---------------------------------------------------------------------------
 
 
+def _read_hgrid_bbox(hgrid_path: Path) -> tuple[float, float, float, float]:
+    """Return ``(lon_min, lat_min, lon_max, lat_max)`` of nodes in a SCHISM hgrid file.
+
+    Reads the node block of a ``.gr3``/``.ll`` mesh file and returns the
+    coordinate extent.  Used by :func:`make_sflux` to subset NWM
+    atmospheric forcing to the SCHISM mesh footprint.  Coordinates are
+    interpreted as ``(lon, lat)`` — the caller is expected to point at a
+    geographic mesh (``hgrid.ll`` for projected setups).
+    """
+    with hgrid_path.open("r") as f:
+        f.readline()  # description line
+        header = f.readline().split()
+        if len(header) < 2:
+            raise ValueError(f"Malformed hgrid header in {hgrid_path}: {header!r}")
+        n_nodes = int(header[1])
+        coords = np.zeros((n_nodes, 2), dtype=np.float64)
+        for i in range(n_nodes):
+            parts = f.readline().split()
+            coords[i, 0] = float(parts[1])
+            coords[i, 1] = float(parts[2])
+    return (
+        float(coords[:, 0].min()),
+        float(coords[:, 1].min()),
+        float(coords[:, 0].max()),
+        float(coords[:, 1].max()),
+    )
+
+
 def make_sflux(
     *,
     work_dir: Path,
     forcing_input_dir: Path,
     start_date: datetime,
     geogrid_file: Path,
+    bbox_buffer_deg: float = 0.5,
 ) -> Path:
     """Generate sflux atmospheric forcing from LDASIN files.
 
-    This is the pure-Python equivalent of ``makeAtmo.py`` — reads
-    LDASIN files and writes ``sflux/sflux_air_1.0001.nc``.
+    This is the pure-Python equivalent of ``makeAtmo.py`` — reads LDASIN
+    files and writes ``sflux/sflux_air_1.0001.nc``.
 
-    Returns the path to the sflux output file.
+    The output is subset to the SCHISM mesh footprint when an hgrid file
+    (``hgrid.ll`` preferred, then ``hgrid.gr3``) is present in
+    *work_dir*.  This avoids writing the full CONUS forcing grid into
+    sflux for mesh subdomains, which can be a 100x I/O reduction on
+    multi-node MPI runs that read the file concurrently from NFS.  Set
+    *bbox_buffer_deg* to control the padding around the mesh extent.
+
+    When no hgrid file is found a warning is logged and the full
+    geogrid is written (the historical behavior).
+
+    Returns the path to the sflux output directory.
     """
     pdy = start_date.strftime("%Y%m%d")
     cyc = start_date.strftime("%H")
@@ -685,6 +725,21 @@ def make_sflux(
         if not dst.exists():
             _symlink(precip_nc, dst)
 
+    mesh_bbox: tuple[float, float, float, float] | None = None
+    hgrid_ll = work_dir / "hgrid.ll"
+    hgrid_gr3 = work_dir / "hgrid.gr3"
+    if hgrid_ll.exists():
+        mesh_bbox = _read_hgrid_bbox(hgrid_ll)
+        logger.info("    Subsetting sflux to hgrid.ll extent: %s", mesh_bbox)
+    elif hgrid_gr3.exists():
+        mesh_bbox = _read_hgrid_bbox(hgrid_gr3)
+        logger.info("    Subsetting sflux to hgrid.gr3 extent: %s", mesh_bbox)
+    else:
+        logger.warning(
+            "    No hgrid.ll or hgrid.gr3 in %s; writing full geogrid (no subsetting).",
+            work_dir,
+        )
+
     from coastal_calibration.schism.sflux import make_atmo_sflux
 
     make_atmo_sflux(
@@ -692,6 +747,8 @@ def make_sflux(
         work_dir=work_dir,
         start_dt=start_date,
         geogrid_file=geogrid_file,
+        mesh_bbox=mesh_bbox,
+        bbox_buffer_deg=bbox_buffer_deg,
     )
 
     if not sflux_out.exists():
@@ -718,6 +775,34 @@ def make_sflux(
 # ---------------------------------------------------------------------------
 
 
+def count_required_scribes(param_nml: Path, include_noaa_gages: bool) -> int | None:
+    """Count the SCHISM scribes implied by an active ``param.nml``.
+
+    Sums uncommented ``iof_*(N) = 1`` flags plus the effective
+    ``iout_sta`` value: when ``include_noaa_gages`` is True the
+    ``schism_obs`` stage will flip ``iout_sta`` to 1, so it counts as 1
+    regardless of the template; otherwise we read the template's own
+    ``iout_sta`` value. SCHISM aborts at init when its CLI ``nscribes``
+    argument is below this number.
+
+    Returns
+    -------
+    int or None
+        Scribes needed, or ``None`` when *param_nml* can't be read
+        (caller should fall back to a safe default).
+    """
+    try:
+        text = param_nml.read_text()
+    except OSError:
+        return None
+    iof_count = len(re.findall(r"(?m)^\s*iof_\w+\(\d+\)\s*=\s*1\b", text))
+    if include_noaa_gages:
+        iout_sta = 1
+    else:
+        iout_sta = 1 if re.search(r"(?m)^\s*iout_sta\s*=\s*1\b", text) else 0
+    return iof_count + iout_sta
+
+
 def update_params(  # noqa: PLR0912, PLR0915
     *,
     work_dir: Path,
@@ -729,6 +814,7 @@ def update_params(  # noqa: PLR0912, PLR0915
     output_freq_hours: float = 1.0,
     single_output_file: bool = False,
     run_param_overrides: dict[str, Any] | None = None,
+    discharge_enabled: bool = True,
 ) -> Path:
     """Create ``param.nml`` and symlink static mesh files.
 
@@ -823,8 +909,13 @@ def update_params(  # noqa: PLR0912, PLR0915
         text,
     )
 
-    # Use netCDF source/sink forcing
-    text = re.sub(r"(?m)^(\s*)if_source\s*=.*$", r"\g<1>if_source = -1", text)
+    # if_source = -1 reads netCDF source/sink forcing (source.nc), produced
+    # by the discharge stage. When discharge is disabled (no discharge_file
+    # configured) the stage skips and source.nc is never written — leaving
+    # if_source = -1 would make SCHISM abort at init reading the missing
+    # file. Set to 0 in that case so SCHISM runs without river forcing.
+    if_source_val = -1 if discharge_enabled else 0
+    text = re.sub(r"(?m)^(\s*)if_source\s*=.*$", rf"\g<1>if_source = {if_source_val}", text)
 
     # rnday is fractional day
     rnday = rnhours / 24.0
@@ -887,12 +978,17 @@ def update_params(  # noqa: PLR0912, PLR0915
             dst.unlink(missing_ok=True)
             dst.symlink_to(src)
 
-    # Copy sflux directory (contains sflux_inputs.txt)
+    # Copy sflux directory (only the small template files — never the
+    # ``sflux_air_*.nc`` forcing arrays). Those are either stale leftovers
+    # from a previous run or about to be regenerated by ``schism_sflux``;
+    # copying a multi-GB stale .nc here can stall this stage for minutes.
     sflux_src = coastal_parm / "sflux"
     sflux_dst = work_dir / "sflux"
     sflux_dst.mkdir(exist_ok=True)
     if sflux_src.exists():
         for f in sflux_src.iterdir():
+            if f.suffix == ".nc":
+                continue
             shutil.copy2(f, sflux_dst / f.name)
 
     logger.info("    Created param.nml and symlinked mesh files in %s", work_dir)
@@ -942,107 +1038,54 @@ def correct_elevation(
 
 
 # ---------------------------------------------------------------------------
-# 11. TPXO boundary conditions  (was make_tpxo_ocean.bash)
+# 11. Harmonic-tide boundary conditions
 # ---------------------------------------------------------------------------
 
 
-def make_tpxo_boundary(
+def make_tidal_boundary(
     *,
     work_dir: Path,
     start_date: datetime,
     duration_hours: int,
-    timestep_seconds: int,
     prebuilt_dir: Path,
-    otps_dir: Path | None,
-    tpxo_data_dir: Path,
+    atlas_dir: Path,
+    tidal_model: str = "TPXO10-atlas-v2-nc",
+    time_step_seconds: int = 3600,
     correction_file: Path | None = None,
     n_open_boundary_nodes: int | None = None,
 ) -> Path:
-    """Generate tidal boundary forcing from TPXO atlas.
+    """Generate tidal boundary forcing via pyTMD harmonic prediction.
 
-    Runs ``predict_tide`` binary and Python scripts to produce
-    ``elev2D.th.nc``.
+    Predicts elevations at the SCHISM open-boundary nodes against
+    *tidal_model* (TPXO/FES/GOT/EOT — any model in pyTMD's database) at
+    *time_step_seconds* cadence and writes ``elev2D.th.nc``. SCHISM
+    interpolates between rows at its own integration dt, so any
+    positive cadence is valid.
 
     Returns the path to ``elev2D.th.nc``.
     """
-    from coastal_calibration.tides import make_otps_input, otps_to_open_bnds
+    from coastal_calibration.data.tides import write_schism_boundary
 
-    coastal_parm = prebuilt_dir
-    start_date.strftime("%Y%m%d")
-    start_date.strftime("%H")
-
-    end_dt = start_date + timedelta(hours=abs(int(duration_hours)))
-
-    # 1. Create OTPS input file
-    open_bnds = coastal_parm / "open_bnds_hgrid.nc"
-    otps_input = work_dir / "otps_lat_lon_time.txt"
-
-    make_otps_input(
-        grid_file=open_bnds,
-        output_file=otps_input,
+    elev_file = work_dir / "elev2D.th.nc"
+    write_schism_boundary(
+        grid_file=prebuilt_dir / "open_bnds_hgrid.nc",
+        output_file=elev_file,
         start_dt=start_date,
-        end_dt=end_dt,
-        timestep_s=timestep_seconds,
+        duration_hours=duration_hours,
+        atlas_dir=atlas_dir,
+        tidal_model=tidal_model,
+        time_step_seconds=time_step_seconds,
     )
 
-    # 2. Copy OTPS setup files and link TPXO atlas data
-    from coastal_calibration.tides import TIDES_DATA_DIR
-
-    for fname in ("setup_tpxo.txt", "Model_tpxo10_atlas"):
-        src = TIDES_DATA_DIR / fname
-        if src.exists():
-            shutil.copy2(src, work_dir / fname)
-
-    tpxo_link = work_dir / "TPXO10_atlas_v2_nc"
-    tpxo_link.unlink(missing_ok=True)
-    tpxo_link.symlink_to(tpxo_data_dir)
-
-    # 3. Run predict_tide
-    if otps_dir is not None:
-        predict_tide_bin = otps_dir / "predict_tide"
-    else:
-        found = shutil.which("predict_tide")
-        if found is None:
-            raise RuntimeError(
-                "predict_tide not found on PATH.  Set paths.otps_dir or "
-                "install predict_tide via pixi."
-            )
-        predict_tide_bin = Path(found)
-    with (work_dir / "setup_tpxo.txt").open() as setup_stdin:
-        result = subprocess.run(
-            [str(predict_tide_bin)],
-            stdin=setup_stdin,
-            cwd=work_dir,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-    if result.returncode != 0:
-        raise RuntimeError(
-            f"predict_tide failed (exit {result.returncode}): {result.stderr[-2000:]}"
-        )
-
-    # 4. Convert OTPS output to elev2D.th.nc
-    otps_to_open_bnds(
-        otps_output_file=work_dir / "otps_out.txt",
-        grid_file=open_bnds,
-        elev_output_file=work_dir / "elev2D.th.nc",
-    )
-
-    # 5. Apply elevation correction if available
     if correction_file is not None and correction_file.exists():
         logger.info("    Applying elevation datum correction")
         correct_elevation(
-            work_dir / "elev2D.th.nc",
+            elev_file,
             correction_file,
             n_open_boundary_nodes=n_open_boundary_nodes,
         )
 
-    elev_file = work_dir / "elev2D.th.nc"
-    if not elev_file.exists():
-        raise RuntimeError("TPXO boundary: elev2D.th.nc was not produced")
-
-    logger.info("    TPXO boundary created: %s", elev_file)
+    logger.info("    Tidal boundary created: %s", elev_file)
     return elev_file
 
 
@@ -1062,6 +1105,8 @@ def make_stofs_boundary(
     correction_file: Path | None = None,
     n_open_boundary_nodes: int | None = None,
     runtime_env: dict[str, str] | None = None,
+    atlas_dir: Path | None = None,
+    tidal_model: str = "TPXO10-atlas-v2-nc",
 ) -> Path:
     """Generate boundary forcing from STOFS data via ESMF regridding.
 
@@ -1138,29 +1183,37 @@ def make_stofs_boundary(
     # Post-process: tidal fill for medium-range runs (>180h)
     raw_length = abs(int(duration_hours))
     if raw_length > 180:
-        from coastal_calibration.tides import generate_ocean_tide
-
-        tidal_constants_dir = Path(os.environ.get("COASTAL_ROOT_DIR", "")) / "Tides" / "TidalConst"
-        try:
-            generate_ocean_tide(
-                hgrid_gr3=coastal_parm / "hgrid.gr3",
-                output_file=output_file,
-                start_dt=start_date,
-                duration_hours=raw_length,
-                tidal_constants_dir=tidal_constants_dir,
-            )
-        except (FileNotFoundError, ValueError, RuntimeError) as exc:
-            # Non-fatal: tidal fill is a best-effort augmentation past
-            # the 180 h STOFS forecast window. Log loudly so the user
-            # knows their boundary is truncated, but continue — the
-            # first 180 h of forcing is still valid.
-            logger.error(
-                "    generate_ocean_tide failed (%s); STOFS boundary "
-                "extends only %d h instead of %d h",
-                exc,
-                180,
+        if atlas_dir is None:
+            logger.warning(
+                "    Duration %dh > 180h but no tidal atlas configured; "
+                "STOFS boundary extends only 180 h. Set paths.tidal_atlas_dir "
+                "to enable pyTMD tidal fill.",
                 raw_length,
             )
+        else:
+            from coastal_calibration.data.tides import extend_schism_boundary
+
+            try:
+                extend_schism_boundary(
+                    grid_file=coastal_parm / "open_bnds_hgrid.nc",
+                    output_file=output_file,
+                    start_dt=start_date,
+                    duration_hours=raw_length,
+                    atlas_dir=atlas_dir,
+                    tidal_model=tidal_model,
+                )
+            except (FileNotFoundError, ValueError, RuntimeError) as exc:
+                # Non-fatal: tidal fill is a best-effort augmentation past
+                # the 180 h STOFS forecast window. Log loudly so the user
+                # knows their boundary is truncated, but continue — the
+                # first 180 h of forcing is still valid.
+                logger.error(
+                    "    pyTMD tidal fill failed (%s); STOFS boundary "
+                    "extends only %d h instead of %d h",
+                    exc,
+                    180,
+                    raw_length,
+                )
 
     # Apply elevation correction if available
     if correction_file is not None and correction_file.exists():

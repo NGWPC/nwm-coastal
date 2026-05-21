@@ -90,8 +90,13 @@ class TestSimulationConfig:
 class TestBoundaryConfig:
     def test_defaults(self):
         cfg = BoundaryConfig()
-        assert cfg.source == "tpxo"
+        assert cfg.source == "harmonic"
         assert cfg.stofs_file is None
+        assert cfg.tidal_model == "TPXO10-atlas-v2-nc"
+
+    def test_tpxo_alias_normalizes_to_harmonic(self):
+        cfg = BoundaryConfig(source="tpxo")
+        assert cfg.source == "harmonic"
 
     def test_stofs_source(self):
         cfg = BoundaryConfig(source="stofs", stofs_file=Path("/tmp/stofs.nc"))
@@ -116,13 +121,13 @@ class TestPathConfig:
         cfg = PathConfig(work_dir=tmp_work_dir, raw_download_dir=tmp_download_dir)
         assert cfg.download_dir == tmp_download_dir
 
-    def test_otps_dir_default_none(self, tmp_work_dir):
+    def test_tidal_atlas_dir_default_none(self, tmp_work_dir):
         cfg = PathConfig(work_dir=tmp_work_dir)
-        assert cfg.otps_dir is None
+        assert cfg.tidal_atlas_dir is None
 
-    def test_otps_dir_explicit(self, tmp_work_dir, tmp_path):
-        cfg = PathConfig(work_dir=tmp_work_dir, otps_dir=tmp_path / "OTPSnc")
-        assert cfg.otps_dir == (tmp_path / "OTPSnc").resolve()
+    def test_tidal_atlas_dir_explicit(self, tmp_work_dir, tmp_path):
+        cfg = PathConfig(work_dir=tmp_work_dir, tidal_atlas_dir=tmp_path / "TPXO10_atlas")
+        assert cfg.tidal_atlas_dir == (tmp_path / "TPXO10_atlas").resolve()
 
     def test_meteo_dir(self, tmp_work_dir, tmp_download_dir):
         cfg = PathConfig(work_dir=tmp_work_dir, raw_download_dir=tmp_download_dir)
@@ -187,12 +192,12 @@ class TestPathConfig:
             work_dir="/tmp/work",
             parm_dir="./parm",
             nwm_dir="./nwm",
-            otps_dir="./otps",
+            tidal_atlas_dir="./atlas",
             hot_start_file="./hotstart.nc",
         )
         assert cfg.parm_dir.is_absolute()
         assert cfg.nwm_dir.is_absolute()
-        assert cfg.otps_dir.is_absolute()
+        assert cfg.tidal_atlas_dir.is_absolute()
         assert cfg.hot_start_file.is_absolute()
 
 
@@ -200,8 +205,8 @@ class TestSchismModelConfig:
     def test_defaults(self):
         cfg = SchismModelConfig()
         assert cfg.schism_exe is None
-        assert cfg.nodes == 2
-        assert cfg.ntasks_per_node == 18
+        assert cfg.nodes == 1
+        assert cfg.ntasks_per_node == max(get_cpu_count() // 2, 1)
         assert cfg.exclusive is True
         assert cfg.nscribes == 2
         assert cfg.omp_num_threads == 2
@@ -249,11 +254,83 @@ class TestSchismModelConfig:
         assert cfg.geogrid_file == geogrid.resolve()
         assert cfg.geogrid_file.is_absolute()
 
+    def test_resolved_discharge_explicit_exists(self, tmp_path):
+        discharge = tmp_path / "my_reaches.csv"
+        discharge.touch()
+        cfg = SchismModelConfig(discharge_file=discharge)
+        assert cfg.resolved_discharge_file == discharge.resolve()
+
+    def test_resolved_discharge_explicit_missing(self, tmp_path):
+        prebuilt = tmp_path / "prebuilt"
+        prebuilt.mkdir()
+        # nwmReaches.csv exists in prebuilt, but explicit path takes priority
+        (prebuilt / "nwmReaches.csv").touch()
+        cfg = SchismModelConfig(
+            prebuilt_dir=prebuilt,
+            discharge_file=tmp_path / "does_not_exist.csv",
+        )
+        assert cfg.resolved_discharge_file is None
+
+    def test_resolved_discharge_autodiscover(self, tmp_path):
+        prebuilt = tmp_path / "prebuilt"
+        prebuilt.mkdir()
+        reaches = prebuilt / "nwmReaches.csv"
+        reaches.touch()
+        cfg = SchismModelConfig(prebuilt_dir=prebuilt)
+        assert cfg.resolved_discharge_file == reaches.resolve()
+
+    def test_resolved_discharge_neither_found(self, tmp_path):
+        prebuilt = tmp_path / "prebuilt"
+        prebuilt.mkdir()
+        cfg = SchismModelConfig(prebuilt_dir=prebuilt)
+        assert cfg.resolved_discharge_file is None
+
+    def test_resolved_discharge_no_prebuilt(self):
+        cfg = SchismModelConfig()
+        assert cfg.resolved_discharge_file is None
+
+    def test_nscribes_autodetect_from_param_nml(self, tmp_path):
+        prebuilt = tmp_path / "prebuilt"
+        prebuilt.mkdir()
+        (prebuilt / "param.nml").write_text(
+            "&OPT\n"
+            "  iof_hydro(1) = 1\n"
+            "  iof_hydro(25) = 1\n"
+            "! iof_hydro(2) = 1  ! commented, ignored\n"
+            "  iout_sta = 0\n"
+            "/\n"
+        )
+        cfg = SchismModelConfig(prebuilt_dir=prebuilt)
+        assert cfg.nscribes == 2  # two active iof_*, iout_sta=0
+
+    def test_nscribes_autodetect_with_noaa_gages(self, tmp_path):
+        prebuilt = tmp_path / "prebuilt"
+        prebuilt.mkdir()
+        (prebuilt / "param.nml").write_text(
+            "  iof_hydro(1) = 1\n  iof_hydro(25) = 1\n  iof_hydro(26) = 1\n  iout_sta = 0\n"
+        )
+        cfg = SchismModelConfig(prebuilt_dir=prebuilt, include_noaa_gages=True)
+        # 3 iof_* + 1 for iout_sta projected on by schism_obs
+        assert cfg.nscribes == 4
+
+    def test_nscribes_explicit_user_value_preserved(self, tmp_path):
+        prebuilt = tmp_path / "prebuilt"
+        prebuilt.mkdir()
+        (prebuilt / "param.nml").write_text("  iof_hydro(1) = 1\n")
+        cfg = SchismModelConfig(prebuilt_dir=prebuilt, nscribes=8)
+        assert cfg.nscribes == 8
+
+    def test_nscribes_fallback_without_param_nml(self, tmp_path):
+        prebuilt = tmp_path / "empty_prebuilt"
+        prebuilt.mkdir()
+        cfg = SchismModelConfig(prebuilt_dir=prebuilt)
+        assert cfg.nscribes == 2
+
     def test_to_dict(self):
         cfg = SchismModelConfig()
         d = cfg.to_dict()
-        assert d["nodes"] == 2
-        assert d["ntasks_per_node"] == 18
+        assert d["nodes"] == 1
+        assert d["ntasks_per_node"] == max(get_cpu_count() // 2, 1)
         assert d["nscribes"] == 2
         assert "schism_exe" in d
         assert d["include_noaa_gages"] is False

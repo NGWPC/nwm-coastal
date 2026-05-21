@@ -29,8 +29,12 @@ def _hour_range(start: datetime, end: datetime) -> range:
 
 
 HydroSource = Literal["nwm", "ngen"]
-CoastalSource = Literal["stofs", "tpxo", "glofs"]
-Domain = Literal["conus", "hawaii", "prvi", "atlgulf", "pacific"]
+# Coastal boundary source label. ``harmonic`` means "predicted locally
+# from a tidal atlas" (no remote download needed); ``stofs`` / ``glofs``
+# are downloaded from NOAA. ``tpxo`` is accepted as the deprecated
+# upstream alias for ``harmonic`` and normalized at the schema boundary.
+CoastalSource = Literal["stofs", "harmonic", "glofs"]
+Domain = Literal["conus", "hawaii", "prvi", "atlgulf", "pacific", "alaska"]
 GLOFSModel = Literal["leofs", "loofs", "lsofs", "lmhofs"]
 
 
@@ -175,7 +179,7 @@ def get_overlapping_range(
     meteo_source : str
         Meteorological data source (e.g., ``nwm_retro``, ``nwm_ana``).
     coastal_source : str
-        Coastal boundary source (e.g., ``stofs``, ``tpxo``).
+        Coastal boundary source (e.g., ``stofs``, ``harmonic``).
     domain : str
         Model domain (e.g., ``conus``, ``hawaii``, ``prvi``).
 
@@ -189,7 +193,7 @@ def get_overlapping_range(
     if meteo_range is None:
         return None
 
-    if coastal_source == "tpxo":
+    if coastal_source == "harmonic":
         return meteo_range
 
     coastal_range = get_date_range(coastal_source, domain)
@@ -232,7 +236,7 @@ def get_default_sources(
     ----------
     domain : CoastalDomain
         Model domain: ``"prvi"``, ``"hawaii"``, ``"atlgulf"``,
-        or ``"pacific"``.
+        ``"pacific"``, or ``"alaska"``.
 
     Returns
     -------
@@ -249,16 +253,16 @@ def get_default_sources(
     if domain == "prvi":
         combos: list[tuple[MeteoSource, BoundarySource]] = [
             ("nwm_ana", "stofs"),
-            ("nwm_ana", "tpxo"),
+            ("nwm_ana", "harmonic"),
             ("nwm_retro", "stofs"),
-            ("nwm_retro", "tpxo"),
+            ("nwm_retro", "harmonic"),
         ]
     else:
         combos: list[tuple[MeteoSource, BoundarySource]] = [
             ("nwm_retro", "stofs"),
             ("nwm_ana", "stofs"),
-            ("nwm_retro", "tpxo"),
-            ("nwm_ana", "tpxo"),
+            ("nwm_retro", "harmonic"),
+            ("nwm_ana", "harmonic"),
         ]
 
     for meteo, coastal in combos:
@@ -319,6 +323,7 @@ _DOMAIN_MAP_RETRO = {
     "pacific": "CONUS",
     "hawaii": "Hawaii",
     "prvi": "PR",
+    "alaska": "Alaska",
 }
 
 _DOMAIN_MAP_ANA = {
@@ -361,40 +366,6 @@ def _build_nwm_retro_forcing_urls(
         url = f"{base_url}/{domain_str}/netcdf/FORCING/{year}/{remote_stamp}.LDASIN_DOMAIN1"
         urls.append(url)
         paths.append(out_dir / f"{local_stamp}.LDASIN_DOMAIN1")
-
-    return urls, paths
-
-
-def _build_nwm_retro_streamflow_urls(  # pyright: ignore[reportUnusedFunction]
-    start: datetime,
-    end: datetime,
-    output_dir: Path,
-    domain: str,
-) -> tuple[list[str], list[Path]]:
-    """Build URLs for NWM Retrospective streamflow (CHRTOUT) files."""
-    base_url = "https://noaa-nwm-retrospective-3-0-pds.s3.amazonaws.com"
-    domain_str = _DOMAIN_MAP_RETRO.get(domain, "CONUS")
-
-    urls: list[str] = []
-    paths: list[Path] = []
-    out_dir = output_dir / PathConfig.STREAMFLOW_SUBDIR / "nwm_retro"
-
-    for h in _hour_range(start, end):
-        dt = start + timedelta(hours=h)
-        year = dt.strftime("%Y")
-        stamp = dt.strftime("%Y%m%d%H") + "00"
-
-        url = f"{base_url}/{domain_str}/netcdf/CHRTOUT/{year}/{stamp}.CHRTOUT_DOMAIN1"
-        urls.append(url)
-        paths.append(out_dir / f"{stamp}.CHRTOUT_DOMAIN1")
-
-        # Hawaii has 15-minute sub-hourly data
-        if domain == "hawaii":
-            for minute in (15, 30, 45):
-                stamp_sub = dt.strftime("%Y%m%d%H") + f"{minute:02d}"
-                url_sub = f"{base_url}/Hawaii/netcdf/CHRTOUT/{year}/{stamp_sub}.CHRTOUT_DOMAIN1"
-                urls.append(url_sub)
-                paths.append(out_dir / f"{stamp_sub}.CHRTOUT_DOMAIN1")
 
     return urls, paths
 
@@ -674,7 +645,7 @@ def validate_date_ranges(
         if error:
             errors.append(error)
 
-    if coastal_source != "tpxo":
+    if coastal_source != "harmonic":
         coastal_range = get_date_range(coastal_source, domain)
         if coastal_range:
             error = coastal_range.validate(start_time, end_time)
@@ -724,7 +695,7 @@ def download_data(
     hydro_source: HydroSource = "nwm",
     coastal_source: CoastalSource = "stofs",
     glofs_model: GLOFSModel = "leofs",
-    tpxo_local_path: Path | str | None = None,
+    tidal_atlas_path: Path | str | None = None,
     timeout: int = 600,
     raise_on_error: bool = False,
 ) -> DownloadResults:
@@ -747,16 +718,17 @@ def download_data(
     hydro_source : {"nwm", "ngen"}, optional
         Hydrology data source: ``nwm`` or ``ngen``.
         Defaults to ``nwm``.
-    coastal_source : {"tpxo", "stofs", "glofs"}, optional
-        Coastal water level source: ``tpxo``, ``stofs``, or ``glofs``.
-        Defaults to ``stofs``.
+    coastal_source : {"harmonic", "stofs", "glofs"}, optional
+        Coastal water level source: ``harmonic`` (predict locally from
+        a tidal atlas), ``stofs``, or ``glofs``. Defaults to ``stofs``.
     glofs_model : {"leofs", "loofs", "lsofs", "lmhofs"}, optional
         GLOFS model (only used if ``coastal_source`` is ``glofs``):
         ``leofs``, ``loofs``, ``lsofs``, or ``lmhofs``.
         Defaults to ``leofs``.
-    tpxo_local_path : str or pathlib.Path, optional
-        Local path to TPXO data (TPXO cannot be downloaded).
-        Defaults to ``None``.
+    tidal_atlas_path : str or pathlib.Path, optional
+        Local path to the tidal atlas directory. Required when
+        ``coastal_source == "harmonic"``; the atlas cannot be
+        downloaded. Defaults to ``None``.
     timeout : int, optional
         Download timeout in seconds, defaults to 600.
     raise_on_error : bool, optional
@@ -782,7 +754,7 @@ def download_data(
     start = to_naive_utc(pd.to_datetime(start_time).to_pydatetime())
     end = to_naive_utc(pd.to_datetime(end_time).to_pydatetime())
     out_dir = Path(output_dir)
-    tpxo_path = Path(tpxo_local_path) if tpxo_local_path else None
+    atlas_path = Path(tidal_atlas_path) if tidal_atlas_path else None
 
     errors = validate_date_ranges(start, end, meteo_source, coastal_source, domain)
     if errors:
@@ -809,27 +781,27 @@ def download_data(
             urls, paths, f"hydro/{hydro_source}", timeout, raise_on_error
         )
 
-    if coastal_source == "tpxo":
-        if tpxo_path is None:
+    if coastal_source == "harmonic":
+        if atlas_path is None:
             coastal_result = DownloadResult(
-                source="coastal/tpxo",
+                source="coastal/harmonic",
                 total_files=1,
                 failed=1,
-                errors=["TPXO data requires local installation. Set tpxo_local_path."],
+                errors=["Tidal atlas requires local installation. Set tidal_atlas_path."],
             )
-        elif not tpxo_path.exists():
+        elif not atlas_path.exists():
             coastal_result = DownloadResult(
-                source="coastal/tpxo",
+                source="coastal/harmonic",
                 total_files=1,
                 failed=1,
-                errors=[f"TPXO local path not found: {tpxo_path}"],
+                errors=[f"Tidal atlas not found: {atlas_path}"],
             )
         else:
             coastal_result = DownloadResult(
-                source="coastal/tpxo",
+                source="coastal/harmonic",
                 total_files=1,
                 successful=1,
-                file_paths=[tpxo_path],
+                file_paths=[atlas_path],
             )
     elif coastal_source == "stofs":
         urls, paths = _build_stofs_urls(start, out_dir)

@@ -404,9 +404,15 @@ class SchismDischargeStage(WorkflowStage):
 
     def run(self) -> dict[str, Any]:
         """Stage streamflow data and produce ``source.nc``."""
-        discharge_file = self.model.discharge_file
+        discharge_file = self.model.resolved_discharge_file
         if discharge_file is None:
-            self._log("No discharge_file configured, skipping")
+            # Reachable only via the auto-discovery path (unset
+            # discharge_file + no nwmReaches.csv in prebuilt_dir).
+            # Explicit-but-missing is caught earlier by validate().
+            self._log(
+                "No discharge file (set discharge_file or place "
+                "nwmReaches.csv in prebuilt_dir to enable); skipping"
+            )
             return {"status": "skipped"}
 
         from coastal_calibration.schism import NWMSCHISMProject

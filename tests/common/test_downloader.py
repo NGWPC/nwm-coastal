@@ -16,7 +16,6 @@ from coastal_calibration.data.downloader import (
     _build_nwm_ana_forcing_urls,
     _build_nwm_ana_streamflow_urls,
     _build_nwm_retro_forcing_urls,
-    _build_nwm_retro_streamflow_urls,
     _build_stofs_urls,
     _execute_download,
     _hour_range,
@@ -142,10 +141,10 @@ class TestGetDateRange:
 
 
 class TestGetOverlappingRange:
-    def test_retro_tpxo_returns_meteo_range(self):
-        overlap = get_overlapping_range("nwm_retro", "tpxo", "conus")
+    def test_retro_harmonic_returns_meteo_range(self):
+        overlap = get_overlapping_range("nwm_retro", "harmonic", "conus")
         assert overlap is not None
-        # TPXO doesn't constrain range
+        # Harmonic tide prediction doesn't constrain the date range
         meteo = get_date_range("nwm_retro", "conus")
         assert overlap.start == meteo.start
 
@@ -173,7 +172,7 @@ class TestGetDefaultSources:
     def test_pacific(self):
         meteo, boundary, start = get_default_sources("pacific")
         assert meteo in ("nwm_retro", "nwm_ana")
-        assert boundary in ("stofs", "tpxo")
+        assert boundary in ("stofs", "harmonic")
         assert isinstance(start, datetime)
 
     def test_hawaii(self):
@@ -262,20 +261,6 @@ class TestBuildUrls:
         end = datetime(2010, 1, 1, 1)
         urls, _paths = _build_nwm_retro_forcing_urls(start, end, tmp_path, "hawaii")
         assert "Hawaii" in urls[0]
-
-    def test_retro_streamflow_urls(self, tmp_path):
-        start = datetime(2021, 6, 11, 0)
-        end = datetime(2021, 6, 11, 1)
-        urls, _paths = _build_nwm_retro_streamflow_urls(start, end, tmp_path, "conus")
-        assert len(urls) == 1
-        assert "CHRTOUT" in urls[0]
-
-    def test_retro_streamflow_urls_hawaii_subhourly(self, tmp_path):
-        start = datetime(2010, 1, 1, 0)
-        end = datetime(2010, 1, 1, 1)
-        urls, _paths = _build_nwm_retro_streamflow_urls(start, end, tmp_path, "hawaii")
-        # Hawaii has 4 files per hour (hourly + 15/30/45 min)
-        assert len(urls) == 4
 
     def test_ana_forcing_urls(self, tmp_path):
         start = datetime(2023, 1, 1, 0)
@@ -484,17 +469,17 @@ class TestValidateDateRanges:
             datetime(1970, 1, 1),
             datetime(1970, 2, 1),
             "nwm_retro",
-            "tpxo",
+            "harmonic",
             "conus",
         )
         assert len(errors) > 0
 
-    def test_tpxo_skips_coastal_validation(self):
+    def test_harmonic_skips_coastal_validation(self):
         errors = validate_date_ranges(
             datetime(2021, 6, 11),
             datetime(2021, 6, 12),
             "nwm_retro",
-            "tpxo",
+            "harmonic",
             "conus",
         )
         assert len(errors) == 0

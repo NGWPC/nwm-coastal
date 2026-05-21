@@ -81,12 +81,6 @@ optional-dependencies.plot = [
   "shapely>=2",
   "xarray>=2024.1",
 ]
-optional-dependencies.sfincs = [
-  "dotenv",
-  "hydromt>=1.3",
-  "icechunk>=1.0.2",
-  # "hydromt-sfincs>=2.0.0rc1",
-]
 optional-dependencies.test = [
   "coverage[toml]",
   "pytest-cov",
@@ -115,18 +109,17 @@ build.targets.wheel.packages = [
 version.source = "vcs"
 
 [tool.pixi.environments]
-test311-common = { features = [ "test", "test-common", "py311" ] }
-test311-sfincs = { features = [ "test", "test-sfincs", "sfincs", "plot", "py311" ] }
-test311-schism = { features = [ "test", "test-schism", "schism", "plot", "py311" ] }
-test313-common = { features = [ "test", "test-common", "py313" ] }
-test313-sfincs = { features = [ "test", "test-sfincs", "sfincs", "plot", "py313" ] }
-test313-schism = { features = [ "test", "test-schism", "schism", "plot", "py313" ] }
-test311 = { features = [ "test", "test311", "schism", "sfincs", "plot", "py311" ] }
-test313 = { features = [ "test", "test313", "schism", "sfincs", "plot", "py313" ] }
-dev = { features = [ "dev", "schism", "sfincs", "plot", "test", "py313" ] }
-schism = { features = [ "schism", "plot", "py313" ] }
-sfincs = { features = [ "sfincs", "plot", "py313" ] }
-typecheck = { features = [ "typecheck", "schism", "sfincs", "plot", "test", "py313" ] }
+# `dev` installs every binary (SCHISM, SFINCS, predict_tide) and every
+# Python dep needed to develop, test, and run the package. Cluster
+# wrappers under docs/getting-started/cluster-install.md activate
+# `.pixi/envs/dev/` directly, so this env name is load-bearing.
+# Run tasks here with `pixi r -e dev <task>`.
+dev = { features = [ "dev", "models", "plot", "test", "py313" ] }
+# CI matrix across Python versions; same composition as dev minus the
+# notebook/changelog tooling. CI runs `pixi r -e test311 test` etc.
+test311 = { features = [ "test", "models", "plot", "py311" ] }
+test313 = { features = [ "test", "models", "plot", "py313" ] }
+typecheck = { features = [ "typecheck", "models", "plot", "test", "py313" ] }
 lint = { features = [ "lint", "py313" ], no-default-feature = true }
 docs = { features = [ "docs", "py313" ] }
 
@@ -157,6 +150,33 @@ lint = "pre-commit run --all-files"
 pcupdate = "pre-commit autoupdate"
 spell = "codespell -w"
 
+[tool.pixi.feature.models.dependencies]
+# Coastal model binaries and their MPI/ESMF dependencies, built from the
+# bundled sources under coastal_models/. Tide predictions are handled in
+# pure Python via pyTMD (see models.pypi-dependencies below) — no Fortran
+# tide binary is bundled or required.
+schism = { path = "coastal_models/schism" }
+sfincs = { path = "coastal_models/sfincs" }
+# Force MPI (OpenMPI) build variants so ESMF/esmpy runs with parallel support.
+# Without the build constraint, conda-forge resolves the nompi variants.
+# On WCOSS2, system Cray MPICH is used via schism_exe + build_isolated_env.
+mpi = { version = "*", build = "openmpi" }
+openmpi = "*"
+esmf = { version = "*", build = "mpi_openmpi_*" }
+esmpy = "*"
+mpi4py = "*"
+
+[tool.pixi.feature.models.pypi-dependencies]
+hydromt-sfincs = { git = "https://github.com/Deltares/hydromt_sfincs", rev = "41aac0a3980fc2714ec28eafb0463d40abfc979a" }
+hydromt = ">=1.3"
+icechunk = ">=1.0.2"
+dotenv = "*"
+# Pure-Python tide predictor; reads TPXO/FES/GOT/EOT atlas files and
+# generates elev2D.th.nc / SFINCS bzs forcing. Replaces the bundled
+# OTPSnc Fortran `predict_tide` binary.
+pyTMD = ">=3"
+timescale = "*"
+
 [tool.pixi.feature.plot.dependencies]
 proj = "*"
 libgdal-core = "*"
@@ -182,28 +202,21 @@ libnetcdf = "*"
 netcdf4 = { version = "*", build = "mpi_openmpi_*" }
 netcdf-fortran = { version = "*", build = "mpi_openmpi_*" }
 
-[tool.pixi.feature.schism.dependencies]
-schism = { path = "coastal_models/schism" }
-# Force MPI (OpenMPI) build variants so ESMF/esmpy runs with parallel support.
-# Without the build constraint, conda-forge resolves the nompi variants.
-# On WCOSS2, system Cray MPICH is used via schism_exe + build_isolated_env.
-mpi = { version = "*", build = "openmpi" }
-openmpi = "*"
-esmf = { version = "*", build = "mpi_openmpi_*" }
-esmpy = "*"
-mpi4py = "*"
-
-[tool.pixi.feature.sfincs.dependencies]
-sfincs = { path = "coastal_models/sfincs" }
-
-[tool.pixi.feature.sfincs.pypi-dependencies]
-hydromt-sfincs = { git = "https://github.com/Deltares/hydromt_sfincs", rev = "41aac0a3980fc2714ec28eafb0463d40abfc979a" }
-
-[tool.pixi.feature.test-common.tasks]
-# Each per-env task writes its coverage data into a uniquely-named file
-# (.coverage.common / .coverage.schism / .coverage.sfincs) so a CI
-# matrix can aggregate them via `coverage combine`. Within a single
-# env the `report` and `html` tasks read that env's own file.
+[tool.pixi.feature.test.tasks]
+# `test` runs the full suite and produces a single .coverage file plus
+# junit.xml. The targeted `test-common` / `test-schism` / `test-sfincs`
+# tasks each scope pytest to one subdirectory and write their own
+# coverage file (.coverage.common / .coverage.schism / .coverage.sfincs)
+# so a CI matrix can later aggregate them via `coverage combine`.
+test = { cmd = [
+  "pytest",
+  "tests/",
+  "--ignore=tests/legacy_scripts",
+  "--cov",
+  "--cov-branch",
+  "--junitxml=junit.xml",
+  "--durations=5",
+] }
 test-common = { cmd = [
   "pytest",
   "tests/common",
@@ -212,10 +225,6 @@ test-common = { cmd = [
   "--junitxml=junit-common.xml",
   "--durations=5",
 ], env = { COVERAGE_FILE = ".coverage.common" } }
-report = { cmd = "coverage report", env = { COVERAGE_FILE = ".coverage.common" }, depends-on = [ "test-common" ] }
-html = { cmd = "coverage html", env = { COVERAGE_FILE = ".coverage.common" }, depends-on = [ "report" ] }
-
-[tool.pixi.feature.test-schism.tasks]
 test-schism = { cmd = [
   "pytest",
   "tests/schism",
@@ -224,10 +233,6 @@ test-schism = { cmd = [
   "--junitxml=junit-schism.xml",
   "--durations=5",
 ], env = { COVERAGE_FILE = ".coverage.schism" } }
-report = { cmd = "coverage report", env = { COVERAGE_FILE = ".coverage.schism" }, depends-on = [ "test-schism" ] }
-html = { cmd = "coverage html", env = { COVERAGE_FILE = ".coverage.schism" }, depends-on = [ "report" ] }
-
-[tool.pixi.feature.test-sfincs.tasks]
 test-sfincs = { cmd = [
   "pytest",
   "tests/sfincs",
@@ -236,41 +241,8 @@ test-sfincs = { cmd = [
   "--junitxml=junit-sfincs.xml",
   "--durations=5",
 ], env = { COVERAGE_FILE = ".coverage.sfincs" } }
-report = { cmd = "coverage report", env = { COVERAGE_FILE = ".coverage.sfincs" }, depends-on = [ "test-sfincs" ] }
-html = { cmd = "coverage html", env = { COVERAGE_FILE = ".coverage.sfincs" }, depends-on = [ "report" ] }
-
-[tool.pixi.feature.test311.tasks]
-# `test` runs every test suite at once against an env that has all
-# features (schism + sfincs + plot) installed, producing a single
-# .coverage file. `report` and `html` then chain off it so that
-# `pixi r html` runs tests + report + html in one go.
-test = { cmd = [
-  "pytest",
-  "tests/",
-  "--ignore=tests/legacy_scripts",
-  "--cov",
-  "--cov-branch",
-  "--junitxml=junit.xml",
-  "--durations=5",
-] }
 report = { cmd = "coverage report && coverage xml", depends-on = [ "test" ] }
 html = { cmd = "coverage html", depends-on = [ "report" ] }
-
-[tool.pixi.feature.test313.tasks]
-test = { cmd = [
-  "pytest",
-  "tests/",
-  "--ignore=tests/legacy_scripts",
-  "--cov",
-  "--cov-branch",
-  "--junitxml=junit.xml",
-  "--durations=5",
-] }
-report = { cmd = "coverage report && coverage xml", depends-on = [ "test" ] }
-html = { cmd = "coverage html", depends-on = [ "report" ] }
-
-[tool.pixi.feature.typecheck.pypi-dependencies]
-hydromt-sfincs = { git = "https://github.com/Deltares/hydromt_sfincs", rev = "41aac0a3980fc2714ec28eafb0463d40abfc979a" }
 
 [tool.pixi.feature.typecheck.tasks]
 typecheck = "pyright"
@@ -405,14 +377,6 @@ lint.per-file-ignores."src/coastal_calibration/schism/subsetter.py" = [
   "PLR0912",
   "PLR0915",
 ]
-lint.per-file-ignores."src/coastal_calibration/tides/pytides/*.py" = [
-  # vendored: unused-arg checks would be noisy across the legacy API surface
-  "ARG001",
-  "ARG002",
-  # scientific naming conventions (tidal constituents: f_M2, u_K1, etc.)
-  "N802",
-  "N806",
-]
 lint.per-file-ignores."tests/**/*.py" = [
   # pytest fixtures, monkeypatch lambdas, and signature-matching mocks
   # routinely accept parameters they don't use; ARG would fire on every
@@ -460,7 +424,7 @@ expand_tables = [ "tool.pixi", "tool.git-cliff" ]
 [tool.pyright]
 pythonVersion = "3.11"
 include = [ "src" ]
-ignore = [ "src/coastal_calibration/tides/pytides/*.py", "tests/" ]
+ignore = [ "tests/" ]
 typeCheckingMode = "strict"
 reportMissingSuperCall = false
 reportMissingTypeStubs = false
@@ -516,7 +480,6 @@ report.ignore_errors = true
 report.omit = [
   "**/__init__.py",
   "*/legacy_scripts/*",
-  "src/coastal_calibration/tides/*",
 ]
 
 [tool.vulture]
@@ -530,8 +493,6 @@ exclude = [
   # Frozen reference implementations from the pre-pixi era; not part of
   # the live codebase.
   "tests/legacy_scripts/",
-  # Vendored upstream library; rewrites here would diverge from upstream.
-  "src/coastal_calibration/tides/pytides/",
   # Notebook .py files are jupytext mirrors of .ipynb; cell-level dead
   # code is intentional (e.g. final-cell expressions for display).
   "docs/examples/notebooks/",

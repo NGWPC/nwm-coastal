@@ -222,7 +222,7 @@ def validate(config: Path) -> None:
     "--domain",
     type=str,
     required=True,
-    help="Coastal domain (atlgulf, hi, prvi, pacific, ak).",
+    help="Coastal domain (atlgulf, hawaii, prvi, pacific, alaska).",
 )
 @click.option(
     "--output-dir",
@@ -285,6 +285,71 @@ def prepare_topobathy(
     )
 
 
+@cli.command("prepare-schism-mesh")
+@click.argument(
+    "prebuilt_dir",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+)
+@click.option(
+    "-f",
+    "--force",
+    is_flag=True,
+    help="Overwrite existing hgrid.nc / open_bnds_hgrid.nc.",
+)
+def prepare_schism_mesh(prebuilt_dir: Path, force: bool) -> None:
+    """Convert a SCHISM hgrid.gr3 into ESMF NetCDF mesh files.
+
+    Writes ``hgrid.nc`` and ``open_bnds_hgrid.nc`` into PREBUILT_DIR so the
+    SCHISM run workflow (atmospheric forcing regridding, boundary stages)
+    can locate the ESMF-format mesh.  Required when a SCHISM model directory
+    is hand-assembled or copied without going through the ``create``
+    workflow that would otherwise generate these files.
+    """
+    import numpy as np
+
+    from coastal_calibration.logging import configure_logger
+    from coastal_calibration.schism.project_reader import NWMSCHISMProject
+    from coastal_calibration.schism.subsetter import MeshSubsetter
+
+    configure_logger(level="INFO")
+
+    prebuilt_dir = prebuilt_dir.resolve()
+    hgrid_gr3 = prebuilt_dir / "hgrid.gr3"
+    hgrid_nc = prebuilt_dir / "hgrid.nc"
+    open_bnds_nc = prebuilt_dir / "open_bnds_hgrid.nc"
+
+    if not hgrid_gr3.exists():
+        _raise_cli_error(f"hgrid.gr3 not found in {prebuilt_dir}")
+
+    existing = [p.name for p in (hgrid_nc, open_bnds_nc) if p.exists()]
+    if existing and not force:
+        _raise_cli_error(
+            f"{', '.join(existing)} already exist in {prebuilt_dir}. Pass --force to overwrite."
+        )
+
+    try:
+        project = NWMSCHISMProject(prebuilt_dir, validate=False)
+        boundaries = project.read_boundaries()
+        subsetter = MeshSubsetter(
+            project,
+            np.array([], dtype=np.int64),
+            np.array([], dtype=np.int64),
+        )
+        stats = subsetter.write_esmf_netcdf(prebuilt_dir, boundaries)
+    except Exception as e:
+        _raise_cli_error(str(e))
+        return  # unreachable, but helps type-checkers
+
+    click.echo(f"\nWrote:   {hgrid_nc}")
+    click.echo(f"         {open_bnds_nc}")
+    click.echo(
+        f"\n  nodes:                 {stats['n_nodes']:,}"
+        f"\n  elements:              {stats['n_elements']:,}"
+        f"\n  max nodes per element: {stats['max_nodes_per_element']}"
+        f"\n  open boundary nodes:   {stats['n_open_bnd_nodes']:,}"
+    )
+
+
 @cli.command()
 @click.argument(
     "output",
@@ -292,7 +357,7 @@ def prepare_topobathy(
 )
 @click.option(
     "--domain",
-    type=click.Choice(["prvi", "hawaii", "atlgulf", "pacific"]),
+    type=click.Choice(["prvi", "hawaii", "atlgulf", "pacific", "alaska"]),
     default="pacific",
     help="Coastal domain.",
 )
@@ -448,7 +513,7 @@ def stages(model: str | None) -> None:
         ("schism_sflux", "Generate sflux atmospheric files"),
         ("schism_params", "Create param.nml and symlink mesh files"),
         ("schism_obs", "Add NOAA observation stations"),
-        ("schism_boundary", "Generate boundary conditions (TPXO/STOFS)"),
+        ("schism_boundary", "Generate boundary conditions (harmonic tide / STOFS)"),
         ("schism_prep", "Prepare SCHISM inputs (discharge, partitioning)"),
         ("schism_run", "Run SCHISM model (MPI)"),
         ("schism_postprocess", "Post-process SCHISM outputs"),

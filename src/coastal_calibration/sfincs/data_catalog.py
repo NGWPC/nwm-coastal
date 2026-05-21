@@ -653,7 +653,7 @@ def generate_data_catalog(
     include_coastal : bool, optional
         Include coastal water level data entry. Default is True.
     coastal_source : CoastalSource, optional
-        Coastal data source (stofs, glofs, tpxo). If None, uses config.boundary.source.
+        Coastal data source (stofs, glofs, harmonic). If None, uses config.boundary.source.
     glofs_model : str, optional
         GLOFS model name if using GLOFS coastal source. Default is "leofs".
 
@@ -693,9 +693,10 @@ def generate_data_catalog(
             coastal_entry = _build_coastal_stofs_entry(sim)
         elif effective_coastal_source == "glofs":
             coastal_entry = _build_coastal_glofs_entry(sim, glofs_model)
-        elif effective_coastal_source == "tpxo":
-            # TPXO forcing is handled directly by SfincsForcingStage
-            # using predict_tide, not via the HydroMT data catalog.
+        elif effective_coastal_source == "harmonic":
+            # Harmonic-tide forcing is handled directly by
+            # SfincsForcingStage via pyTMD, not via the HydroMT data
+            # catalog.
             coastal_entry = None
         else:
             coastal_entry = None

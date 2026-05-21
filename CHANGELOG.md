@@ -8,6 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **schism**: Wire pyTMD harmonic boundary; add scribes counting and discharge gating
+- **alaska**: Add initial Alaska domain support
+- **sflux**: Subset atmospheric forcing to SCHISM mesh footprint
+
+### Changed
+
+- **tides**: Replace ambiguous multiplication sign in log strings
+- **tides**: Apply ruff-format to data/tides.py
+- **sfincs**: Switch boundary forcing to pyTMD harmonic predictor
+- **tides**: Replace pytides+OTPSnc with pyTMD predictor; consolidate pixi envs
+
+## [3.1.2.0.0-rc2] - 2026-05-16
+
+### Added
+
 - **sfincs**: Add NOAA CRM topobathy and make obs-point snap configurable
 
 ### Changed
@@ -171,6 +186,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **docs**: Resolve LICENSE rendering and add manual version deploy
 - Address PR review comments for SFINCS creation workflow
 - Remove duplicate [0.2.0] section from CHANGELOG auto-merge
+
+### New Contributors
+
+- @miguelp1986 made their first contribution in [#28](https://github.com/NGWPC/nwm-coastal/pull/28)
 ## [3.1.1.0.0] - 2026-02-26
 
 ### Added
@@ -293,7 +312,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Use 4326 for stofs data and drop adcirc related vars
 - Replace the code object so pydantic picks it up
 - Monkey patch hydromt's _serialize_crs for cases where crs is proj without authority
-- Add crs info for all supported data sources
+- Add crs info for all supported data sources by @cheginit
 - Add the missing cd step for submit for sfincs models
 - When submit was used for a sfincs model, the container download step was not run
 - Pass the package name so version is identified correctly
@@ -374,7 +393,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Use 4326 for stofs data and drop adcirc related vars
 - Replace the code object so pydantic picks it up
 - Monkey patch hydromt's _serialize_crs for cases where crs is proj without authority
-- Add crs info for all supported data sources
+- Add crs info for all supported data sources by @cheginit
 - Add the missing cd step for submit for sfincs models
 - When submit was used for a sfincs model, the container download step was not run
 - Pass the package name so version is identified correctly
@@ -405,7 +424,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Use a more robust approach for find the stofs path when an old file still exists.
 - Include the date for stofs in the download path since when the start date is changed using skip would have caused using a stale stofs file.
 - Fix the dates for nwm_ana. There were changes in the file names at certain periods.
-[unreleased]: <https://github.com///compare/3.1.2.0.0-rc1...HEAD>
-[3.1.2.0.0-rc1]: <https://github.com///compare/3.1.1.0.0...3.1.2.0.0-rc1>
-[3.1.1.0.0]: <https://github.com///releases/tag/3.1.1.0.0>
+
+### New Contributors
+
+- @cheginit made their first contribution
+- @cmaynard-ngwpc made their first contribution
+- @jduckerOWP made their first contribution
+- @christophertubbs made their first contribution
+[3.1.2.0.0-rc2]: <https://github.com/NGWPC/nwm-coastal/compare/3.1.2.0.0-rc1...3.1.2.0.0-rc2>
+[3.1.2.0.0-rc1]: <https://github.com/NGWPC/nwm-coastal/compare/3.1.1.0.0...3.1.2.0.0-rc1>
+[3.1.1.0.0]: <https://github.com/NGWPC/nwm-coastal/releases/tag/3.1.1.0.0>
 
