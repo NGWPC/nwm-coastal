@@ -253,7 +253,7 @@ def write_schism_boundary(
     coords = _read_open_bnd_coords(grid_file)
     n_bnd = coords.shape[0]
     logger.info(
-        "    pyTMD tide predict: %d nodes × %d steps at %d s cadence from %s (model=%s)",
+        "    pyTMD tide predict: %d nodes x %d steps at %d s cadence from %s (model=%s)",
         n_bnd,
         nsteps,
         time_step_seconds,
@@ -351,7 +351,7 @@ def extend_schism_boundary(
         return
 
     logger.info(
-        "    pyTMD tidal fill: %d nodes × %d steps at %d s cadence from hour %d (model=%s)",
+        "    pyTMD tidal fill: %d nodes x %d steps at %d s cadence from hour %d (model=%s)",
         n_bnd,
         n_fill,
         dt_s,
