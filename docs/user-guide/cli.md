@@ -84,48 +84,9 @@ Or with errors:
   - Simulation dates outside nwm_ana range (2018-09-17 to present)
 ```
 
-### submit
-
-Submit a workflow as a SLURM job. Python-only stages run on the login node; container
-stages are submitted as a SLURM job. The same stage pipeline is used as the `run`
-command.
-
-```bash
-coastal-calibration submit <config> [OPTIONS]
-```
-
-**Arguments:**
-
-| Argument | Description                    |
-| -------- | ------------------------------ |
-| `config` | Path to the configuration file |
-
-**Options:**
-
-| Option                | Description                          | Default |
-| --------------------- | ------------------------------------ | ------- |
-| `--interactive`, `-i` | Wait for job completion with updates | False   |
-| `--start-from`        | Stage to start from (skip earlier)   | First   |
-| `--stop-after`        | Stage to stop after (skip later)     | Last    |
-
-**Examples:**
-
-```bash
-# Submit and return immediately
-coastal-calibration submit config.yaml
-
-# Submit and wait for completion
-coastal-calibration submit config.yaml --interactive
-coastal-calibration submit config.yaml -i
-
-# Submit partial pipeline
-coastal-calibration submit config.yaml --start-from boundary_conditions -i
-coastal-calibration submit config.yaml --stop-after post_forcing
-```
-
 ### run
 
-Run the workflow directly (for testing or inside a SLURM job).
+Run the workflow directly (inside a SLURM job or for local testing).
 
 ```bash
 coastal-calibration run <config> [OPTIONS]
@@ -148,15 +109,15 @@ coastal-calibration run <config> [OPTIONS]
 **Available Stages (SCHISM):**
 
 - `download`
-- `pre_forcing`
-- `nwm_forcing`
-- `post_forcing`
-- `update_params`
+- `schism_forcing_prep`
+- `schism_forcing`
+- `schism_sflux`
+- `schism_params`
 - `schism_obs`
-- `boundary_conditions`
-- `pre_schism`
+- `schism_boundary`
+- `schism_prep`
 - `schism_run`
-- `post_schism`
+- `schism_postprocess`
 - `schism_plot`
 
 **Available Stages (SFINCS):**
@@ -167,13 +128,13 @@ coastal-calibration run <config> [OPTIONS]
 - `sfincs_init`
 - `sfincs_timing`
 - `sfincs_forcing`
-- `sfincs_obs`
 - `sfincs_discharge`
 - `sfincs_precip`
 - `sfincs_wind`
 - `sfincs_pressure`
 - `sfincs_write`
 - `sfincs_run`
+- `sfincs_floodmap`
 - `sfincs_plot`
 
 **Examples:**
@@ -183,7 +144,7 @@ coastal-calibration run <config> [OPTIONS]
 coastal-calibration run config.yaml
 
 # Run only forcing stages (SCHISM)
-coastal-calibration run config.yaml --start-from pre_forcing --stop-after post_forcing
+coastal-calibration run config.yaml --start-from schism_forcing_prep --stop-after schism_sflux
 
 # Run only the model build (SFINCS)
 coastal-calibration run config.yaml --stop-after sfincs_write
@@ -192,7 +153,7 @@ coastal-calibration run config.yaml --stop-after sfincs_write
 coastal-calibration run config.yaml --start-from sfincs_run
 ```
 
-#### Using `run` Inside a SLURM Job — Heredoc (Recommended)
+#### Using `run` Inside a SLURM Job: Heredoc (Recommended)
 
 The recommended way to run workflows on a cluster is to write an `sbatch` script with an
 inline YAML configuration using a heredoc. This keeps everything in a single,
@@ -234,8 +195,8 @@ Key points:
 - **Use the full NFS path**: Compute nodes may not have `coastal-calibration` in their
     `PATH`. Using the full path to the wrapper on the shared filesystem ensures the
     command is always found.
-- **Use `run`, not `submit`**: Inside a SLURM job, `run` executes all stages locally on
-    the allocated nodes. Using `submit` would create a nested SLURM job.
+- **`run` executes all stages sequentially**: All stages execute locally on the
+    allocated nodes.
 - **Use `$SLURM_JOB_ID` in the config filename**: Ensures uniqueness when multiple jobs
     run concurrently.
 - **Use `<<'EOF'`** (single-quoted heredoc): Prevents shell variable expansion inside
@@ -247,8 +208,117 @@ Key points:
 
 Complete examples for both models are available in `docs/examples/`:
 
-- [`schism.sh`](https://github.com/NGWPC/nwm-coastal/blob/main/docs/examples/schism.sh) — SCHISM multi-node MPI
-- [`sfincs.sh`](https://github.com/NGWPC/nwm-coastal/blob/main/docs/examples/sfincs.sh) — SFINCS single-node OpenMP
+- [`schism.sh`](https://github.com/NGWPC/nwm-coastal/blob/development/docs/examples/schism.sh):
+    SCHISM multi-node MPI
+- [`sfincs.sh`](https://github.com/NGWPC/nwm-coastal/blob/development/docs/examples/sfincs.sh):
+    SFINCS single-node OpenMP
+
+### create
+
+Create a SFINCS quadtree model from an AOI polygon.
+
+```bash
+coastal-calibration create <config> [OPTIONS]
+```
+
+**Arguments:**
+
+| Argument | Description                    |
+| -------- | ------------------------------ |
+| `config` | Path to the configuration file |
+
+**Options:**
+
+| Option         | Description                              | Default |
+| -------------- | ---------------------------------------- | ------- |
+| `--start-from` | Stage to start from                      | First   |
+| `--stop-after` | Stage to stop after                      | Last    |
+| `--dry-run`    | Validate configuration without executing | False   |
+
+**Available Stages:**
+
+- `create_grid`: Create SFINCS grid from AOI polygon
+- `create_fetch_data`: Fetch elevation and land cover data for AOI
+- `create_elevation`: Add elevation and bathymetry data
+- `create_mask`: Create active cell mask
+- `create_boundary`: Create water level boundary cells
+- `create_discharge`: Add NWM discharge source points _(optional)_
+- `create_subgrid`: Create subgrid tables
+- `create_obs`: Add observation points _(optional)_
+- `create_write`: Write SFINCS model to disk
+
+**Examples:**
+
+```bash
+# Run entire creation workflow
+coastal-calibration create create_config.yaml
+
+# Run only up to grid generation
+coastal-calibration create create_config.yaml --stop-after create_grid
+
+# Resume from elevation stage
+coastal-calibration create create_config.yaml --start-from create_elevation
+
+# Dry run to validate config
+coastal-calibration create create_config.yaml --dry-run
+```
+
+### prepare-topobathy
+
+Download a NWS 30 m topobathymetric DEM clipped to an AOI bounding box.
+
+```bash
+coastal-calibration prepare-topobathy <aoi> [OPTIONS]
+```
+
+**Arguments:**
+
+| Argument | Description                                            |
+| -------- | ------------------------------------------------------ |
+| `aoi`    | Path to an AOI polygon file (GeoJSON, Shapefile, etc.) |
+
+**Options:**
+
+| Option         | Description                                               | Default              |
+| -------------- | --------------------------------------------------------- | -------------------- |
+| `--domain`     | Coastal domain (`atlgulf`, `hi`, `prvi`, `pacific`, `ak`) | **required**         |
+| `--output-dir` | Output directory for GeoTIFF + catalog                    | Same as AOI location |
+| `--buffer-deg` | BBox buffer in degrees                                    | 0.1                  |
+
+**Examples:**
+
+```bash
+# Download DEM for Atlantic/Gulf domain
+coastal-calibration prepare-topobathy aoi.geojson --domain atlgulf
+
+# Download to a specific directory
+coastal-calibration prepare-topobathy aoi.geojson --domain prvi --output-dir ./dem_data
+```
+
+### update-dem-index
+
+Rebuild the NOAA DEM spatial index from S3 STAC metadata.
+
+```bash
+coastal-calibration update-dem-index [OPTIONS]
+```
+
+**Options:**
+
+| Option           | Description                                               | Default           |
+| ---------------- | --------------------------------------------------------- | ----------------- |
+| `--output`       | Write index to this path instead of the packaged location | Packaged location |
+| `--max-datasets` | Limit S3 scan to N datasets (for testing)                 | All               |
+
+**Examples:**
+
+```bash
+# Rebuild the packaged index
+coastal-calibration update-dem-index
+
+# Write to a custom path
+coastal-calibration update-dem-index --output ./my_index.json
+```
 
 ### stages
 
@@ -260,14 +330,16 @@ coastal-calibration stages [OPTIONS]
 
 **Options:**
 
-| Option    | Description                      | Default  |
-| --------- | -------------------------------- | -------- |
-| `--model` | Show stages for a specific model | Show all |
+| Option    | Description                               | Default  |
+| --------- | ----------------------------------------- | -------- |
+| `--model` | Show stages for a specific model/workflow | Show all |
+
+Valid `--model` values: `schism`, `sfincs`, `create`.
 
 **Examples:**
 
 ```bash
-# List all stages for both models
+# List all stages for all workflows
 coastal-calibration stages
 
 # List only SCHISM stages
@@ -275,6 +347,9 @@ coastal-calibration stages --model schism
 
 # List only SFINCS stages
 coastal-calibration stages --model sfincs
+
+# List only creation stages
+coastal-calibration stages --model create
 ```
 
 **Output (all):**
@@ -282,32 +357,43 @@ coastal-calibration stages --model sfincs
 ```console
 SCHISM workflow stages:
   1. download: Download NWM/STOFS data (optional)
-  2. pre_forcing: Prepare NWM forcing data
-  3. nwm_forcing: Generate atmospheric forcing (MPI)
-  4. post_forcing: Post-process forcing data
-  5. update_params: Create SCHISM param.nml
+  2. schism_forcing_prep: Prepare NWM forcing data
+  3. schism_forcing: Generate atmospheric forcing (MPI)
+  4. schism_sflux: Generate sflux atmospheric files
+  5. schism_params: Create SCHISM param.nml
   6. schism_obs: Add NOAA observation stations
-  7. boundary_conditions: Generate boundary conditions (TPXO/STOFS)
-  8. pre_schism: Prepare SCHISM inputs
+  7. schism_boundary: Generate boundary conditions (TPXO/STOFS)
+  8. schism_prep: Prepare SCHISM inputs
   9. schism_run: Run SCHISM model (MPI)
-  10. post_schism: Post-process SCHISM outputs
+  10. schism_postprocess: Post-process SCHISM outputs
   11. schism_plot: Plot simulated vs observed water levels
 
 SFINCS workflow stages:
   1. download: Download NWM/STOFS data (optional)
   2. sfincs_symlinks: Create .nc symlinks for NWM data
   3. sfincs_data_catalog: Generate HydroMT data catalog
-  4. sfincs_init: Initialise SFINCS model (pre-built)
+  4. sfincs_init: Initialize SFINCS model (pre-built)
   5. sfincs_timing: Set SFINCS timing
   6. sfincs_forcing: Add water level forcing
-  7. sfincs_obs: Add observation points
-  8. sfincs_discharge: Add discharge sources
-  9. sfincs_precip: Add precipitation forcing
-  10. sfincs_wind: Add wind forcing
-  11. sfincs_pressure: Add atmospheric pressure forcing
-  12. sfincs_write: Write SFINCS model
-  13. sfincs_run: Run SFINCS model (Singularity)
+  7. sfincs_discharge: Add discharge sources
+  8. sfincs_precip: Add precipitation forcing
+  9. sfincs_wind: Add wind forcing
+  10. sfincs_pressure: Add atmospheric pressure forcing
+  11. sfincs_write: Write SFINCS model
+  12. sfincs_run: Run SFINCS model (OpenMP)
+  13. sfincs_floodmap: Downscale flood depth map
   14. sfincs_plot: Plot simulated vs observed water levels
+
+SFINCS creation stages (create subcommand):
+  1. create_grid: Create SFINCS grid from AOI polygon
+  2. create_fetch_data: Fetch elevation and land cover data for AOI
+  3. create_elevation: Add elevation and bathymetry data
+  4. create_mask: Create active cell mask
+  5. create_boundary: Create water level boundary cells
+  6. create_discharge: Add NWM discharge source points
+  7. create_subgrid: Create subgrid tables
+  8. create_obs: Add observation points (NOAA CO-OPS, file, inline)
+  9. create_write: Write SFINCS model to disk
 ```
 
 ## Exit Codes
@@ -317,8 +403,7 @@ SFINCS workflow stages:
 | 0    | Success                        |
 | 1    | Configuration validation error |
 | 2    | Runtime error                  |
-| 3    | Job submission failed          |
-| 4    | Job execution failed           |
+| 3    | Runtime error (stage failure)  |
 
 ## Environment Variables
 

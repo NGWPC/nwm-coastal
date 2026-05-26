@@ -1,0 +1,173 @@
+"""Tests for coastal_calibration.runner module."""
+
+from __future__ import annotations
+
+import json
+from datetime import datetime
+
+import pytest
+
+from coastal_calibration.config.schema import SchismModelConfig, SfincsModelConfig
+from coastal_calibration.runner import CoastalCalibRunner, WorkflowResult
+
+
+class TestWorkflowResult:
+    def test_duration_seconds(self):
+        start = datetime(2024, 1, 1, 0, 0, 0)
+        end = datetime(2024, 1, 1, 1, 0, 0)
+        result = WorkflowResult(
+            success=True,
+            job_id=None,
+            start_time=start,
+            end_time=end,
+            stages_completed=["s1"],
+            stages_failed=[],
+            outputs={},
+            errors=[],
+        )
+        assert result.duration_seconds == 3600.0
+
+    def test_duration_seconds_no_end(self):
+        result = WorkflowResult(
+            success=True,
+            job_id=None,
+            start_time=datetime.now(),
+            end_time=None,
+            stages_completed=[],
+            stages_failed=[],
+            outputs={},
+            errors=[],
+        )
+        assert result.duration_seconds is None
+
+    def test_to_dict(self):
+        result = WorkflowResult(
+            success=True,
+            job_id="123",
+            start_time=datetime(2024, 1, 1),
+            end_time=datetime(2024, 1, 1, 1),
+            stages_completed=["s1"],
+            stages_failed=[],
+            outputs={"key": "value"},
+            errors=[],
+        )
+        d = result.to_dict()
+        assert d["success"] is True
+        assert d["job_id"] == "123"
+        assert d["duration_seconds"] == 3600.0
+        assert d["stages_completed"] == ["s1"]
+
+    def test_save(self, tmp_path):
+        result = WorkflowResult(
+            success=True,
+            job_id=None,
+            start_time=datetime(2024, 1, 1),
+            end_time=datetime(2024, 1, 1, 1),
+            stages_completed=[],
+            stages_failed=[],
+            outputs={},
+            errors=[],
+        )
+        path = tmp_path / "result.json"
+        result.save(path)
+        assert path.exists()
+        data = json.loads(path.read_text())
+        assert data["success"] is True
+
+    def test_save_creates_parent_dirs(self, tmp_path):
+        result = WorkflowResult(
+            success=True,
+            job_id=None,
+            start_time=datetime(2024, 1, 1),
+            end_time=None,
+            stages_completed=[],
+            stages_failed=[],
+            outputs={},
+            errors=[],
+        )
+        path = tmp_path / "deep" / "nested" / "result.json"
+        result.save(path)
+        assert path.exists()
+
+
+class TestCoastalCalibRunner:
+    def test_schism_stage_order(self):
+        """SchismModelConfig.stage_order returns the correct SCHISM stages."""
+        expected = [
+            "download",
+            "schism_forcing_prep",
+            "schism_forcing",
+            "schism_sflux",
+            "schism_params",
+            "schism_obs",
+            "schism_boundary",
+            "schism_discharge",
+            "schism_prep",
+            "schism_run",
+            "schism_postprocess",
+            "schism_plot",
+        ]
+        assert expected == SchismModelConfig().stage_order
+
+    def test_sfincs_stage_order(self, tmp_path):
+        """SfincsModelConfig.stage_order returns the correct SFINCS stages."""
+        expected = [
+            "download",
+            "sfincs_symlinks",
+            "sfincs_data_catalog",
+            "sfincs_init",
+            "sfincs_timing",
+            "sfincs_forcing",
+            "sfincs_discharge",
+            "sfincs_precip",
+            "sfincs_wind",
+            "sfincs_pressure",
+            "sfincs_write",
+            "sfincs_run",
+            "sfincs_floodmap",
+            "sfincs_plot",
+        ]
+        assert expected == SfincsModelConfig(prebuilt_dir=tmp_path).stage_order
+
+    def test_stage_order_property(self, sample_config):
+        runner = CoastalCalibRunner(sample_config)
+        # Default model is "schism" -> stage_order comes from SchismModelConfig
+        assert SchismModelConfig().stage_order == runner.STAGE_ORDER
+
+    def test_init(self, sample_config):
+        runner = CoastalCalibRunner(sample_config)
+        assert runner.config is sample_config
+
+    def test_get_stages_to_run_all(self, sample_config):
+        runner = CoastalCalibRunner(sample_config)
+        # download is disabled in sample_config
+        stages = runner._get_stages_to_run(None, None)
+        assert "download" not in stages
+        assert "schism_forcing_prep" in stages
+        assert "schism_postprocess" in stages
+
+    def test_get_stages_to_run_start_from(self, sample_config):
+        runner = CoastalCalibRunner(sample_config)
+        stages = runner._get_stages_to_run("schism_boundary", None)
+        assert "schism_forcing_prep" not in stages
+        assert "schism_boundary" in stages
+        assert stages[0] == "schism_boundary"
+
+    def test_get_stages_to_run_stop_after(self, sample_config):
+        runner = CoastalCalibRunner(sample_config)
+        stages = runner._get_stages_to_run(None, "schism_forcing")
+        assert "schism_forcing" in stages
+        assert "schism_sflux" not in stages
+
+    def test_get_stages_to_run_invalid_stage(self, sample_config):
+        runner = CoastalCalibRunner(sample_config)
+        with pytest.raises(ValueError, match="Unknown stage"):
+            runner._get_stages_to_run("nonexistent", None)
+        with pytest.raises(ValueError, match="Unknown stage"):
+            runner._get_stages_to_run(None, "nonexistent")
+
+    def test_get_stages_with_download_enabled(self, sample_config):
+        sample_config.download.enabled = True
+        runner = CoastalCalibRunner(sample_config)
+        stages = runner._get_stages_to_run(None, None)
+        assert "download" in stages

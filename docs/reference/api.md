@@ -11,14 +11,11 @@ This page provides detailed documentation for the NWM Coastal Python API.
       show_source: true
       members:
         - from_yaml
+        - from_dict
         - to_yaml
         - to_dict
         - validate
         - model
-
-### SlurmConfig
-
-::: coastal_calibration.config.schema.SlurmConfig
 
 ### SimulationConfig
 
@@ -52,7 +49,42 @@ This page provides detailed documentation for the NWM Coastal Python API.
 
 ::: coastal_calibration.config.schema.DownloadConfig
 
-## Workflow Runner
+## SFINCS Creation Configuration
+
+### SfincsCreateConfig
+
+::: coastal_calibration.config.create_schema.SfincsCreateConfig
+    options:
+      show_source: true
+      members:
+        - from_yaml
+        - from_dict
+        - to_yaml
+        - to_dict
+        - validate
+        - stage_order
+
+### GridConfig
+
+::: coastal_calibration.config.create_schema.GridConfig
+
+### ElevationConfig
+
+::: coastal_calibration.config.create_schema.ElevationConfig
+
+### MaskConfig
+
+::: coastal_calibration.config.create_schema.MaskConfig
+
+### SubgridConfig
+
+::: coastal_calibration.config.create_schema.SubgridConfig
+
+### RiverDischargeConfig
+
+::: coastal_calibration.config.create_schema.RiverDischargeConfig
+
+## Workflow Runners
 
 ### CoastalCalibRunner
 
@@ -61,24 +93,91 @@ This page provides detailed documentation for the NWM Coastal Python API.
       show_source: true
       members:
         - validate
-        - submit
+        - run
+
+### SfincsCreator
+
+::: coastal_calibration.sfincs.create.SfincsCreator
+    options:
+      show_source: true
+      members:
         - run
 
 ### WorkflowResult
 
 ::: coastal_calibration.runner.WorkflowResult
 
+## Plotting
+
+### SfincsGridInfo
+
+::: coastal_calibration.sfincs.plotting.SfincsGridInfo
+    options:
+      show_source: true
+      members:
+        - from_model_root
+
+### plot_mesh
+
+::: coastal_calibration.sfincs.plotting.plot_mesh
+
+### plot_floodmap
+
+::: coastal_calibration.sfincs.plotting.plot_floodmap
+
+### plot_station_comparison
+
+::: coastal_calibration.plotting.stations.plot_station_comparison
+
+### plot_water_level
+
+::: coastal_calibration.plotting.spatial.plot_water_level
+
+### animate_water_level
+
+::: coastal_calibration.plotting.animate.animate_water_level
+
+## Output Readers
+
+### load_schism_elevation
+
+::: coastal_calibration.schism.outputs.load_schism_elevation
+
+### load_sfincs_water_level
+
+::: coastal_calibration.sfincs.outputs.load_sfincs_water_level
+
+## Observation Points
+
+### load_obs_points
+
+::: coastal_calibration.observations.load_obs_points
+
+### validate_points_in_domain
+
+::: coastal_calibration.observations.validate_points_in_domain
+
+### extract_water_level_series
+
+::: coastal_calibration.observations.extract_water_level_series
+
+## Flood Depth Map
+
+### create_flood_depth_map
+
+::: coastal_calibration.sfincs.floodmap.create_flood_depth_map
+
 ## Downloader
 
 ### validate_date_ranges
 
-::: coastal_calibration.downloader.validate_date_ranges
+::: coastal_calibration.data.downloader.validate_date_ranges
 
 ## NOAA CO-OPS API
 
 ### COOPSAPIClient
 
-::: coastal_calibration.coops_api.COOPSAPIClient
+::: coastal_calibration.data.coops_api.COOPSAPIClient
     options:
       show_source: true
       members:
@@ -90,11 +189,11 @@ This page provides detailed documentation for the NWM Coastal Python API.
 
 ### query_coops_byids
 
-::: coastal_calibration.coops_api.query_coops_byids
+::: coastal_calibration.data.coops_api.query_coops_byids
 
 ### query_coops_bygeometry
 
-::: coastal_calibration.coops_api.query_coops_bygeometry
+::: coastal_calibration.data.coops_api.query_coops_bygeometry
 
 ## Type Aliases
 
@@ -120,26 +219,20 @@ LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 ### Default Paths
 
 ```python
-DEFAULT_SING_IMAGE_PATH = Path("/ngencerf-app/singularity/ngen-coastal.sif")
-DEFAULT_PARM_DIR = Path("/ngen-test/coastal/ngwpc-coastal")
 DEFAULT_NFS_MOUNT = Path("/ngen-test")
-DEFAULT_CONDA_ENV_NAME = "ngen_forcing_coastal"
-DEFAULT_NWM_DIR = Path("/ngen-app/nwm.v3.0.6")
-DEFAULT_OTPS_DIR = Path("/ngen-app/OTPSnc")
-DEFAULT_SLURM_PARTITION = "c5n-18xlarge"
 ```
 
 ### Default Path Templates
 
 ```python
 DEFAULT_WORK_DIR_TEMPLATE = (
-    "/ngen-test/coastal/${slurm.user}/"
+    "/ngen-test/coastal/${user}/"
     "${model}_${simulation.coastal_domain}_${boundary.source}_${simulation.meteo_source}/"
     "${model}_${simulation.start_date}"
 )
 
 DEFAULT_RAW_DOWNLOAD_DIR_TEMPLATE = (
-    "/ngen-test/coastal/${slurm.user}/"
+    "/ngen-test/coastal/${user}/"
     "${model}_${simulation.coastal_domain}_${boundary.source}_${simulation.meteo_source}/"
     "raw_data"
 )

@@ -1,25 +1,20 @@
 # Quick Start
 
-This guide walks you through running your first coastal simulation using the
-`coastal-calibration` CLI.
+This guide walks you through running your first coastal simulation.
 
 ## Prerequisites
 
-Before starting, ensure you have:
-
-- `coastal-calibration` installed (see [Installation](installation.md))
-- Access to an HPC cluster with SLURM
-- The Singularity image at `/ngencerf-app/singularity/ngen-coastal.sif`
-- Access to the `/ngen-test` NFS mount
+- Pixi installed with the `dev` environment (see [Installation](installation.md))
+- For SCHISM: a pre-built model directory and geogrid file
+- For SFINCS: a pre-built model directory (or create one from an AOI polygon using the
+    `create` workflow)
 
 ## SCHISM Quick Start
 
 ### Step 1: Generate a Configuration File
 
-Create a new configuration file for your simulation:
-
 ```bash
-coastal-calibration init config.yaml --domain hawaii
+pixi r -e dev coastal-calibration init config.yaml --domain hawaii
 ```
 
 This generates a template configuration file with sensible defaults.
@@ -29,46 +24,41 @@ This generates a template configuration file with sensible defaults.
 Open `config.yaml` and set your simulation parameters:
 
 ```yaml
-slurm:
-  job_name: my_schism_run
-
 simulation:
-  start_date: 2021-06-11
-  duration_hours: 24
+  start_date: 2025-11-26
+  duration_hours: 50
   coastal_domain: hawaii
   meteo_source: nwm_ana
 
 boundary:
   source: stofs
+
+model_config:
+  prebuilt_dir: /path/to/schism/model
+  geogrid_file: /path/to/geo_em_HI.nc
+  include_noaa_gages: true
 ```
 
 !!! tip "Minimal Configuration"
 
-    The configuration above is all you need! Paths are automatically generated based on your
-    username, domain, and data sources.
+    For SCHISM, you need to specify `prebuilt_dir` (the pre-built mesh and config files) and
+    `geogrid_file` (for atmospheric forcing regridding). Everything else has sensible
+    defaults.
 
-### Step 3: Validate the Configuration
-
-Before submitting, validate your configuration:
+### Step 3: Validate and Run
 
 ```bash
-coastal-calibration validate config.yaml
+pixi r -e dev coastal-calibration validate config.yaml
+pixi r -e dev coastal-calibration run config.yaml
 ```
 
-This checks for:
+The pipeline executes 11 stages: download, forcing preparation, atmospheric regridding,
+boundary conditions, mesh partitioning, model execution, and validation against NOAA
+observations.
 
-- Required fields
-- Valid date ranges for data sources
-- File and directory existence
-- SLURM configuration validity
+### Running on HPC
 
-### Step 4: Submit the Job
-
-#### Option A: Heredoc sbatch Script (Recommended)
-
-The preferred approach on clusters is to write an `sbatch` script with an inline YAML
-configuration using a heredoc. This keeps the SLURM directives and workflow
-configuration in a single, self-contained file:
+On clusters, write an `sbatch` script with an inline YAML config:
 
 ```bash
 #!/usr/bin/env bash
@@ -85,113 +75,35 @@ cat > "${CONFIG_FILE}" <<'EOF'
 model: schism
 
 simulation:
-  start_date: 2021-01-01
-  duration_hours: 12
+  start_date: 2025-11-26
+  duration_hours: 50
   coastal_domain: hawaii
-  meteo_source: nwm_retro
+  meteo_source: nwm_ana
 
 boundary:
-  source: tpxo
+  source: stofs
 
 model_config:
   include_noaa_gages: true
 EOF
 
-/ngen-test/coastal-calibration/coastal-calibration run "${CONFIG_FILE}"
+coastal-calibration run "${CONFIG_FILE}"
 rm -f "${CONFIG_FILE}"
 ```
 
-Save this as `my_run.sh` and submit with `sbatch my_run.sh`.
-
-!!! tip "Use the full NFS path"
-
-    Compute nodes may not have `coastal-calibration` in their `PATH`. Using the full path to
-    the wrapper on the shared filesystem
-    (`/ngen-test/coastal-calibration/coastal-calibration`) ensures the command is always
-    found.
-
-!!! tip "run vs submit"
-
-    Use `run` (not `submit`) inside sbatch scripts. The `run` command executes all stages
-    locally on the allocated compute nodes. Using `submit` would create a nested SLURM job,
-    which is not what you want.
-
-!!! tip "Unique config filenames"
-
-    The config filename uses `$SLURM_JOB_ID` to avoid collisions when multiple jobs run
-    concurrently.
+Submit with `sbatch my_run.sh`.
 
 !!! tip "Single-quoted heredoc"
 
     Use `<<'EOF'` (single-quoted) to prevent the shell from expanding `$` variables inside
-    the YAML content. This ensures the YAML is written exactly as written.
-
-Complete SCHISM and SFINCS sbatch examples are provided in
-[`docs/examples/`](../examples/).
-
-#### Option B: Submit and Return Immediately
-
-```bash
-coastal-calibration submit config.yaml
-```
-
-This will:
-
-1. Run Python-only pre-job stages on the login node (download, observation stations)
-1. Generate a SLURM job script for container stages
-1. Submit the job and return immediately
-
-```console
-INFO  Running download stage on login node...
-INFO  meteo/nwm_ana: 4/4 [OK]
-INFO  hydro/nwm: 16/16 [OK]
-INFO  coastal/stofs: 1/1 [OK]
-INFO  Total: 21/21 (failed: 0)
-INFO  Download stage completed
-INFO  Job 167 submitted.
-INFO  Check job status with: squeue -j 167
-```
-
-#### Option C: Submit and Wait for Completion
-
-Use the `--interactive` flag to monitor the job until it completes:
-
-```bash
-coastal-calibration submit config.yaml --interactive
-```
-
-#### Option D: Submit a Partial Pipeline
-
-Use `--start-from` and `--stop-after` (same options as `run`) to submit only part of the
-workflow:
-
-```bash
-coastal-calibration submit config.yaml --start-from boundary_conditions -i
-coastal-calibration submit config.yaml --stop-after post_forcing
-```
-
-### Step 5: Check Results
-
-After the job completes, find your outputs in the work directory:
-
-```bash
-ls /ngen-test/coastal/your_username/schism_hawaii_stofs_nwm_ana/schism_2021-06-11/
-```
-
-!!! tip "Compare with NOAA observations"
-
-    Add `include_noaa_gages: true` under `model_config` to automatically discover NOAA
-    CO-OPS water level stations, collect station time-series during the simulation, and
-    generate comparison plots after the run completes. See
-    [Configuration](../user-guide/configuration.md#noaa-observation-stations-include_noaa_gages)
-    for details.
+    the YAML content.
 
 ## SFINCS Quick Start
 
 ### Step 1: Generate a SFINCS Configuration
 
 ```bash
-coastal-calibration init sfincs_config.yaml --domain atlgulf --model sfincs
+pixi r -e dev coastal-calibration init sfincs_config.yaml --domain atlgulf --model sfincs
 ```
 
 ### Step 2: Edit the Configuration
@@ -201,12 +113,9 @@ Set the path to a pre-built SFINCS model:
 ```yaml
 model: sfincs
 
-slurm:
-  job_name: my_sfincs_run
-
 simulation:
-  start_date: 2025-06-01
-  duration_hours: 168
+  start_date: 2024-01-09
+  duration_hours: 60
   coastal_domain: atlgulf
   meteo_source: nwm_ana
 
@@ -217,31 +126,88 @@ model_config:
   prebuilt_dir: /path/to/prebuilt/sfincs/model
 ```
 
-### Step 3: Validate and Submit
+### Step 3: Validate and Run
 
 ```bash
-coastal-calibration validate sfincs_config.yaml
-coastal-calibration submit sfincs_config.yaml --interactive
+pixi r -e dev coastal-calibration validate sfincs_config.yaml
+pixi r -e dev coastal-calibration run sfincs_config.yaml
 ```
 
-## Using the Python API
+## SFINCS Model Creation
+
+The `create` command builds a new SFINCS quadtree model from an AOI polygon, handling
+grid generation, DEM download, elevation, masking, boundary cells, and subgrid tables.
+
+!!! tip "Draw the AOI in QGIS"
+
+    Use the [QGIS Plugin](../user-guide/qgis-plugin.md) to interactively draw your AOI
+    polygon, snap it to watershed divides, select discharge points, and export everything as
+    GeoJSON.
+
+### Step 1: Prepare a Topobathy DEM
+
+```bash
+pixi r -e dev coastal-calibration prepare-topobathy aoi.geojson --domain atlgulf --output-dir ./dem
+```
+
+### Step 2: Write a Creation Config
+
+```yaml
+aoi: aoi.geojson
+output_dir: ./my_sfincs_model
+
+grid:
+  crs: EPSG:32617
+
+elevation:
+  datasets:
+    - name: nws_topobathy
+      zmin: -20000
+
+data_catalog:
+  data_libs:
+    - ./dem/data_catalog.yml
+```
+
+### Step 3: Run the Creation Workflow
+
+```bash
+pixi r -e dev coastal-calibration create create_config.yaml
+```
+
+The output directory will contain a ready-to-run SFINCS model that can be used as
+`prebuilt_dir` in a simulation config.
+
+## Python API
 
 You can also run workflows programmatically:
 
 ```python
 from coastal_calibration import CoastalCalibConfig, CoastalCalibRunner
 
-# Load configuration
 config = CoastalCalibConfig.from_yaml("config.yaml")
-
-# Create runner and submit
 runner = CoastalCalibRunner(config)
-result = runner.submit(wait=True)
+result = runner.run()
 
 if result.success:
-    print(f"Job completed in {result.duration_seconds:.1f}s")
+    print(f"Completed in {result.duration_seconds:.1f}s")
 else:
-    print(f"Job failed: {result.errors}")
+    print(f"Failed: {result.errors}")
+```
+
+### Partial Workflows
+
+Restart from a specific stage or stop early:
+
+```python
+result = runner.run(start_from="schism_forcing_prep", stop_after="schism_sflux")
+```
+
+Or via the CLI:
+
+```bash
+pixi r -e dev coastal-calibration run config.yaml --start-from schism_boundary
+pixi r -e dev coastal-calibration run config.yaml --stop-after schism_sflux
 ```
 
 ## Next Steps
@@ -249,3 +215,7 @@ else:
 - Learn about [Configuration Options](../user-guide/configuration.md)
 - Explore [Workflow Stages](../user-guide/workflow-stages.md)
 - See the [CLI Reference](../user-guide/cli.md)
+- Try the example notebooks: the
+    [Mendocino Walkthrough](../examples/notebooks/walkthrough.ipynb) (end-to-end SCHISM
+    \+ SFINCS comparison) and the [Lavaca Bay SFINCS](../examples/notebooks/lavaca.ipynb)
+    tutorial

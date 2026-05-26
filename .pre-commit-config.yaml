@@ -1,3 +1,4 @@
+exclude: ^legacy-coastal/
 repos:
 - repo: https://github.com/pre-commit/pre-commit-hooks
   rev: v6.0.0
@@ -7,7 +8,9 @@ repos:
   - id: mixed-line-ending
     args: [--fix=lf]
   - id: check-ast
+    exclude: ^docs/examples/notebooks/.*\.py$
   - id: check-builtin-literals
+    exclude: ^docs/examples/notebooks/.*\.py$
   - id: check-case-conflict
   - id: check-docstring-first
   - id: check-shebang-scripts-are-executable
@@ -18,12 +21,14 @@ repos:
   - id: check-yaml
     exclude: mkdocs.yml
   - id: debug-statements
+    exclude: ^docs/examples/notebooks/.*\.py$
   - id: destroyed-symlinks
   - id: detect-private-key
   - id: end-of-file-fixer
     exclude: ^LICENSE|\.(html|csv|txt|svg|py)$
   - id: pretty-format-json
     args: [--autofix, --no-ensure-ascii, --no-sort-keys]
+    exclude: \.ipynb$
   - id: trailing-whitespace
     args: [--markdown-linebreak-ext=md]
     exclude: \.(html|svg)$
@@ -33,9 +38,17 @@ repos:
   hooks:
   - id: ssort
     name: Sort top level statements with ssort
+    exclude: ^docs/examples/notebooks/.*\.py$
+
+- repo: https://github.com/mwouts/jupytext
+  rev: v1.19.3
+  hooks:
+  - id: jupytext
+    args: [--sync]
+    files: ^docs/examples/notebooks/.*\.(py|ipynb)$
 
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.15.2
+  rev: v0.15.13
   hooks:
   - id: ruff
     name: Linting with Ruff
@@ -45,6 +58,26 @@ repos:
     name: Formatting with Ruff
     types_or: [python, jupyter]
 
+- repo: https://github.com/jendrikseipp/vulture
+  rev: v2.16
+  hooks:
+  - id: vulture
+    name: Detect dead code with vulture
+    # Reads paths, min_confidence, exclude, and ignore_* lists from
+    # [tool.vulture] in pyproject.toml. Vulture is silent on a clean
+    # run and prints findings (with file:line) only when something
+    # needs review.
+    pass_filenames: false
+
+- repo: local
+  hooks:
+  - id: nb-clean
+    name: Strip ANSI codes and absolute paths from notebooks
+    entry: python scripts/clean_notebooks.py
+    language: python
+    files: ^docs/examples/notebooks/.*\.ipynb$
+    pass_filenames: true
+
 - repo: https://github.com/PyCQA/doc8
   rev: v2.0.0
   hooks:
@@ -53,7 +86,7 @@ repos:
     args: [--max-line-length, '100']
 
 - repo: https://github.com/codespell-project/codespell
-  rev: v2.4.1
+  rev: v2.4.2
   hooks:
   - id: codespell
     name: Check common misspellings in text files with codespell.
@@ -61,7 +94,7 @@ repos:
     - tomli
 
 - repo: https://github.com/tox-dev/pyproject-fmt
-  rev: v2.16.1
+  rev: v2.21.2
   hooks:
   - id: pyproject-fmt
     name: Apply a consistent format to pyproject.toml
@@ -73,7 +106,7 @@ repos:
     args: [--autofix, --indent, '2']
 
 - repo: https://github.com/rhysd/actionlint
-  rev: v1.7.11
+  rev: v1.7.12
   hooks:
   - id: actionlint
     files: .github/workflows/
@@ -89,6 +122,5 @@ repos:
     - ruff
     - mdformat-config
     - mdformat-toc
-    # - mdformat-admon
     args: [--wrap, '88']
-    exclude: ^docs/reference/
+    exclude: ^(docs/reference/|legacy-coastal/)

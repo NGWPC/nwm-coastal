@@ -8,6 +8,7 @@
 
 # Logs
 *.log
+*.ESMF_LogFile
 # Temporary files
 *.tmp
 *~
@@ -191,12 +192,20 @@ site/
 
 ### Data Folder ###
 data/
+!src/coastal_calibration/data/
 
 ### Test Reports ###
-junit.xml
+junit*.xml
 .htmlcov/
 
 ### Temp
 cache
-docs/examples/texas/
-docs/examples/sfincs_texas/
+.cache/
+
+### Local binaries / symlinks
+nwm-coastal-py
+nwm-coastal-cli
+
+# Per-domain runtime artifacts under docs/examples/ are gitignored by
+# docs/examples/.gitignore (cache/, run/, model symlinks, etc.) so the
+# committed inputs at the top of each domain dir stay tracked.

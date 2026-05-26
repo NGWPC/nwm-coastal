@@ -1,119 +1,66 @@
 # Installation
 
-## Requirements
+## Prerequisites
 
-- Python >= 3.11
-- Access to an HPC cluster with SLURM and Singularity
-- NFS mount point (default: `/ngen-test`)
-- Singularity image with SCHISM and/or SFINCS and dependencies pre-compiled
+- [Git](https://git-scm.com/)
+- [Pixi](https://pixi.prefix.dev/latest/installation/)
 
-!!! note "Model Executables"
+Pixi handles all other dependencies including Python, and compiling SFINCS and SCHISM
+from source. No containers are required.
 
-    This package orchestrates SCHISM and SFINCS workflows on HPC clusters where the models
-    are **already compiled and available** (typically inside a Singularity container). You
-    do not need to install SCHISM or SFINCS locally to use this package for job submission.
-
-## Install from PyPI
+## Install
 
 ```bash
-pip install coastal-calibration
-```
-
-This installs the core package with CLI and workflow orchestration capabilities.
-
-## Install from Source
-
-For development or to get the latest features, install from source:
-
-```bash
-git clone https://github.com/NGWPC/nwm-coastal
-cd nwm-coastal
-pip install -e .
-```
-
-## Development Installation with Pixi
-
-For development, we recommend using [Pixi](https://pixi.prefix.dev/latest/) for
-environment management:
-
-```bash
-# Install Pixi (Linux/macOS)
-curl -fsSL https://pixi.sh/install.sh | sh
-```
-
-!!! tip "Restart Terminal"
-
-    After installing Pixi, restart your terminal or run `source ~/.bashrc` (or
-    `source ~/.zshrc` for Zsh) to make the `pixi` command available.
-
-```bash
-# Clone and install
 git clone https://github.com/NGWPC/nwm-coastal
 cd nwm-coastal
 pixi install -e dev
 ```
 
-### Available Environments
+The first activation compiles both SFINCS and SCHISM from source (they are included as
+git submodules). Subsequent activations skip the build if dependencies have not changed.
 
-| Environment | Description                                 | Command                         |
-| ----------- | ------------------------------------------- | ------------------------------- |
-| `dev`       | Development with all tools                  | `pixi r -e dev <cmd>`           |
-| `test311`   | Testing with Python 3.11                    | `pixi r -e test311 test`        |
-| `test314`   | Testing with Python 3.14                    | `pixi r -e test314 test`        |
-| `schism`    | Local development with SCHISM I/O libraries | `pixi r -e schism <cmd>`        |
-| `sfincs`    | Local development with HydroMT-SFINCS       | `pixi r -e sfincs <cmd>`        |
-| `typecheck` | Type checking with Pyright                  | `pixi r -e typecheck typecheck` |
-| `lint`      | Linting with pre-commit                     | `pixi r lint`                   |
-| `docs`      | Documentation building                      | `pixi r -e docs docs-serve`     |
+## Running Commands
 
-## Optional Dependencies
-
-Optional dependencies are available for **local development purposes only**. They are
-useful for:
-
-- Reading and analyzing model output files
-- Debugging and testing workflow components locally
-- Building SFINCS models with HydroMT
-
-!!! warning "Not Required for Cluster Execution"
-
-    These optional dependencies are **not required** to submit and run jobs on the cluster.
-    The actual SCHISM and SFINCS executables must be pre-compiled and available on the HPC
-    cluster (inside the Singularity container).
+All commands must be run through Pixi to activate the environment:
 
 ```bash
-# SCHISM I/O dependencies (netCDF, numpy, etc.) - for local development
-pip install coastal-calibration[schism]
-
-# SFINCS/HydroMT dependencies - for local model building and analysis
-pip install coastal-calibration[sfincs]
-
-# Development dependencies (Jupyter, etc.)
-pip install coastal-calibration[dev]
-
-# Documentation dependencies
-pip install coastal-calibration[docs]
+pixi r -e dev coastal-calibration --help
 ```
 
-## Verify Installation
-
-After installation, verify by running:
-
-```bash
-coastal-calibration --help
-```
-
-You should see the CLI help output with available commands:
+You should see the CLI help output:
 
 ```console
 Usage: coastal-calibration [OPTIONS] COMMAND [ARGS]...
 
-  NWM Coastal: Coastal model workflow on HPC clusters.
+  Coastal calibration workflow manager (SCHISM, SFINCS).
 
 Commands:
-  init      Generate a new configuration file.
-  validate  Validate a configuration file.
-  submit    Submit workflow as a SLURM job.
-  run       Run workflow directly.
-  stages    List available workflow stages.
+  create             Create a SFINCS model from an AOI polygon.
+  init               Create a minimal configuration file.
+  prepare-topobathy  Download NWS topobathy DEM clipped to an AOI bounding box.
+  run                Run the calibration workflow.
+  stages             List available workflow stages.
+  update-dem-index   Rebuild the NOAA DEM spatial index from S3 STAC metadata.
+  validate           Validate a configuration file.
 ```
+
+## Available Environments
+
+| Environment | Description               | Command                         |
+| ----------- | ------------------------- | ------------------------------- |
+| `dev`       | Every binary and dev tool | `pixi r -e dev <cmd>`           |
+| `test311`   | CI matrix on Python 3.11  | `pixi r -e test311 test`        |
+| `test313`   | CI matrix on Python 3.13  | `pixi r -e test313 test`        |
+| `typecheck` | Type checking             | `pixi r -e typecheck typecheck` |
+| `lint`      | Linting with pre-commit   | `pixi r lint`                   |
+| `docs`      | Documentation building    | `pixi r -e docs docs-serve`     |
+
+`dev` installs every binary (SCHISM, SFINCS, predict_tide) and every Python dependency
+needed to develop, test, and run the package. The `test311` / `test313` envs mirror it
+for the CI Python-version matrix.
+
+## QGIS Plugin
+
+The repository includes a QGIS plugin for interactive domain definition. See the
+[QGIS Plugin guide](../user-guide/qgis-plugin.md) for installation and usage
+instructions.

@@ -7,7 +7,7 @@ requires = [
 
 [project]
 name = "coastal-calibration"
-description = "A coastal model (SCHISM, SFINCS) workflow on HPC clusters"
+description = "A coastal model creation and run (SCHISM, SFINCS) workflow"
 readme = "README.md"
 keywords = [
   "calibration",
@@ -15,10 +15,10 @@ keywords = [
   "hpc",
   "schism",
   "sfincs",
-  "singularity",
   "slurm",
 ]
 license = { file = "LICENSE" }
+authors = [ { name = "Taher Chegini", email = "tchegini@dewberry.com" } ]
 requires-python = ">=3.11"
 classifiers = [
   "Development Status :: 3 - Alpha",
@@ -36,81 +36,237 @@ dynamic = [
   "version",
 ]
 dependencies = [
+  "fsspec",
+  "geopandas>=1",
+  "netcdf4",
+  "numpy>=2",
+  "pandas>=2.2",
+  "pyproj>=3",
   "pyyaml>=6",
   "rich-click",
-  "tiny-retriever<0.2",
+  "rioxarray>=0.17",
+  "s3fs",
+  "scipy>=1.13",
+  "shapely>=2",
+  "tiny-retriever>=0.3",
+  "xarray>=2024.1",
 ]
-[[project.authors]]
-name = "Taher Chegini"
-email = "tchegini@dewberry.com"
-[project.optional-dependencies]
-dev = [
+optional-dependencies.dev = [
+  "git-cliff",
   "ipykernel",
   "ipywidgets",
+  "jupytext",
+  "nbconvert",
 ]
-docs = [
+optional-dependencies.docs = [
+  "jupytext",
   "mike>=2",
   "mkdocs>=1.6",
-  "mkdocs-material>=9.5",
+  "mkdocs-jupyter>=0.26.1",
+  "mkdocs-materialx>=10.1.1",
   "mkdocstrings[python]>=0.27",
   "ruff",
 ]
-lint = [
+optional-dependencies.lint = [
   "codespell",
   "pre-commit",
 ]
-plot = [
-  "cartopy",
+optional-dependencies.plot = [
+  "contextily>=1.6",
   "geopandas>=1",
   "matplotlib>=3.9",
   "numpy>=2",
   "pandas>=2.2",
+  "pyarrow>=15",
   "shapely>=2",
   "xarray>=2024.1",
 ]
-schism = [
-  "netcdf4",
-  "numpy",
-  "pandas",
-  "xarray",
-]
-sfincs = [
-  "hydromt>=1.3",
-  # "hydromt-sfincs>=2.0.0rc1",
-]
-test = [
+optional-dependencies.test = [
   "coverage[toml]",
   "pytest-cov",
   "pytest-sugar",
 ]
-typecheck = [
+optional-dependencies.typecheck = [
+  "numpy",
+  "pandas-stubs",
   "pyright",
+  "scipy-stubs",
+  "types-geopandas",
   "types-pyyaml",
+  "types-shapely",
 ]
-[project.scripts]
-coastal-calibration = "coastal_calibration.cli:main"
-[project.urls]
-Documentation = "https://ngwpc.github.io/nwm-coastal"
-Source = "https://github.com/NGWPC/nwm-coastal"
+urls.Documentation = "https://ngwpc.github.io/nwm-coastal"
+urls.Source = "https://github.com/NGWPC/nwm-coastal"
+scripts.coastal-calibration = "coastal_calibration.cli:main"
 
-[tool.hatch.build.targets.sdist]
-exclude = [
+[tool.hatch]
+build.targets.sdist.exclude = [
   "*.tar.gz",
 ]
-[tool.hatch.build.targets.wheel]
-packages = [
+build.targets.wheel.packages = [
   "src/coastal_calibration",
 ]
-[tool.hatch.version]
-source = "vcs"
+version.source = "vcs"
+
+[tool.pixi.environments]
+# `dev` installs every binary (SCHISM, SFINCS, predict_tide) and every
+# Python dep needed to develop, test, and run the package. Cluster
+# wrappers under docs/getting-started/cluster-install.md activate
+# `.pixi/envs/dev/` directly, so this env name is load-bearing.
+# Run tasks here with `pixi r -e dev <task>`.
+dev = { features = [ "dev", "models", "plot", "test", "py313" ] }
+# CI matrix across Python versions; same composition as dev minus the
+# notebook/changelog tooling. CI runs `pixi r -e test311 test` etc.
+test311 = { features = [ "test", "models", "plot", "py311" ] }
+test313 = { features = [ "test", "models", "plot", "py313" ] }
+typecheck = { features = [ "typecheck", "models", "plot", "test", "py313" ] }
+lint = { features = [ "lint", "py313" ], no-default-feature = true }
+docs = { features = [ "docs", "py313" ] }
+
+[tool.pixi.feature.dev.tasks]
+# Preview unreleased changes without writing to CHANGELOG.md
+changelog = "git cliff -c pyproject.toml --unreleased"
+# Update CHANGELOG.md with all unreleased commits
+changelog-update = "git cliff -c pyproject.toml -o CHANGELOG.md"
+# Sync all percent-format .py scripts → paired .ipynb files
+nb-sync = "jupytext --sync docs/examples/notebooks/*.py"
+# Execute all notebooks in-place (requires .ipynb to exist; run nb-sync first)
+nb-execute = "jupyter nbconvert --to notebook --execute --inplace docs/examples/notebooks/*.ipynb"
+# Full workflow: sync .py → .ipynb, then execute — use before building docs or committing
+nb-run = { depends-on = [ "nb-sync", "nb-execute" ] }
+# Pair an existing .ipynb with a .py counterpart (one-time setup for imported notebooks)
+nb-pair = "jupytext --set-formats 'ipynb,py:percent' docs/examples/notebooks/*.ipynb"
+# Strip all cell outputs from .ipynb files (keeps repo diff clean)
+nb-clear = "jupyter nbconvert --ClearOutputPreprocessor.enabled=True --to notebook --inplace docs/examples/notebooks/*.ipynb"
+
+[tool.pixi.feature.docs.tasks]
+docs-build = "mkdocs build --strict"
+docs-serve = "mkdocs serve"
+docs-deploy = "mike deploy --push --update-aliases dev latest"
+docs-release = "mike deploy --push --update-aliases $(git describe --tags --abbrev=0) stable"
+
+[tool.pixi.feature.lint.tasks]
+lint = "pre-commit run --all-files"
+pcupdate = "pre-commit autoupdate"
+spell = "codespell -w"
+
+[tool.pixi.feature.models.dependencies]
+# Coastal model binaries and their MPI/ESMF dependencies, built from the
+# bundled sources under coastal_models/. Tide predictions are handled in
+# pure Python via pyTMD (see models.pypi-dependencies below) — no Fortran
+# tide binary is bundled or required.
+schism = { path = "coastal_models/schism" }
+sfincs = { path = "coastal_models/sfincs" }
+# Force MPI (OpenMPI) build variants so ESMF/esmpy runs with parallel support.
+# Without the build constraint, conda-forge resolves the nompi variants.
+# On WCOSS2, system Cray MPICH is used via schism_exe + build_isolated_env.
+mpi = { version = "*", build = "openmpi" }
+openmpi = "*"
+esmf = { version = "*", build = "mpi_openmpi_*" }
+esmpy = "*"
+mpi4py = "*"
+
+[tool.pixi.feature.models.pypi-dependencies]
+hydromt-sfincs = { git = "https://github.com/Deltares/hydromt_sfincs", rev = "41aac0a3980fc2714ec28eafb0463d40abfc979a" }
+hydromt = ">=1.3"
+icechunk = ">=1.0.2"
+dotenv = "*"
+# Pure-Python tide predictor; reads TPXO/FES/GOT/EOT atlas files and
+# generates elev2D.th.nc / SFINCS bzs forcing. Replaces the bundled
+# OTPSnc Fortran `predict_tide` binary.
+pyTMD = ">=3"
+timescale = "*"
+
+[tool.pixi.feature.plot.dependencies]
+proj = "*"
+libgdal-core = "*"
+hdf5 = "*"
+libnetcdf = "*"
+ffmpeg = { version = ">=6", build = "gpl_*" }
+
+[tool.pixi.feature.py311.dependencies]
+python = "~=3.11.0"
+proj = "*"
+libgdal-core = "*"
+hdf5 = { version = "*", build = "mpi_openmpi_*" }
+libnetcdf = "*"
+netcdf4 = { version = "*", build = "mpi_openmpi_*" }
+netcdf-fortran = { version = "*", build = "mpi_openmpi_*" }
+
+[tool.pixi.feature.py313.dependencies]
+python = "~=3.13.0"
+proj = "*"
+libgdal-core = "*"
+hdf5 = { version = "*", build = "mpi_openmpi_*" }
+libnetcdf = "*"
+netcdf4 = { version = "*", build = "mpi_openmpi_*" }
+netcdf-fortran = { version = "*", build = "mpi_openmpi_*" }
+
+[tool.pixi.feature.test.tasks]
+# `test` runs the full suite and produces a single .coverage file plus
+# junit.xml. The targeted `test-common` / `test-schism` / `test-sfincs`
+# tasks each scope pytest to one subdirectory and write their own
+# coverage file (.coverage.common / .coverage.schism / .coverage.sfincs)
+# so a CI matrix can later aggregate them via `coverage combine`.
+test = { cmd = [
+  "pytest",
+  "tests/",
+  "--ignore=tests/legacy_scripts",
+  "--cov",
+  "--cov-branch",
+  "--junitxml=junit.xml",
+  "--durations=5",
+] }
+test-common = { cmd = [
+  "pytest",
+  "tests/common",
+  "--cov",
+  "--cov-branch",
+  "--junitxml=junit-common.xml",
+  "--durations=5",
+], env = { COVERAGE_FILE = ".coverage.common" } }
+test-schism = { cmd = [
+  "pytest",
+  "tests/schism",
+  "--cov",
+  "--cov-branch",
+  "--junitxml=junit-schism.xml",
+  "--durations=5",
+], env = { COVERAGE_FILE = ".coverage.schism" } }
+test-sfincs = { cmd = [
+  "pytest",
+  "tests/sfincs",
+  "--cov",
+  "--cov-branch",
+  "--junitxml=junit-sfincs.xml",
+  "--durations=5",
+], env = { COVERAGE_FILE = ".coverage.sfincs" } }
+report = { cmd = "coverage report && coverage xml", depends-on = [ "test" ] }
+html = { cmd = "coverage html", depends-on = [ "report" ] }
+
+[tool.pixi.feature.typecheck.tasks]
+typecheck = "pyright"
+
+[tool.pixi.pypi-dependencies]
+coastal_calibration = { path = ".", editable = true }
+
+[tool.pixi.workspace]
+channels = [ "conda-forge" ]
+platforms = [ "linux-64", "osx-arm64" ]
+preview = [ "pixi-build" ]
 
 [tool.ruff]
 target-version = "py311"
 line-length = 100
-include = [ "src/coastal_calibration/**/*.py", "src/coastal_calibration/*.py" ]
-exclude = [ "src/coastal_calibration/scripts/**" ]
-[tool.ruff.lint]
-select = [
+include = [
+  "src/coastal_calibration/**/*.py",
+  "src/coastal_calibration/*.py",
+  "tests/**/*.py",
+]
+exclude = [ "docs/examples/notebooks/*.py", "legacy-coastal", "tests/legacy_scripts/**/*.py" ]
+lint.select = [
+  # flake8-unused-arguments
+  "ARG",
   # flake8-bugbear
   "B",
   # flake8-comprehensions
@@ -175,9 +331,11 @@ select = [
   # flake8-2020
   "YTT",
 ]
-ignore = [
+lint.ignore = [
   "D103",
   "D105",
+  # module level imports
+  "E402",
   "E501",
   # conflict with ruff-formatter
   "ISC001",
@@ -193,10 +351,40 @@ ignore = [
   # shell command
   "S605",
   "S607",
+  # cast() string-arg style — conflicts with vulture's ability to see
+  # the symbol as used; both forms are runtime no-ops with TYPE_CHECKING
+  # imports anyway.
+  "TC006",
   # custom exception
   "TRY003",
 ]
-per-file-ignores."tests/*.py" = [
+lint.per-file-ignores."docs/examples/notebooks/*.{ipynb,py}" = [
+  # missing module docstring
+  "D100",
+  # use of "assert"
+  "S101",
+  # print statements
+  "T20",
+]
+lint.per-file-ignores."src/coastal_calibration/regridding/*.py" = [
+  # physics variable naming (Rd, Tv, H, LON, LAT)
+  "N806",
+  # ESMF convention: import esmpy as ESMF
+  "N812",
+]
+lint.per-file-ignores."src/coastal_calibration/schism/subsetter.py" = [
+  # complex mesh operations with many sequential steps
+  "PLR0912",
+  "PLR0915",
+]
+lint.per-file-ignores."tests/**/*.py" = [
+  # pytest fixtures, monkeypatch lambdas, and signature-matching mocks
+  # routinely accept parameters they don't use; ARG would fire on every
+  # `tmp_path` or `lambda *a, **kw: ...`.
+  "ARG001",
+  "ARG002",
+  "ARG004",
+  "ARG005",
   "D100",
   "D101",
   "D102",
@@ -212,9 +400,7 @@ per-file-ignores."tests/*.py" = [
   # insecure use of path
   "S108",
 ]
-extend-safe-fixes = [
-  # module level imports
-  "E402",
+lint.extend-safe-fixes = [
   # break down assert
   "PT018",
   # Move imports
@@ -222,28 +408,43 @@ extend-safe-fixes = [
   # absolute imports
   "TID252",
 ]
-isort.known-first-party = [
+lint.isort.known-first-party = [
   "coastal_calibration",
 ]
-isort.required-imports = [ "from __future__ import annotations" ]
-pydocstyle.convention = "numpy"
+lint.isort.required-imports = [ "from __future__ import annotations" ]
+lint.pydocstyle.convention = "numpy"
 
 [tool.codespell]
-skip = "__pycache__,_build,.git,./htmlcov,pixi.lock"
-ignore-words-list = "gages,parm,oce,gage"
+skip = "__pycache__,_build,.git,./htmlcov,pixi.lock,./site,./cache,*.ipynb,./legacy-coastal/,CHANGELOG.md"
+ignore-words-list = "gages,parm,oce,gage,nd"
 
 [tool.pyproject-fmt]
-table_format = "long"
+expand_tables = [ "tool.pixi", "tool.git-cliff" ]
 
-[tool.pytest.ini_options]
-addopts = [
+[tool.pyright]
+pythonVersion = "3.11"
+include = [ "src" ]
+ignore = [ "tests/" ]
+typeCheckingMode = "strict"
+reportMissingSuperCall = false
+reportMissingTypeStubs = false
+reportUnknownMemberType = false
+reportUnknownVariableType = false
+reportUnknownArgumentType = false
+reportUnknownParameterType = false
+reportMissingTypeArgument = false
+reportUnnecessaryIsInstance = false
+reportUnnecessaryTypeIgnoreComment = true
+
+[tool.pytest]
+ini_options.addopts = [
   "--import-mode=importlib",
   "--doctest-modules",
   "-v",
   "--durations=5",
 ]
-doctest_optionflags = "NORMALIZE_WHITESPACE IGNORE_EXCEPTION_DETAIL NUMBER"
-filterwarnings = [
+ini_options.doctest_optionflags = "NORMALIZE_WHITESPACE IGNORE_EXCEPTION_DETAIL NUMBER"
+ini_options.filterwarnings = [
   "ignore:.*distutils.*",
   "ignore:.*--rsyncdir command line argument.*",
   "ignore:.*numpy.ndarray size changed.*",
@@ -251,111 +452,171 @@ filterwarnings = [
   "ignore:.*Ensure you extract a single element.*",
   "ignore:.*Deprecated in Pydantic V2.0.*",
 ]
-testpaths = [
-  "tests",
+ini_options.markers = [
+  "schism: SCHISM compilation and workflow tests (require pixi schism env)",
+  "sfincs: SFINCS workflow integration tests (require HydroMT-SFINCS + plot deps)",
+]
+ini_options.testpaths = [
+  "tests/common",
+  "tests/schism",
+  "tests/sfincs",
 ]
 
-[tool.coverage.paths]
-source = [ "src", "*/site-packages" ]
-[tool.coverage.report]
-exclude_lines = [
-  "raise ServiceUnavailableError",
-  "if TYPE_CHECKING:",
+[tool.coverage]
+run.branch = true
+run.omit = [
+  "*/legacy_scripts/*",
 ]
-ignore_errors = true
-omit = [
-  "**/__init__.py",
-  "*/scripts/*",
-]
-[tool.coverage.run]
-branch = true
-parallel = true
-omit = [
-  "*/scripts/*",
-]
-source_pkgs = [
+run.parallel = true
+run.source_pkgs = [
   "coastal_calibration",
 ]
-
-[tool.pyright]
-exclude = [
-  "**/__pycache__",
+paths.source = [ "src", "*/site-packages" ]
+report.exclude_lines = [
+  "if TYPE_CHECKING:",
+  "raise ServiceUnavailableError",
+]
+report.ignore_errors = true
+report.omit = [
   "**/__init__.py",
-  "src/coastal_calibration/coops_api.py",
-  "src/coastal_calibration/scripts/**",
+  "*/legacy_scripts/*",
 ]
-include = [
-  "src/coastal_calibration",
-]
-reportMissingTypeStubs = false
-reportUnknownArgumentType = false
-reportUnknownLambdaType = false
-reportUnknownMemberType = false
-reportUnknownParameterType = false
-reportUnknownVariableType = false
-reportUnnecessaryIsInstance = false
-reportUntypedFunctionDecorator = false
-reportAttributeAccessIssue = false
-reportInvalidTypeForm = false
-typeCheckingMode = "strict"
 
-[tool.pixi.environments]
-test311 = { features = [ "test", "plot", "py311" ] }
-test314 = { features = [ "test", "plot", "py314" ] }
-dev = { features = [ "dev", "sfincs", "plot", "test", "py314" ] }
-schism = { features = [ "schism", "py314" ] }
-sfincs = { features = [ "sfincs", "plot", "py314" ] }
-typecheck = { features = [ "typecheck", "sfincs", "plot", "py314" ] }
-lint = { features = [ "lint", "py314" ], no-default-feature = true }
-docs = { features = [ "docs", "py314" ] }
-[tool.pixi.feature.docs.tasks]
-docs-build = "mkdocs build"
-docs-serve = "mike serve"
-docs-deploy = "mike deploy --push dev"
-[tool.pixi.feature.lint.tasks]
-lint = "pre-commit run --all-files"
-pcupdate = "pre-commit autoupdate"
-spell = "codespell -w"
-[tool.pixi.feature.plot.dependencies]
-proj = "*"
-libgdal-core = "*"
-hdf5 = "*"
-libnetcdf = "*"
-[tool.pixi.feature.py311.dependencies]
-python = "~=3.11.0"
-[tool.pixi.feature.py314.dependencies]
-python = "~=3.14.0"
-[tool.pixi.feature.schism.dependencies]
-proj = "*"
-libgdal-core = "*"
-hdf5 = "*"
-libnetcdf = "*"
-esmpy = "*"
-mpi4py = "*"
-openmpi = "*"
-[tool.pixi.feature.sfincs.dependencies]
-proj = "*"
-libgdal-core = "*"
-hdf5 = "*"
-libnetcdf = "*"
-[tool.pixi.feature.sfincs.pypi-dependencies]
-hydromt-sfincs = { git = "https://github.com/Deltares/hydromt_sfincs", rev = "41aac0a3980fc2714ec28eafb0463d40abfc979a" }
-[tool.pixi.feature.test.tasks]
-test = { cmd = [
-  "pytest",
-  "--cov",
-  "--cov-append",
-  "--cov-branch",
-  "--cov-report=xml",
-  "--junitxml=junit.xml",
-  "--durations=5",
-] }
-report = { cmd = [ "coverage", "report" ], depends-on = [ "test" ] }
-html = { cmd = [ "coverage", "html" ], depends-on = [ "report" ] }
-[tool.pixi.feature.typecheck.tasks]
-typecheck = "pyright"
-[tool.pixi.pypi-dependencies]
-coastal_calibration = { path = ".", editable = true }
-[tool.pixi.workspace]
-channels = [ "conda-forge" ]
-platforms = [ "linux-64", "osx-arm64" ]
+[tool.vulture]
+# Dead-code detection. Pre-commit runs `vulture --quiet` and reads this
+# config; raise the bar to >=80% confidence so it stays signal, not
+# noise. Drop the threshold (e.g. `pixi r -e dev python -m vulture
+# --min-confidence=60 src tests`) for an exploratory sweep.
+min_confidence = 80
+paths = [ "src", "tests" ]
+exclude = [
+  # Frozen reference implementations from the pre-pixi era; not part of
+  # the live codebase.
+  "tests/legacy_scripts/",
+  # Notebook .py files are jupytext mirrors of .ipynb; cell-level dead
+  # code is intentional (e.g. final-cell expressions for display).
+  "docs/examples/notebooks/",
+]
+ignore_decorators = [
+  # pytest fixtures and parametrize args look unused but are wired up
+  # by pytest at collection time.
+  "@pytest.fixture",
+  "@pytest.mark.*",
+  # rich-click subcommands are registered via decorator and dispatched
+  # by name from the CLI entry point.
+  "@*.command",
+  "@*.group",
+  # Properties may be invoked dynamically (getattr / dataclass / pydantic).
+  "@property",
+]
+ignore_names = [
+  # pytest naming conventions.
+  "test_*",
+  "setUp",
+  "tearDown",
+  # Dataclass / NamedTuple fields aren't "called" but are accessed via
+  # attribute lookup that vulture can't always trace.
+  "model_config",
+  # CLI command callbacks share a `ctx` parameter that goes unused
+  # whenever the subcommand doesn't need click's context.
+  "ctx",
+]
+
+[tool.jupytext]
+notebook_metadata_filter = "kernelspec,jupytext"
+cell_metadata_filter = "-all"
+formats = "ipynb,py:percent"
+
+[tool.git-cliff.changelog]
+header = """
+# Changelog
+
+All notable changes to this project will be documented in this file.
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+"""
+body = """
+{%- macro remote_url() -%}
+  https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}
+{%- endmacro -%}
+
+{% if version -%}
+## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else -%}
+## [Unreleased]
+{% endif -%}
+
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group }}
+{% for commit in commits %}
+- {% if commit.scope %}**{{ commit.scope }}**: {% endif %}\
+{{ commit.message | split(pat="\\n") | first | upper_first | trim }}\
+{% if commit.breaking %} (**breaking**){% endif %}\
+{% if commit.remote.username and commit.remote.username != "github-actions[bot]" %} by @{{ commit.remote.username }}{% endif %}\
+{% if commit.remote.pr_number %} in \
+[#{{ commit.remote.pr_number }}]({{ self::remote_url() }}/pull/{{ commit.remote.pr_number }})\
+{% endif %}
+{%- endfor %}
+{% endfor -%}
+
+{%- if github.contributors | filter(attribute="is_first_time", value=true) | length != 0 %}
+### New Contributors
+{% for contributor in github.contributors | filter(attribute="is_first_time", value=true) %}
+{%- if contributor.username and contributor.username != "github-actions[bot]" %}
+- @{{ contributor.username }} made their first contribution\
+{% if contributor.pr_number %} in \
+[#{{ contributor.pr_number }}]({{ self::remote_url() }}/pull/{{ contributor.pr_number }})\
+{% endif %}
+{%- endif -%}
+{%- endfor %}
+{% endif %}
+"""
+footer = """
+{%- macro remote_url() -%}
+  https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}
+{%- endmacro -%}
+
+{% for release in releases -%}
+{% if release.version -%}
+{% if release.previous.version -%}
+[{{ release.version | trim_start_matches(pat="v") }}]: \
+<{{ self::remote_url() }}/compare/{{ release.previous.version }}...{{ release.version }}>
+{% else -%}
+[{{ release.version | trim_start_matches(pat="v") }}]: \
+<{{ self::remote_url() }}/releases/tag/{{ release.version }}>
+{% endif -%}
+{% else -%}
+{% if release.previous.version -%}
+[unreleased]: <{{ self::remote_url() }}/compare/{{ release.previous.version }}...HEAD>
+{% endif -%}
+{% endif -%}
+{% endfor %}"""
+trim = true
+
+[tool.git-cliff.git]
+conventional_commits = true
+filter_unconventional = true
+split_commits = false
+commit_parsers = [
+  # Skip cherry-picks so backports don't duplicate the original entries
+  # when the backport branch is later merged back. Relies on
+  # `git cherry-pick -x` adding the trailer.
+  { message = "cherry picked from commit", skip = true },
+  { message = "^feat", group = "Added" },
+  { message = "^fix", group = "Fixed" },
+  { message = "^perf", group = "Changed" },
+  { message = "^refactor", group = "Changed" },
+  { message = "^revert", group = "Fixed" },
+  { message = "^style", group = "Changed" },
+  { message = "^docs", skip = true },
+  { message = "^test", skip = true },
+  { message = "^chore", skip = true },
+  { message = "^ci", skip = true },
+  { message = "^build", skip = true },
+]
+protect_breaking_commits = true
+filter_commits = false
+tag_pattern = "[0-9].*"
+topo_order = false
+sort_commits = "newest"

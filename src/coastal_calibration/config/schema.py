@@ -5,93 +5,75 @@ from __future__ import annotations
 import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, ClassVar, Literal
 
+import pandas as pd
 import yaml
 
-from coastal_calibration.utils.time import parse_datetime as _parse_datetime
-
 MeteoSource = Literal["nwm_retro", "nwm_ana"]
-CoastalDomain = Literal["prvi", "hawaii", "atlgulf", "pacific"]
-BoundarySource = Literal["tpxo", "stofs"]
+CoastalDomain = Literal["prvi", "hawaii", "atlgulf", "pacific", "alaska"]
+# ``harmonic`` predicts boundary elevations from harmonic constituents via
+# pyTMD against ``tidal_atlas_dir`` (TPXO, FES, GOT, EOT, ...). ``tpxo``
+# is accepted for backward compatibility with older config files and is
+# normalized to ``harmonic`` in :meth:`BoundaryConfig.__post_init__`.
+BoundarySource = Literal["harmonic", "tpxo", "stofs"]
 ModelType = Literal["schism", "sfincs"]
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
-
-DEFAULT_SING_IMAGE_PATH = Path("/ngencerf-app/singularity/ngen-coastal.sif")
-DEFAULT_PARM_DIR = Path("/ngen-test/coastal/ngwpc-coastal")
-DEFAULT_NFS_MOUNT = Path("/ngen-test")
-DEFAULT_CONDA_ENV_NAME = "ngen_forcing_coastal"
-DEFAULT_NWM_DIR = Path("/ngen-app/nwm.v3.0.6")
-DEFAULT_SLURM_PARTITION = "c5n-18xlarge"
-# TPXO binary directory inside the Singularity container (not user-configurable)
-DEFAULT_OTPS_DIR = Path("/ngen-app/OTPSnc")
-# Default working directory inside the Singularity container (not user-configurable)
-DEFAULT_CONTAINER_PWD = Path("/ngen-app/ngen-forcing/coastal/calib")
-
-# Default SCHISM binary name (used as default for SchismModelConfig.binary)
-_DEFAULT_SCHISM_BINARY = "pschism_wcoss2_NO_PARMETIS_TVD-VL.openmpi"
-
-# Default path templates using interpolation syntax.
-# ${model} resolves to "schism" or "sfincs" based on the top-level ``model`` key.
-DEFAULT_WORK_DIR_TEMPLATE = (
-    "/ngen-test/coastal/${slurm.user}/"
-    "${model}_${simulation.coastal_domain}_${boundary.source}_${simulation.meteo_source}/"
-    "${model}_${simulation.start_date}"
-)
-DEFAULT_RAW_DOWNLOAD_DIR_TEMPLATE = (
-    "/ngen-test/coastal/${slurm.user}/"
-    "${model}_${simulation.coastal_domain}_${boundary.source}_${simulation.meteo_source}/"
-    "raw_data"
-)
-
-
-@dataclass
-class SlurmConfig:
-    """SLURM job scheduling configuration.
-
-    Contains only parameters related to job scheduling (partition, account,
-    time limits).  Compute resources (nodes, tasks) are model-specific and
-    live on the concrete :class:`ModelConfig` subclasses.
-    """
-
-    job_name: str = "coastal_calibration"
-    partition: str = DEFAULT_SLURM_PARTITION
-    time_limit: str | None = None
-    account: str | None = None
-    qos: str | None = None
-    user: str | None = field(default_factory=lambda: os.environ.get("USER"))
 
 
 @dataclass
 class SimulationConfig:
-    """Simulation time and domain configuration."""
+    """Simulation time and domain configuration.
+
+    ``start_date`` is normalized to **naive UTC** in ``__post_init__``
+    so the rest of the pipeline can compare and serialize it without
+    crossing the naive/aware boundary. Tz-aware values are converted to
+    UTC then stripped; tz-naive values are passed through (assumed UTC
+    by the project's data contract — NWM/STOFS are published on UTC
+    days).
+    """
 
     start_date: datetime
     duration_hours: int
     coastal_domain: CoastalDomain
     meteo_source: MeteoSource
-    timestep_seconds: int = 3600
+    # Model integration timestep in seconds: SCHISM's ``dt`` and the
+    # tick that ``nspool``/``ihfskip``/``nhot_write`` are counted in.
+    # The default (200) matches the Pacific/Hawaii forecast templates
+    # and is a stable choice for coastal mesh resolutions of ~100-1000 m.
+    # Note: the tidal boundary (``make_tidal_boundary``) writes
+    # ``elev2D.th.nc`` at a separate cadence (default 3600 s); SCHISM
+    # interpolates from that file to its own ``dt`` at runtime.
+    timestep_seconds: int = 200
 
     _INLAND_DOMAIN: ClassVar[dict[str, str]] = {
         "prvi": "domain_puertorico",
         "hawaii": "domain_hawaii",
         "atlgulf": "domain",
         "pacific": "domain",
+        "alaska": "domain_alaska",
     }
     _NWM_DOMAIN: ClassVar[dict[str, str]] = {
         "prvi": "prvi",
         "hawaii": "hawaii",
         "atlgulf": "conus",
         "pacific": "conus",
+        "alaska": "alaska",
     }
     _GEO_GRID: ClassVar[dict[str, str]] = {
         "prvi": "geo_em_PRVI.nc",
         "hawaii": "geo_em_HI.nc",
         "atlgulf": "geo_em_CONUS.nc",
         "pacific": "geo_em_CONUS.nc",
+        "alaska": "geo_em_AK.nc",
     }
+
+    def __post_init__(self) -> None:
+        from coastal_calibration.utils import to_naive_utc
+
+        self.start_date = to_naive_utc(self.start_date)
 
     @property
     def start_pdy(self) -> str:
@@ -121,19 +103,48 @@ class SimulationConfig:
 
 @dataclass
 class BoundaryConfig:
-    """Boundary condition configuration."""
+    """Boundary condition configuration.
 
-    source: BoundarySource = "tpxo"
+    Parameters
+    ----------
+    source : {"harmonic", "stofs"}
+        Boundary forcing source. ``harmonic`` predicts tides locally
+        via pyTMD against the atlas at
+        :attr:`PathConfig.tidal_atlas_dir`; ``stofs`` regrids the NOAA
+        STOFS product (and falls back to ``harmonic`` past the STOFS
+        180 h window when the simulation runs longer).
+        ``"tpxo"`` is accepted as a deprecated alias for ``"harmonic"``
+        and is normalized at construction time.
+    stofs_file : Path, optional
+        STOFS NetCDF (only used when ``source == "stofs"``).
+    tidal_model : str
+        pyTMD model identifier (see ``pyTMD.io.load_database()``).
+        Defaults to TPXO10-atlas-v2 in netcdf form. Set to e.g.
+        ``"FES2014"`` or ``"GOT4.10"`` to predict against another atlas
+        without code changes — only the files under
+        :attr:`PathConfig.tidal_atlas_dir` change.
+    """
+
+    source: BoundarySource = "harmonic"
     stofs_file: Path | None = None
+    tidal_model: str = "TPXO10-atlas-v2-nc"
 
     def __post_init__(self) -> None:
+        # Normalize the deprecated "tpxo" alias upfront so every consumer
+        # downstream only ever has to check for "harmonic".
+        if self.source == "tpxo":
+            self.source = "harmonic"
         if self.stofs_file is not None:
             self.stofs_file = Path(self.stofs_file).expanduser().resolve()
 
 
 @dataclass
 class PathConfig:
-    """Path configuration for data and executables."""
+    """Path configuration for data and executables.
+
+    Only ``work_dir`` is required. All other fields are optional and
+    only needed by specific workflow stages.
+    """
 
     METEO_SUBDIR: ClassVar[str] = "meteo"
     STREAMFLOW_SUBDIR: ClassVar[str] = "streamflow"
@@ -142,57 +153,50 @@ class PathConfig:
 
     work_dir: Path
     raw_download_dir: Path | None = None
-    nfs_mount: Path = field(default_factory=lambda: DEFAULT_NFS_MOUNT)
-    nwm_dir: Path = field(default_factory=lambda: DEFAULT_NWM_DIR)
     hot_start_file: Path | None = None
-    conda_env_name: str = DEFAULT_CONDA_ENV_NAME
-    parm_dir: Path = field(default_factory=lambda: DEFAULT_PARM_DIR)
+    # Legacy create-workflow fields — not used by the run workflow.
+    parm_dir: Path | None = None
+    nwm_dir: Path | None = None
+    # Directory containing the pyTMD tidal atlas files for
+    # :attr:`BoundaryConfig.tidal_model`. The path is read directly:
+    # users point at whatever folder holds the atlas constituent + grid
+    # netCDFs, regardless of the subdirectory convention pyTMD's
+    # bundled database uses internally.
+    tidal_atlas_dir: Path | None = None
+
+    # Local filesystem subdirectory under hydro/nwm/ for NWM analysis-and-
+    # assimilation downloads (see ``streamflow_dir``). Distinct from
+    # :attr:`SimulationConfig._NWM_DOMAIN`: that mapping yields the NWM
+    # *product identifier* used in URL paths, whereas this one yields the
+    # download cache subdirectory we land files in. They happen to share
+    # values for some domains (e.g. ``hawaii``) but not all
+    # (``prvi`` → ``puertorico`` here, ``prvi`` there). Domains not listed
+    # here fall back to ``"conus"``.
+    _NWM_DOMAIN_DIR: ClassVar[dict[str, str]] = {
+        "hawaii": "hawaii",
+        "prvi": "puertorico",
+        "alaska": "alaska",
+    }
 
     def __post_init__(self) -> None:
-        # Resolve all path fields to absolute so that downstream paths
-        # (model_root, sif_path, Singularity bind mounts, etc.) never
-        # contain relative components that can double up when cwd changes.
-        # expanduser() must come before resolve() so that "~" is expanded
-        # to the user's home directory instead of being treated as a
-        # literal path component.
         self.work_dir = Path(self.work_dir).expanduser().resolve()
-        self.parm_dir = Path(self.parm_dir).expanduser().resolve()
-        self.nfs_mount = Path(self.nfs_mount).expanduser().resolve()
-        self.nwm_dir = Path(self.nwm_dir).expanduser().resolve()
         if self.raw_download_dir:
             self.raw_download_dir = Path(self.raw_download_dir).expanduser().resolve()
         if self.hot_start_file:
             self.hot_start_file = Path(self.hot_start_file).expanduser().resolve()
-
-    @property
-    def otps_dir(self) -> Path:
-        """TPXO binary directory (inside Singularity container, not configurable)."""
-        return DEFAULT_OTPS_DIR
-
-    @property
-    def tpxo_data_dir(self) -> Path:
-        """TPXO tidal atlas data directory."""
-        return self.parm_dir / "TPXO10_atlas_v2_nc"
-
-    @property
-    def ush_nwm(self) -> Path:
-        """USH scripts directory."""
-        return self.nwm_dir / "ush"
-
-    @property
-    def exec_nwm(self) -> Path:
-        """Executables directory."""
-        return self.nwm_dir / "exec"
+        if self.parm_dir is not None:
+            self.parm_dir = Path(self.parm_dir).expanduser().resolve()
+        if self.nwm_dir is not None:
+            self.nwm_dir = Path(self.nwm_dir).expanduser().resolve()
+        if self.tidal_atlas_dir is not None:
+            self.tidal_atlas_dir = Path(self.tidal_atlas_dir).expanduser().resolve()
 
     @property
     def parm_nwm(self) -> Path:
-        """Parameter files directory."""
+        """Parameter files directory (requires ``parm_dir``)."""
+        if self.parm_dir is None:
+            raise ValueError("paths.parm_dir is required for NWM parameter lookup")
         return self.parm_dir / "parm"
-
-    @property
-    def conda_envs_path(self) -> Path:
-        """Conda environments directory."""
-        return self.nfs_mount / "ngen-app" / "conda" / "envs"
 
     @property
     def download_dir(self) -> Path:
@@ -203,18 +207,19 @@ class PathConfig:
         """Directory for meteorological data."""
         return self.download_dir / self.METEO_SUBDIR / meteo_source
 
-    def streamflow_dir(self, meteo_source: str) -> Path:
+    def streamflow_dir(self, meteo_source: str, coastal_domain: str = "conus") -> Path:
         """Directory for streamflow/hydro data."""
         if meteo_source == "nwm_retro":
             return self.download_dir / self.STREAMFLOW_SUBDIR / "nwm_retro"
-        return self.download_dir / self.HYDRO_SUBDIR / "nwm"
+        nwm_dir = self._NWM_DOMAIN_DIR.get(coastal_domain, "conus")
+        return self.download_dir / self.HYDRO_SUBDIR / "nwm" / nwm_dir
 
     def coastal_dir(self, coastal_source: str) -> Path:
         """Directory for coastal boundary data."""
         return self.download_dir / self.COASTAL_SUBDIR / coastal_source
 
     def geogrid_file(self, sim: SimulationConfig) -> Path:
-        """Geogrid file path for the given domain."""
+        """Geogrid file path for the given domain (requires ``parm_dir``)."""
         return self.parm_nwm / sim.inland_domain / sim.geo_grid
 
 
@@ -255,7 +260,19 @@ class ModelConfig(ABC):
     This keeps model-specific concerns out of the shared configuration and
     makes adding new models straightforward: create a new subclass,
     implement the abstract methods, and register it in :data:`MODEL_REGISTRY`.
+
+    Attributes
+    ----------
+    omp_num_threads : int
+        Number of OpenMP threads per process.
+    runtime_env : dict[str, str]
+        Extra environment variables for the model run subprocess.
+        Merged last so they can override any auto-detected value.
+        Only used by model run stages (``schism_run``, ``sfincs_run``).
     """
+
+    omp_num_threads: int
+    runtime_env: dict[str, str]
 
     @property
     @abstractmethod
@@ -267,7 +284,7 @@ class ModelConfig(ABC):
         """Add model-specific environment variables to *env* (mutating).
 
         Called by :meth:`WorkflowStage.build_environment` after shared
-        variables have been populated.
+        variables (OpenMP pinning, HDF5 file locking) have been populated.
         """
 
     @abstractmethod
@@ -284,10 +301,6 @@ class ModelConfig(ABC):
         """Construct and return the ``{name: stage}`` dictionary."""
 
     @abstractmethod
-    def generate_job_script_lines(self, config: CoastalCalibConfig) -> list[str]:
-        """Return ``#SBATCH`` directives specific to this model's compute needs."""
-
-    @abstractmethod
     def to_dict(self) -> dict[str, Any]:
         """Serialize model-specific fields to a dictionary."""
 
@@ -296,30 +309,52 @@ class ModelConfig(ABC):
 class SchismModelConfig(ModelConfig):
     """SCHISM model configuration.
 
-    Contains compute parameters (MPI layout, SCHISM binary) that were
-    previously split across ``MPIConfig`` and ``SlurmConfig``.
+    Contains compute parameters (MPI layout, SCHISM binary), the path
+    to a prebuilt model directory, and the geogrid file used for
+    atmospheric forcing regridding.
 
     Parameters
     ----------
-    singularity_image : Path
-        Path to the Singularity/Apptainer SIF image used to run
-        SCHISM and its pre-/post-processing scripts inside a
-        container.  SFINCS manages its own container independently
-        (see :attr:`SfincsModelConfig.container_tag`).
+    prebuilt_dir : Path
+        Path to the directory containing the pre-built SCHISM model
+        files (``hgrid.gr3``, ``vgrid.in``, ``param.nml``, etc.).
+    geogrid_file : Path
+        Path to the WRF geogrid file (e.g. ``geo_em_HI.nc``) used by
+        the atmospheric forcing regridding stage.
     nodes : int
-        Number of SLURM nodes.
+        Number of SLURM nodes. Defaults to ``1``; set higher for multi-node
+        HPC jobs.
     ntasks_per_node : int
-        MPI tasks per node.
+        MPI tasks per node. When ``<= 0`` (the default), this is auto-set
+        to ``get_cpu_count() // omp_num_threads`` so a single-node run
+        fills the available physical cores
+        (see :func:`~coastal_calibration.utils.get_cpu_count`).
     exclusive : bool
         Request exclusive node access.
     nscribes : int
-        Number of SCHISM scribe processes.
+        Number of SCHISM scribe processes. When ``<= 0`` (the default),
+        this is auto-detected from the prebuilt's ``param.nml``: a count
+        of uncommented ``iof_*(N) = 1`` flags plus one for ``iout_sta``
+        when ``include_noaa_gages`` is enabled. SCHISM aborts at init
+        when nscribes is below the actual number of output variables.
     omp_num_threads : int
-        OpenMP threads per MPI rank.
+        OpenMP threads per MPI rank. Defaults to ``2`` (typical SCHISM
+        hybrid layout); combined with the auto-detected ``ntasks_per_node``
+        this fills one node's physical cores.
     oversubscribe : bool
-        Allow MPI oversubscription.
-    binary : str
-        SCHISM executable name.
+        Pass ``--oversubscribe`` to ``mpiexec``. Only honored under
+        OpenMPI; silently ignored under MPICH (see
+        :func:`~coastal_calibration.utils.build_mpi_cmd`). Defaults to
+        ``False``; set ``True`` when intentionally launching more MPI
+        ranks than physical cores.
+    schism_exe : Path, optional
+        Path to a compiled SCHISM executable.  When set, the
+        ``schism_run`` stage uses this binary instead of discovering
+        ``pschism`` on ``PATH``.  Normally not needed -- SCHISM is
+        compiled automatically when activating a pixi environment
+        with the ``schism`` feature.  Set this to a system-compiled
+        binary on WCOSS2 or other clusters where the model is built
+        against system MPI/HDF5/NetCDF.
     include_noaa_gages : bool
         When True, automatically query NOAA CO-OPS for water level
         stations within the model domain (computed from the concave
@@ -327,20 +362,94 @@ class SchismModelConfig(ModelConfig):
         ``station.in`` file, set ``iout_sta = 1`` in ``param.nml``,
         and generate sim-vs-obs comparison plots after the run.
         Requires the ``plot`` optional dependencies.
+    discharge_file : Path, optional
+        Path to a ``nwmReaches.csv`` file mapping NWM reach feature IDs
+        to SCHISM source/sink elements.  When ``None`` (default), the
+        discharge stage is skipped and no river forcing is generated.
+    create_water_level_animation : bool
+        When True, the ``schism_plot`` stage loads the 2-D elevation
+        field from ``outputs/out2d_*.nc`` and renders an MP4 animation
+        to ``figs/water_level.mp4`` using
+        :func:`coastal_calibration.plotting.animate_water_level`.
+        Requires an ``ffmpeg`` binary on PATH.  Independent of
+        ``include_noaa_gages``.  Defaults to False.
+    animation_fps : int
+        Frames per second for the animation output.
+    animation_time_stride : int
+        Keep every ``animation_time_stride``-th frame from the model
+        time series; useful for long runs.
+    obs_points_csv : Path, optional
+        Path to a CSV with columns ``id, lon, lat`` specifying extra
+        observation points for water-level extraction after the run.
+        The ``schism_plot`` stage interpolates water-surface elevation
+        at each point (and at any NOAA CO-OPS gauges when
+        ``include_noaa_gages`` is enabled) and writes the combined time
+        series to ``obs_water_level.parquet`` in the work directory.
+    output_freq_hours : float
+        How often SCHISM writes field outputs, in hours. Translated into
+        the ``nspool`` parameter of ``param.nml``. Defaults to 1.0
+        (hourly output, matching the previous hardcoded behavior).
+    single_output_file : bool
+        When True, set ``ihfskip`` to the full simulation length so
+        SCHISM keeps appending to a single output file instead of
+        rotating to a new file every ``nspool`` steps. Useful on shared
+        filesystems where each file rotation costs an MPI barrier and
+        metadata round-trips. Defaults to False (matching the previous
+        ``ihfskip = nspool`` behavior).
+    run_param_overrides : dict
+        Arbitrary key/value pairs written into ``param.nml`` after the
+        template values, ``output_freq_hours``, and ``single_output_file``
+        have been applied. Use this to override any other namelist
+        parameter (e.g. ``{"dt": 100, "iwbl": 1}``). Mirrors the SFINCS
+        ``run_param_overrides`` option. Validation catches mismatches
+        between ``ihfskip``, ``nhot_write``, and ``nspool_sta`` before
+        SCHISM is launched.
     """
 
-    singularity_image: Path = field(default_factory=lambda: DEFAULT_SING_IMAGE_PATH)
-    nodes: int = 2
-    ntasks_per_node: int = 18
+    prebuilt_dir: Path | None = None
+    geogrid_file: Path | None = None
+    nodes: int = 1
+    ntasks_per_node: int = 0
     exclusive: bool = True
-    nscribes: int = 2
+    nscribes: int = 0
     omp_num_threads: int = 2
     oversubscribe: bool = False
-    binary: str = _DEFAULT_SCHISM_BINARY
+    schism_exe: Path | None = None
     include_noaa_gages: bool = False
+    discharge_file: Path | None = None
+    create_water_level_animation: bool = False
+    animation_fps: int = 10
+    animation_time_stride: int = 1
+    obs_points_csv: Path | None = None
+    output_freq_hours: float = 1.0
+    single_output_file: bool = False
+    run_param_overrides: dict[str, Any] = field(default_factory=dict)
+    runtime_env: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        self.singularity_image = Path(self.singularity_image).expanduser().resolve()
+        if self.prebuilt_dir is not None:
+            self.prebuilt_dir = Path(self.prebuilt_dir).expanduser().resolve()
+        if self.geogrid_file is not None:
+            self.geogrid_file = Path(self.geogrid_file).expanduser().resolve()
+        if self.schism_exe is not None:
+            self.schism_exe = Path(self.schism_exe).expanduser().resolve()
+        if self.discharge_file is not None:
+            self.discharge_file = Path(self.discharge_file).expanduser().resolve()
+        if self.obs_points_csv is not None:
+            self.obs_points_csv = Path(self.obs_points_csv).expanduser().resolve()
+        if self.ntasks_per_node <= 0:
+            from coastal_calibration.utils import get_cpu_count
+
+            self.ntasks_per_node = max(get_cpu_count() // max(self.omp_num_threads, 1), 1)
+        if self.nscribes <= 0:
+            from coastal_calibration.schism.prep import count_required_scribes
+
+            detected: int | None = None
+            if self.prebuilt_dir is not None:
+                detected = count_required_scribes(
+                    self.prebuilt_dir / "param.nml", self.include_noaa_gages
+                )
+            self.nscribes = detected if detected and detected > 0 else 2
 
     @property
     def model_name(self) -> str:  # noqa: D102
@@ -351,64 +460,89 @@ class SchismModelConfig(ModelConfig):
         """Total number of MPI tasks (nodes * ntasks_per_node)."""
         return self.nodes * self.ntasks_per_node
 
-    def schism_mesh(self, sim: SimulationConfig, paths: PathConfig) -> Path:
-        """SCHISM ESMF mesh file path for the given domain."""
-        return paths.parm_nwm / "coastal" / sim.coastal_domain / "hgrid.nc"
+    @property
+    def coastal_parm(self) -> Path:
+        """Directory containing prebuilt SCHISM model files."""
+        if self.prebuilt_dir is None:
+            raise ValueError("model_config.prebuilt_dir is not set")
+        return self.prebuilt_dir
+
+    @property
+    def geogrid_path(self) -> Path:
+        """WRF geogrid file used for atmospheric regridding."""
+        if self.geogrid_file is None:
+            raise ValueError("model_config.geogrid_file is not set")
+        return self.geogrid_file
+
+    @property
+    def schism_mesh(self) -> Path:
+        """SCHISM ESMF mesh file path."""
+        return self.coastal_parm / "hgrid.nc"
+
+    @property
+    def resolved_discharge_file(self) -> Path | None:
+        """Resolve the NWM-reaches discharge CSV, or ``None`` to skip discharge.
+
+        Resolution order:
+
+        1. ``discharge_file`` explicitly set → use it if it exists, else
+           ``None``. An explicit configuration is treated as exclusive: it
+           does not silently fall back to the prebuilt-directory convention.
+        2. ``discharge_file`` unset → look for ``nwmReaches.csv`` next to
+           the prebuilt model (matching the Pacific/Hawaii/PRVI/AtlGulf
+           convention). Use it if present.
+        3. Otherwise → ``None`` (river forcing is skipped and SCHISM is
+           configured with ``if_source = 0``).
+
+        A missing optional file degrades gracefully — the caller skips
+        discharge rather than aborting.
+        """
+        if self.discharge_file is not None:
+            return self.discharge_file if self.discharge_file.exists() else None
+        if self.prebuilt_dir is None:
+            return None
+        candidate = self.prebuilt_dir / "nwmReaches.csv"
+        return candidate if candidate.exists() else None
+
+    @property
+    def elevation_correction_csv(self) -> Path | None:
+        """Return ``elevation_correction.csv`` next to the prebuilt model.
+
+        Returns ``None`` when ``prebuilt_dir`` is unset *or* when the
+        correction file is absent. Callers can pass the result straight
+        into readers that accept an optional path without re-doing the
+        ``exists()`` check.
+        """
+        if self.prebuilt_dir is None:
+            return None
+        candidate = self.prebuilt_dir / "elevation_correction.csv"
+        return candidate if candidate.exists() else None
 
     @property
     def stage_order(self) -> list[str]:  # noqa: D102
         return [
             "download",
-            "pre_forcing",
-            "nwm_forcing",
-            "post_forcing",
-            "update_params",
+            "schism_forcing_prep",
+            "schism_forcing",
+            "schism_sflux",
+            "schism_params",
             "schism_obs",
-            "boundary_conditions",
-            "pre_schism",
+            "schism_boundary",
+            "schism_discharge",
+            "schism_prep",
             "schism_run",
-            "post_schism",
+            "schism_postprocess",
             "schism_plot",
         ]
 
     def build_environment(  # noqa: D102
-        self, env: dict[str, str], config: CoastalCalibConfig
+        self,
+        env: dict[str, str],
+        config: CoastalCalibConfig,  # noqa: ARG002
     ) -> dict[str, str]:
-        env["NODES"] = str(self.nodes)
-        env["NCORES"] = str(self.ntasks_per_node)
-        env["NPROCS"] = str(self.total_tasks)
-        env["NSCRIBES"] = str(self.nscribes)
-        env["OMP_NUM_THREADS"] = str(self.omp_num_threads)
-        env["OMP_PLACES"] = "cores"
-        env["SCHISM_ESMFMESH"] = str(self.schism_mesh(config.simulation, config.paths))
+        from coastal_calibration.utils import build_mpi_env
 
-        # MPI / AWS EFA fabric tuning — required for reliable MPI
-        # on EFA-enabled instances (e.g. c5n-18xlarge).  Without
-        # these, MPI collectives can hang during ESMF initialisation.
-        env["MPICH_OFI_STARTUP_CONNECT"] = "1"
-        env["MPICH_COLL_SYNC"] = "MPI_Bcast"
-        env["MPICH_REDUCE_NO_SMP"] = "1"
-        env["FI_OFI_RXM_SAR_LIMIT"] = "3145728"
-        env["FI_MR_CACHE_MAX_COUNT"] = "0"
-        env["FI_EFA_RECVWIN_SIZE"] = "65536"
-
-        # SCHISM date variables
-        sim = config.simulation
-        start_dt = datetime.strptime(f"{sim.start_pdy} {sim.start_cyc}", "%Y%m%d %H").replace(
-            tzinfo=UTC
-        )
-        length_hrs = int(sim.duration_hours)
-        pdycyc = f"{sim.start_pdy}{sim.start_cyc}"
-
-        if length_hrs <= 0:
-            schism_begin_dt = start_dt + timedelta(hours=length_hrs)
-            env["SCHISM_BEGIN_DATE"] = schism_begin_dt.strftime("%Y%m%d%H00")
-            env["SCHISM_END_DATE"] = f"{pdycyc}00"
-        else:
-            env["SCHISM_BEGIN_DATE"] = f"{pdycyc}00"
-            schism_end_dt = start_dt + timedelta(hours=length_hrs)
-            env["SCHISM_END_DATE"] = schism_end_dt.strftime("%Y%m%d%H00")
-
+        build_mpi_env(env)
         return env
 
     def validate(self, config: CoastalCalibConfig) -> list[str]:  # noqa: D102
@@ -421,35 +555,68 @@ class SchismModelConfig(ModelConfig):
             errors.append("model_config.ntasks_per_node must be at least 1")
 
         if self.nscribes >= self.total_tasks:
-            errors.append("model_config.nscribes must be less than total MPI tasks")
+            errors.append(
+                f"model_config: nscribes ({self.nscribes}) leaves no compute ranks "
+                f"with total MPI tasks {self.total_tasks} "
+                f"(nodes={self.nodes} * ntasks_per_node={self.ntasks_per_node}). "
+                "Either lower omp_num_threads (typical: 1) to widen ntasks_per_node, "
+                "raise ntasks_per_node explicitly (set oversubscribe: true if it "
+                "exceeds physical cores), or reduce iof_* outputs in the prebuilt "
+                "param.nml."
+            )
+
+        if self.schism_exe and not self.schism_exe.exists():
+            errors.append(f"model_config.schism_exe not found: {self.schism_exe}")
 
         if config.paths.hot_start_file and not config.paths.hot_start_file.exists():
             errors.append(f"Hot start file not found: {config.paths.hot_start_file}")
 
-        if not config.paths.raw_download_dir:
-            errors.append("paths.raw_download_dir is required")
+        if self.prebuilt_dir is None:
+            errors.append("model_config.prebuilt_dir is required")
+        elif not self.prebuilt_dir.exists():
+            errors.append(f"model_config.prebuilt_dir not found: {self.prebuilt_dir}")
+        else:
+            required = [
+                "hgrid.gr3",
+                "vgrid.in",
+                "param.nml",
+                "bctides.in",
+            ]
+            errors.extend(
+                f"Required file missing in model_config.prebuilt_dir: {fname}"
+                for fname in required
+                if not (self.prebuilt_dir / fname).exists()
+            )
 
-        if not self.singularity_image.exists():
-            errors.append(f"Singularity image not found: {self.singularity_image}")
+        if self.discharge_file and not self.discharge_file.exists():
+            errors.append(f"model_config.discharge_file not found: {self.discharge_file}")
+
+        if self.geogrid_file is None:
+            errors.append(
+                "model_config.geogrid_file is required for atmospheric forcing regridding"
+            )
+        elif not self.geogrid_file.exists():
+            errors.append(f"model_config.geogrid_file not found: {self.geogrid_file}")
 
         return errors
 
     def create_stages(  # noqa: D102
         self, config: CoastalCalibConfig, monitor: Any
     ) -> dict[str, Any]:
-        from coastal_calibration.stages.boundary import (
+        from coastal_calibration.data.download_stage import DownloadStage
+        from coastal_calibration.schism.boundary import (
             BoundaryConditionStage,
             UpdateParamsStage,
         )
-        from coastal_calibration.stages.download import DownloadStage
-        from coastal_calibration.stages.forcing import (
+        from coastal_calibration.schism.forcing import (
             NWMForcingStage,
             PostForcingStage,
             PreForcingStage,
         )
-        from coastal_calibration.stages.schism import (
+        from coastal_calibration.schism.stages import (
             PostSCHISMStage,
             PreSCHISMStage,
+            SchismDischargeStage,
             SchismObservationStage,
             SchismPlotStage,
             SCHISMRunStage,
@@ -457,41 +624,42 @@ class SchismModelConfig(ModelConfig):
 
         return {
             "download": DownloadStage(config, monitor),
-            "pre_forcing": PreForcingStage(config, monitor),
-            "nwm_forcing": NWMForcingStage(config, monitor),
-            "post_forcing": PostForcingStage(config, monitor),
+            "schism_forcing_prep": PreForcingStage(config, monitor),
+            "schism_forcing": NWMForcingStage(config, monitor),
+            "schism_sflux": PostForcingStage(config, monitor),
+            "schism_params": UpdateParamsStage(config, monitor),
             "schism_obs": SchismObservationStage(config, monitor),
-            "update_params": UpdateParamsStage(config, monitor),
-            "boundary_conditions": BoundaryConditionStage(config, monitor),
-            "pre_schism": PreSCHISMStage(config, monitor),
+            "schism_boundary": BoundaryConditionStage(config, monitor),
+            "schism_discharge": SchismDischargeStage(config, monitor),
+            "schism_prep": PreSCHISMStage(config, monitor),
             "schism_run": SCHISMRunStage(config, monitor),
-            "post_schism": PostSCHISMStage(config, monitor),
+            "schism_postprocess": PostSCHISMStage(config, monitor),
             "schism_plot": SchismPlotStage(config, monitor),
         }
 
-    def generate_job_script_lines(  # noqa: D102
-        self, config: CoastalCalibConfig
-    ) -> list[str]:
-        lines = [
-            f"#SBATCH -N {self.nodes}",
-            f"#SBATCH --ntasks-per-node={self.ntasks_per_node}",
-        ]
-        if self.exclusive:
-            lines.append("#SBATCH --exclusive")
-        return lines
-
     def to_dict(self) -> dict[str, Any]:  # noqa: D102
-        return {
+        d: dict[str, Any] = {
+            "prebuilt_dir": str(self.prebuilt_dir) if self.prebuilt_dir else None,
+            "geogrid_file": str(self.geogrid_file) if self.geogrid_file else None,
             "nodes": self.nodes,
-            "singularity_image": str(self.singularity_image),
             "ntasks_per_node": self.ntasks_per_node,
             "exclusive": self.exclusive,
             "nscribes": self.nscribes,
             "omp_num_threads": self.omp_num_threads,
             "oversubscribe": self.oversubscribe,
-            "binary": self.binary,
+            "schism_exe": (str(self.schism_exe) if self.schism_exe else None),
             "include_noaa_gages": self.include_noaa_gages,
+            "discharge_file": (str(self.discharge_file) if self.discharge_file else None),
+            "create_water_level_animation": self.create_water_level_animation,
+            "animation_fps": self.animation_fps,
+            "animation_time_stride": self.animation_time_stride,
+            "obs_points_csv": (str(self.obs_points_csv) if self.obs_points_csv else None),
+            "output_freq_hours": self.output_freq_hours,
+            "single_output_file": self.single_output_file,
+            "run_param_overrides": self.run_param_overrides,
+            "runtime_env": self.runtime_env,
         }
+        return d
 
 
 @dataclass
@@ -509,17 +677,6 @@ class SfincsModelConfig(ModelConfig):
     model_root : Path, optional
         Output directory for the built model.  Defaults to
         ``{work_dir}/sfincs_model``.
-    include_noaa_gages : bool
-        When True, automatically query NOAA CO-OPS for water level
-        stations within the model domain and add them as observation
-        points.  Requires the ``plot`` optional dependencies.
-    observation_points : list, optional
-        Observation point specifications as list of dicts with
-        ``x``, ``y``, ``name`` keys (coordinates in model CRS).
-    observation_locations_file : Path, optional
-        Path to a GeoJSON file with observation point locations.
-    merge_observations : bool
-        Whether to merge with pre-existing observation points.
     discharge_locations_file : Path, optional
         Path to a SFINCS ``.src`` or GeoJSON with discharge source point
         locations.
@@ -550,10 +707,10 @@ class SfincsModelConfig(ModelConfig):
            full CONUS extent, producing multi-GB files and very slow
            simulations.
     forcing_to_mesh_offset_m : float
-        Vertical offset in metres *added* to the boundary-condition water
+        Vertical offset in meters *added* to the boundary-condition water
         levels before they enter SFINCS.
 
-        Tidal-only sources such as TPXO provide oscillations centred on
+        Tidal-only sources (harmonic prediction) provide oscillations centered on
         zero (MSL) but carry no information about where MSL sits on the
         mesh's vertical datum.  This parameter anchors the forcing signal
         to the correct geodetic height on the mesh.  Set it to the
@@ -566,7 +723,7 @@ class SfincsModelConfig(ModelConfig):
 
         Defaults to ``0.0``.
     vdatum_mesh_to_msl_m : float
-        Vertical offset in metres *added* to the simulated water level
+        Vertical offset in meters *added* to the simulated water level
         before comparison with NOAA CO-OPS observations (which are in
         MSL).  The model output inherits the mesh vertical datum, so
         this converts it to MSL (e.g. ``0.171`` for a NAVD88 mesh on
@@ -574,29 +731,231 @@ class SfincsModelConfig(ModelConfig):
 
         Defaults to ``0.0``.
     sfincs_exe : Path, optional
-        Path to a locally compiled SFINCS executable.  When set, the
-        ``sfincs_run`` stage invokes this binary directly instead of
-        using a Singularity container, making it possible to run on
-        systems where Singularity is unavailable (e.g. macOS laptops).
-        The container-related options (``container_tag``,
-        ``container_image``) are ignored when ``sfincs_exe`` is set.
-    container_tag : str
-        Tag for the ``deltares/sfincs-cpu`` Docker/Singularity image.
-    container_image : Path, optional
-        Path to a pre-pulled Singularity SIF file.
+        Path to a compiled SFINCS executable.  When set, the
+        ``sfincs_run`` stage uses this binary instead of discovering
+        ``sfincs`` on ``PATH``.  Normally not needed -- SFINCS is
+        compiled automatically when activating a pixi environment
+        with the ``sfincs`` feature.
     omp_num_threads : int
         Number of OpenMP threads.  Defaults to the number of physical CPU
-        cores on the current machine (see :func:`~coastal_calibration.utils.system.get_cpu_count`).
+        cores on the current machine (see :func:`~coastal_calibration.utils.get_cpu_count`).
         On HPC nodes this auto-detects correctly; on a local laptop it
         avoids over-subscribing the system.
+    run_param_overrides : dict
+        Arbitrary key/value pairs written to ``sfincs.inp`` just before the
+        model is written to disk.  Use this to override physics parameters
+        that HydroMT-SFINCS sets by default (e.g. ``advection: 0``,
+        ``nuvisc: 0.01``).  Keys must be valid ``sfincs.inp`` parameter
+        names.  Mirrors the SCHISM ``run_param_overrides`` option.
+    create_water_level_animation : bool
+        When True, the ``sfincs_plot`` stage loads the time-dependent
+        water level field from ``sfincs_map.nc`` and renders an MP4
+        animation to ``figs/water_level.mp4`` using
+        :func:`coastal_calibration.plotting.animate_water_level`.
+        Requires an ``ffmpeg`` binary on PATH.  Defaults to False.
+    animation_fps : int
+        Frames per second for the animation output.
+    animation_time_stride : int
+        Keep every ``animation_time_stride``-th frame from the model
+        time series; useful for long runs.
+    obs_points_csv : Path, optional
+        Path to a CSV with columns ``id, lon, lat`` specifying extra
+        observation points for water-level extraction after the run.
+        The ``sfincs_plot`` stage interpolates water-surface elevation
+        at each point (and at any NOAA CO-OPS gauges found in
+        ``obs_station_map.json``) and writes the combined time series
+        to ``obs_water_level.parquet`` alongside ``sfincs_map.nc``.
     """
+
+    # Known sfincs.inp parameter names parsed by the SFINCS binary
+    # (extracted from SFINCS/source/src/sfincs_input.f90).  Used to
+    # catch typos in ``run_param_overrides`` early — SFINCS silently
+    # ignores unrecognized parameters.
+    _KNOWN_INP_PARAMS: ClassVar[frozenset[str]] = frozenset(
+        {
+            "advection",
+            "advection_mask",
+            "advection_scheme",
+            "advlim",
+            "alpha",
+            "amprblock",
+            "ampfile",
+            "amprfile",
+            "amufile",
+            "amvfile",
+            "baro",
+            "bcafile",
+            "bdrfile",
+            "bndfile",
+            "bndtype",
+            "btfilter",
+            "btrelax",
+            "bzifile",
+            "bzsfile",
+            "cdnrb",
+            "cdval",
+            "cdwnd",
+            "coriolis",
+            "crsgeo",
+            "crsfile",
+            "cstfile",
+            "debug",
+            "depfile",
+            "disfile",
+            "drnfile",
+            "dtmax",
+            "dtmaxout",
+            "dtmapout",
+            "dtout",
+            "dtrstout",
+            "dthisout",
+            "dtwave",
+            "dtwnd",
+            "dx",
+            "dy",
+            "epsg",
+            "f0file",
+            "factor_pres",
+            "factor_prcp",
+            "factor_spw_size",
+            "factor_wind",
+            "fcfile",
+            "freqmaxig",
+            "freqminig",
+            "friction2d",
+            "gapres",
+            "global",
+            "h73table",
+            "hmin_cfl",
+            "horton_kr_kd",
+            "huthresh",
+            "indexfile",
+            "inifile",
+            "inputformat",
+            "kdfile",
+            "ksfile",
+            "latitude",
+            "manning",
+            "manning_land",
+            "manning_sea",
+            "manningfile",
+            "mmax",
+            "mskfile",
+            "nc_deflate_level",
+            "ncinifile",
+            "netamprfile",
+            "netampfile",
+            "netamuamvfile",
+            "netbndbzsbzifile",
+            "netsrcdisfile",
+            "netspwfile",
+            "nfreqsig",
+            "nmax",
+            "nonh",
+            "nh_fnudge",
+            "nh_itermax",
+            "nh_tol",
+            "nh_tstop",
+            "nuvisc",
+            "nuviscfac",
+            "obsfile",
+            "outputformat",
+            "outputtype_his",
+            "outputtype_map",
+            "pavbnd",
+            "percentage_done",
+            "precipfile",
+            "prcfile",
+            "psifile",
+            "qinf",
+            "qinf_zmin",
+            "qinffile",
+            "qtrfile",
+            "radstr",
+            "regular_output_on_mesh",
+            "rgh_lev_land",
+            "rhoa",
+            "rhow",
+            "rotation",
+            "rstfile",
+            "rugdepth",
+            "rugfile",
+            "sbgfile",
+            "scsfile",
+            "sefffile",
+            "sfacinf",
+            "sigmafile",
+            "slopelim",
+            "smaxfile",
+            "snapwave",
+            "snapwave_use_nearest",
+            "snapwave_wind",
+            "spwfile",
+            "spwmergefrac",
+            "srcfile",
+            "store_dynamic_bed_level",
+            "store_tsunami_arrival_time",
+            "storecumprcp",
+            "storefluxmax",
+            "storefw",
+            "storehmean",
+            "storehsubgrid",
+            "storemeteo",
+            "storemaxwind",
+            "storeqdrain",
+            "storestoragevolume",
+            "storetzsmax",
+            "storetwet",
+            "storevel",
+            "storevelmax",
+            "storewavdir",
+            "storezvolume",
+            "structure_relax",
+            "t0out",
+            "t1out",
+            "thdfile",
+            "theta",
+            "tref",
+            "trstout",
+            "tspinup",
+            "tstart",
+            "tstop",
+            "tsunami_arrival_threshold",
+            "twet_threshold",
+            "use_bcafile",
+            "usespwprecip",
+            "utmzone",
+            "uvlim",
+            "uvmax",
+            "viscosity",
+            "volfile",
+            "wave_enhanced_roughness",
+            "waveage",
+            "weirfile",
+            "wfpfile",
+            "whifile",
+            "wiggle_factor",
+            "wiggle_suppression",
+            "wiggle_threshold",
+            "wmfred",
+            "wmsignal",
+            "wmtfilter",
+            "wndfile",
+            "writeruntime",
+            "wstfile",
+            "wtifile",
+            "wvmfile",
+            "x0",
+            "y0",
+            "z0lfile",
+            "zsini",
+            "spinup_meteo",
+            "dtoutfixed",
+        }
+    )
 
     prebuilt_dir: Path
     model_root: Path | None = None
-    include_noaa_gages: bool = False
-    observation_points: list[dict[str, Any]] = field(default_factory=list)
-    observation_locations_file: Path | None = None
-    merge_observations: bool = False
     discharge_locations_file: Path | None = None
     merge_discharge: bool = False
     include_precip: bool = False
@@ -606,28 +965,33 @@ class SfincsModelConfig(ModelConfig):
     forcing_to_mesh_offset_m: float = 0.0
     vdatum_mesh_to_msl_m: float = 0.0
     sfincs_exe: Path | None = None
-    container_tag: str = "latest"
-    container_image: Path | None = None
     omp_num_threads: int = field(default=0)
+    run_param_overrides: dict[str, Any] = field(default_factory=dict)
+    floodmap_dem: Path | None = None
+    floodmap_hmin: float = 0.05
+    floodmap_enabled: bool = True
+    create_water_level_animation: bool = False
+    animation_fps: int = 10
+    animation_time_stride: int = 1
+    obs_points_csv: Path | None = None
+    runtime_env: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self.prebuilt_dir = Path(self.prebuilt_dir).expanduser().resolve()
         if self.model_root is not None:
             self.model_root = Path(self.model_root).expanduser().resolve()
-        if self.observation_locations_file is not None:
-            self.observation_locations_file = (
-                Path(self.observation_locations_file).expanduser().resolve()
-            )
         if self.discharge_locations_file is not None:
             self.discharge_locations_file = (
                 Path(self.discharge_locations_file).expanduser().resolve()
             )
         if self.sfincs_exe is not None:
             self.sfincs_exe = Path(self.sfincs_exe).expanduser().resolve()
-        if self.container_image is not None:
-            self.container_image = Path(self.container_image).expanduser().resolve()
+        if self.floodmap_dem is not None:
+            self.floodmap_dem = Path(self.floodmap_dem).expanduser().resolve()
+        if self.obs_points_csv is not None:
+            self.obs_points_csv = Path(self.obs_points_csv).expanduser().resolve()
         if self.omp_num_threads <= 0:
-            from coastal_calibration.utils.system import get_cpu_count
+            from coastal_calibration.utils import get_cpu_count
 
             self.omp_num_threads = get_cpu_count()
 
@@ -644,23 +1008,24 @@ class SfincsModelConfig(ModelConfig):
             "sfincs_init",
             "sfincs_timing",
             "sfincs_forcing",
-            "sfincs_obs",
             "sfincs_discharge",
             "sfincs_precip",
             "sfincs_wind",
             "sfincs_pressure",
             "sfincs_write",
             "sfincs_run",
+            "sfincs_floodmap",
             "sfincs_plot",
         ]
 
     def build_environment(  # noqa: D102
-        self, env: dict[str, str], config: CoastalCalibConfig
+        self,
+        env: dict[str, str],
+        config: CoastalCalibConfig,  # noqa: ARG002
     ) -> dict[str, str]:
-        env["OMP_NUM_THREADS"] = str(self.omp_num_threads)
         return env
 
-    def validate(self, config: CoastalCalibConfig) -> list[str]:  # noqa: D102
+    def validate(self, config: CoastalCalibConfig) -> list[str]:  # noqa: D102, ARG002
         errors: list[str] = []
 
         if not self.prebuilt_dir.exists():
@@ -673,12 +1038,6 @@ class SfincsModelConfig(ModelConfig):
                 if not (self.prebuilt_dir / fname).exists()
             )
 
-        if self.observation_locations_file and not self.observation_locations_file.exists():
-            errors.append(
-                "model_config.observation_locations_file not found: "
-                f"{self.observation_locations_file}"
-            )
-
         if self.discharge_locations_file and not self.discharge_locations_file.exists():
             errors.append(
                 f"model_config.discharge_locations_file not found: {self.discharge_locations_file}"
@@ -687,21 +1046,26 @@ class SfincsModelConfig(ModelConfig):
         if self.sfincs_exe and not self.sfincs_exe.exists():
             errors.append(f"model_config.sfincs_exe not found: {self.sfincs_exe}")
 
-        if self.container_image and not self.container_image.exists():
-            errors.append(f"model_config.container_image not found: {self.container_image}")
+        if self.run_param_overrides:
+            unknown = sorted(set(self.run_param_overrides) - self._KNOWN_INP_PARAMS)
+            if unknown:
+                errors.append(
+                    f"Unrecognized sfincs.inp parameter(s): {', '.join(unknown)}. "
+                    "SFINCS silently ignores unknown parameters; check for typos."
+                )
 
         return errors
 
     def create_stages(  # noqa: D102
         self, config: CoastalCalibConfig, monitor: Any
     ) -> dict[str, Any]:
-        from coastal_calibration.stages.download import DownloadStage
-        from coastal_calibration.stages.sfincs_build import (
+        from coastal_calibration.data.download_stage import DownloadStage
+        from coastal_calibration.sfincs.stages import (
             SfincsDataCatalogStage,
             SfincsDischargeStage,
+            SfincsFloodMapStage,
             SfincsForcingStage,
             SfincsInitStage,
-            SfincsObservationPointsStage,
             SfincsPlotStage,
             SfincsPrecipitationStage,
             SfincsPressureStage,
@@ -719,36 +1083,20 @@ class SfincsModelConfig(ModelConfig):
             "sfincs_init": SfincsInitStage(config, monitor),
             "sfincs_timing": SfincsTimingStage(config, monitor),
             "sfincs_forcing": SfincsForcingStage(config, monitor),
-            "sfincs_obs": SfincsObservationPointsStage(config, monitor),
             "sfincs_discharge": SfincsDischargeStage(config, monitor),
             "sfincs_precip": SfincsPrecipitationStage(config, monitor),
             "sfincs_wind": SfincsWindStage(config, monitor),
             "sfincs_pressure": SfincsPressureStage(config, monitor),
             "sfincs_write": SfincsWriteStage(config, monitor),
             "sfincs_run": SfincsRunStage(config, monitor),
+            "sfincs_floodmap": SfincsFloodMapStage(config, monitor),
             "sfincs_plot": SfincsPlotStage(config, monitor),
         }
-
-    def generate_job_script_lines(  # noqa: D102
-        self, config: CoastalCalibConfig
-    ) -> list[str]:
-        return [
-            "#SBATCH -N 1",
-            "#SBATCH --ntasks=1",
-            f"#SBATCH --cpus-per-task={self.omp_num_threads}",
-            "#SBATCH --exclusive",
-        ]
 
     def to_dict(self) -> dict[str, Any]:  # noqa: D102
         return {
             "prebuilt_dir": str(self.prebuilt_dir),
             "model_root": str(self.model_root) if self.model_root else None,
-            "include_noaa_gages": self.include_noaa_gages,
-            "observation_points": self.observation_points,
-            "observation_locations_file": (
-                str(self.observation_locations_file) if self.observation_locations_file else None
-            ),
-            "merge_observations": self.merge_observations,
             "discharge_locations_file": (
                 str(self.discharge_locations_file) if self.discharge_locations_file else None
             ),
@@ -759,9 +1107,16 @@ class SfincsModelConfig(ModelConfig):
             "forcing_to_mesh_offset_m": self.forcing_to_mesh_offset_m,
             "vdatum_mesh_to_msl_m": self.vdatum_mesh_to_msl_m,
             "sfincs_exe": (str(self.sfincs_exe) if self.sfincs_exe else None),
-            "container_tag": self.container_tag,
-            "container_image": (str(self.container_image) if self.container_image else None),
             "omp_num_threads": self.omp_num_threads,
+            "run_param_overrides": self.run_param_overrides,
+            "floodmap_dem": (str(self.floodmap_dem) if self.floodmap_dem else None),
+            "floodmap_hmin": self.floodmap_hmin,
+            "floodmap_enabled": self.floodmap_enabled,
+            "create_water_level_animation": self.create_water_level_animation,
+            "animation_fps": self.animation_fps,
+            "animation_time_stride": self.animation_time_stride,
+            "obs_points_csv": (str(self.obs_points_csv) if self.obs_points_csv else None),
+            "runtime_env": self.runtime_env,
         }
 
 
@@ -795,7 +1150,7 @@ def _interpolate_value(value: Any, context: dict[str, Any]) -> Any:
     value : Any
         The value to interpolate. If not a string, returns unchanged.
     context : dict
-        Flat dictionary of available variables (e.g., {"slurm.user": "john"}).
+        Flat dictionary of available variables (e.g., {"user": "john"}).
 
     Returns
     -------
@@ -804,8 +1159,8 @@ def _interpolate_value(value: Any, context: dict[str, Any]) -> Any:
 
     Examples
     --------
-    >>> ctx = {"slurm.user": "john", "simulation.coastal_domain": "hawaii"}
-    >>> _interpolate_value("/data/${slurm.user}/${simulation.coastal_domain}", ctx)
+    >>> ctx = {"user": "john", "simulation.coastal_domain": "hawaii"}
+    >>> _interpolate_value("/data/${user}/${simulation.coastal_domain}", ctx)
     '/data/john/hawaii'
     """
     if not isinstance(value, str):
@@ -835,7 +1190,7 @@ def _build_interpolation_context(data: dict[str, Any]) -> dict[str, Any]:
     Returns
     -------
     dict
-        Flat dictionary with keys like "slurm.user", "simulation.coastal_domain".
+        Flat dictionary with keys like "user", "simulation.coastal_domain".
     """
     context: dict[str, Any] = {}
     for section, values in data.items():
@@ -846,10 +1201,9 @@ def _build_interpolation_context(data: dict[str, Any]) -> dict[str, Any]:
     # Top-level scalar keys (e.g., "model") are available without a section prefix.
     if "model" in data:
         context["model"] = data["model"]
-    # Fall back to $USER env var when slurm.user is not provided, so that
-    # default path templates (which reference ${slurm.user}) resolve correctly.
-    if "slurm.user" not in context:
-        context["slurm.user"] = os.environ.get("USER", "unknown")
+    # Resolve ${user} from $USER env var for default path templates.
+    if "user" not in context:
+        context["user"] = os.environ.get("USER", "unknown")
     return context
 
 
@@ -881,80 +1235,6 @@ def _interpolate_config(data: dict[str, Any]) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Backward compatibility migration helpers
-# ---------------------------------------------------------------------------
-
-# Maps old SfincsModelConfig field names to new names.
-_SFINCS_FIELD_MIGRATION: dict[str, str] = {
-    "model_dir": "prebuilt_dir",
-    "docker_tag": "container_tag",
-    "sif_path": "container_image",
-    "obs_points": "observation_points",
-    "obs_locations": "observation_locations_file",
-    "obs_merge": "merge_observations",
-    "src_locations": "discharge_locations_file",
-    "src_merge": "merge_discharge",
-}
-
-# Maps old SchismModelConfig field names to new names.
-_SCHISM_FIELD_MIGRATION: dict[str, str] = {
-    "schism_binary": "binary",
-}
-
-
-def _migrate_model_config_data(
-    model_type: str,
-    data: dict[str, Any],
-) -> dict[str, Any]:
-    """Migrate old-style config keys into the new ``model_config`` dict.
-
-    Handles two legacy patterns:
-
-    1. **SCHISM** — fields were split across top-level ``mpi`` and ``slurm``
-       sections.  We pull compute fields (``nodes``, ``ntasks_per_node``,
-       ``exclusive``) from ``slurm`` and all fields from ``mpi`` into the
-       model config dict.
-    2. **SFINCS** — the model config lived under a top-level ``sfincs`` key
-       and used different field names.
-
-    In both cases the ``model_config`` key in *data* (if already present)
-    takes precedence over migrated values.
-    """
-    model_config_data: dict[str, Any] = {}
-
-    if model_type == "schism":
-        # Migrate old mpi section
-        mpi_data = data.pop("mpi", None)
-        if mpi_data is not None:
-            for old_key, new_key in _SCHISM_FIELD_MIGRATION.items():
-                if old_key in mpi_data:
-                    model_config_data[new_key] = mpi_data.pop(old_key)
-            # Remaining mpi fields map directly (nscribes, omp_num_threads, etc.)
-            model_config_data.update(mpi_data)
-
-        # Migrate compute fields from old slurm section
-        slurm_data = data.get("slurm", {})
-        for compute_key in ("nodes", "ntasks_per_node", "exclusive"):
-            if compute_key in slurm_data:
-                model_config_data.setdefault(compute_key, slurm_data.pop(compute_key))
-
-    elif model_type == "sfincs":
-        # Migrate old top-level sfincs section
-        sfincs_data = data.pop("sfincs", None)
-        if sfincs_data is not None:
-            for old_key, new_key in _SFINCS_FIELD_MIGRATION.items():
-                if old_key in sfincs_data:
-                    model_config_data[new_key] = sfincs_data.pop(old_key)
-            model_config_data.update(sfincs_data)
-
-    # Explicit model_config in YAML takes precedence
-    explicit = data.pop("model_config", {}) or {}
-    model_config_data.update(explicit)
-
-    return model_config_data
-
-
-# ---------------------------------------------------------------------------
 # Main configuration class
 # ---------------------------------------------------------------------------
 
@@ -969,14 +1249,12 @@ class CoastalCalibConfig:
     :data:`MODEL_REGISTRY`.
     """
 
-    slurm: SlurmConfig
     simulation: SimulationConfig
     boundary: BoundaryConfig
     paths: PathConfig
-    model_config: ModelConfig
+    model_config: SchismModelConfig | SfincsModelConfig
     monitoring: MonitoringConfig = field(default_factory=MonitoringConfig)
     download: DownloadConfig = field(default_factory=DownloadConfig)
-    _base_config: Path | None = field(default=None, repr=False)
 
     @property
     def model(self) -> str:
@@ -984,23 +1262,30 @@ class CoastalCalibConfig:
         return self.model_config.model_name
 
     @classmethod
-    def _from_dict(
-        cls, data: dict[str, Any], base_config_path: Path | None = None
-    ) -> CoastalCalibConfig:
-        """Create config from dictionary."""
+    def from_dict(cls, data: dict[str, Any]) -> CoastalCalibConfig:
+        """Create config from a plain dictionary.
+
+        Parameters
+        ----------
+        data : dict
+            Configuration dictionary with the same structure as the YAML
+            file (see :meth:`to_dict` for the expected keys). The dict
+            is read but not mutated.
+
+        Returns
+        -------
+        CoastalCalibConfig
+        """
         if "model" not in data:
             raise ValueError("'model' is required (e.g., model: schism or model: sfincs)")
         model_type: str = data["model"]
 
-        # Migrate legacy keys into model_config
-        model_config_data = _migrate_model_config_data(model_type, data)
-
-        slurm_data = data.get("slurm", {})
-        slurm = SlurmConfig(**slurm_data)
+        # Read but do not mutate the caller's dict.
+        model_config_data = data.get("model_config") or {}
 
         sim_data = data.get("simulation", {})
         if "start_date" in sim_data:
-            sim_data["start_date"] = _parse_datetime(sim_data["start_date"])
+            sim_data["start_date"] = pd.to_datetime(sim_data["start_date"]).to_pydatetime()
         simulation = SimulationConfig(**sim_data)
 
         boundary_data = data.get("boundary", {})
@@ -1009,12 +1294,6 @@ class CoastalCalibConfig:
         boundary = BoundaryConfig(**boundary_data)
 
         paths_data = data.get("paths", {})
-        # Remove deprecated keys that have moved elsewhere
-        paths_data.pop("otps_dir", None)
-        # singularity_image moved to model_config (SchismModelConfig)
-        simg = paths_data.pop("singularity_image", None)
-        if simg and model_type == "schism":
-            model_config_data.setdefault("singularity_image", simg)
         paths = PathConfig(**paths_data)
 
         monitoring_data = data.get("monitoring", {})
@@ -1035,14 +1314,12 @@ class CoastalCalibConfig:
         model_config = model_cls(**model_config_data)
 
         return cls(
-            slurm=slurm,
             simulation=simulation,
             boundary=boundary,
             paths=paths,
-            model_config=model_config,
+            model_config=model_config,  # pyright: ignore[reportArgumentType]
             monitoring=monitoring,
             download=download,
-            _base_config=base_config_path,
         )
 
     @classmethod
@@ -1052,7 +1329,7 @@ class CoastalCalibConfig:
         Supports variable interpolation using ${section.key} syntax.
         Variables are resolved from other config values, e.g.:
 
-        - ``${slurm.user}`` -> value of ``slurm.user``
+        - ``${user}`` -> value of ``$USER`` environment variable
         - ``${simulation.coastal_domain}`` -> value of ``simulation.coastal_domain``
         - ``${model}`` -> the model type string (``"schism"`` or ``"sfincs"``)
 
@@ -1085,7 +1362,6 @@ class CoastalCalibConfig:
         if data is None:
             raise ValueError(f"Configuration file is empty: {config_path}")
 
-        base_config = None
         if "_base" in data:
             base_path = Path(data.pop("_base"))
             if not base_path.is_absolute():
@@ -1096,31 +1372,15 @@ class CoastalCalibConfig:
         # Ensure model key has a default before interpolation
         data.setdefault("model", "schism")
 
-        # Inject default path templates if not provided (before interpolation)
-        if "paths" not in data:
-            data["paths"] = {}
-        if "work_dir" not in data["paths"]:
-            data["paths"]["work_dir"] = DEFAULT_WORK_DIR_TEMPLATE
-        if "raw_download_dir" not in data["paths"]:
-            data["paths"]["raw_download_dir"] = DEFAULT_RAW_DOWNLOAD_DIR_TEMPLATE
-
         # Interpolate variables after merging
         data = _interpolate_config(data)
 
-        return cls._from_dict(data, base_config_path=config_path if base_config else None)
+        return cls.from_dict(data)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert config to dictionary."""
         return {
             "model": self.model,
-            "slurm": {
-                "job_name": self.slurm.job_name,
-                "partition": self.slurm.partition,
-                "time_limit": self.slurm.time_limit,
-                "account": self.slurm.account,
-                "qos": self.slurm.qos,
-                "user": self.slurm.user,
-            },
             "simulation": {
                 "start_date": self.simulation.start_date.isoformat(),
                 "duration_hours": self.simulation.duration_hours,
@@ -1131,19 +1391,23 @@ class CoastalCalibConfig:
             "boundary": {
                 "source": self.boundary.source,
                 "stofs_file": (str(self.boundary.stofs_file) if self.boundary.stofs_file else None),
+                "tidal_model": self.boundary.tidal_model,
             },
             "paths": {
                 "work_dir": str(self.paths.work_dir),
                 "raw_download_dir": (
                     str(self.paths.raw_download_dir) if self.paths.raw_download_dir else None
                 ),
-                "nfs_mount": str(self.paths.nfs_mount),
-                "nwm_dir": str(self.paths.nwm_dir),
                 "hot_start_file": (
                     str(self.paths.hot_start_file) if self.paths.hot_start_file else None
                 ),
-                "conda_env_name": self.paths.conda_env_name,
-                "parm_dir": str(self.paths.parm_dir),
+                **({"parm_dir": str(self.paths.parm_dir)} if self.paths.parm_dir else {}),
+                **({"nwm_dir": str(self.paths.nwm_dir)} if self.paths.nwm_dir else {}),
+                **(
+                    {"tidal_atlas_dir": str(self.paths.tidal_atlas_dir)}
+                    if self.paths.tidal_atlas_dir
+                    else {}
+                ),
             },
             "model_config": self.model_config.to_dict(),
             "monitoring": {
@@ -1189,19 +1453,19 @@ class CoastalCalibConfig:
             ):
                 errors.append(f"STOFS file not found: {self.boundary.stofs_file}")
 
-        # TPXO binary (predict_tide) is inside the Singularity container at
-        # DEFAULT_OTPS_DIR, so we only validate the data directory on the host
-        elif self.boundary.source == "tpxo" and not self.paths.tpxo_data_dir.exists():
-            errors.append(
-                f"TPXO data directory not found: {self.paths.tpxo_data_dir}. "
-                "TPXO tidal atlas data requires local installation."
-            )
+        elif self.boundary.source == "harmonic":
+            if self.paths.tidal_atlas_dir is None:
+                errors.append(
+                    "paths.tidal_atlas_dir is required when boundary.source is 'harmonic'"
+                )
+            elif not self.paths.tidal_atlas_dir.exists():
+                errors.append(f"Tidal atlas directory not found: {self.paths.tidal_atlas_dir}")
 
         return errors
 
     def validate(self) -> list[str]:
         """Validate configuration and return list of errors."""
-        from coastal_calibration.downloader import validate_date_ranges
+        from coastal_calibration.data.downloader import validate_date_ranges
 
         errors: list[str] = []
 

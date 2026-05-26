@@ -1,0 +1,40 @@
+# Shared NWM/STOFS download cache (~83 GB; never commit)
+downloads/
+
+# Per-domain runtime working dirs
+**/cache/
+**/run/
+**/run_*/
+**/output/
+**/output_*/
+**/extracted/
+**/model_a/
+**/model_b/
+**/figs/
+**/sfincs_model/
+
+# Per-domain symlinks to proprietary data (set up post-clone — see README)
+**/model
+**/geo_em_*.nc
+
+# SFINCS files written into working dirs
+**/sfincs_*.nc
+**/sfincs_*.inp
+**/sfincs_*.bnd
+**/sfincs_*.obs
+**/sfincs_*.src
+**/*.dis
+**/*_subgrid.nc
+
+# Other transient artifacts
+*.log
+*.tif
+*.tiff
+*.qmd
+gis/
+subgrid/
+.create_status.json
+.pipeline_status.json
+workflow_*.json
+slurm-*.out
+.DS_Store

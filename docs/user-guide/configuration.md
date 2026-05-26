@@ -10,9 +10,6 @@ documents all available configuration options.
 The simplest valid SCHISM configuration only requires:
 
 ```yaml
-slurm:
-  job_name: my_run
-
 simulation:
   start_date: 2021-06-11
   duration_hours: 24
@@ -32,9 +29,6 @@ A minimal SFINCS configuration requires a `model` key and a `model_config` secti
 
 ```yaml
 model: sfincs
-
-slurm:
-  job_name: my_sfincs_run
 
 simulation:
   start_date: 2025-06-01
@@ -62,25 +56,24 @@ model_config:
 Configuration values support variable interpolation using `${section.key}` syntax:
 
 ```yaml
-slurm:
-  user: john
-
 simulation:
   coastal_domain: hawaii
 
 paths:
-  work_dir: /data/${slurm.user}/${simulation.coastal_domain}
-  # Resolves to: /data/john/hawaii
+  work_dir: /data/${user}/${simulation.coastal_domain}
+  # Resolves to: /data/<your_username>/hawaii
 ```
+
+The `${user}` variable is automatically resolved from the `$USER` environment variable.
 
 ### Default Path Templates
 
 If not specified, paths are automatically generated using model-aware templates:
 
-| Path               | Default Template                                                                                                                                         |
-| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `work_dir`         | `/ngen-test/coastal/${slurm.user}/${model}_${simulation.coastal_domain}_${boundary.source}_${simulation.meteo_source}/${model}_${simulation.start_date}` |
-| `raw_download_dir` | `/ngen-test/coastal/${slurm.user}/${model}_${simulation.coastal_domain}_${boundary.source}_${simulation.meteo_source}/raw_data`                          |
+| Path               | Default Template                                                                                                                                   |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `work_dir`         | `/ngen-test/coastal/${user}/${model}_${simulation.coastal_domain}_${boundary.source}_${simulation.meteo_source}/${model}_${simulation.start_date}` |
+| `raw_download_dir` | `/ngen-test/coastal/${user}/${model}_${simulation.coastal_domain}_${boundary.source}_${simulation.meteo_source}/raw_data`                          |
 
 The `${model}` variable resolves to `schism` or `sfincs` based on the `model` key.
 
@@ -93,30 +86,6 @@ The top-level `model` key selects the model type. It defaults to `schism` if omi
 ```yaml
 model: sfincs  # or "schism" (default)
 ```
-
-### SLURM Settings
-
-Configure SLURM job scheduling. Compute resources (nodes, tasks) are model-specific and
-live in the `model_config` section.
-
-```yaml
-slurm:
-  job_name: coastal_calibration  # Job name shown in squeue
-  user: your_username            # Optional: defaults to $USER
-  partition: c5n-18xlarge        # SLURM partition
-  time_limit:                    # Time limit (HH:MM:SS), null for no limit
-  account:                       # SLURM account for billing
-  qos:                           # Quality of Service
-```
-
-| Parameter    | Type   | Default               | Description                          |
-| ------------ | ------ | --------------------- | ------------------------------------ |
-| `job_name`   | string | `coastal_calibration` | SLURM job name                       |
-| `user`       | string | `$USER`               | SLURM username (defaults to `$USER`) |
-| `partition`  | string | `c5n-18xlarge`        | SLURM partition                      |
-| `time_limit` | string | null                  | Time limit                           |
-| `account`    | string | null                  | SLURM account                        |
-| `qos`        | string | null                  | Quality of Service                   |
 
 ### Simulation Settings
 
@@ -176,22 +145,18 @@ the full home directory path.
 paths:
   work_dir: /path/to/work         # Working directory (auto-generated if not set)
   raw_download_dir: /path/to/data # Download directory (auto-generated if not set)
-  nfs_mount: /ngen-test           # NFS mount point
-  nwm_dir: /ngen-app/nwm.v3.0.6
+  nwm_dir: /path/to/nwm.v3.0.6
   hot_start_file:                 # Hot restart file for warm start
-  conda_env_name: ngen_forcing_coastal
-  parm_dir: /ngen-test/coastal/ngwpc-coastal
+  parm_dir: /path/to/coastal/parm
 ```
 
-| Parameter          | Type   | Default                            |
-| ------------------ | ------ | ---------------------------------- |
-| `work_dir`         | path   | Auto-generated from template       |
-| `raw_download_dir` | path   | Auto-generated from template       |
-| `nfs_mount`        | path   | `/ngen-test`                       |
-| `nwm_dir`          | path   | `/ngen-app/nwm.v3.0.6`             |
-| `hot_start_file`   | path   | null                               |
-| `conda_env_name`   | string | `ngen_forcing_coastal`             |
-| `parm_dir`         | path   | `/ngen-test/coastal/ngwpc-coastal` |
+| Parameter          | Type | Default                      |
+| ------------------ | ---- | ---------------------------- |
+| `work_dir`         | path | Auto-generated from template |
+| `raw_download_dir` | path | Auto-generated from template |
+| `nwm_dir`          | path | -                            |
+| `hot_start_file`   | path | null                         |
+| `parm_dir`         | path | -                            |
 
 ### Model Configuration
 
@@ -203,28 +168,32 @@ Model-specific parameters live in the `model_config` section. The contents depen
 ```yaml
 # model: schism (default, can be omitted)
 model_config:
-  singularity_image: /ngencerf-app/singularity/ngen-coastal.sif
+  prebuilt_dir: /path/to/coastal/hawaii
+  geogrid_file: /path/to/coastal/hawaii/geo_em_HI.nc
   nodes: 2                        # Number of compute nodes
   ntasks_per_node: 18             # MPI tasks per node
   exclusive: true                 # Request exclusive node access
   nscribes: 2                     # SCHISM I/O scribes
   omp_num_threads: 2              # OpenMP threads
   oversubscribe: false            # Allow MPI oversubscription
-  binary: pschism_wcoss2_NO_PARMETIS_TVD-VL.openmpi
+  schism_exe:                     # System-compiled SCHISM executable (optional)
   include_noaa_gages: true        # Enable NOAA observation stations & comparison plots
+  runtime_env: {}                 # Extra env vars for model run (optional)
 ```
 
-| Parameter            | Type   | Default                                      | Description                                  |
-| -------------------- | ------ | -------------------------------------------- | -------------------------------------------- |
-| `singularity_image`  | path   | `/ngencerf-app/singularity/ngen-coastal.sif` | Singularity/Apptainer SIF image for SCHISM   |
-| `nodes`              | int    | 2                                            | Number of compute nodes                      |
-| `ntasks_per_node`    | int    | 18                                           | MPI tasks per node                           |
-| `exclusive`          | bool   | true                                         | Request exclusive node access                |
-| `nscribes`           | int    | 2                                            | SCHISM I/O scribes                           |
-| `omp_num_threads`    | int    | 2                                            | OpenMP threads                               |
-| `oversubscribe`      | bool   | false                                        | Allow MPI oversubscription                   |
-| `binary`             | string | `pschism_wcoss2_NO_PARMETIS_TVD-VL.openmpi`  | SCHISM executable name                       |
-| `include_noaa_gages` | bool   | false                                        | Enable NOAA station discovery and comparison |
+| Parameter            | Type | Default | Description                                         |
+| -------------------- | ---- | ------- | --------------------------------------------------- |
+| `prebuilt_dir`       | path | -       | Path to pre-built SCHISM model directory            |
+| `geogrid_file`       | path | -       | WRF geogrid file for atmospheric forcing regridding |
+| `nodes`              | int  | 2       | Number of compute nodes                             |
+| `ntasks_per_node`    | int  | 18      | MPI tasks per node                                  |
+| `exclusive`          | bool | true    | Request exclusive node access                       |
+| `nscribes`           | int  | 2       | SCHISM I/O scribes                                  |
+| `omp_num_threads`    | int  | 2       | OpenMP threads                                      |
+| `oversubscribe`      | bool | false   | Allow MPI oversubscription                          |
+| `schism_exe`         | path | -       | Path to a system-compiled SCHISM executable         |
+| `include_noaa_gages` | bool | false   | Enable NOAA station discovery and comparison        |
+| `runtime_env`        | dict | `{}`    | Extra env vars for the model run subprocess         |
 
 #### NOAA Observation Stations (`include_noaa_gages`)
 
@@ -234,14 +203,14 @@ When set to `true`, two additional stages are activated in the SCHISM pipeline:
     model domain by computing a concave hull around the open boundary nodes in
     `hgrid.gr3` and querying the CO-OPS API. Writes a `station.in` file so SCHISM
     outputs time-series at those locations, and a `station_noaa_ids.txt` companion that
-    maps station indices to NOAA station IDs. The `pre_schism` stage then patches
+    maps station indices to NOAA station IDs. The `schism_prep` stage then patches
     `param.nml` to enable station output (`iout_sta = 1`, `nspool_sta = 18`).
 - **`schism_plot`**: After the SCHISM run completes, reads the station output
     (`staout_1`), fetches the corresponding NOAA CO-OPS observations (converting from
     MLLW to MSL datum), and generates 2×2 comparison plots saved to `figs/`.
 
 Both stages require network access for NOAA CO-OPS API calls and are classified as
-Python-only stages (they run on the login node in `submit` mode).
+Python-only stages.
 
 #### SFINCS Model Configuration
 
@@ -262,33 +231,36 @@ model_config:
   include_pressure: true          # Add atmospheric pressure forcing
   forcing_to_mesh_offset_m: 0.0  # Vertical offset added to boundary forcing
   vdatum_mesh_to_msl_m: 0.0      # Vertical offset converting model output to MSL
-  meteo_res:                      # Meteo forcing resolution in metres (auto if null)
-  sfincs_exe:                     # Local SFINCS executable (bypasses container)
+  meteo_res:                      # Meteo forcing resolution in meters (auto if null)
+  sfincs_exe:                     # Explicit SFINCS executable path (overrides PATH lookup)
   omp_num_threads: 36             # OpenMP threads (defaults to CPU count)
-  container_tag: latest           # SFINCS container tag
-  container_image:                # Singularity image path
+  floodmap_dem:                   # High-resolution DEM for flood depth map
+  floodmap_hmin: 0.05             # Minimum flood depth threshold (m)
+  floodmap_enabled: true          # Enable flood depth map generation
 ```
 
-| Parameter                    | Type   | Default  | Description                                                          |
-| ---------------------------- | ------ | -------- | -------------------------------------------------------------------- |
-| `prebuilt_dir`               | path   | required | Path to pre-built SFINCS model                                       |
-| `model_root`                 | path   | null     | Output directory (defaults to `{work_dir}/sfincs_model`)             |
-| `observation_points`         | list   | `[]`     | Observation point coordinates                                        |
-| `observation_locations_file` | path   | null     | Observation locations file                                           |
-| `merge_observations`         | bool   | false    | Merge observations into model                                        |
-| `discharge_locations_file`   | path   | null     | Discharge source locations file                                      |
-| `merge_discharge`            | bool   | false    | Merge discharge into model                                           |
-| `include_noaa_gages`         | bool   | false    | Enable NOAA station discovery and comparison plots                   |
-| `include_precip`             | bool   | false    | Add precipitation forcing from meteo data source                     |
-| `include_wind`               | bool   | false    | Add spatially-varying wind forcing                                   |
-| `include_pressure`           | bool   | false    | Add atmospheric pressure forcing with barometric correction          |
-| `forcing_to_mesh_offset_m`   | float  | 0.0      | Vertical offset (m) added to boundary forcing before simulation      |
-| `vdatum_mesh_to_msl_m`       | float  | 0.0      | Vertical offset (m) added to model output for MSL comparison         |
-| `meteo_res`                  | float  | null     | Meteo output resolution (m). Auto-derived from quadtree grid if null |
-| `sfincs_exe`                 | path   | null     | Local SFINCS executable (bypasses Singularity container)             |
-| `omp_num_threads`            | int    | auto     | OpenMP threads (defaults to CPU count)                               |
-| `container_tag`              | string | latest   | SFINCS container tag                                                 |
-| `container_image`            | path   | null     | Singularity image path                                               |
+| Parameter                    | Type  | Default  | Description                                                          |
+| ---------------------------- | ----- | -------- | -------------------------------------------------------------------- |
+| `prebuilt_dir`               | path  | required | Path to pre-built SFINCS model                                       |
+| `model_root`                 | path  | null     | Output directory (defaults to `{work_dir}/sfincs_model`)             |
+| `observation_points`         | list  | `[]`     | Observation point coordinates                                        |
+| `observation_locations_file` | path  | null     | Observation locations file                                           |
+| `merge_observations`         | bool  | false    | Merge observations into model                                        |
+| `discharge_locations_file`   | path  | null     | Discharge source locations file                                      |
+| `merge_discharge`            | bool  | false    | Merge discharge into model                                           |
+| `include_noaa_gages`         | bool  | false    | Enable NOAA station discovery and comparison plots                   |
+| `include_precip`             | bool  | false    | Add precipitation forcing from meteo data source                     |
+| `include_wind`               | bool  | false    | Add spatially-varying wind forcing                                   |
+| `include_pressure`           | bool  | false    | Add atmospheric pressure forcing with barometric correction          |
+| `forcing_to_mesh_offset_m`   | float | 0.0      | Vertical offset (m) added to boundary forcing before simulation      |
+| `vdatum_mesh_to_msl_m`       | float | 0.0      | Vertical offset (m) added to model output for MSL comparison         |
+| `meteo_res`                  | float | null     | Meteo output resolution (m). Auto-derived from quadtree grid if null |
+| `sfincs_exe`                 | path  | null     | Explicit SFINCS executable path (overrides PATH lookup)              |
+| `omp_num_threads`            | int   | auto     | OpenMP threads (defaults to CPU count)                               |
+| `runtime_env`                | dict  | `{}`     | Extra env vars for the model run subprocess                          |
+| `floodmap_dem`               | path  | null     | High-resolution DEM GeoTIFF for flood depth downscaling              |
+| `floodmap_hmin`              | float | 0.05     | Minimum flood depth threshold (m); shallower cells are masked out    |
+| `floodmap_enabled`           | bool  | true     | Enable flood depth map generation after SFINCS run                   |
 
 !!! note "Meteorological forcing resolution"
 
@@ -302,7 +274,7 @@ model_config:
     SFINCS operates in the vertical datum of the mesh (e.g. NAVD88). When the boundary
     forcing is in a different datum, `forcing_to_mesh_offset_m` anchors the forcing signal
     to the correct height on the mesh. For tidal-only sources like TPXO, whose oscillations
-    are centred on zero (MSL), this places the mean water level at the geodetic height of
+    are centered on zero (MSL), this places the mean water level at the geodetic height of
     MSL on the mesh. For sources that already report water levels in the mesh datum (e.g.
     STOFS on a NAVD88 mesh), set this to `0.0`.
 
@@ -353,15 +325,91 @@ download:
 | `raise_on_error` | bool | true    | Fail workflow on download errors |
 | `limit_per_host` | int  | 4       | Concurrent downloads per host    |
 
+## Cluster-Specific Tuning (`runtime_env`)
+
+By default the package ships with **no cluster-specific MPI or fabric tuning**. It works
+out of the box on a laptop or any consumer workstation. On HPC clusters where
+performance matters, the cluster admin (or end user) supplies a `runtime_env` block in
+the `model_config` to tune MPI transport, NUMA placement, etc.
+
+Whatever keys are in `runtime_env` are merged into the subprocess environment after the
+package's own setup, so they always win.
+
+### When you might need this
+
+- **Consumer workstation / single node**: nothing needed. Empty / absent `runtime_env`
+    is correct.
+- **NUMA-heavy multi-rank workloads** (SCHISM on big nodes): enable OpenMP thread
+    pinning so each MPI rank's threads stay on the same NUMA node.
+- **Cluster MPI fabrics** that need specific transport selection (AWS EFA, Cray
+    Slingshot, InfiniBand): set the relevant transport MCA variables.
+
+### Examples
+
+#### AWS c5n.9xlarge with healthy EFA
+
+```yaml
+model_config:
+  runtime_env:
+    OMPI_MCA_pml: cm
+    OMPI_MCA_mtl: ofi
+    OMPI_MCA_btl: ^openib
+    FI_OFI_RXM_SAR_LIMIT: '3145728'
+    FI_EFA_RECVWIN_SIZE: '65536'
+    OMP_PROC_BIND: close
+    OMP_PLACES: cores
+```
+
+#### AWS c5n.9xlarge falling back to TCP
+
+If EFA is misbehaving and you want TCP-over-ENA instead:
+
+```yaml
+model_config:
+  runtime_env:
+    OMPI_MCA_pml: ob1
+    OMPI_MCA_btl: self,tcp
+    OMPI_MCA_btl_tcp_if_exclude: lo,docker0
+```
+
+#### NOAA WCOSS (Cray MPICH on Slingshot)
+
+```yaml
+model_config:
+  runtime_env:
+    MPICH_OFI_STARTUP_CONNECT: '1'
+    MPICH_COLL_SYNC: MPI_Bcast
+    MPICH_REDUCE_NO_SMP: '1'
+```
+
+#### Single-process OpenMP workloads (SFINCS, post-processing)
+
+Single-process workloads usually run best with **no** thread pinning, so the kernel can
+spread OpenMP threads across whatever cores the process has access to. Leave
+`runtime_env` empty for these unless you have a measured reason to pin.
+
+### SLURM allocation gotcha
+
+`srun --pty bash` creates an interactive step with **one CPU per task**, even when the
+parent allocation has many more. A workflow started inside that bash inherits the narrow
+CPU mask, and any single-process OpenMP workload (e.g. SFINCS) gets pinned to one core.
+
+`CoastalCalibRunner` detects the situation (current affinity narrower than
+`SLURM_CPUS_ON_NODE`) and expands the mask automatically with a log line.
+
+To avoid relying on the runner's recovery, prefer one of:
+
+- Run the workflow **directly from the `salloc` shell on the login node**, without
+    `srun --pty bash` in between.
+- Use `srun --cpus-per-task=N --pty bash` so the step gets the full CPU set.
+- Wrap the workflow in `taskset -c 0-N nwm-coastal-py ...`.
+
 ## Configuration Inheritance
 
 Use `_base` to inherit settings from another configuration file:
 
 ```yaml
 # base.yaml - shared settings
-slurm:
-  job_name: coastal_sim
-
 simulation:
   duration_hours: 24
   meteo_source: nwm_ana
@@ -394,6 +442,138 @@ This allows you to:
 - Override only the parameters that differ
 - Maintain consistency across related simulations
 
+## SFINCS Creation Configuration
+
+The `create` command uses a separate configuration schema (`SfincsCreateConfig`) to
+build a new SFINCS quadtree model from an AOI polygon. This config is independent of the
+run/simulation config above.
+
+### Minimal Create Config
+
+```yaml
+aoi: ./texas_aoi.geojson
+output_dir: ./my_sfincs_model
+
+elevation:
+  datasets:
+    - name: nws_topobathy
+      zmin: -20000
+
+data_catalog:
+  data_libs:
+    - ./dem/data_catalog.yml
+```
+
+### Create Configuration Sections
+
+#### Top-Level Fields
+
+| Parameter                    | Type | Default                  | Description                                         |
+| ---------------------------- | ---- | ------------------------ | --------------------------------------------------- |
+| `aoi`                        | path | **required**             | Path to AOI polygon (GeoJSON, Shapefile, etc.)      |
+| `output_dir`                 | path | **required**             | Directory where the model will be written           |
+| `download_dir`               | path | `{output_dir}/downloads` | Directory for downloaded data (NOAA DEMs)           |
+| `add_noaa_gages`             | bool | false                    | Auto-discover NOAA CO-OPS stations as obs points    |
+| `observation_points`         | list | `[]`                     | Observation point dicts (`x`, `y`, `name`)          |
+| `observation_locations_file` | path | null                     | GeoJSON file with observation point locations       |
+| `merge_observations`         | bool | false                    | Merge with pre-existing observation points in model |
+
+#### Grid Settings (`grid`)
+
+```yaml
+grid:
+  resolution: 50.0
+  crs: utm
+  rotated: true
+  refinement:
+    - polygon: ./aoi.geojson
+      level: 4
+      buffer_m: -3072
+```
+
+| Parameter    | Type  | Default | Description                                         |
+| ------------ | ----- | ------- | --------------------------------------------------- |
+| `resolution` | float | 50.0    | Base grid cell resolution in meters                 |
+| `crs`        | str   | `utm`   | CRS (`"utm"` for auto-detection, or `"EPSG:xxxxx"`) |
+| `rotated`    | bool  | true    | Allow grid rotation for tighter bounding-box fit    |
+| `refinement` | list  | `[]`    | Quadtree refinement levels (see below)              |
+
+Each refinement entry:
+
+| Field      | Type  | Description                                            |
+| ---------- | ----- | ------------------------------------------------------ |
+| `polygon`  | path  | Polygon defining the area to refine                    |
+| `level`    | int   | Refinement level (1 = base, 2 = base/2, 3 = base/4, …) |
+| `buffer_m` | float | Inward buffer in meters (negative shrinks the polygon) |
+
+#### Elevation Settings (`elevation`)
+
+```yaml
+elevation:
+  datasets:
+    - name: nws_topobathy
+      zmin: -20000
+    - name: gebco
+      zmin: -20000
+  buffer_cells: 1
+```
+
+| Parameter      | Type | Default          | Description                        |
+| -------------- | ---- | ---------------- | ---------------------------------- |
+| `datasets`     | list | copdem30 + gebco | Ordered list of elevation datasets |
+| `buffer_cells` | int  | 1                | Buffer cells around grid boundary  |
+
+Each dataset entry:
+
+| Field          | Type  | Description                                          |
+| -------------- | ----- | ---------------------------------------------------- |
+| `name`         | str   | HydroMT data-catalog dataset name                    |
+| `zmin`         | float | Minimum elevation threshold                          |
+| `source`       | str   | Auto-fetch source (`"noaa"` or null)                 |
+| `noaa_dataset` | str   | Explicit NOAA dataset name (auto-discovered if null) |
+
+#### Mask Settings (`mask`)
+
+| Parameter       | Type  | Default | Description                          |
+| --------------- | ----- | ------- | ------------------------------------ |
+| `zmin`          | float | -5.0    | Minimum elevation for active cells   |
+| `boundary_zmax` | float | -5.0    | Maximum elevation for boundary cells |
+| `reset_bounds`  | bool  | true    | Reset existing boundary conditions   |
+
+#### Subgrid Settings (`subgrid`)
+
+| Parameter           | Type  | Default          | Description                          |
+| ------------------- | ----- | ---------------- | ------------------------------------ |
+| `nr_subgrid_pixels` | int   | 5                | Number of subgrid pixels per cell    |
+| `lulc_dataset`      | str   | `esa_worldcover` | Land-use/land-cover dataset          |
+| `reclass_table`     | path  | null             | Custom reclassification table CSV    |
+| `manning_land`      | float | 0.04             | Default Manning coefficient for land |
+| `manning_sea`       | float | 0.02             | Default Manning coefficient for sea  |
+
+#### Data Catalog (`data_catalog`)
+
+| Parameter   | Type | Default | Description                                |
+| ----------- | ---- | ------- | ------------------------------------------ |
+| `data_libs` | list | `[]`    | Additional HydroMT data catalog YAML paths |
+
+#### River Discharge (`river_discharge`, Optional)
+
+When configured, adds river discharge source points to the model by intersecting
+hydrofabric flowpaths with the AOI boundary.
+
+```yaml
+river_discharge:
+  flowlines: ./selected_flowpaths.geojson
+  nwm_id_column: feature_id
+  max_snap_distance_m: 2000
+```
+
+| Parameter             | Type  | Default  | Description                                                                    |
+| --------------------- | ----- | -------- | ------------------------------------------------------------------------------ |
+| `flowlines`           | path  | required | GeoJSON file with flowpath linestrings (e.g. exported from QGIS)               |
+| `nwm_id_column`       | str   | required | Column whose values correspond to NWM `feature_id` in CHRTOUT                  |
+| `max_snap_distance_m` | float | `2000`   | Max distance (m) to snap a point to an active cell; farther points are dropped |
+
 ## Validation
 
 Validate your configuration before running:
@@ -407,6 +587,5 @@ The validation checks:
 - All required fields are present
 - Date ranges are valid for selected data sources
 - File paths exist (for required files)
-- SLURM parameters are valid
 - Model-specific configuration is consistent (e.g., nscribes < total MPI tasks for
     SCHISM)
