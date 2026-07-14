@@ -12,7 +12,12 @@ from typing import Any, ClassVar, Literal
 import pandas as pd
 import yaml
 
-MeteoSource = Literal["nwm_retro", "nwm_ana"]
+# ``nwm_retro`` / ``nwm_ana`` are downloaded from public archives.
+# ``ngen_forecast`` means the meteorological forcing is produced ahead of time
+# by the ngen forecast forcing engine and left on disk as a single
+# multi-timestep file (see ``paths.forecast_meteo_file``); nothing is
+# downloaded for it.
+MeteoSource = Literal["nwm_retro", "nwm_ana", "ngen_forecast"]
 CoastalDomain = Literal["prvi", "hawaii", "atlgulf", "pacific", "alaska"]
 # ``harmonic`` predicts boundary elevations from harmonic constituents via
 # pyTMD against ``tidal_atlas_dir`` (TPXO, FES, GOT, EOT, ...). ``tpxo``
@@ -189,6 +194,11 @@ class PathConfig:
     work_dir: Path
     raw_download_dir: Path | None = None
     hot_start_file: Path | None = None
+    # Path to the meteorological forcing file produced by the ngen forecast
+    # forcing engine (a single multi-timestep netCDF on the WRF-Hydro
+    # geogrid, e.g. ``Hawaii_202509150000.nc``). Required when
+    # ``simulation.meteo_source == "ngen_forecast"``; ignored otherwise.
+    forecast_meteo_file: Path | None = None
     # Legacy create-workflow fields — not used by the run workflow.
     parm_dir: Path | None = None
     nwm_dir: Path | None = None
@@ -205,6 +215,8 @@ class PathConfig:
             self.raw_download_dir = Path(self.raw_download_dir).expanduser().resolve()
         if self.hot_start_file:
             self.hot_start_file = Path(self.hot_start_file).expanduser().resolve()
+        if self.forecast_meteo_file:
+            self.forecast_meteo_file = Path(self.forecast_meteo_file).expanduser().resolve()
         if self.parm_dir is not None:
             self.parm_dir = Path(self.parm_dir).expanduser().resolve()
         if self.nwm_dir is not None:
@@ -1351,6 +1363,8 @@ class CoastalCalibConfig:
         boundary = BoundaryConfig(**boundary_data)
 
         paths_data = data.get("paths", {})
+        if paths_data.get("forecast_meteo_file"):
+            paths_data["forecast_meteo_file"] = Path(paths_data["forecast_meteo_file"])
         paths = PathConfig(**paths_data)
 
         monitoring_data = data.get("monitoring", {})
@@ -1458,6 +1472,11 @@ class CoastalCalibConfig:
                 "hot_start_file": (
                     str(self.paths.hot_start_file) if self.paths.hot_start_file else None
                 ),
+                **(
+                    {"forecast_meteo_file": str(self.paths.forecast_meteo_file)}
+                    if self.paths.forecast_meteo_file
+                    else {}
+                ),
                 **({"parm_dir": str(self.paths.parm_dir)} if self.paths.parm_dir else {}),
                 **({"nwm_dir": str(self.paths.nwm_dir)} if self.paths.nwm_dir else {}),
                 **(
@@ -1528,6 +1547,18 @@ class CoastalCalibConfig:
 
         if self.simulation.duration_hours <= 0:
             errors.append("simulation.duration_hours must be positive")
+
+        # ngen forecast forcing is read from a pre-generated file on disk
+        # rather than downloaded, so the path must be set and present.
+        if self.simulation.meteo_source == "ngen_forecast":
+            fcst = self.paths.forecast_meteo_file
+            if fcst is None:
+                errors.append(
+                    "paths.forecast_meteo_file is required when "
+                    "simulation.meteo_source is 'ngen_forecast'"
+                )
+            elif not fcst.exists():
+                errors.append(f"Forecast meteo file not found: {fcst}")
 
         # Model-specific validation
         errors.extend(self.model_config.validate(self))

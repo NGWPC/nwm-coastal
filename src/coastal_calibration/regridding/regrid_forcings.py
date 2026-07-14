@@ -50,15 +50,33 @@ def _pick_time_var(ds: netCDF4.Dataset) -> str:
     """Return the name of the time variable in *ds*.
 
     WRF-Hydro LDASIN files use ``"time"``; ERA5/HRRR-derived files may use
-    ``"valid_time"``.  Raises ``KeyError`` with a descriptive message if
-    neither is present.
+    ``"valid_time"``; the ngen forecast forcing engine writes ``"Time"``
+    (a multi-timestep ``minutes since 1970`` axis, same units as ``time``).
+    Raises ``KeyError`` with a descriptive message if none is present.
     """
-    for name in ("time", "valid_time"):
+    for name in ("time", "valid_time", "Time"):
         if name in ds.variables:
             return name
     raise KeyError(
-        f"Expected 'time' or 'valid_time' in {ds.filepath()}, found: {list(ds.variables)}"
+        f"Expected 'time', 'valid_time' or 'Time' in {ds.filepath()}, found: {list(ds.variables)}"
     )
+
+
+def _time_slabs(files: list[Path]) -> list[tuple[Path, int]]:
+    """Enumerate ``(file, time_index)`` slabs across *files*.
+
+    Canonical WRF-Hydro LDASIN files carry a single timestep, yielding one
+    slab per file.  The ngen forecast forcing engine packs several
+    timesteps into one file, yielding one slab per index.  This lets the
+    regridder treat both layouts uniformly without copying multi-timestep
+    files into per-hour files first.
+    """
+    slabs: list[tuple[Path, int]] = []
+    for f in files:
+        with netCDF4.Dataset(f) as ds:
+            n_times = ds.variables[_pick_time_var(ds)].shape[0]
+        slabs.extend((f, t) for t in range(n_times))
+    return slabs
 
 
 def sea_level_pressure(
@@ -173,13 +191,19 @@ class CoastalForcingRegridder:
 
         self.schism_first_timestep = None
 
-    def _read_start_time(self, ds: netCDF4.Dataset) -> float:
-        """Extract the forcing start time from an input dataset."""
-        if "time" in ds.variables:
-            return ds["time"][0] * 60  # minutes -> seconds
-        if "valid_time" in ds.variables:
-            return ds["valid_time"][0]
-        raise KeyError("Input file has neither 'time' nor 'valid_time' variable")
+    def _read_start_time(self, ds: netCDF4.Dataset, time_index: int = 0) -> float:
+        """Return the valid time (seconds) of slab *time_index* in *ds*.
+
+        ``time`` and ``Time`` are stored as minutes (WRF-Hydro / ngen
+        forecast convention) and converted to seconds; ``valid_time`` is
+        already in seconds.  The value is absolute, so differences between
+        slabs give the hourly output offsets used to index ``vsource``.
+        """
+        name = _pick_time_var(ds)
+        value = float(np.asarray(ds.variables[name][time_index]))
+        if name == "valid_time":
+            return value
+        return value * 60  # 'time'/'Time' are minutes -> seconds
 
     def _init_vsource_nc(self, ds: netCDF4.Dataset, ntimes: int):
         """Create dimensions and variables for the SCHISM vsource file."""
@@ -197,13 +221,22 @@ class CoastalForcingRegridder:
         write_var(eso, np.arange(1, self.total_elements + 1))
         vts[:] = 3600
 
-    def _regrid_to_schism(self, input_file: Path, vsource_ds: netCDF4.Dataset | None):
-        """Regrid RAINRATE to SCHISM mesh elements and write to vsource."""
+    def _regrid_to_schism(
+        self,
+        input_file: Path,
+        vsource_ds: netCDF4.Dataset | None,
+        time_index: int = 0,
+    ):
+        """Regrid RAINRATE to SCHISM mesh elements and write to vsource.
+
+        *time_index* selects the timestep to read; canonical LDASIN files
+        have a single step (index 0) while forecast files hold several.
+        """
         with netCDF4.Dataset(input_file) as input_ds:
             # Populate source field
             in_field = ESMF.Field(grid=self.in_grid, name="rainrate-in")
             b = self.in_bounds
-            in_field.data[...] = input_ds.variables["RAINRATE"][0, :].T[  # pyright: ignore[reportOptionalSubscript]
+            in_field.data[...] = input_ds.variables["RAINRATE"][time_index, :].T[  # pyright: ignore[reportOptionalSubscript]
                 b.x_lo : b.x_hi, b.y_lo : b.y_hi
             ]
 
@@ -255,7 +288,7 @@ class CoastalForcingRegridder:
 
             # Write on root rank
             if self.root and vsource_ds is not None:
-                step_time = self._read_start_time(input_ds)
+                step_time = self._read_start_time(input_ds, time_index)
                 output_ts = int(step_time - self.schism_first_timestep)  # pyright: ignore[reportOperatorIssue]
                 output_idx = output_ts // 3600
                 vsource_ds["time_vsource"][output_idx] = output_ts
@@ -313,8 +346,16 @@ class CoastalForcingRegridder:
             },
         )
 
-    def _regrid_to_latlon(self, input_file: Path, apply_slp: bool = True):  # noqa: PLR0912, PLR0915
-        """Regrid atmospheric variables to a regular lat-lon grid."""
+    def _regrid_to_latlon(  # noqa: PLR0912, PLR0915
+        self, input_file: Path, apply_slp: bool = True, time_index: int = 0
+    ):
+        """Regrid atmospheric variables to a regular lat-lon grid.
+
+        *time_index* selects the timestep to read.  Output files are named
+        ``<stem>.latlon.nc`` for the first slab (preserving the one-file-per
+        -hour convention) and ``<stem>.t<NNN>.latlon.nc`` for further slabs
+        of a multi-timestep forecast file, so slabs never overwrite.
+        """
         from coastal_calibration._nc_io import create_var, write_var
 
         with netCDF4.Dataset(input_file) as input_ds:
@@ -322,7 +363,8 @@ class CoastalForcingRegridder:
 
             # Prepare output dataset on root
             if self.root:
-                output_path = self.output_dir / (input_file.stem + ".latlon.nc")
+                suffix = f".t{time_index:03d}" if time_index else ""
+                output_path = self.output_dir / (input_file.stem + suffix + ".latlon.nc")
                 output_ds = netCDF4.Dataset(output_path, "w", format="NETCDF4")
                 self._init_latlon_nc(output_ds, nlats, nlons, input_ds)
             else:
@@ -334,7 +376,7 @@ class CoastalForcingRegridder:
                         continue
 
                     # Read and optionally transform the variable
-                    data = input_ds.variables[variable][0, :].T
+                    data = input_ds.variables[variable][time_index, :].T
                     var_name = variable
                     var_attrs = {}
                     for attr in ("standard_name", "long_name", "units"):
@@ -343,8 +385,8 @@ class CoastalForcingRegridder:
 
                     if apply_slp and variable == "PSFC":
                         data = sea_level_pressure(
-                            temp=input_ds.variables["T2D"][0, :].T,
-                            mixing=input_ds.variables["Q2D"][0, :].T,
+                            temp=input_ds.variables["T2D"][time_index, :].T,
+                            mixing=input_ds.variables["Q2D"][time_index, :].T,
                             height=self.src_height[0, :].T,
                             press=data,
                         )
@@ -414,10 +456,13 @@ class CoastalForcingRegridder:
                         raise RuntimeError(msg)
                     write_var(output_ds.variables["lat"], self.lats)
                     write_var(output_ds.variables["lon"], self.lons)
-                    write_var(
-                        output_ds.variables["time"],
-                        input_ds.variables[_pick_time_var(input_ds)][:],
-                    )
+                    # Each lat-lon output holds a single slab, so write only
+                    # this slab's timestamp (not the file's whole time axis,
+                    # which would exceed the single data row for forecast
+                    # files that pack multiple timesteps).
+                    output_ds.variables["time"][0] = input_ds.variables[_pick_time_var(input_ds)][
+                        time_index
+                    ]
             finally:
                 if output_ds is not None:
                     output_ds.close()
@@ -443,19 +488,24 @@ class CoastalForcingRegridder:
         if not input_files:
             raise FileNotFoundError(f"No files match '{file_filter}' in {self.input_dir}")
 
+        # Unit of work is a (file, timestep) slab, not a file: canonical
+        # LDASIN files yield one slab each, forecast files yield several.
+        slabs = _time_slabs(input_files)
+
         # Job array partitioning for lat-lon regridding
         if self.job_idx is not None and self.job_count is not None:
             idx = self.job_idx
-            count = math.ceil(len(input_files) / self.job_count)
-            sub_input_files = input_files[idx * count : idx * count + count]
+            count = math.ceil(len(slabs) / self.job_count)
+            sub_slabs = set(slabs[idx * count : idx * count + count])
         else:
             idx = 0
-            sub_input_files = input_files
+            sub_slabs = set(slabs)
 
         # Determine first timestep for SCHISM time offsets
         if self.root:
-            with netCDF4.Dataset(input_files[0]) as ds0:
-                self.schism_first_timestep = self._read_start_time(ds0)
+            first_file, first_ti = slabs[0]
+            with netCDF4.Dataset(first_file) as ds0:
+                self.schism_first_timestep = self._read_start_time(ds0, first_ti)
 
         # Initialize SCHISM vsource output on idx=0
         schism_vsource = None
@@ -463,15 +513,15 @@ class CoastalForcingRegridder:
             schism_vsource = netCDF4.Dataset(
                 self.output_dir / "precip_source.nc", "w", format="NETCDF4"
             )
-            self._init_vsource_nc(schism_vsource, len(input_files))
+            self._init_vsource_nc(schism_vsource, len(slabs))
 
         try:
-            # Process files
-            for file in input_files:
-                if not skip_latlon and file in sub_input_files:
-                    self._regrid_to_latlon(file, apply_slp=apply_slp)
+            # Process slabs
+            for file, time_index in slabs:
+                if not skip_latlon and (file, time_index) in sub_slabs:
+                    self._regrid_to_latlon(file, apply_slp=apply_slp, time_index=time_index)
                 if idx == 0:
-                    self._regrid_to_schism(file, schism_vsource)
+                    self._regrid_to_schism(file, schism_vsource, time_index)
         finally:
             if schism_vsource is not None:
                 schism_vsource.sync()

@@ -188,33 +188,61 @@ def make_geo_em_nc(path: Path, nx: int = 20, ny: int = 16) -> None:
 # Time in minutes since 1970-01-01 anchored to a fixed date for repeatability
 _LDASIN_TIME_MINUTES = 28512000.0  # 2024-03-15 00:00:00 UTC
 
+# (name, low, high) draw ranges shared by the canonical and forecast writers
+_FORCING_VAR_RANGES = [
+    ("U2D", -5.0, 5.0),
+    ("V2D", -5.0, 5.0),
+    ("T2D", 280.0, 305.0),
+    ("Q2D", 0.005, 0.02),
+    ("PSFC", 98000.0, 102000.0),
+    ("SWDOWN", 0.0, 800.0),
+    ("LWDOWN", 300.0, 450.0),
+    ("LQFRAC", 0.0, 1.0),
+    ("RAINRATE", 0.0, 5.0e-5),
+]
+
+
+def make_forcing_stack(
+    nx: int = 20, ny: int = 16, n_times: int = 3, seed: int = 13
+) -> dict[str, np.ndarray]:
+    """Return a deterministic ``{var: (n_times, ny, nx)}`` stack of forcing fields.
+
+    Shared by the canonical (one file per timestep) and forecast (one
+    multi-timestep file) writers so equivalence tests can populate both
+    layouts from identical data.
+    """
+    rng = np.random.default_rng(seed)
+    return {
+        name: rng.uniform(lo, hi, (n_times, ny, nx)).astype("f4")
+        for name, lo, hi in _FORCING_VAR_RANGES
+    }
+
 
 def make_ldasin_nc(
     path: Path,
     nx: int = 20,
     ny: int = 16,
     time_minutes: float = _LDASIN_TIME_MINUTES,
+    stack: dict[str, np.ndarray] | None = None,
+    time_index: int = 0,
 ) -> None:
     """Write a minimal WRF-Hydro LDASIN forcing NetCDF file.
 
     Variables are stored in ``(time, south_north, west_east)`` order (C order),
     matching real LDASIN files.  The :class:`CoastalForcingRegridder` reads
     them as ``variable[0, :].T`` to get ``(nx, ny)`` Fortran-order arrays.
-    """
-    rng = np.random.default_rng(13)
-    shape = (1, ny, nx)
 
-    var_ranges = [
-        ("U2D", -5.0, 5.0),
-        ("V2D", -5.0, 5.0),
-        ("T2D", 280.0, 305.0),
-        ("Q2D", 0.005, 0.02),
-        ("PSFC", 98000.0, 102000.0),
-        ("SWDOWN", 0.0, 800.0),
-        ("LWDOWN", 300.0, 450.0),
-        ("LQFRAC", 0.0, 1.0),
-        ("RAINRATE", 0.0, 5.0e-5),
-    ]
+    When *stack* is given (a ``{var: (n_times, ny, nx)}`` mapping from
+    :func:`make_forcing_stack`), the *time_index* slab of that stack is
+    written instead of fresh random data — letting a caller emit one
+    canonical file per timestep that matches a forecast file exactly.
+    """
+    shape = (1, ny, nx)
+    if stack is None:
+        rng = np.random.default_rng(13)
+        stack_slab = {name: rng.uniform(lo, hi, shape) for name, lo, hi in _FORCING_VAR_RANGES}
+    else:
+        stack_slab = {name: arr[time_index][np.newaxis, :, :] for name, arr in stack.items()}
 
     with netCDF4.Dataset(path, "w", format="NETCDF4") as ds:
         ds.createDimension("time", 1)
@@ -225,9 +253,45 @@ def make_ldasin_nc(
         tv.units = "minutes since 1970-01-01 00:00:00"
         tv[:] = [time_minutes]
 
-        for name, lo, hi in var_ranges:
+        for name in stack_slab:
             v = ds.createVariable(name, "f4", ("time", "south_north", "west_east"))
-            v[:] = rng.uniform(lo, hi, shape)
+            v[:] = stack_slab[name]
+
+
+def make_forecast_ldasin_nc(
+    path: Path,
+    nx: int = 20,
+    ny: int = 16,
+    n_times: int = 3,
+    start_minutes: float = _LDASIN_TIME_MINUTES,
+    stack: dict[str, np.ndarray] | None = None,
+) -> None:
+    """Write a multi-timestep ngen forecast forcing NetCDF file.
+
+    Mirrors the layout the forecast forcing engine emits: several
+    timesteps packed into ``(time, south_north, west_east)`` arrays with a
+    capital ``Time`` coordinate in ``minutes since 1970`` (the same units as
+    canonical LDASIN ``time``).  When *stack* is omitted, deterministic data
+    from :func:`make_forcing_stack` is used so a matching set of canonical
+    single-timestep files can be produced for equivalence checks.
+    """
+    if stack is None:
+        stack = make_forcing_stack(nx=nx, ny=ny, n_times=n_times)
+    times = start_minutes + np.arange(n_times, dtype="f8") * 60.0  # hourly steps
+
+    with netCDF4.Dataset(path, "w", format="NETCDF4") as ds:
+        ds.createDimension("time", n_times)
+        ds.createDimension("south_north", ny)
+        ds.createDimension("west_east", nx)
+
+        tv = ds.createVariable("Time", "f8", ("time",))
+        tv.units = "minutes since 1970-01-01 00:00:00 UTC"
+        tv.standard_name = "time"
+        tv[:] = times
+
+        for name, arr in stack.items():
+            v = ds.createVariable(name, "f4", ("time", "south_north", "west_east"))
+            v[:] = arr
 
 
 # ---------------------------------------------------------------------------

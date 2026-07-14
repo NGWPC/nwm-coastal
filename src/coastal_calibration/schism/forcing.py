@@ -26,7 +26,10 @@ class PreForcingStage(WorkflowStage):
 
     def run(self) -> dict[str, Any]:
         """Stage LDASIN forcing files and create output directories."""
-        from coastal_calibration.schism.prep import stage_ldasin_files
+        from coastal_calibration.schism.prep import (
+            stage_forecast_forcing,
+            stage_ldasin_files,
+        )
 
         self._update_substep("Building environment")
         self.build_environment()
@@ -35,18 +38,32 @@ class PreForcingStage(WorkflowStage):
         work_dir = self.config.paths.work_dir
         work_dir.mkdir(parents=True, exist_ok=True)
 
-        self._update_substep("Staging LDASIN files")
-        self._log("Creating forcing symlinks and output directories")
-
         sim = self.config.simulation
-        nwm_forcing_dir = self.config.paths.meteo_dir(sim.meteo_source, sim.coastal_domain)
 
-        _forcing_input_dir, coastal_forcing_output = stage_ldasin_files(
-            work_dir=work_dir,
-            start_date=sim.start_date,
-            duration_hours=sim.duration_hours,
-            nwm_forcing_dir=nwm_forcing_dir,
-        )
+        if sim.meteo_source == "ngen_forecast":
+            self._update_substep("Staging forecast forcing")
+            self._log("Staging pre-generated ngen forecast forcing")
+            forecast_file = self.config.paths.forecast_meteo_file
+            if forecast_file is None:
+                raise RuntimeError(
+                    "paths.forecast_meteo_file must be set when "
+                    "meteo_source is 'ngen_forecast'"
+                )
+            _forcing_input_dir, coastal_forcing_output = stage_forecast_forcing(
+                work_dir=work_dir,
+                start_date=sim.start_date,
+                forecast_file=forecast_file,
+            )
+        else:
+            self._update_substep("Staging LDASIN files")
+            self._log("Creating forcing symlinks and output directories")
+            nwm_forcing_dir = self.config.paths.meteo_dir(sim.meteo_source, sim.coastal_domain)
+            _forcing_input_dir, coastal_forcing_output = stage_ldasin_files(
+                work_dir=work_dir,
+                start_date=sim.start_date,
+                duration_hours=sim.duration_hours,
+                nwm_forcing_dir=nwm_forcing_dir,
+            )
 
         self._log(f"Pre-forcing complete. Output dir: {coastal_forcing_output}")
         return {

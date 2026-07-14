@@ -229,6 +229,8 @@ def stofs_cycle_env() -> dict[str, str]:
 
 from .synthetic import (
     make_esmfmesh_nc,
+    make_forcing_stack,
+    make_forecast_ldasin_nc,
     make_geo_em_nc,
     make_hgrid_nc,
     make_ldasin_nc,
@@ -308,6 +310,37 @@ def synthetic_ldasin_dir(tmp_path_factory) -> Path:
     d = tmp_path_factory.mktemp("ldasin")
     make_ldasin_nc(d / "201603150000.LDASIN_DOMAIN1")
     return d
+
+
+@pytest.fixture(scope="session")
+def synthetic_forecast_vs_canonical_dirs(tmp_path_factory) -> tuple[Path, Path]:
+    """Two input dirs carrying identical data in the two on-disk layouts.
+
+    Returns ``(forecast_dir, canonical_dir)`` where *forecast_dir* holds a
+    single 3-timestep ngen forecast file and *canonical_dir* holds three
+    matching single-timestep LDASIN files, both populated from the same
+    :func:`make_forcing_stack` data.  The regridder must produce byte-for
+    -byte identical ``precip_source.nc`` from either.
+    """
+    n_times = 3
+    stack = make_forcing_stack(n_times=n_times)
+
+    forecast_dir = tmp_path_factory.mktemp("forecast")
+    make_forecast_ldasin_nc(
+        forecast_dir / "Hawaii_201603150000.LDASIN_DOMAIN1",
+        n_times=n_times,
+        stack=stack,
+    )
+
+    canonical_dir = tmp_path_factory.mktemp("canonical")
+    for t in range(n_times):
+        make_ldasin_nc(
+            canonical_dir / f"20160315{t:02d}00.LDASIN_DOMAIN1",
+            time_minutes=28512000.0 + t * 60.0,
+            stack=stack,
+            time_index=t,
+        )
+    return forecast_dir, canonical_dir
 
 
 @pytest.fixture(scope="session")

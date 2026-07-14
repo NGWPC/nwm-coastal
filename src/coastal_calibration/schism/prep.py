@@ -671,6 +671,44 @@ def stage_ldasin_files(
     return nwm_forcing_output, coastal_forcing_output
 
 
+def stage_forecast_forcing(
+    *,
+    work_dir: Path,
+    start_date: datetime,
+    forecast_file: Path,
+) -> tuple[Path, Path]:
+    """Stage a pre-generated ngen forecast forcing file for regridding.
+
+    Unlike :func:`stage_ldasin_files`, which symlinks one file per hour,
+    the ngen forecast forcing engine emits a single multi-timestep file on
+    the WRF-Hydro geogrid.  A single symlink is placed in
+    ``forcing_input/<YYYYMMDDHH>/`` with a ``*.LDASIN_DOMAIN1`` name so the
+    (slab-aware) regridder and sflux generator discover it via their
+    existing globs and iterate its timesteps in place — no copy needed.
+
+    Returns ``(forcing_input_dir, coastal_forcing_output_dir)``.
+    """
+    pdy = start_date.strftime("%Y%m%d")
+    cyc = start_date.strftime("%H")
+    forcing_begin = f"{pdy}{cyc}"
+
+    nwm_forcing_output = work_dir / "forcing_input"
+    forcing_subdir = nwm_forcing_output / forcing_begin[:10]
+    forcing_subdir.mkdir(parents=True, exist_ok=True)
+
+    coastal_forcing_output = work_dir / "coastal_forcing_output"
+    coastal_forcing_output.mkdir(parents=True, exist_ok=True)
+
+    if not forecast_file.exists():
+        raise FileNotFoundError(f"Forecast meteo file not found: {forecast_file}")
+
+    dst = forcing_subdir / f"{forecast_file.stem}.LDASIN_DOMAIN1"
+    _symlink(forecast_file, dst)
+
+    logger.info("    Staged forecast forcing %s -> %s", forecast_file, dst)
+    return nwm_forcing_output, coastal_forcing_output
+
+
 # ---------------------------------------------------------------------------
 # 8. Generate sflux from LDASIN  (was post_nwm_forcing_coastal → makeAtmo.py)
 # ---------------------------------------------------------------------------

@@ -855,16 +855,29 @@ def download_data(
     if errors:
         raise ValueError("Date range validation failed:\n" + "\n".join(f"  - {e}" for e in errors))
 
-    if meteo_source == "nwm_retro":
+    if meteo_source == "ngen_forecast":
+        # Forcing is pre-generated on disk by the ngen forecast engine and
+        # read from paths.forecast_meteo_file — there is nothing to fetch.
+        meteo_result = DownloadResult(source="meteo/ngen_forecast")
+    elif meteo_source == "nwm_retro":
         urls, paths = _build_nwm_retro_forcing_urls(start, end, out_dir, domain)
         # PRVI and Alaska Retrospective forcing ships with no georeferencing,
         # so record the domain's grid alongside it while we are online.
         write_nwm_grid_sidecar(out_dir / PathConfig.meteo_subdir("nwm_retro", domain), domain)
+        meteo_result = _execute_download(
+            urls, paths, f"meteo/{meteo_source}", timeout, raise_on_error
+        )
     else:
         urls, paths = _build_nwm_ana_forcing_urls(start, end, out_dir, domain)
-    meteo_result = _execute_download(urls, paths, f"meteo/{meteo_source}", timeout, raise_on_error)
+        meteo_result = _execute_download(
+            urls, paths, f"meteo/{meteo_source}", timeout, raise_on_error
+        )
 
-    if hydro_source == "ngen":
+    if meteo_source == "ngen_forecast":
+        # Streamflow for the forecast pipeline comes from t-route output,
+        # which is not wired up yet — skip the hydro download for now.
+        hydro_result = DownloadResult(source=f"hydro/{hydro_source}")
+    elif hydro_source == "ngen":
         hydro_result = DownloadResult(
             source=f"hydro/{hydro_source}",
             errors=["NGEN hydrology source not yet supported"],

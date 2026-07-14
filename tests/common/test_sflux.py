@@ -108,7 +108,78 @@ def _write_ldasin(path: Path, t2d: float, q2d: float, u2d: float, v2d: float, ps
             )
 
 
+def _write_forecast_ldasin(path: Path, per_step: list[dict[str, float]]) -> None:
+    """Write a multi-timestep ngen forecast forcing file.
+
+    *per_step* is one ``{var: value}`` dict per timestep; each field is a
+    constant plane so slab placement is easy to assert.  Mirrors the
+    forecast engine layout: ``(time, south_north, west_east)`` fields.
+    """
+    ny, nx = 3, 4
+    n_times = len(per_step)
+    with netCDF4.Dataset(path, "w") as ds:
+        ds.createDimension("time", n_times)
+        ds.createDimension("south_north", ny)
+        ds.createDimension("west_east", nx)
+        tv = ds.createVariable("Time", "f8", ("time",))
+        tv.units = "minutes since 1970-01-01 00:00:00 UTC"
+        tv[:] = 28512000.0 + np.arange(n_times) * 60.0
+        for name in ("T2D", "Q2D", "U2D", "V2D", "PSFC"):
+            var = ds.createVariable(name, "f4", ("time", "south_north", "west_east"))
+            for t, step in enumerate(per_step):
+                var[t] = np.full((ny, nx), step[name], dtype=np.float32)
+
+
 class TestMakeAtmoSflux:
+    def test_forecast_multitime_matches_hourly_files(self, tmp_path: Path, geogrid_file: Path):
+        """One 2-step forecast file yields the same sflux as two hourly files.
+
+        Proves the sflux slab refactor reads a packed multi-timestep
+        forecast file in place, without exploding it into per-hour files.
+        """
+        step0 = {"T2D": 295.0, "Q2D": 0.005, "U2D": 2.0, "V2D": -1.0, "PSFC": 100000.0}
+        step1 = {"T2D": 296.0, "Q2D": 0.006, "U2D": 3.0, "V2D": -2.0, "PSFC": 99500.0}
+
+        def _canonical(name: str, step: dict[str, float]) -> None:
+            _write_ldasin(
+                canonical_dir / name,
+                t2d=step["T2D"],
+                q2d=step["Q2D"],
+                u2d=step["U2D"],
+                v2d=step["V2D"],
+                psfc=step["PSFC"],
+            )
+
+        # Canonical: two hourly single-timestep files.
+        canonical_dir = tmp_path / "canonical"
+        canonical_dir.mkdir()
+        _canonical("2024010100.LDASIN_DOMAIN1", step0)
+        _canonical("2024010101.LDASIN_DOMAIN1", step1)
+
+        # Forecast: one file packing both timesteps.
+        forecast_dir = tmp_path / "forecast"
+        forecast_dir.mkdir()
+        _write_forecast_ldasin(forecast_dir / "Hawaii.LDASIN_DOMAIN1", [step0, step1])
+
+        def _sflux(forcing_dir: Path, tag: str) -> Path:
+            work = tmp_path / tag
+            make_atmo_sflux(
+                forcing_input_dir=forcing_dir,
+                work_dir=work,
+                start_dt=datetime(2024, 1, 1, 0),
+                geogrid_file=geogrid_file,
+            )
+            return work / "sflux" / "sflux_air_1.0001.nc"
+
+        with (
+            netCDF4.Dataset(_sflux(forecast_dir, "fc_work")) as fc,
+            netCDF4.Dataset(_sflux(canonical_dir, "cn_work")) as cn,
+        ):
+            # Same time axis (2 steps + trailing duplicate) and identical fields.
+            assert fc.dimensions["time"].size == cn.dimensions["time"].size == 3
+            for var in ("uwind", "vwind", "stmp", "spfh", "prmsl"):
+                np.testing.assert_allclose(fc[var][:], cn[var][:])
+
     def test_raises_when_no_ldasin_files(self, tmp_path: Path, geogrid_file: Path):
         forcing_dir = tmp_path / "forcing"
         forcing_dir.mkdir()

@@ -22,6 +22,7 @@ from coastal_calibration.schism.prep import (
     partition_mesh,
     run_combine_sink_source,
     stage_chrtout_files,
+    stage_forecast_forcing,
     stage_ldasin_files,
     update_params,
     validate_param_nml,
@@ -377,6 +378,39 @@ class TestStageLdasinFiles:
         assert subdir.exists()
         # No symlinks since no source files exist
         assert len(list(subdir.iterdir())) == 0
+
+
+class TestStageForecastForcing:
+    def test_symlinks_single_multitimestep_file(self, tmp_path):
+        """A single forecast file is symlinked with a LDASIN_DOMAIN1 name."""
+        forecast_file = tmp_path / "Hawaii_202509150000.nc"
+        forecast_file.write_text("dummy")
+        dt = datetime(2025, 9, 15, tzinfo=UTC)
+
+        forcing_input, coastal_output = stage_forecast_forcing(
+            work_dir=tmp_path,
+            start_date=dt,
+            forecast_file=forecast_file,
+        )
+
+        assert coastal_output.exists()
+        subdir = forcing_input / "2025091500"
+        assert subdir.exists()
+        links = list(subdir.iterdir())
+        # Exactly one symlink, discoverable by the *LDASIN_DOMAIN1 globs.
+        assert len(links) == 1
+        link = links[0]
+        assert link.name == "Hawaii_202509150000.LDASIN_DOMAIN1"
+        assert link.is_symlink()
+        assert link.resolve() == forecast_file.resolve()
+
+    def test_raises_when_forecast_file_missing(self, tmp_path):
+        with pytest.raises(FileNotFoundError, match="Forecast meteo file not found"):
+            stage_forecast_forcing(
+                work_dir=tmp_path,
+                start_date=datetime(2025, 9, 15, tzinfo=UTC),
+                forecast_file=tmp_path / "does_not_exist.nc",
+            )
 
 
 # ---------------------------------------------------------------------------

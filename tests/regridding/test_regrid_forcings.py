@@ -398,6 +398,54 @@ def test_synthetic_source_elem_covers_all_mesh_elements(
     )
 
 
+@have_esmf
+@have_synthetic_esmf_mesh
+def test_forecast_multitime_matches_canonical_files(
+    tmp_path,
+    synthetic_forecast_vs_canonical_dirs,
+    synthetic_geo_em_nc,
+    synthetic_esmfmesh_nc,
+):
+    """A 3-timestep forecast file yields the same vsource as 3 hourly files.
+
+    Proves the slab refactor reads multi-timestep forecast forcing in place
+    (no explode-to-per-hour copy) without changing the regridded result.
+    """
+    import netCDF4
+
+    from coastal_calibration.regridding.regrid_forcings import CoastalForcingRegridder
+
+    forecast_dir, canonical_dir = synthetic_forecast_vs_canonical_dirs
+
+    def _regrid(input_dir: Path, tag: str) -> Path:
+        out = tmp_path / tag
+        out.mkdir()
+        app = CoastalForcingRegridder(
+            input_dir=input_dir,
+            output_dir=out,
+            geo_em_path=synthetic_geo_em_nc,
+            schism_mesh_path=synthetic_esmfmesh_nc,
+        )
+        app.run(file_filter="**/*LDASIN_DOMAIN*", skip_latlon=True)
+        return out / "precip_source.nc"
+
+    forecast_vs = _regrid(forecast_dir, "forecast")
+    canonical_vs = _regrid(canonical_dir, "canonical")
+
+    with netCDF4.Dataset(forecast_vs) as f:
+        fc_v = f["vsource"][:].data
+        fc_t = f["time_vsource"][:].data
+    with netCDF4.Dataset(canonical_vs) as f:
+        cn_v = f["vsource"][:].data
+        cn_t = f["time_vsource"][:].data
+
+    # Three slabs, hourly offsets, identical volumetric flux either way.
+    assert fc_v.shape == (3, cn_v.shape[1])
+    np.testing.assert_array_equal(fc_t, [0.0, 3600.0, 7200.0])
+    np.testing.assert_array_equal(cn_t, fc_t)
+    np.testing.assert_allclose(fc_v, cn_v, rtol=1e-6, atol=1e-10)
+
+
 # ---------------------------------------------------------------------------
 # Optional real-data comparison tests
 # ---------------------------------------------------------------------------
