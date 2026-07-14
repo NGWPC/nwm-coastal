@@ -2434,7 +2434,11 @@ class SfincsDataCatalogStage(WorkflowStage):
     def run(self) -> dict[str, Any]:
         """Generate a HydroMT data catalog YAML for downloaded data."""
         download_dir = self.config.paths.download_dir
-        if not download_dir.exists():
+        # ngen forecast meteo is an external, absolute-path file referenced
+        # directly by the catalog, so the catalog is still worth generating
+        # even when download_dir is absent (e.g. download disabled).
+        is_forecast = self.config.simulation.meteo_source == "ngen_forecast"
+        if not download_dir.exists() and not is_forecast:
             self._log(f"Download dir {download_dir} does not exist; skipping catalog generation")
             return {"catalog_path": None, "entries": [], "status": "skipped"}
 
@@ -2463,7 +2467,10 @@ class SfincsDataCatalogStage(WorkflowStage):
         created by the download stage, so this check is skipped.
         """
         errors = super().validate()
-        if not self.config.download.enabled:
+        # ngen forecast meteo does not live under download_dir, so a missing
+        # download_dir is not fatal for that source.
+        is_forecast = self.config.simulation.meteo_source == "ngen_forecast"
+        if not self.config.download.enabled and not is_forecast:
             download_dir = self.config.paths.download_dir
             if not download_dir.exists():
                 errors.append(f"Download directory does not exist: {download_dir}")

@@ -780,6 +780,58 @@ def _log_summary(results: DownloadResults) -> None:
     )
 
 
+def _download_meteo(
+    meteo_source: str,
+    start: datetime,
+    end: datetime,
+    out_dir: Path,
+    domain: str,
+    timeout: int,
+    raise_on_error: bool,
+) -> DownloadResult:
+    """Resolve and execute the meteorological forcing download."""
+    if meteo_source == "ngen_forecast":
+        # Forcing is pre-generated on disk by the ngen forecast engine and
+        # read from paths.forecast_meteo_file — there is nothing to fetch.
+        return DownloadResult(source="meteo/ngen_forecast")
+    if meteo_source == "nwm_retro":
+        urls, paths = _build_nwm_retro_forcing_urls(start, end, out_dir, domain)
+        # PRVI and Alaska Retrospective forcing ships with no georeferencing,
+        # so record the domain's grid alongside it while we are online.
+        write_nwm_grid_sidecar(out_dir / PathConfig.meteo_subdir("nwm_retro", domain), domain)
+    else:
+        urls, paths = _build_nwm_ana_forcing_urls(start, end, out_dir, domain)
+    return _execute_download(urls, paths, f"meteo/{meteo_source}", timeout, raise_on_error)
+
+
+def _download_hydro(
+    meteo_source: str,
+    hydro_source: str,
+    start: datetime,
+    end: datetime,
+    out_dir: Path,
+    domain: str,
+    timeout: int,
+    raise_on_error: bool,
+) -> DownloadResult:
+    """Resolve and execute the hydrological (streamflow) download."""
+    if meteo_source == "ngen_forecast":
+        # Streamflow for the forecast pipeline comes from t-route output,
+        # which is not wired up yet — skip the hydro download for now.
+        return DownloadResult(source=f"hydro/{hydro_source}")
+    if hydro_source == "ngen":
+        return DownloadResult(
+            source=f"hydro/{hydro_source}",
+            errors=["NGEN hydrology source not yet supported"],
+        )
+    if meteo_source == "nwm_retro":
+        # nwm_retro streamflow is read directly from the S3 Zarr store at
+        # runtime — no file download needed.
+        return DownloadResult(source=f"hydro/{hydro_source}")
+    urls, paths = _build_nwm_ana_streamflow_urls(start, end, out_dir, domain)
+    return _execute_download(urls, paths, f"hydro/{hydro_source}", timeout, raise_on_error)
+
+
 def download_data(
     start_time: datetime | str,
     end_time: datetime | str,
@@ -855,42 +907,12 @@ def download_data(
     if errors:
         raise ValueError("Date range validation failed:\n" + "\n".join(f"  - {e}" for e in errors))
 
-    if meteo_source == "ngen_forecast":
-        # Forcing is pre-generated on disk by the ngen forecast engine and
-        # read from paths.forecast_meteo_file — there is nothing to fetch.
-        meteo_result = DownloadResult(source="meteo/ngen_forecast")
-    elif meteo_source == "nwm_retro":
-        urls, paths = _build_nwm_retro_forcing_urls(start, end, out_dir, domain)
-        # PRVI and Alaska Retrospective forcing ships with no georeferencing,
-        # so record the domain's grid alongside it while we are online.
-        write_nwm_grid_sidecar(out_dir / PathConfig.meteo_subdir("nwm_retro", domain), domain)
-        meteo_result = _execute_download(
-            urls, paths, f"meteo/{meteo_source}", timeout, raise_on_error
-        )
-    else:
-        urls, paths = _build_nwm_ana_forcing_urls(start, end, out_dir, domain)
-        meteo_result = _execute_download(
-            urls, paths, f"meteo/{meteo_source}", timeout, raise_on_error
-        )
-
-    if meteo_source == "ngen_forecast":
-        # Streamflow for the forecast pipeline comes from t-route output,
-        # which is not wired up yet — skip the hydro download for now.
-        hydro_result = DownloadResult(source=f"hydro/{hydro_source}")
-    elif hydro_source == "ngen":
-        hydro_result = DownloadResult(
-            source=f"hydro/{hydro_source}",
-            errors=["NGEN hydrology source not yet supported"],
-        )
-    elif meteo_source == "nwm_retro":
-        # nwm_retro streamflow is read directly from the S3 Zarr store
-        # at runtime — no file download needed.
-        hydro_result = DownloadResult(source=f"hydro/{hydro_source}")
-    else:
-        urls, paths = _build_nwm_ana_streamflow_urls(start, end, out_dir, domain)
-        hydro_result = _execute_download(
-            urls, paths, f"hydro/{hydro_source}", timeout, raise_on_error
-        )
+    meteo_result = _download_meteo(
+        meteo_source, start, end, out_dir, domain, timeout, raise_on_error
+    )
+    hydro_result = _download_hydro(
+        meteo_source, hydro_source, start, end, out_dir, domain, timeout, raise_on_error
+    )
 
     if coastal_source == "harmonic":
         if atlas_path is None:

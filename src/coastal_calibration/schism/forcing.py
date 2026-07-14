@@ -46,8 +46,7 @@ class PreForcingStage(WorkflowStage):
             forecast_file = self.config.paths.forecast_meteo_file
             if forecast_file is None:
                 raise RuntimeError(
-                    "paths.forecast_meteo_file must be set when "
-                    "meteo_source is 'ngen_forecast'"
+                    "paths.forecast_meteo_file must be set when meteo_source is 'ngen_forecast'"
                 )
             _forcing_input_dir, coastal_forcing_output = stage_forecast_forcing(
                 work_dir=work_dir,

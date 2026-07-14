@@ -299,6 +299,144 @@ class TestGenerateDataCatalog:
         assert entry.uri.endswith("*.LDASIN_DOMAIN1.nc")
 
 
+def _write_forecast_meteo_nc(path, *, n_times: int = 3, ny: int = 16, nx: int = 20):
+    """Write a synthetic ngen-forecast forcing file.
+
+    Mirrors the real engine output as faithfully as the test needs: a
+    ``Time`` variable (minutes since 1970, no ``time`` coordinate),
+    projected ``x``/``y`` (LCC meters), a ``crs`` grid-mapping variable
+    with a WKT ``spatial_ref``, and LDASIN-named fields on
+    ``(time, y, x)``.
+
+    The coordinates reproduce the real grid's structure so the test
+    genuinely exercises the ``forecast_meteo_coords`` rounding: an integer
+    1 km spacing, a constant sub-cell offset (the real Hawaii file sits at
+    ``…46875``), plus a few centimetres of per-point float noise.  That
+    noise makes the raw spacing slightly irregular (as in the real files),
+    and the preprocessor's integer rounding snaps it back onto a clean
+    regular grid.
+    """
+    import netCDF4
+    import numpy as np
+    from pyproj import CRS
+
+    wkt = CRS.from_proj4(
+        "+proj=lcc +lat_0=20.6 +lon_0=-157.42 +lat_1=10 +lat_2=30 +R=6370000 +units=m"
+    ).to_wkt()
+    # LCC meters centered on the projection origin (~Hawaii): 1 km integer
+    # spacing + constant 0.375 m sub-cell offset + <=5 cm float noise that
+    # stays within the same rounding bucket (so rounding is well-defined).
+    rng = np.random.default_rng(0)
+    offset = 0.375
+    x = offset + (np.arange(nx) - nx // 2) * 1000.0 + rng.uniform(-0.05, 0.05, nx)
+    y = offset + (np.arange(ny) - ny // 2) * 1000.0 + rng.uniform(-0.05, 0.05, ny)
+    times = 29298240.0 + np.arange(n_times) * 60.0  # minutes since 1970, hourly
+
+    with netCDF4.Dataset(path, "w") as ds:
+        ds.createDimension("time", n_times)
+        ds.createDimension("y", ny)
+        ds.createDimension("x", nx)
+        tv = ds.createVariable("Time", "f8", ("time",))
+        tv.units = "minutes since 1970-01-01 00:00:00 UTC"
+        tv.standard_name = "time"
+        tv[:] = times
+        xv = ds.createVariable("x", "f8", ("x",))
+        xv.units = "m"
+        xv.standard_name = "projection_x_coordinate"
+        xv[:] = x
+        yv = ds.createVariable("y", "f8", ("y",))
+        yv.units = "m"
+        yv.standard_name = "projection_y_coordinate"
+        yv[:] = y
+        crs = ds.createVariable("crs", "S1")
+        crs.grid_mapping_name = "lambert_conformal_conic"
+        crs.spatial_ref = wkt
+        for name in ("U2D", "V2D", "T2D", "Q2D", "PSFC", "RAINRATE"):
+            v = ds.createVariable(name, "f4", ("time", "y", "x"))
+            v[:] = rng.uniform(0.0, 5.0, (n_times, ny, nx)).astype("f4")
+
+
+def _forecast_config(work_dir, forecast_file):
+    return CoastalCalibConfig(
+        simulation=SimulationConfig(
+            start_date=datetime(2025, 9, 15),
+            duration_hours=2,
+            coastal_domain="hawaii",
+            meteo_source="ngen_forecast",
+        ),
+        boundary=BoundaryConfig(source="stofs"),
+        paths=PathConfig(work_dir=work_dir, forecast_meteo_file=forecast_file),
+        model_config=SchismModelConfig(),
+        download=DownloadConfig(enabled=False),
+    )
+
+
+class TestForecastMeteoCatalog:
+    """ngen_forecast meteo: single-file entry, file-derived crs, no streamflow."""
+
+    def test_entry_single_file_uri_and_crs(self, tmp_path):
+        fc = tmp_path / "Hawaii_202509150000.nc"
+        _write_forecast_meteo_nc(fc)
+        cfg = _forecast_config(tmp_path / "work", fc)
+
+        catalog = generate_data_catalog(cfg)
+        names = [e.name for e in catalog.entries]
+        # meteo + coastal, but NOT streamflow (troute not wired)
+        assert "ngen_forecast_meteo" in names
+        assert "stofs_waterlevel" in names
+        assert not any("streamflow" in n for n in names)
+
+        meteo = next(e for e in catalog.entries if e.name == "ngen_forecast_meteo")
+        assert meteo.uri == str(fc)  # absolute single-file URI, not a glob
+        assert meteo.driver["options"]["preprocess"] == "forecast_meteo_coords"
+        # crs read from the file → Hawaii LCC (not the CONUS default)
+        assert "-157.42" in str(meteo.metadata.crs)
+
+    def test_hydromt_reads_forecast_file(self, tmp_path):
+        """The catalog HydroMT builds must yield a time coord + crs + renamed vars."""
+        import datetime as _dt
+
+        from hydromt import DataCatalog as HydroMTDataCatalog
+
+        fc = tmp_path / "Hawaii_202509150000.nc"
+        _write_forecast_meteo_nc(fc)
+        cfg = _forecast_config(tmp_path / "work", fc)
+        cat_path = tmp_path / "work" / "data_catalog.yml"
+        generate_data_catalog(cfg, output_path=cat_path)
+
+        dc = HydroMTDataCatalog(data_libs=[str(cat_path)])
+        da = dc.get_rasterdataset(
+            "ngen_forecast_meteo",
+            bbox=(-158.3, 20.0, -156.5, 21.2),
+            buffer=2,
+            time_range=(_dt.datetime(2025, 9, 15, 0), _dt.datetime(2025, 9, 15, 2)),
+            variables=["precip"],
+            single_var_as_array=True,
+        )
+        # Time promoted to a coordinate, projection recovered, dims intact.
+        assert "time" in da.coords
+        assert da.coords["time"].size == 3
+        assert da.raster.crs is not None
+        assert da.raster.crs.to_epsg() is None  # custom spherical LCC, no EPSG
+        assert {da.raster.x_dim, da.raster.y_dim} == {"x", "y"}
+
+    def test_missing_forecast_file_raises(self, tmp_path):
+        cfg = CoastalCalibConfig(
+            simulation=SimulationConfig(
+                start_date=datetime(2025, 9, 15),
+                duration_hours=2,
+                coastal_domain="hawaii",
+                meteo_source="ngen_forecast",
+            ),
+            boundary=BoundaryConfig(source="stofs"),
+            paths=PathConfig(work_dir=tmp_path / "work"),  # no forecast_meteo_file
+            model_config=SchismModelConfig(),
+            download=DownloadConfig(enabled=False),
+        )
+        with pytest.raises(ValueError, match="forecast_meteo_file is required"):
+            generate_data_catalog(cfg, include_coastal=False, include_streamflow=False)
+
+
 class TestCreateNcSymlinks:
     def test_creates_meteo_symlinks(self, tmp_path):
         meteo_dir = tmp_path / "meteo" / "nwm_retro" / "prvi"

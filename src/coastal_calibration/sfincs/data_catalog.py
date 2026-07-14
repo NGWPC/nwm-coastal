@@ -420,6 +420,102 @@ def _build_meteo_entry(
     ]
 
 
+def _read_forecast_crs(forecast_file: Path) -> str:
+    """Read the projection of a forecast forcing file as a WKT string.
+
+    The ngen forecast forcing engine writes the grid mapping into a
+    ``crs`` variable (``spatial_ref``/``esri_pe_string`` WKT).  hydromt's
+    raster accessor does not pick this up automatically, so the catalog
+    entry must carry the crs explicitly.  Reading it from the file (rather
+    than hardcoding a per-domain projection) keeps the entry correct for
+    whatever domain the forecast engine produced.
+
+    Raises
+    ------
+    ValueError
+        If the file has no readable ``crs`` variable.
+    """
+    import xarray as xr
+    from pyproj import CRS
+
+    with xr.open_dataset(forecast_file) as ds:
+        attrs = ds["crs"].attrs if "crs" in ds.variables else {}
+        wkt = attrs.get("spatial_ref") or attrs.get("esri_pe_string")
+    if not wkt:
+        raise ValueError(
+            f"Forecast meteo file has no readable 'crs' variable: {forecast_file}. "
+            "Cannot determine the projection for the SFINCS data catalog."
+        )
+    return CRS.from_user_input(wkt).to_wkt()
+
+
+def _build_forecast_meteo_entry(
+    sim: SimulationConfig,
+    forecast_file: Path,
+) -> CatalogEntry:
+    """Build the catalog entry for ngen forecast meteorological forcing.
+
+    Unlike NWM LDASIN (one extension-less file per hour), the ngen
+    forecast forcing engine emits a single multi-timestep netCDF on a
+    projected (domain-specific LCC) grid.  The entry therefore points at
+    that one file, carries the crs read from the file, and uses the
+    ``forecast_meteo_coords`` preprocessor to promote the ``Time``
+    variable to a ``time`` coordinate and regularize ``x``/``y``.  The
+    variable names match LDASIN, so the same rename/unit adapters apply.
+
+    Parameters
+    ----------
+    sim : SimulationConfig
+        Simulation configuration (for the temporal extent).
+    forecast_file : Path
+        Path to the ngen forecast forcing file
+        (``paths.forecast_meteo_file``).
+
+    Returns
+    -------
+    CatalogEntry
+        A single entry named ``<meteo_source>_meteo`` (matching the name
+        the precip/wind/pressure stages resolve).
+    """
+    temporal_extent = _get_temporal_extent(sim)
+
+    metadata = CatalogMetadata(
+        crs=_read_forecast_crs(forecast_file),
+        temporal_extent=temporal_extent,
+        category="meteo",
+        source_url="local ngen forecast forcing engine",
+        source_license="Public Domain",
+        source_version="ngen_forecast",
+        notes="ngen forecast forcing engine output (single multi-timestep file)",
+    )
+
+    data_adapter = DataAdapter(
+        rename=NWM_METEO_RENAME,
+        unit_mult=NWM_METEO_UNIT_MULT,
+        unit_add=NWM_METEO_UNIT_ADD,
+    )
+
+    # The datetime axis lives in a ``Time`` variable and the projected
+    # coordinates carry sub-meter float noise; ``forecast_meteo_coords``
+    # promotes ``Time`` -> ``time`` and rounds ``x``/``y``.  ``Time`` must
+    # not be dropped at open time (the preprocessor needs it), so no
+    # ``drop_variables`` here.
+    driver: dict[str, Any] = {
+        "name": "raster_xarray",
+        "options": {"preprocess": "forecast_meteo_coords"},
+    }
+
+    return CatalogEntry(
+        name=f"{sim.meteo_source}_meteo",
+        data_type="RasterDataset",
+        driver=driver,
+        uri=str(forecast_file),
+        metadata=metadata,
+        data_adapter=data_adapter,
+        version=temporal_extent[0][:10],
+    )
+
+
 def _build_streamflow_entry(
     sim: SimulationConfig,
     meteo_source: MeteoSource,
@@ -694,6 +790,10 @@ def generate_data_catalog(
     >>> catalog = generate_data_catalog(config, "data_catalog.yml")  # doctest: +SKIP
     """
     download_dir = config.paths.download_dir.resolve()
+    # The catalog root must exist for hydromt to load it. With ngen_forecast
+    # meteo (external absolute-path file) and download disabled, download_dir
+    # may not exist yet — create it so the produced catalog stays loadable.
+    download_dir.mkdir(parents=True, exist_ok=True)
     sim = config.simulation
     meteo_source = sim.meteo_source
     effective_coastal_source = coastal_source or config.boundary.source
@@ -706,10 +806,21 @@ def generate_data_catalog(
     )
 
     if include_meteo:
-        for entry in _build_meteo_entry(sim, meteo_source):
-            catalog.add_entry(entry)
+        if meteo_source == "ngen_forecast":
+            forecast_file = config.paths.forecast_meteo_file
+            if forecast_file is None:
+                raise ValueError(
+                    "paths.forecast_meteo_file is required when "
+                    "simulation.meteo_source is 'ngen_forecast'"
+                )
+            catalog.add_entry(_build_forecast_meteo_entry(sim, forecast_file))
+        else:
+            for entry in _build_meteo_entry(sim, meteo_source):
+                catalog.add_entry(entry)
 
-    if include_streamflow:
+    # ngen forecast streamflow comes from t-route output, which is not wired
+    # up yet — no streamflow catalog entry for it (mirrors the SCHISM side).
+    if include_streamflow and meteo_source != "ngen_forecast":
         for entry in _build_streamflow_entry(sim, meteo_source):
             catalog.add_entry(entry)
 
@@ -803,7 +914,9 @@ def create_nc_symlinks(
     created: dict[str, list[Path]] = {"meteo": [], "streamflow": []}
     existing: dict[str, int] = {"meteo": 0, "streamflow": 0}
 
-    if include_meteo:
+    # ngen forecast forcing is a single already-".nc" file referenced by the
+    # catalog directly, so there are no extension-less LDASIN files to link.
+    if include_meteo and meteo_source != "ngen_forecast":
         meteo_dir = download_dir / PathConfig.meteo_subdir(meteo_source, coastal_domain)
         # Both nwm_retro and nwm_ana downloads use extension-less
         # YYYYMMDDHH.LDASIN_DOMAIN1 naming.  We create .nc symlinks to
@@ -856,7 +969,7 @@ def remove_nc_symlinks(
     download_dir = Path(download_dir)
     removed: dict[str, int] = {"meteo": 0, "streamflow": 0}
 
-    if include_meteo:
+    if include_meteo and meteo_source != "ngen_forecast":
         meteo_dir = download_dir / PathConfig.meteo_subdir(meteo_source, coastal_domain)
         # Both sources use extension-less LDASIN_DOMAIN1 naming; remove
         # the .nc symlinks we created as a HydroMT workaround.

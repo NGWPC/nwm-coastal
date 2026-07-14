@@ -32,13 +32,188 @@ thing for the hydromt-free reader and stays.
 
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import TYPE_CHECKING, Any
+
+from pyproj import Transformer
 
 from coastal_calibration.logging import logger as _log
 
 if TYPE_CHECKING:
     import geopandas as gpd
     import xarray as xr
+
+
+TransformerCRS = lru_cache(Transformer.from_crs)
+
+# Raw WRF dimension names used by the non-CONUS NWM Retrospective forcing.
+_WRF_DIMS = {"west_east": "x", "south_north": "y", "Time": "time"}
+
+
+def normalize_wrf_forcing(ds: xr.Dataset) -> xr.Dataset:
+    """Convert raw WRF-style NWM forcing to a CF ``x``/``y``/``time`` layout.
+
+    The NWM Retrospective serves its non-CONUS forcing (e.g. Hawaii) in the
+    raw WRF layout: dimensions ``west_east``/``south_north``/``Time``, no
+    ``x``/``y`` coordinate variables at all, and the timestamp in a
+    character array (``Times``) plus a CF-encoded ``valid_time`` data
+    variable.  CONUS Retrospective and every Analysis file instead use the
+    ``x``/``y``/``time`` layout that hydromt's raster accessor expects.
+
+    Without coordinates hydromt raises "x dimension not found", so rebuild
+    them from the ``GeoTransform`` attribute of the grid-mapping variable,
+    promote ``valid_time`` to the time coordinate, and drop the leftover
+    grid-mapping and character-timestamp variables.
+
+    Datasets that already use the CF layout are returned unchanged.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Dataset as opened from an LDASIN file.
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset with ``x``/``y``/``time`` dimensions and coordinates.
+    """
+    import numpy as np
+
+    if not {"west_east", "south_north"} <= set(ds.dims):
+        return ds
+
+    # The grid-mapping variable is named after the projection
+    # (``lambert_conformal_conic``, ``polar_stereographic``, ...), so find
+    # it by the attribute that actually matters rather than by name.
+    grid_mapping = next(
+        (name for name, var in ds.variables.items() if "GeoTransform" in var.attrs),
+        None,
+    )
+    if grid_mapping is None:
+        raise ValueError(
+            "WRF-style NWM forcing has no grid-mapping variable carrying a "
+            "GeoTransform attribute, so x/y coordinates cannot be rebuilt."
+        )
+
+    # GDAL order: x_origin, x_res, x_rot, y_origin, y_rot, y_res. Origins are
+    # the outer edge of the first pixel, so offset by half a cell to get
+    # centers.
+    x_origin, x_res, _, y_origin, _, y_res = (
+        float(v) for v in str(ds[grid_mapping].attrs["GeoTransform"]).split()
+    )
+    n_x = ds.sizes["west_east"]
+    n_y = ds.sizes["south_north"]
+
+    # The GeoTransform is a leftover from the GDAL conversion these files went
+    # through and declares a north-up raster (negative y_res), but the rows are
+    # actually stored south to north, as ``south_north`` implies. Both axes
+    # therefore ascend; deriving y from the sign of y_res instead flips the
+    # field by the height of the domain. Verified against the same NWM Hawaii
+    # grid in Analysis form: ascending y puts the orographic surface-pressure
+    # low over Mauna Loa (19.5N), descending y puts it 2.2 degrees out to sea.
+    x_start = min(x_origin, x_origin + n_x * x_res)
+    y_start = min(y_origin, y_origin + n_y * y_res)
+
+    ds = ds.rename({old: new for old, new in _WRF_DIMS.items() if old in ds.dims})
+    ds = ds.assign_coords(
+        x=x_start + (np.arange(n_x) + 0.5) * abs(x_res),
+        y=y_start + (np.arange(n_y) + 0.5) * abs(y_res),
+    )
+
+    # ``valid_time`` is CF-encoded ("seconds since ...") but ships as a data
+    # variable, so xarray never decodes it into the time coordinate.
+    if "valid_time" in ds.variables:
+        import xarray as xr_mod
+
+        ds = ds.assign_coords(time=xr_mod.decode_cf(ds[["valid_time"]])["valid_time"].variable)
+
+    # ``Times`` carries a DateStrLen dimension that hydromt cannot handle,
+    # and the grid-mapping variable is redundant once the CRS is set from
+    # the catalog metadata.
+    return ds.drop_vars([v for v in ("Times", "valid_time", grid_mapping) if v in ds.variables])
+
+
+def register_round_coords_preprocessor() -> None:
+    """Register a ``round_coords`` preprocessor in hydromt.
+
+    NWM LDASIN files store projected coordinates (LCC, in meters) with
+    floating-point rounding errors up to ~0.125 m.  hydromt's raster
+    accessor rejects them as "not a regular grid" because its tolerance
+    (``atol=5e-4``) is far too tight for meter-scale coordinates.
+
+    This preprocessor rounds x/y coordinates to the nearest integer,
+    which makes the grid perfectly regular.  Files that arrive in the raw
+    WRF layout (non-CONUS Retrospective forcing) are first converted to
+    the CF ``x``/``y``/``time`` layout by :func:`normalize_wrf_forcing`,
+    since they carry no x/y coordinates to round.
+    """
+    try:
+        from hydromt.data_catalog.drivers.preprocessing import PREPROCESSORS
+    except ImportError:
+        return
+
+    if "round_coords" in PREPROCESSORS:
+        return
+
+    import numpy as np
+
+    def round_coords(ds: xr.Dataset) -> xr.Dataset:
+        """Round x and y coordinates to the nearest integer."""
+        ds = normalize_wrf_forcing(ds)
+        x_dim = ds.raster.x_dim
+        y_dim = ds.raster.y_dim
+        ds[x_dim] = np.round(ds[x_dim], decimals=0)
+        ds[y_dim] = np.round(ds[y_dim], decimals=0)
+        return ds
+
+    PREPROCESSORS["round_coords"] = round_coords
+    _log.debug("Registered 'round_coords' preprocessor in hydromt.")
+
+
+def register_forecast_meteo_preprocessor() -> None:
+    """Register a ``forecast_meteo_coords`` preprocessor in hydromt.
+
+    The ngen forecast forcing engine writes a single multi-timestep file
+    whose datetime axis lives in a ``Time`` *variable* rather than a
+    ``time`` coordinate, and whose projected ``x``/``y`` carry the same
+    sub-meter float noise as NWM LDASIN.  hydromt's raster reader needs a
+    ``time`` *coordinate* (:func:`_create_meteo_forcing` selects on
+    ``data.coords["time"]``) and a regular grid, so this preprocessor:
+
+    1. promotes ``Time`` to the ``time`` dimension coordinate,
+    2. rounds ``x``/``y`` to the nearest integer (regularity, as in
+       :func:`register_round_coords_preprocessor`),
+    3. drops the leftover ``Time`` and ``crs`` variables.
+
+    The crs itself is supplied by the catalog entry (read from the file's
+    ``crs`` variable at catalog-generation time), not from the dropped
+    ``crs`` var here.
+    """
+    try:
+        from hydromt.data_catalog.drivers.preprocessing import PREPROCESSORS
+    except ImportError:
+        return
+
+    if "forecast_meteo_coords" in PREPROCESSORS:
+        return
+
+    import numpy as np
+
+    def forecast_meteo_coords(ds: xr.Dataset) -> xr.Dataset:
+        """Promote ``Time`` to a coordinate and regularize ``x``/``y``."""
+        if "Time" in ds.variables and "time" not in ds.coords:
+            ds = ds.assign_coords(time=("time", ds["Time"].values))
+        drop = [v for v in ("Time", "crs") if v in ds.variables]
+        if drop:
+            ds = ds.drop_vars(drop)
+        x_dim = ds.raster.x_dim
+        y_dim = ds.raster.y_dim
+        ds[x_dim] = np.round(ds[x_dim], decimals=0)
+        ds[y_dim] = np.round(ds[y_dim], decimals=0)
+        return ds
+
+    PREPROCESSORS["forecast_meteo_coords"] = forecast_meteo_coords
+    _log.debug("Registered 'forecast_meteo_coords' preprocessor in hydromt.")
 
 
 def patch_serialize_crs() -> None:
@@ -669,6 +844,8 @@ def patch_make_index_cog() -> None:  # noqa: PLR0915
 def apply_all_patches() -> None:
     """Apply all hydromt/hydromt-sfincs compatibility patches."""
     patch_serialize_crs()
+    register_round_coords_preprocessor()
+    register_forecast_meteo_preprocessor()
     patch_boundary_conditions_index_dim()
     patch_meteo_write_gridded()
     patch_quadtree_subgrid_data_setter()
