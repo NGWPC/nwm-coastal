@@ -65,9 +65,11 @@ def _read_from_zarr(
     mapper = fsspec.get_mapper(url, anon=True)
     ds = xr.open_zarr(mapper, consolidated=True, chunks="auto")  # pyright: ignore[reportArgumentType]
 
-    fids = list(feature_ids)
     available = set(ds["feature_id"].values.tolist())
-    keep = [f for f in fids if f in available]
+    # Dedupe: the same feature_id can appear twice in feature_ids (e.g. a reach
+    # listed as both a source and a sink), which would select duplicate columns
+    # and break label-based access downstream. Matches the CHRTOUT path.
+    keep = sorted(set(feature_ids) & available)
 
     if not keep:
         logger.warning("None of the requested feature_ids found in Zarr store")
