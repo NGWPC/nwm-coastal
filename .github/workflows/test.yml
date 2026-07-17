@@ -22,15 +22,15 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        environment: [test311, test313]
+        environment: [test313]
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         submodules: recursive
-    - uses: prefix-dev/setup-pixi@v0.9.5
+    - uses: prefix-dev/setup-pixi@v0.10.0
       with:
-        pixi-version: v0.68.0
+        pixi-version: v0.73.0
         environments: ${{ matrix.environment }}
         activate-environment: ${{ matrix.environment }}
     - name: Run pixi
