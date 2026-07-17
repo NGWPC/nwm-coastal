@@ -26,6 +26,15 @@ if TYPE_CHECKING:
     from shapely.geometry.base import BaseGeometry
 
 
+class COOPSUnavailableError(RuntimeError):
+    """The NOAA CO-OPS API is unreachable (transport/HTTP failure).
+
+    Distinct from a genuine "station has no datum data" result so callers
+    can tell a transient outage (retry later) apart from stations that
+    should be permanently excluded.
+    """
+
+
 def _check_plot_deps() -> None:
     """Check that plot optional dependencies are installed."""
     missing = []
@@ -399,8 +408,10 @@ class COOPSAPIClient:
 
         Raises
         ------
+        COOPSUnavailableError
+            If every request failed at the transport level (API outage).
         ValueError
-            If no valid datum data is returned for any station.
+            If responses came back but none had valid datum data.
         """
         import numpy as np
 
@@ -412,8 +423,10 @@ class COOPSAPIClient:
         logger.info("  Fetching datum information for %d station(s)", len(ids))
         responses = self.fetch_data(urls)
         datum_objects = []
+        n_failed = 0
         for station_id, response in zip(ids, responses, strict=False):
             if response is None:
+                n_failed += 1
                 logger.warning("  No datum data returned for station %s", station_id)
                 continue
 
@@ -463,6 +476,17 @@ class COOPSAPIClient:
             datum_objects.append(station_datum)
 
         if not datum_objects:
+            # A None response means the fetch failed at the transport layer
+            # (non-2xx / connection error); a station that merely lacks datums
+            # still returns a 200 dict. So if every request failed and there was
+            # at least one, the API is unreachable rather than the stations being
+            # data-less. Empty input falls through to the ValueError below.
+            if ids and n_failed == len(ids):
+                raise COOPSUnavailableError(
+                    f"NOAA CO-OPS API unreachable: all {n_failed} datum request(s) failed. "
+                    "This is a transient server-side outage, not a station data problem. "
+                    "Retry later."
+                )
             raise ValueError("No valid datum data returned for any station")
 
         if single_input:
@@ -489,6 +513,8 @@ class COOPSAPIClient:
         try:
             datums = self.get_datums(station_ids)
         except ValueError:
+            # Genuine "no valid datums" -> drop these stations. A full API
+            # outage raises COOPSUnavailableError, which propagates on purpose.
             return set()
 
         valid: set[str] = set()

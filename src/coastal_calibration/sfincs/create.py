@@ -200,7 +200,9 @@ class CreateGridStage(CreateStage):
             )
             raise ValueError(msg)
 
-        if eroded.geom_type == "MultiPolygon":
+        # A negative buffer can split the polygon, so MultiPolygon is reachable
+        # even though shapely types buffer() as returning a Polygon.
+        if eroded.geom_type == "MultiPolygon":  # pyright: ignore[reportUnnecessaryComparison]
             # ``Polygon``/``MultiPolygon`` are TYPE_CHECKING-only
             # imports; the annotation and the cast() are erased at
             # runtime so the symbol form here costs nothing and lets

@@ -13,6 +13,7 @@ import xarray as xr
 
 from coastal_calibration.data.coops_api import (
     COOPSAPIClient,
+    COOPSUnavailableError,
     DatumValue,
     StationDatum,
     _add_variable_attributes,
@@ -327,6 +328,28 @@ class TestGetDatums:
             assert len(result) == 1
             assert result[0].station_id == "8771450"
 
+    def test_all_transport_fail_raises_unavailable(self, client):
+        """Multiple stations all failing at transport = API outage, not missing data."""
+        with (
+            patch.object(client, "fetch_data", return_value=[None, None, None]),
+            pytest.raises(COOPSUnavailableError, match="unreachable"),
+        ):
+            client.get_datums(["1611400", "1612340", "1617760"])
+
+    def test_partial_failure_is_not_outage(self, client):
+        """Any non-None response means the API is up: no valid datums -> ValueError.
+
+        Locks the ``n_failed == len(ids)`` requirement so a single response
+        that came back (here an error dict) cannot be misreported as an outage
+        even when the other requests failed at transport.
+        """
+        error_resp = {"error": {"message": "Station not found"}}
+        with (
+            patch.object(client, "fetch_data", return_value=[None, None, error_resp]),
+            pytest.raises(ValueError, match="No valid datum data"),
+        ):
+            client.get_datums(["1611400", "1612340", "BAD"])
+
     def test_null_datums_field_handled(self, client):
         """Stations that return ``"datums": null`` must not crash."""
         null_datums_resp = {
@@ -451,10 +474,25 @@ class TestFilterStationsByDatum:
             result = client.filter_stations_by_datum(["BAD", "8771450"])
             assert result == {"8771450"}
 
-    def test_all_fail_returns_empty(self, client):
-        with patch.object(client, "fetch_data", return_value=[None]):
-            result = client.filter_stations_by_datum(["BAD"])
-            assert result == set()
+    def test_single_transport_fail_propagates(self, client):
+        """Even one station: a transport failure is an outage, not 'no datum'.
+
+        A None response is always a transport/HTTP failure (a data-less station
+        returns a 200 dict), so it must not be silently swallowed to an empty set.
+        """
+        with (
+            patch.object(client, "fetch_data", return_value=[None]),
+            pytest.raises(COOPSUnavailableError, match="unreachable"),
+        ):
+            client.filter_stations_by_datum(["1611400"])
+
+    def test_outage_propagates(self, client):
+        """A full API outage is not swallowed to an empty set; it propagates."""
+        with (
+            patch.object(client, "fetch_data", return_value=[None, None]),
+            pytest.raises(COOPSUnavailableError, match="unreachable"),
+        ):
+            client.filter_stations_by_datum(["1611400", "1612340"])
 
 
 # ---------------------------------------------------------------------------

@@ -500,7 +500,8 @@ def gatherv_1d(
 
     result = np.zeros(int(all_counts.sum())) if comm.Get_rank() == root else None  # pyright: ignore[reportOptionalMemberAccess]
 
-    comm.Gatherv(sendbuf=local_data, recvbuf=(result, all_counts), root=root)
+    # (buffer, counts) is valid mpi4py Gatherv recvbuf syntax that its stubs miss.
+    comm.Gatherv(sendbuf=local_data, recvbuf=(result, all_counts), root=root)  # pyright: ignore[reportArgumentType]
     return result
 
 

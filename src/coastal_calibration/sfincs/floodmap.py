@@ -9,7 +9,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-import hydromt  # noqa: F401  # pyright: ignore[reportUnusedImport]  # registers the ``DataArray.raster`` accessor used below
 import numpy as np
 
 from coastal_calibration.logging import logger as _log
@@ -282,6 +281,9 @@ def create_flood_depth_map(
     KeyError
         If ``zsmax`` is not present in the SFINCS map output.
     """
+    # registers the ``DataArray.raster`` accessor used below
+    import hydromt  # noqa: F401  # pyright: ignore[reportUnusedImport]
+
     # -- Ensure patches are applied before any hydromt-sfincs call --
     from coastal_calibration.logging import suppress_hydromt_output
     from coastal_calibration.sfincs._hydromt_compat import apply_all_patches
