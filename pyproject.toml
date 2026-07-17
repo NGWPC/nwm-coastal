@@ -178,6 +178,9 @@ mpi4py = "*"
 
 [tool.pixi.feature.models.pypi-dependencies]
 hydromt-sfincs = { git = "https://github.com/Deltares/hydromt_sfincs", rev = "41aac0a3980fc2714ec28eafb0463d40abfc979a" }
+# Optional xugrid backend required by the SFINCS floodmap downscaling path;
+# not pulled transitively, so declare it explicitly (uses the PyPI numba).
+numba-celltree = "*"
 
 [tool.pixi.feature.plot.dependencies]
 ffmpeg = { version = ">=6", build = "gpl_*" }
