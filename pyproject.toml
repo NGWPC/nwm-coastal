@@ -133,9 +133,6 @@ typecheck = { features = [ "typecheck", "models", "plot", "test", "py313" ] }
 lint = { features = [ "lint", "py313" ], no-default-feature = true }
 docs = { features = [ "docs", "py313" ] }
 
-[tool.pixi.feature.dev.pypi-dependencies]
-hydromt-sfincs = { git = "https://github.com/Deltares/hydromt_sfincs", rev = "41aac0a3980fc2714ec28eafb0463d40abfc979a" }
-
 [tool.pixi.feature.dev.tasks]
 # Preview unreleased changes without writing to CHANGELOG.md
 changelog = "git cliff -c pyproject.toml --unreleased"
@@ -178,6 +175,9 @@ openmpi = "*"
 esmf = { version = "*", build = "mpi_openmpi_*" }
 esmpy = "*"
 mpi4py = "*"
+
+[tool.pixi.feature.models.pypi-dependencies]
+hydromt-sfincs = { git = "https://github.com/Deltares/hydromt_sfincs", rev = "41aac0a3980fc2714ec28eafb0463d40abfc979a" }
 
 [tool.pixi.feature.plot.dependencies]
 ffmpeg = { version = ">=6", build = "gpl_*" }
