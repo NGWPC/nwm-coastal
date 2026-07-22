@@ -259,3 +259,143 @@ def test_regrid_estofs_matches_original(
         new_ts,
         err_msg="time_series values differ between original and refactored implementation",
     )
+
+
+# ---------------------------------------------------------------------------
+# Source connectivity resolution
+#
+# The pre-2023 ``estofs`` product ships only time/x/y/zeta, so ``element``
+# must come from the companion ``*.maxele.nc`` or be synthesized.
+# ---------------------------------------------------------------------------
+
+_BBOX = (-2.0, -2.0, 2.0, 2.0)
+
+
+def _grid_nodes(n: int = 6) -> tuple[NDArray[np.floating[Any]], NDArray[np.floating[Any]]]:
+    """Return a small regular lon/lat node cloud inside ``_BBOX``."""
+    gx, gy = np.meshgrid(np.linspace(-2.0, 2.0, n), np.linspace(-2.0, 2.0, n))
+    return gx.ravel(), gy.ravel()
+
+
+def _write_fields(path: Path, lon, lat, elements=None, start_index: int = 1) -> None:
+    """Write a minimal ESTOFS ``fields.cwl.nc``-style file."""
+    with netCDF4.Dataset(path, "w") as ds:
+        ds.createDimension("node", len(lon))
+        ds.createVariable("x", "f8", ("node",))[:] = lon
+        ds.createVariable("y", "f8", ("node",))[:] = lat
+        if elements is not None:
+            ds.createDimension("nele", len(elements))
+            ds.createDimension("nvertex", 3)
+            var = ds.createVariable("element", "i4", ("nele", "nvertex"))
+            var.start_index = start_index
+            var[:] = elements
+
+
+def _write_maxele(path: Path, n_nodes: int, elements, start_index: int = 1) -> None:
+    """Write a minimal companion ``maxele`` file carrying connectivity."""
+    with netCDF4.Dataset(path, "w") as ds:
+        ds.createDimension("node", n_nodes)
+        ds.createDimension("nele", len(elements))
+        ds.createDimension("nvertex", 3)
+        var = ds.createVariable("element", "i4", ("nele", "nvertex"))
+        var.start_index = start_index
+        var[:] = elements
+
+
+@have_esmf
+def test_resolve_elements_prefers_inline_connectivity(tmp_path):
+    """A file carrying ``element`` is used directly, honoring start_index."""
+    from coastal_calibration.regridding.regrid_estofs import _resolve_source_elements
+
+    lon, lat = _grid_nodes()
+    inline = np.array([[1, 2, 3], [2, 3, 4]])
+    nc = tmp_path / "stofs_2d_glo.t00z.fields.cwl.nc"
+    _write_fields(nc, lon, lat, elements=inline, start_index=1)
+
+    with netCDF4.Dataset(nc) as ds:
+        elements, start_index = _resolve_source_elements(ds, str(nc), lon, lat, _BBOX, 1.0)
+
+    assert start_index == 1
+    np.testing.assert_array_equal(elements, inline)
+
+
+@have_esmf
+def test_resolve_elements_reads_companion_maxele(tmp_path):
+    """Connectivity is recovered from the sibling maxele file."""
+    from coastal_calibration.regridding.regrid_estofs import _resolve_source_elements
+
+    lon, lat = _grid_nodes()
+    companion = np.array([[1, 2, 7], [2, 7, 8]])
+    nc = tmp_path / "estofs.t00z.fields.cwl.nc"
+    _write_fields(nc, lon, lat)
+    _write_maxele(tmp_path / "estofs.t00z.fields.cwl.maxele.nc", len(lon), companion)
+
+    with netCDF4.Dataset(nc) as ds:
+        elements, start_index = _resolve_source_elements(ds, str(nc), lon, lat, _BBOX, 1.0)
+
+    assert start_index == 1
+    np.testing.assert_array_equal(elements, companion)
+
+
+@have_esmf
+def test_resolve_elements_rejects_mismatched_maxele(tmp_path):
+    """A companion describing a different mesh is ignored, not misapplied."""
+    from coastal_calibration.regridding.regrid_estofs import _resolve_source_elements
+
+    lon, lat = _grid_nodes()
+    nc = tmp_path / "estofs.t00z.fields.cwl.nc"
+    _write_fields(nc, lon, lat)
+    # Node count deliberately disagrees with the fields file.
+    _write_maxele(
+        tmp_path / "estofs.t00z.fields.cwl.maxele.nc",
+        len(lon) + 5,
+        np.array([[1, 2, 3]]),
+    )
+
+    with netCDF4.Dataset(nc) as ds:
+        elements, start_index = _resolve_source_elements(ds, str(nc), lon, lat, _BBOX, 1.0)
+
+    # Fell through to the synthesized triangulation instead of the bad mesh.
+    assert start_index == 0
+    assert len(elements) > 1
+
+
+@have_esmf
+def test_resolve_elements_synthesizes_when_no_companion(tmp_path):
+    """Without any connectivity a valid Delaunay triangulation is built."""
+    from coastal_calibration.regridding.regrid_estofs import _resolve_source_elements
+
+    lon, lat = _grid_nodes()
+    nc = tmp_path / "estofs.t00z.fields.cwl.nc"
+    _write_fields(nc, lon, lat)
+
+    with netCDF4.Dataset(nc) as ds:
+        elements, start_index = _resolve_source_elements(ds, str(nc), lon, lat, _BBOX, 1.0)
+
+    assert start_index == 0
+    assert elements.shape[1] == 3
+    # 0-based indices addressing the full node array, no degenerate triangles.
+    assert elements.min() >= 0
+    assert elements.max() < len(lon)
+    assert (elements[:, 0] != elements[:, 1]).all()
+
+
+@have_esmf
+def test_delaunay_elements_drops_land_spanning_triangles():
+    """The max-edge filter removes triangles bridging a gap in the cloud."""
+    from coastal_calibration.regridding.esmf_utils import delaunay_elements
+
+    # Two dense clusters separated by a wide empty gap; Delaunay would
+    # otherwise bridge them with elements spanning the void.
+    left_x, left_y = np.meshgrid(np.linspace(-2.0, -1.8, 6), np.linspace(-1.0, 1.0, 6))
+    right_x, right_y = np.meshgrid(np.linspace(1.8, 2.0, 6), np.linspace(-1.0, 1.0, 6))
+    lon = np.concatenate([left_x.ravel(), right_x.ravel()])
+    lat = np.concatenate([left_y.ravel(), right_y.ravel()])
+
+    unfiltered = delaunay_elements(lon, lat, bbox=_BBOX, max_edge_factor=None)
+    filtered = delaunay_elements(lon, lat, bbox=_BBOX, max_edge_factor=3.0)
+
+    assert len(filtered) < len(unfiltered)
+    # No surviving triangle spans the gap between the two clusters.
+    spans = (lon[filtered].max(axis=1) > 0) & (lon[filtered].min(axis=1) < 0)
+    assert not spans.any()

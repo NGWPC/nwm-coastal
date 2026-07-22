@@ -16,12 +16,14 @@ from coastal_calibration.data.downloader import (
     _build_nwm_ana_forcing_urls,
     _build_nwm_ana_streamflow_urls,
     _build_nwm_retro_forcing_urls,
+    _build_stofs_mesh_urls,
     _build_stofs_urls,
     _execute_download,
     _hour_range,
     get_date_range,
     get_default_sources,
     get_overlapping_range,
+    get_stofs_path,
     validate_date_ranges,
 )
 
@@ -483,3 +485,25 @@ class TestValidateDateRanges:
             "conus",
         )
         assert len(errors) == 0
+
+
+class TestBuildStofsMeshUrls:
+    """The pre-2023 estofs product needs its connectivity fetched separately."""
+
+    def test_old_product_fetches_maxele_companion(self):
+        urls, paths = _build_stofs_mesh_urls(datetime(2022, 9, 28), Path("/tmp/dl"))
+        assert len(urls) == 1
+        assert urls[0].endswith("estofs.20220928/estofs.t00z.fields.cwl.maxele.nc")
+        # Lands beside the main fields file so regrid_estofs finds it by name.
+        assert paths[0].name == "estofs.t00z.fields.cwl.maxele.nc"
+        assert paths[0].parent == get_stofs_path(datetime(2022, 9, 28), Path("/tmp/dl")).parent
+
+    def test_new_product_needs_nothing_extra(self):
+        # stofs_2d_glo carries ``element`` inline.
+        urls, paths = _build_stofs_mesh_urls(datetime(2024, 1, 9), Path("/tmp/dl"))
+        assert urls == []
+        assert paths == []
+
+    def test_boundary_date_is_new_product(self):
+        assert _build_stofs_mesh_urls(datetime(2023, 1, 8), Path("/tmp/dl")) == ([], [])
+        assert _build_stofs_mesh_urls(datetime(2023, 1, 7), Path("/tmp/dl"))[0]

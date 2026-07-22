@@ -470,6 +470,12 @@ def _build_nwm_ana_streamflow_urls(
     return urls, paths
 
 
+# STOFS naming convention changed on 2023-01-08. The older ``estofs``
+# product also stores mesh connectivity in a separate companion file.
+STOFS_NAME_CHANGE_DATE = datetime(2023, 1, 8)
+STOFS_BASE_URL = "https://noaa-gestofs-pds.s3.amazonaws.com"
+
+
 def get_stofs_path(start: datetime, output_dir: Path) -> Path:
     """Get the expected local path for a STOFS file.
 
@@ -485,8 +491,7 @@ def get_stofs_path(start: datetime, output_dir: Path) -> Path:
     Path
         Expected path to the STOFS file.
     """
-    name_change_date = datetime(2023, 1, 8)
-    product = "estofs" if start < name_change_date else "stofs_2d_glo"
+    product = "estofs" if start < STOFS_NAME_CHANGE_DATE else "stofs_2d_glo"
     date_str = start.strftime("%Y%m%d")
     cycle_hour = (start.hour // 6) * 6
     hour_str = f"{cycle_hour:02d}"
@@ -504,19 +509,38 @@ def _build_stofs_urls(
     output_dir: Path,
 ) -> tuple[list[str], list[Path]]:
     """Build URLs for STOFS water level files."""
-    base_url = "https://noaa-gestofs-pds.s3.amazonaws.com"
-    # STOFS naming convention changed on 2023-01-08
-    name_change_date = datetime(2023, 1, 8)
-
-    product = "estofs" if start < name_change_date else "stofs_2d_glo"
+    product = "estofs" if start < STOFS_NAME_CHANGE_DATE else "stofs_2d_glo"
     date_str = start.strftime("%Y%m%d")
     cycle_hour = (start.hour // 6) * 6
     hour_str = f"{cycle_hour:02d}"
 
-    url = f"{base_url}/{product}.{date_str}/{product}.t{hour_str}z.fields.cwl.nc"
+    url = f"{STOFS_BASE_URL}/{product}.{date_str}/{product}.t{hour_str}z.fields.cwl.nc"
     filepath = get_stofs_path(start, output_dir)
 
     return [url], [filepath]
+
+
+def _build_stofs_mesh_urls(
+    start: datetime,
+    output_dir: Path,
+) -> tuple[list[str], list[Path]]:
+    """Build URLs for the companion file holding STOFS mesh connectivity.
+
+    The pre-2023 ``estofs`` product stores only ``time``/``x``/``y``/
+    ``zeta`` in its ``fields.cwl.nc`` file; the ``element`` connectivity
+    needed for BILINEAR regridding lives in the companion ``maxele``
+    file, which describes the same ADCIRC mesh with identical node
+    ordering.  Newer ``stofs_2d_glo`` files carry ``element`` directly,
+    so nothing extra is needed and this returns empty lists.
+    """
+    if start >= STOFS_NAME_CHANGE_DATE:
+        return [], []
+
+    date_str = start.strftime("%Y%m%d")
+    hour_str = f"{(start.hour // 6) * 6:02d}"
+    url = f"{STOFS_BASE_URL}/estofs.{date_str}/estofs.t{hour_str}z.fields.cwl.maxele.nc"
+    main = get_stofs_path(start, output_dir)
+    return [url], [main.with_name(f"{main.stem}.maxele{main.suffix}")]
 
 
 def _build_glofs_urls(
@@ -809,6 +833,13 @@ def download_data(
         stofs_timeout = max(timeout, 3600)
         coastal_result = _execute_download(
             urls, paths, "coastal/stofs", stofs_timeout, raise_on_error
+        )
+        # Best effort: regrid_estofs synthesizes a triangulation when this
+        # companion mesh file is absent, so a failure is not fatal. The
+        # lists are empty for the newer product, where this is a no-op.
+        mesh_urls, mesh_paths = _build_stofs_mesh_urls(start, out_dir)
+        _execute_download(
+            mesh_urls, mesh_paths, "coastal/stofs-mesh", stofs_timeout, raise_on_error=False
         )
     else:
         urls, paths = _build_glofs_urls(start, end, out_dir, glofs_model)
