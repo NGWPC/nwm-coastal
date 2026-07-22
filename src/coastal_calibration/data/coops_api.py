@@ -484,8 +484,8 @@ class COOPSAPIClient:
             if ids and n_failed == len(ids):
                 raise COOPSUnavailableError(
                     f"NOAA CO-OPS API unreachable: all {n_failed} datum request(s) failed. "
-                    "This is a transient server-side outage, not a station data problem. "
-                    "Retry later."
+                    "Likely a server error or API throttling rather than a station data "
+                    "problem, but the HTTP status is not surfaced here. Retry later."
                 )
             raise ValueError("No valid datum data returned for any station")
 
