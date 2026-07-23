@@ -324,9 +324,10 @@ def _build_meteo_entry(
 
     temporal_extent = _get_temporal_extent(sim)
 
-    # Both NWM Retrospective and Analysis LDASIN files use the same
-    # Lambert Conformal Conic (LCC) projected grid with coordinates in meters.
-    crs = "+proj=lcc +lat_0=40 +lon_0=-97 +lat_1=30 +lat_2=60 +x_0=0 +y_0=0 +R=6370000 +units=m +no_defs=True"
+    # Both NWM Retrospective and Analysis LDASIN files use the same projected
+    # grid (coordinates in meters) for a given domain, but that projection
+    # differs between domains, so it must be looked up per coastal domain.
+    crs = sim.meteo_crs
 
     # Determine source URL based on meteo source
     if meteo_source == "nwm_retro":
