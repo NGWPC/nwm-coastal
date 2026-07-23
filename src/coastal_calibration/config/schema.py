@@ -23,6 +23,13 @@ ModelType = Literal["schism", "sfincs"]
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 
+# Projection of the NWM CONUS meteorological (LDASIN) grid, shared by the
+# coastal domains that are carved out of it.
+NWM_CONUS_METEO_CRS = (
+    "+proj=lcc +lat_0=40 +lon_0=-97 +lat_1=30 +lat_2=60 +x_0=0 +y_0=0 +R=6370000 +units=m +no_defs"
+)
+
+
 @dataclass
 class SimulationConfig:
     """Simulation time and domain configuration.
@@ -69,6 +76,17 @@ class SimulationConfig:
         "pacific": "geo_em_CONUS.nc",
         "alaska": "geo_em_AK.nc",
     }
+    # Every NWM domain projects its LDASIN forcing differently: CONUS,
+    # Hawaii, and PRVI are Lambert Conformal Conic about different origins,
+    # while Alaska is polar stereographic.  These mirror the ``crs``
+    # variable carried inside the LDASIN files themselves.
+    _METEO_CRS: ClassVar[dict[str, str]] = {
+        "prvi": "+proj=lcc +lat_0=18.1 +lon_0=-65.91 +lat_1=18.1 +lat_2=18.1 +x_0=0 +y_0=0 +R=6370000 +nadgrids=@null +units=m +no_defs",
+        "hawaii": "+proj=lcc +lat_0=20.6 +lon_0=-157.42 +lat_1=10 +lat_2=30 +x_0=0 +y_0=0 +R=6370000 +units=m +no_defs",
+        "atlgulf": NWM_CONUS_METEO_CRS,
+        "pacific": NWM_CONUS_METEO_CRS,
+        "alaska": "+proj=stere +lat_0=90 +lat_ts=60 +lon_0=-135 +x_0=0 +y_0=0 +R=6370000 +units=m +no_defs",
+    }
 
     def __post_init__(self) -> None:
         from coastal_calibration.utils import to_naive_utc
@@ -99,6 +117,11 @@ class SimulationConfig:
     def geo_grid(self) -> str:
         """Geogrid filename for this coastal domain."""
         return self._GEO_GRID[self.coastal_domain]
+
+    @property
+    def meteo_crs(self) -> str:
+        """PROJ string for this domain's NWM meteorological forcing grid."""
+        return self._METEO_CRS[self.coastal_domain]
 
 
 @dataclass

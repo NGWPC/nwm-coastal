@@ -47,6 +47,48 @@ class TestSimulationConfig:
             )
             assert sim.inland_domain == expected
 
+    def test_meteo_crs_is_domain_specific(self):
+        """Each NWM forcing domain has its own projection, not CONUS's."""
+        from pyproj import CRS
+
+        crs_by_domain = {}
+        for domain in ("prvi", "hawaii", "atlgulf", "pacific", "alaska"):
+            sim = SimulationConfig(
+                start_date=datetime(2021, 1, 1),
+                duration_hours=3,
+                coastal_domain=domain,
+                meteo_source="nwm_retro",
+            )
+            crs_by_domain[domain] = CRS.from_user_input(sim.meteo_crs)
+
+        # The CONUS-derived coastal domains share the CONUS grid.
+        assert crs_by_domain["atlgulf"].equals(crs_by_domain["pacific"])
+        # The standalone NWM domains must not inherit it.
+        for domain in ("hawaii", "prvi", "alaska"):
+            assert not crs_by_domain[domain].equals(crs_by_domain["atlgulf"]), (
+                f"{domain} must not reuse the CONUS forcing projection"
+            )
+        # Alaska is polar stereographic, the others Lambert Conformal Conic.
+        assert crs_by_domain["alaska"].to_dict()["proj"] == "stere"
+        assert crs_by_domain["hawaii"].to_dict()["proj"] == "lcc"
+
+    def test_meteo_crs_places_hawaii_in_hawaii(self):
+        """Guards the regression: CONUS parameters put the grid in Nebraska."""
+        from pyproj import CRS, Transformer
+
+        sim = SimulationConfig(
+            start_date=datetime(2021, 1, 1),
+            duration_hours=3,
+            coastal_domain="hawaii",
+            meteo_source="nwm_retro",
+        )
+        # Corner of the real NWM Hawaii LDASIN grid, in projected meters.
+        lon, lat = Transformer.from_crs(
+            CRS.from_user_input(sim.meteo_crs), 4326, always_xy=True
+        ).transform(-294500.5, 194500.1)
+        assert -161 < lon < -154
+        assert 18 < lat < 23
+
     def test_nwm_domain_mapping(self):
         for domain, expected in [
             ("prvi", "prvi"),
