@@ -800,12 +800,17 @@ def subset_nwm_reaches_file(
     output_file: Path,
     element_mapping: dict[int, int],
 ) -> dict[str, int]:
-    """Subset NWM reaches file based on element mapping.
+    """Subset a reaches crosswalk file based on element mapping.
+
+    Works for both ``nwmReaches.csv`` (NWM COMIDs) and ``ngenReaches.csv``
+    (NextGen hydrofabric feature_ids) — the block format
+    (``<element_id> <feature_id>``) is identical, so subsetting is
+    agnostic to the ID space.
 
     Parameters
     ----------
     input_file : pathlib.Path
-        Input NWM reaches file path.
+        Input reaches file path.
     output_file : pathlib.Path
         Output path for subset file.
     element_mapping : dict
@@ -1080,7 +1085,13 @@ class MeshSubsetter:
         project = NWMSCHISMProject(
             input_file.parent, buffer_size=self.project.buffer_size, validate=False
         )
-        nwm_required_files = set(project.optional_files.values()) - {project.elev_corr_file}
+        # elev_corr_file and ngen_reaches_file are genuinely optional inputs
+        # (the latter is produced by a separate team; older projects lack it),
+        # so exclude them from the required-for-subset check.
+        nwm_required_files = set(project.optional_files.values()) - {
+            project.elev_corr_file,
+            project.ngen_reaches_file,
+        }
         nwm_required_files = set(project.required_files.values()) | nwm_required_files
         missing_files = [f for f in nwm_required_files if not f.exists()]
         if missing_files:
@@ -1869,6 +1880,32 @@ def split_mesh(
         output_dir_b / SCHISMFiles.NWM_REACHES,
         element_mapping_b,
     )
+
+    # ngenReaches.csv (NextGen hydrofabric feature_ids) is the discharge
+    # crosswalk for ngen_forecast runs.  It has the same block format as
+    # nwmReaches.csv, so the same subsetter applies.  It is optional: the
+    # source data is produced by a separate team, so older projects may not
+    # have one — subset it only when present, and warn that ngen forecast
+    # discharge cannot run without it.
+    if project.ngen_reaches_file.exists():
+        logger.info("Subsetting ngen reaches files...")
+        _ = subset_nwm_reaches_file(
+            project.ngen_reaches_file,
+            output_dir_a / SCHISMFiles.NGEN_REACHES,
+            element_mapping_a,
+        )
+        _ = subset_nwm_reaches_file(
+            project.ngen_reaches_file,
+            output_dir_b / SCHISMFiles.NGEN_REACHES,
+            element_mapping_b,
+        )
+    else:
+        logger.warning(
+            "ngenReaches.csv not found in project (%s); skipping its subset. "
+            "ngen forecast runs with river discharge require ngenReaches.csv "
+            "in the subset model directory.",
+            project.ngen_reaches_file,
+        )
 
     logger.info("Subsetting Manning's coefficient files...")
     _ = subset_nongrid_file(

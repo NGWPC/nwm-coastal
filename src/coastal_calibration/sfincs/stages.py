@@ -510,6 +510,9 @@ class SfincsInitStage(_SfincsStageBase):
         "sfincs_netamp.nc",
         "sfincs_netampr.nc",
         "sfincs_netsrcdisfile.nc",
+        # ID-space-suffixed discharge files (ngen_forecast vs nwm runs)
+        "sfincs_netsrcdisfile_nwm.nc",
+        "sfincs_netsrcdisfile_ngen.nc",
         # SFINCS output files (not strictly forcing but can interfere)
         "sfincs_map.nc",
         "sfincs_his.nc",
@@ -1395,6 +1398,21 @@ class SfincsDischargeStage(_SfincsStageBase):
                 meteo_source="nwm_retro",
                 domain=sim.coastal_domain,
             )
+        elif sim.meteo_source == "ngen_forecast":
+            troute_file = self.config.paths.troute_file
+            if troute_file is None:
+                self._log(
+                    "meteo_source is 'ngen_forecast' but paths.troute_file is unset; "
+                    "discharge points will use default (zero) values"
+                )
+                return
+            df_fid = read_streamflow(
+                needed_fids,
+                start_dt,
+                end_dt,
+                meteo_source="ngen_forecast",
+                troute_file=troute_file,
+            )
         else:
             streamflow_dir = self.config.paths.streamflow_dir(sim.coastal_domain)
             files = _filter_chrtout_files(
@@ -1462,9 +1480,21 @@ class SfincsDischargeStage(_SfincsStageBase):
         """Add discharge source points from a ``.src`` or GeoJSON file."""
         model = _get_model(self.config)
 
-        if self.sfincs.discharge_locations_file is None:
+        # Resolve the discharge-points file for this run's source: for
+        # ngen_forecast prefer the ``_ngen`` file (NextGen hydrofabric IDs),
+        # otherwise ``_nwm`` (NWM COMIDs).  This picks the right file when the
+        # user drops both alongside each other.
+        meteo_source = self.config.simulation.meteo_source
+        token = self.sfincs._discharge_token(meteo_source)
+        src_path = self.sfincs.resolved_discharge_locations_file(meteo_source)
+        if src_path is None:
             self._log("No discharge configuration, skipping")
             return {"status": "skipped"}
+        self._log(f"Using {token} discharge points: {src_path.name}")
+
+        # Carry the ID-space token onto the written SFINCS discharge file so
+        # the model directory makes the active source obvious.
+        _set_forcing_filename(model.discharge_points, f"sfincs_netsrcdisfile_{token}.nc")
 
         self._update_substep("Adding discharge source points")
 
@@ -1481,7 +1511,6 @@ class SfincsDischargeStage(_SfincsStageBase):
             except (AttributeError, ValueError) as exc:
                 logger.debug("No existing discharge points to clear: %s", exc)
 
-        src_path = self.sfincs.discharge_locations_file
         suffix = src_path.suffix.lower()
 
         if suffix == ".src":

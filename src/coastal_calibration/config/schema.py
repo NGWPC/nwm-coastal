@@ -199,6 +199,12 @@ class PathConfig:
     # geogrid, e.g. ``Hawaii_202509150000.nc``). Required when
     # ``simulation.meteo_source == "ngen_forecast"``; ignored otherwise.
     forecast_meteo_file: Path | None = None
+    # Path to the t-route output netCDF (``troute_output_*.nc``) produced by
+    # the ngen forecast's routing step, keyed by NextGen hydrofabric
+    # ``feature_id``. Used for river discharge when
+    # ``simulation.meteo_source == "ngen_forecast"``; only needed when the
+    # model is configured with a discharge crosswalk. Ignored otherwise.
+    troute_file: Path | None = None
     # Legacy create-workflow fields — not used by the run workflow.
     parm_dir: Path | None = None
     nwm_dir: Path | None = None
@@ -217,6 +223,8 @@ class PathConfig:
             self.hot_start_file = Path(self.hot_start_file).expanduser().resolve()
         if self.forecast_meteo_file:
             self.forecast_meteo_file = Path(self.forecast_meteo_file).expanduser().resolve()
+        if self.troute_file:
+            self.troute_file = Path(self.troute_file).expanduser().resolve()
         if self.parm_dir is not None:
             self.parm_dir = Path(self.parm_dir).expanduser().resolve()
         if self.nwm_dir is not None:
@@ -536,18 +544,23 @@ class SchismModelConfig(ModelConfig):
         """SCHISM ESMF mesh file path."""
         return self.coastal_parm / "hgrid.nc"
 
-    @property
-    def resolved_discharge_file(self) -> Path | None:
-        """Resolve the NWM-reaches discharge CSV, or ``None`` to skip discharge.
+    def resolved_discharge_file(self, meteo_source: str = "nwm_ana") -> Path | None:
+        """Resolve the discharge crosswalk CSV, or ``None`` to skip discharge.
+
+        The crosswalk maps SCHISM source/sink elements to routed-reach IDs.
+        Which file is used depends on *meteo_source*: ``ngen_forecast`` runs
+        use ``ngenReaches.csv`` (NextGen hydrofabric feature_ids, matching
+        the t-route output), while ``nwm_retro`` / ``nwm_ana`` use
+        ``nwmReaches.csv`` (NWM COMIDs).
 
         Resolution order:
 
         1. ``discharge_file`` explicitly set → use it if it exists, else
            ``None``. An explicit configuration is treated as exclusive: it
            does not silently fall back to the prebuilt-directory convention.
-        2. ``discharge_file`` unset → look for ``nwmReaches.csv`` next to
-           the prebuilt model (matching the Pacific/Hawaii/PRVI/AtlGulf
-           convention). Use it if present.
+        2. ``discharge_file`` unset → look for the source-appropriate
+           reaches file (``ngenReaches.csv`` or ``nwmReaches.csv``) next to
+           the prebuilt model. Use it if present.
         3. Otherwise → ``None`` (river forcing is skipped and SCHISM is
            configured with ``if_source = 0``).
 
@@ -558,7 +571,8 @@ class SchismModelConfig(ModelConfig):
             return self.discharge_file if self.discharge_file.exists() else None
         if self.prebuilt_dir is None:
             return None
-        candidate = self.prebuilt_dir / "nwmReaches.csv"
+        fname = "ngenReaches.csv" if meteo_source == "ngen_forecast" else "nwmReaches.csv"
+        candidate = self.prebuilt_dir / fname
         return candidate if candidate.exists() else None
 
     @property
@@ -1063,6 +1077,57 @@ class SfincsModelConfig(ModelConfig):
 
             self.omp_num_threads = get_cpu_count()
 
+    @staticmethod
+    def _discharge_token(meteo_source: str) -> str:
+        """Return the discharge-file ID-space token for *meteo_source*.
+
+        ``ngen`` for ngen_forecast (NextGen hydrofabric IDs), ``nwm``
+        otherwise (NWM COMIDs).
+        """
+        return "ngen" if meteo_source == "ngen_forecast" else "nwm"
+
+    @staticmethod
+    def _sibling_with_token(path: Path, token: str) -> Path:
+        """Return *path* re-suffixed with ``_<token>`` before its extension.
+
+        Swaps an existing ``_nwm`` / ``_ngen`` stem suffix, or appends one
+        when absent.  e.g. ``discharge_points_nwm.geojson`` + ``ngen`` ->
+        ``discharge_points_ngen.geojson``.
+        """
+        stem = path.stem
+        for other in ("nwm", "ngen"):
+            if stem.endswith(f"_{other}"):
+                base = stem[: -(len(other) + 1)]
+                return path.with_name(f"{base}_{token}{path.suffix}")
+        return path.with_name(f"{stem}_{token}{path.suffix}")
+
+    def resolved_discharge_locations_file(self, meteo_source: str = "nwm_ana") -> Path | None:
+        """Resolve the discharge-points file for *meteo_source*.
+
+        Discharge-point files carry the reach IDs in each point's ``name``:
+        NWM COMIDs for ``nwm_retro`` / ``nwm_ana`` runs, NextGen
+        hydrofabric IDs for ``ngen_forecast`` runs.  By convention the
+        files are suffixed ``_nwm`` / ``_ngen`` so both can coexist.
+
+        Resolution: if ``discharge_locations_file`` already matches the
+        meteo-appropriate token it is used as-is; otherwise the sibling
+        carrying that token is preferred **when it exists** (so a user can
+        drop both ``*_nwm`` and ``*_ngen`` files and the correct one is
+        chosen automatically).  Falls back to the configured file when no
+        matching sibling exists — :meth:`validate` flags a hard mismatch.
+
+        Returns ``None`` when ``discharge_locations_file`` is unset
+        (discharge is skipped).
+        """
+        if self.discharge_locations_file is None:
+            return None
+        token = self._discharge_token(meteo_source)
+        path = self.discharge_locations_file
+        if path.stem.endswith(f"_{token}"):
+            return path
+        sibling = self._sibling_with_token(path, token)
+        return sibling if sibling.exists() else path
+
     @property
     def model_name(self) -> str:  # noqa: D102
         return "sfincs"
@@ -1093,7 +1158,7 @@ class SfincsModelConfig(ModelConfig):
     ) -> dict[str, str]:
         return env
 
-    def validate(self, config: CoastalCalibConfig) -> list[str]:  # noqa: D102, ARG002
+    def validate(self, config: CoastalCalibConfig) -> list[str]:  # noqa: D102
         errors: list[str] = []
 
         if not self.prebuilt_dir.exists():
@@ -1106,10 +1171,22 @@ class SfincsModelConfig(ModelConfig):
                 if not (self.prebuilt_dir / fname).exists()
             )
 
-        if self.discharge_locations_file and not self.discharge_locations_file.exists():
-            errors.append(
-                f"model_config.discharge_locations_file not found: {self.discharge_locations_file}"
-            )
+        # Validate the discharge-points file resolved for this run's source.
+        if self.discharge_locations_file is not None:
+            meteo_source = config.simulation.meteo_source
+            token = self._discharge_token(meteo_source)
+            resolved = self.resolved_discharge_locations_file(meteo_source)
+            if resolved is not None and not resolved.exists():
+                errors.append(f"model_config.discharge_locations_file not found: {resolved}")
+            elif resolved is not None:
+                other = "nwm" if token == "ngen" else "ngen"
+                if resolved.stem.endswith(f"_{other}"):
+                    errors.append(
+                        f"Discharge file '{resolved.name}' is suffixed '_{other}' but "
+                        f"simulation.meteo_source is '{meteo_source}', which needs "
+                        f"'_{token}' reach IDs. Provide a '_{token}' discharge file "
+                        "(its point names must match the streamflow source's feature_ids)."
+                    )
 
         if self.sfincs_exe and not self.sfincs_exe.exists():
             errors.append(f"model_config.sfincs_exe not found: {self.sfincs_exe}")
@@ -1365,6 +1442,8 @@ class CoastalCalibConfig:
         paths_data = data.get("paths", {})
         if paths_data.get("forecast_meteo_file"):
             paths_data["forecast_meteo_file"] = Path(paths_data["forecast_meteo_file"])
+        if paths_data.get("troute_file"):
+            paths_data["troute_file"] = Path(paths_data["troute_file"])
         paths = PathConfig(**paths_data)
 
         monitoring_data = data.get("monitoring", {})
@@ -1477,6 +1556,11 @@ class CoastalCalibConfig:
                     if self.paths.forecast_meteo_file
                     else {}
                 ),
+                **(
+                    {"troute_file": str(self.paths.troute_file)}
+                    if self.paths.troute_file
+                    else {}
+                ),
                 **({"parm_dir": str(self.paths.parm_dir)} if self.paths.parm_dir else {}),
                 **({"nwm_dir": str(self.paths.nwm_dir)} if self.paths.nwm_dir else {}),
                 **(
@@ -1559,6 +1643,12 @@ class CoastalCalibConfig:
                 )
             elif not fcst.exists():
                 errors.append(f"Forecast meteo file not found: {fcst}")
+
+            # troute_file is optional (only needed when discharge is wired),
+            # but if given it must exist.
+            troute = self.paths.troute_file
+            if troute is not None and not troute.exists():
+                errors.append(f"t-route file not found: {troute}")
 
         # Model-specific validation
         errors.extend(self.model_config.validate(self))

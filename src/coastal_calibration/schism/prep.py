@@ -265,8 +265,10 @@ def make_discharge(  # noqa: PLR0912
     domain: str = "conus",
     start_date: datetime | None = None,
     end_date: datetime | None = None,
+    troute_file: Path | None = None,
+    reaches_filename: str = "nwmReaches.csv",
 ) -> None:
-    """Create discharge files from NWM CHRT output.
+    """Create discharge files from routed-streamflow output.
 
     Writes ``vsource.th``, ``vsink.th``, and ``source_sink.in`` into
     *work_dir*.  The sink block of ``nwmReaches.csv`` is optional, since a
@@ -275,11 +277,13 @@ def make_discharge(  # noqa: PLR0912
 
     For ``nwm_retro`` the streamflow is read directly from the S3 Zarr
     store (requires *start_date* and *end_date*).  For ``nwm_ana`` the
-    streamflow is read from local CHRTOUT netCDF files.
+    streamflow is read from local CHRTOUT netCDF files.  For
+    ``ngen_forecast`` it is read from the t-route output netCDF
+    (*troute_file*, requires *start_date* and *end_date*).
     """
     from coastal_calibration.data.streamflow import read_streamflow
 
-    reaches_path = work_dir / "nwmReaches.csv"
+    reaches_path = work_dir / reaches_filename
     # Blank separator lines are dropped, which makes the trailing sink
     # block optional: a mesh subset can contain sources and no sinks, and
     # such a file may end right after the source block instead of writing
@@ -308,6 +312,18 @@ def make_discharge(  # noqa: PLR0912
             end_date,
             meteo_source="nwm_retro",
             domain=domain,
+        )
+    elif meteo_source == "ngen_forecast":
+        if start_date is None or end_date is None:
+            raise ValueError("start_date and end_date are required for ngen_forecast")
+        if troute_file is None:
+            raise ValueError("troute_file is required for ngen_forecast discharge")
+        df = read_streamflow(
+            all_fids,
+            start_date,
+            end_date,
+            meteo_source="ngen_forecast",
+            troute_file=troute_file,
         )
     else:
         # Gather local CHRTOUT files for nwm_ana

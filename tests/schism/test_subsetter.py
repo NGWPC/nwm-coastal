@@ -574,3 +574,35 @@ class TestExtractMeshBoundaryChain:
             "chained ring revisits a node — extract_mesh boundary order is "
             "not chainable, or _chain_ring is choosing wrong matches"
         )
+
+
+class TestSubsetReachesFile:
+    """subset_nwm_reaches_file works for ngenReaches.csv (16-digit hf IDs)."""
+
+    def test_subsets_ngen_16digit_ids(self, tmp_path):
+        from coastal_calibration.schism.subsetter import subset_nwm_reaches_file
+
+        # One block of 3 element->hf_id pairs (NextGen 16-digit feature_ids).
+        src = tmp_path / "ngenReaches.csv"
+        src.write_text(
+            "3\n"
+            "10 1072639236903480\n"
+            "20 1073115932546594\n"
+            "30 1075116176753856\n"
+            "\n"
+        )
+        out = tmp_path / "sub" / "ngenReaches.csv"
+        # Keep elements 10 and 30, remapped to new ids 1 and 2; drop 20.
+        stats = subset_nwm_reaches_file(src, out, {10: 1, 30: 2})
+
+        assert stats["elements_in"] == 3
+        assert stats["elements_out"] == 2
+        assert stats["elements_dropped"] == 1
+
+        lines = [ln for ln in out.read_text().splitlines() if ln.strip()]
+        # header "2", then the two kept pairs with remapped element ids and
+        # the 16-digit ids preserved.
+        assert lines[0] == "2"
+        assert "1 1072639236903480" in lines
+        assert "2 1075116176753856" in lines
+        assert not any("1073115932546594" in ln for ln in lines)  # dropped

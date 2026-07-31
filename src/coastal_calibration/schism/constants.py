@@ -41,5 +41,8 @@ class SCHISMFiles:
     ELEV_IC = "elev.ic"
     ELEV_CORRECTION = "elevation_correction.csv"
     NWM_REACHES = "nwmReaches.csv"
+    # Discharge crosswalk keyed by NextGen hydrofabric feature_id, used for
+    # ngen_forecast runs (same block format as nwmReaches.csv).
+    NGEN_REACHES = "ngenReaches.csv"
     BCTIDES = "bctides.in"
     NODE_MAPPING = "node_mapping.txt"
