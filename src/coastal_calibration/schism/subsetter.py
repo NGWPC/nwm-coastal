@@ -2331,6 +2331,27 @@ def extract_mesh(
         element_mapping,
     )
 
+    # ngenReaches.csv (NextGen hydrofabric feature_ids) is the discharge
+    # crosswalk for ngen_forecast runs.  It has the same block format as
+    # nwmReaches.csv, so the same subsetter applies.  It is optional: the
+    # source data is produced by a separate team, so older projects may not
+    # have one — subset it only when present, and warn that ngen forecast
+    # discharge cannot run without it.
+    if project.ngen_reaches_file.exists():
+        logger.info("Subsetting ngen reaches file...")
+        _ = subset_nwm_reaches_file(
+            project.ngen_reaches_file,
+            out / SCHISMFiles.NGEN_REACHES,
+            element_mapping,
+        )
+    else:
+        logger.warning(
+            "ngenReaches.csv not found in project (%s); skipping its subset. "
+            "ngen forecast runs with river discharge require ngenReaches.csv "
+            "in the subset model directory.",
+            project.ngen_reaches_file,
+        )
+
     logger.info("Subsetting Manning's coefficient files...")
     _ = subset_nongrid_file(
         project,
