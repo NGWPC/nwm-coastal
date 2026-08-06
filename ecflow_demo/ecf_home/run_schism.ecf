@@ -7,13 +7,18 @@ CYCLE=${YMD}${HH}
 CONFIG_FILE="%SCHISM_CYCLES_DIR%/${CYCLE}/run.yaml"
 [ -f "${CONFIG_FILE}" ] || { echo "ERROR: missing config: ${CONFIG_FILE}" >&2; exit 1; }
 
+# Resumes after run_schism_download.ecf's --stop-after download. Runner
+# skips clean_run_directory() whenever --start-from is set, so the
+# already-downloaded inputs are preserved, not wiped. See
+# run_schism_download.ecf for why the download stage is split out.
+#
 # ---- LAUNCH (placeholder for future Slurm submission) --------------------
 # Today: direct execution on this shared node.
 # Future migration, e.g.:
 #   sbatch --wait --job-name="schism_${CYCLE}" \
 #     --output="%SCHISM_CYCLES_DIR%/${CYCLE}/slurm.out" \
-#     --wrap="%NWM_COASTAL_CLI% run ${CONFIG_FILE}"
-%NWM_COASTAL_CLI% run "${CONFIG_FILE}"
+#     --wrap="%NWM_COASTAL_CLI% run ${CONFIG_FILE} --start-from schism_forcing_prep"
+%NWM_COASTAL_CLI% run "${CONFIG_FILE}" --start-from schism_forcing_prep
 # ---- END LAUNCH ------------------------------------------------------------
 
 %include <tail.h>

@@ -69,10 +69,12 @@ suite coastal_hourly
       task ngen_troute
       task gen_configs
         trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism_download
+        trigger gen_configs == complete
       task run_schism
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
       task run_sfincs
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
     endfamily
     family h01
       edit HOUR '01'
@@ -81,10 +83,12 @@ suite coastal_hourly
       task ngen_troute
       task gen_configs
         trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism_download
+        trigger gen_configs == complete
       task run_schism
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
       task run_sfincs
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
     endfamily
     family h02
       edit HOUR '02'
@@ -93,10 +97,12 @@ suite coastal_hourly
       task ngen_troute
       task gen_configs
         trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism_download
+        trigger gen_configs == complete
       task run_schism
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
       task run_sfincs
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
     endfamily
     family h03
       edit HOUR '03'
@@ -105,10 +111,12 @@ suite coastal_hourly
       task ngen_troute
       task gen_configs
         trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism_download
+        trigger gen_configs == complete
       task run_schism
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
       task run_sfincs
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
     endfamily
     family h04
       edit HOUR '04'
@@ -117,10 +125,12 @@ suite coastal_hourly
       task ngen_troute
       task gen_configs
         trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism_download
+        trigger gen_configs == complete
       task run_schism
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
       task run_sfincs
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
     endfamily
     family h05
       edit HOUR '05'
@@ -129,10 +139,12 @@ suite coastal_hourly
       task ngen_troute
       task gen_configs
         trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism_download
+        trigger gen_configs == complete
       task run_schism
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
       task run_sfincs
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
     endfamily
     family h06
       edit HOUR '06'
@@ -141,10 +153,12 @@ suite coastal_hourly
       task ngen_troute
       task gen_configs
         trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism_download
+        trigger gen_configs == complete
       task run_schism
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
       task run_sfincs
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
     endfamily
     family h07
       edit HOUR '07'
@@ -153,10 +167,12 @@ suite coastal_hourly
       task ngen_troute
       task gen_configs
         trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism_download
+        trigger gen_configs == complete
       task run_schism
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
       task run_sfincs
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
     endfamily
     family h08
       edit HOUR '08'
@@ -165,10 +181,12 @@ suite coastal_hourly
       task ngen_troute
       task gen_configs
         trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism_download
+        trigger gen_configs == complete
       task run_schism
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
       task run_sfincs
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
     endfamily
     family h09
       edit HOUR '09'
@@ -177,10 +195,12 @@ suite coastal_hourly
       task ngen_troute
       task gen_configs
         trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism_download
+        trigger gen_configs == complete
       task run_schism
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
       task run_sfincs
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
     endfamily
     family h10
       edit HOUR '10'
@@ -189,10 +209,12 @@ suite coastal_hourly
       task ngen_troute
       task gen_configs
         trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism_download
+        trigger gen_configs == complete
       task run_schism
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
       task run_sfincs
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
     endfamily
     family h11
       edit HOUR '11'
@@ -201,10 +223,12 @@ suite coastal_hourly
       task ngen_troute
       task gen_configs
         trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism_download
+        trigger gen_configs == complete
       task run_schism
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
       task run_sfincs
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
     endfamily
     family h12
       edit HOUR '12'
@@ -213,10 +237,12 @@ suite coastal_hourly
       task ngen_troute
       task gen_configs
         trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism_download
+        trigger gen_configs == complete
       task run_schism
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
       task run_sfincs
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
     endfamily
     family h13
       edit HOUR '13'
@@ -225,10 +251,12 @@ suite coastal_hourly
       task ngen_troute
       task gen_configs
         trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism_download
+        trigger gen_configs == complete
       task run_schism
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
       task run_sfincs
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
     endfamily
     family h14
       edit HOUR '14'
@@ -237,10 +265,12 @@ suite coastal_hourly
       task ngen_troute
       task gen_configs
         trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism_download
+        trigger gen_configs == complete
       task run_schism
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
       task run_sfincs
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
     endfamily
     family h15
       edit HOUR '15'
@@ -249,10 +279,12 @@ suite coastal_hourly
       task ngen_troute
       task gen_configs
         trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism_download
+        trigger gen_configs == complete
       task run_schism
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
       task run_sfincs
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
     endfamily
     family h16
       edit HOUR '16'
@@ -261,10 +293,12 @@ suite coastal_hourly
       task ngen_troute
       task gen_configs
         trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism_download
+        trigger gen_configs == complete
       task run_schism
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
       task run_sfincs
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
     endfamily
     family h17
       edit HOUR '17'
@@ -273,10 +307,12 @@ suite coastal_hourly
       task ngen_troute
       task gen_configs
         trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism_download
+        trigger gen_configs == complete
       task run_schism
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
       task run_sfincs
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
     endfamily
     family h18
       edit HOUR '18'
@@ -285,10 +321,12 @@ suite coastal_hourly
       task ngen_troute
       task gen_configs
         trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism_download
+        trigger gen_configs == complete
       task run_schism
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
       task run_sfincs
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
     endfamily
     family h19
       edit HOUR '19'
@@ -297,10 +335,12 @@ suite coastal_hourly
       task ngen_troute
       task gen_configs
         trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism_download
+        trigger gen_configs == complete
       task run_schism
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
       task run_sfincs
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
     endfamily
     family h20
       edit HOUR '20'
@@ -309,10 +349,12 @@ suite coastal_hourly
       task ngen_troute
       task gen_configs
         trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism_download
+        trigger gen_configs == complete
       task run_schism
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
       task run_sfincs
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
     endfamily
     family h21
       edit HOUR '21'
@@ -321,10 +363,12 @@ suite coastal_hourly
       task ngen_troute
       task gen_configs
         trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism_download
+        trigger gen_configs == complete
       task run_schism
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
       task run_sfincs
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
     endfamily
     family h22
       edit HOUR '22'
@@ -333,10 +377,12 @@ suite coastal_hourly
       task ngen_troute
       task gen_configs
         trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism_download
+        trigger gen_configs == complete
       task run_schism
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
       task run_sfincs
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
     endfamily
     family h23
       edit HOUR '23'
@@ -345,10 +391,12 @@ suite coastal_hourly
       task ngen_troute
       task gen_configs
         trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism_download
+        trigger gen_configs == complete
       task run_schism
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
       task run_sfincs
-        trigger gen_configs == complete
+        trigger run_schism_download == complete
     endfamily
   endfamily
 endsuite

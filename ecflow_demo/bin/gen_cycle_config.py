@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import yaml
@@ -18,7 +19,15 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--model", required=True, choices=["schism", "sfincs"])
     p.add_argument("--base-yaml", required=True, type=Path)
     p.add_argument("--cycle", required=True, help="YYYYMMDDHH")
-    p.add_argument("--start-date", required=True, help="YYYY-MM-DD HH:MM:SS")
+    p.add_argument(
+        "--start-date",
+        required=True,
+        help=(
+            "Forecast cycle time, YYYY-MM-DD HH:MM:SS (e.g. the ngen_forcing/"
+            "ngen_troute cycle time). NOT the model's t=0 -- see the +1h shift "
+            "in main()."
+        ),
+    )
     p.add_argument("--forecast-meteo-file", required=True, type=Path)
     p.add_argument("--troute-file", required=True, type=Path)
     p.add_argument(
@@ -60,7 +69,24 @@ def main() -> int:
     out = args.cycle_dir / "run.yaml"
     work_dir = args.cycle_dir / "run"
 
-    cfg.setdefault("simulation", {})["start_date"] = args.start_date
+    # NWM short_range forecast forcing and t-route's routed streamflow
+    # both start their first real output at cycle-time + 1h, not at the
+    # cycle time itself -- there is no real T+0 driving data for either
+    # source. Using the raw cycle time as the model's start_date forced
+    # every downstream stage to fabricate a synthetic t=0 by persisting
+    # the first real value backward one hour, which is what caused SCHISM
+    # to abort mid-run (confirmed live). Setting the model's actual
+    # start_date to cycle time + 1h means it starts exactly where the
+    # real data starts -- no fabrication anywhere. This also means the
+    # model runs for one hour less than base_yaml's duration_hours
+    # nominally suggests (17 real hours of driving data, not 18) --
+    # duration_hours in the base templates reflects that already.
+    model_start_date = datetime.strptime(args.start_date, "%Y-%m-%d %H:%M:%S") + timedelta(
+        hours=1
+    )
+    cfg.setdefault("simulation", {})["start_date"] = model_start_date.strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
     paths = cfg.setdefault("paths", {})
 
     # coastal-calibration's PathConfig resolves every relative path against

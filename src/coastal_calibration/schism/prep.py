@@ -372,17 +372,7 @@ def make_discharge(  # noqa: PLR0912
             vsink[:, i] = -1.0 * df[sid].to_numpy()
 
     # Elapsed seconds since simulation start for each row of real data.
-    # SCHISM requires the first vsource.th/vsink.th row to be at t=0, but
-    # t-route's first output is at T+1h (not T+0h) -- when the real data
-    # doesn't start exactly at start_date, backfill a synthetic t=0 row by
-    # persisting the first available real values (assume discharge is
-    # unchanged during the ungauged gap before routed flow becomes
-    # available; there is no better information for that window).
     elapsed = (df.index - start_date).total_seconds().to_numpy()
-    if elapsed[0] != 0.0:
-        elapsed = np.concatenate(([0.0], elapsed))
-        vsource = np.vstack([vsource[0], vsource])
-        vsink = np.vstack([vsink[0], vsink])
 
     _write_th_file(work_dir / "vsource.th", vsource, elapsed)
     _write_th_file(work_dir / "vsink.th", vsink, elapsed)
