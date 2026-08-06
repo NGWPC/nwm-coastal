@@ -198,10 +198,12 @@ class CoastalCalibRunner:
         missing = [s for s in all_stages[:start_idx] if s not in completed]
         if missing:
             return [
-                f"Cannot start from '{start_from}': prerequisite stage(s) "
-                f"{', '.join(repr(s) for s in missing)} have not completed.  "
-                f"Run them first or start from an earlier stage.  "
-                f"(Status file: {self._status_path})"
+                (
+                    f"Cannot start from '{start_from}': prerequisite stage(s) "
+                    f"{', '.join(repr(s) for s in missing)} have not completed.  "
+                    f"Run them first or start from an earlier stage.  "
+                    f"(Status file: {self._status_path})"
+                )
             ]
         return []
 
