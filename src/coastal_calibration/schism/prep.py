@@ -188,11 +188,20 @@ def stage_chrtout_files(
 
     Returns ``(nwm_output_dir, nwm_ana_dir)`` so that
     :func:`make_discharge` can find them.
+
+    Both directories are scoped to *start_date* and emptied first, the same
+    way :func:`stage_ldasin_files` scopes its output.  ``make_discharge``
+    reads whatever it finds by glob and derives each timestamp from the file
+    itself, so a link left behind by an earlier run in the same ``work_dir``
+    would silently extend the discharge series with another run's dates.
     """
-    nwm_output_dir = work_dir / "nwm_output"
-    nwm_ana_dir = work_dir / "nwm_output_ana"
-    nwm_output_dir.mkdir(parents=True, exist_ok=True)
-    nwm_ana_dir.mkdir(parents=True, exist_ok=True)
+    stamp = start_date.strftime("%Y%m%d%H")
+    nwm_output_dir = work_dir / "nwm_output" / stamp
+    nwm_ana_dir = work_dir / "nwm_output_ana" / stamp
+    for staging in (nwm_output_dir, nwm_ana_dir):
+        staging.mkdir(parents=True, exist_ok=True)
+        for stale in staging.glob("*CHRTOUT*"):
+            stale.unlink()
 
     is_hawaii = "hawaii" in coastal_domain
     sub_steps = (15, 30, 45) if is_hawaii else ()

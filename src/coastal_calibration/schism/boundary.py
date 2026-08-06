@@ -134,7 +134,13 @@ class STOFSBoundaryStage(WorkflowStage):
         self.model: SchismModelConfig = cast("SchismModelConfig", config.model_config)
 
     def _resolve_stofs_file(self) -> Path:
-        """Resolve STOFS file path from config or download directory."""
+        """Resolve the STOFS file for this simulation's start date.
+
+        Only the file matching the start date is acceptable.  Falling back
+        to whatever else happens to be cached would hand the model a
+        boundary condition from another date without saying so, which is
+        worse than stopping.
+        """
         if self.config.boundary.stofs_file:
             return self.config.boundary.stofs_file
 
@@ -148,15 +154,11 @@ class STOFSBoundaryStage(WorkflowStage):
             self._log(f"Auto-resolved STOFS file: {expected}")
             return expected
 
-        # Fallback: search for any STOFS file in the directory
-        coastal_dir = self.config.paths.download_dir / "coastal" / "stofs"
-        if coastal_dir.exists():
-            stofs_files = sorted(coastal_dir.rglob("*.fields.cwl.nc"))
-            if stofs_files:
-                self._log(f"Auto-resolved STOFS file (fallback): {stofs_files[0]}")
-                return stofs_files[0]
-
-        msg = f"No STOFS file found. Set boundary.stofs_file or ensure data exists in {coastal_dir}"
+        msg = (
+            f"No STOFS file for {self.config.simulation.start_date:%Y-%m-%d %H:%M} at "
+            f"{expected}. Run the download stage for this date, or set "
+            "boundary.stofs_file explicitly."
+        )
         raise FileNotFoundError(msg)
 
     def run(self) -> dict[str, Any]:
