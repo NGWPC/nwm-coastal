@@ -12,9 +12,12 @@ as :mod:`coastal_calibration.sfincs.stages`.
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import json
 import math
 from abc import ABC, abstractmethod
+from dataclasses import asdict, is_dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
@@ -35,8 +38,6 @@ from coastal_calibration.utils import utc_now
 apply_all_patches()
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     import geopandas as gpd
     from hydromt_sfincs import SfincsModel
     from numpy.typing import NDArray
@@ -72,6 +73,56 @@ def _get_model(config: SfincsCreateConfig) -> SfincsModel:
             "No SfincsModel found in registry.  "
             "Ensure the 'create_grid' stage runs before other creation stages."
         ) from None
+
+
+#: Config each stage consumes, as attribute paths on
+#: :class:`SfincsCreateConfig`.  ``--start-from`` skips earlier stages and
+#: reuses their outputs, so these are fingerprinted to catch a config edit
+#: that would pair those stale outputs with new settings.  Entries name only
+#: what changes a stage's result, so that editing a setting only blocks the
+#: stages it actually reaches: ``offset`` and ``zmin`` change the merged bed
+#: but not which rasters are downloaded, and :attr:`~SfincsCreateConfig.aoi_key`
+#: is already the identity the fetcher caches under.
+_STAGE_CONFIG_DEPS: dict[str, tuple[str, ...]] = {
+    "create_grid": ("aoi", "aoi_simplify_neck_m", "grid"),
+    "create_fetch_data": ("aoi_key",),
+    "create_elevation": ("elevation",),
+    "create_mask": ("mask",),
+    "create_boundary": ("mask",),
+    "create_discharge": ("river_discharge",),
+    "create_obs": (
+        "add_noaa_gages",
+        "merge_observations",
+        "observation_locations_file",
+        "observation_points",
+        "obs_snap_depth_threshold",
+        "obs_snap_search_radius_m",
+    ),
+    # Merges the elevation datasets a second time, so it moves with them.
+    "create_subgrid": ("subgrid", "elevation"),
+    "create_write": (),
+}
+
+
+def _stage_fingerprint(cfg: SfincsCreateConfig, stage: str) -> str:
+    """Hash the config *stage* consumes.
+
+    Lists keep their order, so reordering ``elevation.datasets`` registers as
+    a change.  Files are hashed by content rather than by path, so editing the
+    AOI counts but moving the project does not.
+    """
+    payload: dict[str, Any] = {}
+    for dep in _STAGE_CONFIG_DEPS.get(stage, ()):
+        value: Any = cfg
+        for part in dep.split("."):
+            value = getattr(value, part)
+        if isinstance(value, Path) and value.is_file():
+            value = hashlib.sha256(value.read_bytes()).hexdigest()[:16]
+        elif is_dataclass(value) and not isinstance(value, type):
+            value = asdict(value)
+        payload[dep] = value
+    blob = json.dumps(payload, sort_keys=True, default=str)
+    return hashlib.sha256(blob.encode()).hexdigest()[:16]
 
 
 def _elevation_list(cfg: SfincsCreateConfig) -> list[dict[str, Any]]:
@@ -1471,10 +1522,17 @@ class SfincsCreator:
         if stage_name not in completed:
             completed.append(stage_name)
         status["completed_stages"] = completed
+        fingerprints: dict[str, str] = status.get("stage_fingerprints", {})
+        fingerprints[stage_name] = _stage_fingerprint(self.config, stage_name)
+        status["stage_fingerprints"] = fingerprints
         self._status_path.write_text(json.dumps(status, indent=2) + "\n")
 
     def _check_prerequisites(self, start_from: str) -> list[str]:
-        """Verify that all stages before *start_from* have completed."""
+        """Verify that all stages before *start_from* can be skipped safely.
+
+        They must have completed, and their config must not have changed
+        since they ran.
+        """
         status = self._load_status()
         completed: set[str] = set(status.get("completed_stages", []))
 
@@ -1483,13 +1541,34 @@ class SfincsCreator:
             return [f"Unknown stage: {start_from}"]
 
         start_idx = all_stages.index(start_from)
-        missing = [s for s in all_stages[:start_idx] if s not in completed]
+        skipped = all_stages[:start_idx]
+        missing = [s for s in skipped if s not in completed]
         if missing:
             return [
                 (
                     f"Cannot start from '{start_from}': prerequisite stage(s) "
                     f"{', '.join(repr(s) for s in missing)} have not completed.  "
                     f"Run them first or start from an earlier stage.  "
+                    f"(Status file: {self._status_path})"
+                )
+            ]
+
+        # Models built before fingerprints were recorded have no entry, and
+        # resume for them behaves as it always did.
+        recorded: dict[str, str] = status.get("stage_fingerprints", {})
+        changed = [
+            s
+            for s in skipped
+            if s in recorded and recorded[s] != _stage_fingerprint(self.config, s)
+        ]
+        if changed:
+            return [
+                (
+                    f"Cannot start from '{start_from}': the configuration for "
+                    f"already-completed stage(s) {', '.join(repr(s) for s in changed)} "
+                    f"has changed since they ran.  Resuming would combine their "
+                    f"existing outputs with the new settings.  Start from "
+                    f"'{changed[0]}' instead, or rebuild the model from scratch.  "
                     f"(Status file: {self._status_path})"
                 )
             ]

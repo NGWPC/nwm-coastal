@@ -10,6 +10,7 @@ Run with::
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -29,6 +30,7 @@ from coastal_calibration.config.create_schema import (
     SubgridConfig,
 )
 from coastal_calibration.sfincs.create import (
+    _STAGE_CONFIG_DEPS,
     CreateBoundaryStage,
     CreateDischargeStage,
     CreateElevationStage,
@@ -1654,3 +1656,146 @@ class TestElevationOffsetValidation:
 
     def test_valid_offset_passes(self, tmp_path: Path) -> None:
         assert not [e for e in self._config(tmp_path, -0.24).validate() if "offset" in e]
+
+
+class TestResumeFingerprint:
+    """``--start-from`` must not pair stale stage outputs with new config."""
+
+    def _completed_through(self, creator: SfincsCreator, start_from: str) -> None:
+        """Record every stage before *start_from* under the current config."""
+        order = creator.stage_order
+        for stage in order[: order.index(start_from)]:
+            creator._save_stage_status(stage)
+
+    def test_every_stage_declares_its_config(
+        self, minimal_create_config: SfincsCreateConfig
+    ) -> None:
+        """A stage missing from the map would silently skip the check."""
+        creator = SfincsCreator(minimal_create_config)
+
+        assert not set(creator.stage_order) - set(_STAGE_CONFIG_DEPS)
+
+    def test_unchanged_config_resumes(self, minimal_create_config: SfincsCreateConfig) -> None:
+        creator = SfincsCreator(minimal_create_config)
+        self._completed_through(creator, "create_boundary")
+
+        assert creator._check_prerequisites("create_boundary") == []
+
+    def test_changed_offset_blocks_a_later_resume(
+        self, minimal_create_config: SfincsCreateConfig
+    ) -> None:
+        """The subgrid stage merges elevation again, so it moves with it.
+
+        Without the check, an offset edit pairs the existing grid and mask
+        with subgrid tables built against the new datum, and writes that
+        combination out with no error.
+        """
+        creator = SfincsCreator(minimal_create_config)
+        self._completed_through(creator, "create_subgrid")
+
+        minimal_create_config.elevation.datasets[0].offset = -0.24
+        errors = SfincsCreator(minimal_create_config)._check_prerequisites("create_subgrid")
+
+        assert len(errors) == 1
+        assert "has changed since they ran" in errors[0]
+        # The offset shifts the merged bed but not which rasters are
+        # downloaded, so it must not force a re-fetch.
+        assert "Start from 'create_elevation' instead" in errors[0]
+        assert "create_fetch_data" not in errors[0]
+
+    def test_changed_source_blocks_the_fetch_stage(
+        self, minimal_create_config: SfincsCreateConfig
+    ) -> None:
+        """A different source under the same name changes the raster content."""
+        cfg = minimal_create_config
+        cfg.elevation.datasets = [ElevationDataset(name="dem", zmin=0.001, source="noaa_crm")]
+        creator = SfincsCreator(cfg)
+        self._completed_through(creator, "create_mask")
+
+        cfg.elevation.datasets[0].source = "gebco_15arcs"
+        errors = SfincsCreator(cfg)._check_prerequisites("create_mask")
+
+        assert "Start from 'create_fetch_data' instead" in errors[0]
+
+    def test_a_moved_project_still_resumes(
+        self, minimal_create_config: SfincsCreateConfig, tmp_path: Path
+    ) -> None:
+        """The AOI is hashed by content, so its path may change."""
+        creator = SfincsCreator(minimal_create_config)
+        self._completed_through(creator, "create_mask")
+
+        moved = tmp_path / "elsewhere.geojson"
+        moved.write_bytes(minimal_create_config.aoi.read_bytes())
+        minimal_create_config.aoi = moved
+
+        assert SfincsCreator(minimal_create_config)._check_prerequisites("create_mask") == []
+
+    def test_the_error_names_the_earliest_changed_stage(
+        self, minimal_create_config: SfincsCreateConfig
+    ) -> None:
+        """Restarting anywhere later would still reuse the stale output."""
+        creator = SfincsCreator(minimal_create_config)
+        self._completed_through(creator, "create_subgrid")
+
+        minimal_create_config.grid.resolution = 200.0
+        minimal_create_config.mask.zmin = -9.0
+        errors = SfincsCreator(minimal_create_config)._check_prerequisites("create_subgrid")
+
+        assert "Start from 'create_grid' instead" in errors[0]
+
+    def test_unrelated_change_still_resumes(
+        self, minimal_create_config: SfincsCreateConfig
+    ) -> None:
+        """Only stages that consume the changed setting may block.
+
+        ``nr_subgrid_pixels`` is read by the stage being restarted, so
+        editing it is the normal reason to resume there.
+        """
+        creator = SfincsCreator(minimal_create_config)
+        self._completed_through(creator, "create_subgrid")
+
+        minimal_create_config.subgrid.nr_subgrid_pixels = 8
+        errors = SfincsCreator(minimal_create_config)._check_prerequisites("create_subgrid")
+
+        assert errors == []
+
+    def test_reordered_datasets_are_a_change(
+        self, minimal_create_config: SfincsCreateConfig
+    ) -> None:
+        """Merge order decides which source wins where they overlap."""
+        cfg = minimal_create_config
+        cfg.elevation.datasets = [
+            ElevationDataset(name="noaa_crm", zmin=0.001),
+            ElevationDataset(name="gebco_15arcs", zmin=0.001),
+        ]
+        creator = SfincsCreator(cfg)
+        self._completed_through(creator, "create_mask")
+
+        cfg.elevation.datasets.reverse()
+        errors = SfincsCreator(cfg)._check_prerequisites("create_mask")
+
+        assert "create_elevation" in errors[0]
+
+    def test_a_status_file_without_fingerprints_resumes(
+        self, minimal_create_config: SfincsCreateConfig
+    ) -> None:
+        """Models built before this check must keep resuming."""
+        creator = SfincsCreator(minimal_create_config)
+        order = creator.stage_order
+        creator._status_path.write_text(
+            json.dumps({"completed_stages": order[: order.index("create_mask")]})
+        )
+
+        assert creator._check_prerequisites("create_mask") == []
+
+    def test_missing_prerequisite_still_reported(
+        self, minimal_create_config: SfincsCreateConfig
+    ) -> None:
+        """The fingerprint check must not shadow the completeness check."""
+        creator = SfincsCreator(minimal_create_config)
+        creator._save_stage_status("create_grid")
+
+        errors = creator._check_prerequisites("create_mask")
+
+        assert "have not completed" in errors[0]
+
