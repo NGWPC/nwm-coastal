@@ -113,6 +113,19 @@ class SimulationConfig:
         """NWM domain identifier for this coastal domain."""
         return self._NWM_DOMAIN[self.coastal_domain]
 
+    @classmethod
+    def nwm_domain_for(cls, coastal_domain: str) -> str:
+        """NWM domain identifier for an arbitrary coastal domain name.
+
+        Same mapping as :attr:`nwm_domain`, but callable without a
+        configured simulation and lenient about names outside
+        :data:`CoastalDomain` (``"conus"`` is passed straight through, as
+        the downloader accepts it).  Used for naming the download cache,
+        where the NWM domain is the right key: ``atlgulf`` and ``pacific``
+        pull byte-identical CONUS forcing and should share one copy.
+        """
+        return cls._NWM_DOMAIN.get(coastal_domain, coastal_domain)
+
     @property
     def geo_grid(self) -> str:
         """Geogrid filename for this coastal domain."""
@@ -170,7 +183,6 @@ class PathConfig:
     """
 
     METEO_SUBDIR: ClassVar[str] = "meteo"
-    STREAMFLOW_SUBDIR: ClassVar[str] = "streamflow"
     HYDRO_SUBDIR: ClassVar[str] = "hydro"
     COASTAL_SUBDIR: ClassVar[str] = "coastal"
 
@@ -186,20 +198,6 @@ class PathConfig:
     # netCDFs, regardless of the subdirectory convention pyTMD's
     # bundled database uses internally.
     tidal_atlas_dir: Path | None = None
-
-    # Local filesystem subdirectory under hydro/nwm/ for NWM analysis-and-
-    # assimilation downloads (see ``streamflow_dir``). Distinct from
-    # :attr:`SimulationConfig._NWM_DOMAIN`: that mapping yields the NWM
-    # *product identifier* used in URL paths, whereas this one yields the
-    # download cache subdirectory we land files in. They happen to share
-    # values for some domains (e.g. ``hawaii``) but not all
-    # (``prvi`` → ``puertorico`` here, ``prvi`` there). Domains not listed
-    # here fall back to ``"conus"``.
-    _NWM_DOMAIN_DIR: ClassVar[dict[str, str]] = {
-        "hawaii": "hawaii",
-        "prvi": "puertorico",
-        "alaska": "alaska",
-    }
 
     def __post_init__(self) -> None:
         self.work_dir = Path(self.work_dir).expanduser().resolve()
@@ -226,16 +224,40 @@ class PathConfig:
         """Effective download directory (fallback to work_dir/downloads)."""
         return self.raw_download_dir or self.work_dir / "downloads"
 
-    def meteo_dir(self, meteo_source: str) -> Path:
-        """Directory for meteorological data."""
-        return self.download_dir / self.METEO_SUBDIR / meteo_source
+    @classmethod
+    def meteo_subdir(cls, meteo_source: str, coastal_domain: str) -> Path:
+        """Relative meteo path, ``meteo/<source>/<nwm domain>``.
 
-    def streamflow_dir(self, meteo_source: str, coastal_domain: str = "conus") -> Path:
-        """Directory for streamflow/hydro data."""
-        if meteo_source == "nwm_retro":
-            return self.download_dir / self.STREAMFLOW_SUBDIR / "nwm_retro"
-        nwm_dir = self._NWM_DOMAIN_DIR.get(coastal_domain, "conus")
-        return self.download_dir / self.HYDRO_SUBDIR / "nwm" / nwm_dir
+        Every NWM domain names its hourly forcing ``YYYYMMDDHH.LDASIN_DOMAIN1``,
+        so files from different domains collide unless each domain gets its
+        own directory: a cached Hawaii file would otherwise be served for a
+        PRVI run covering the same hour.
+        """
+        return (
+            Path(cls.METEO_SUBDIR) / meteo_source / SimulationConfig.nwm_domain_for(coastal_domain)
+        )
+
+    def meteo_dir(self, meteo_source: str, coastal_domain: str) -> Path:
+        """Directory for meteorological data."""
+        return self.download_dir / self.meteo_subdir(meteo_source, coastal_domain)
+
+    @classmethod
+    def streamflow_subdir(cls, coastal_domain: str) -> Path:
+        """Relative streamflow path, ``hydro/nwm/<nwm domain>``.
+
+        Keyed the same way as :meth:`meteo_subdir`, so a domain reads the
+        same everywhere under the download directory even though NWM
+        spells it differently in its own URLs (``puertorico`` there,
+        ``prvi`` here).
+
+        Only ``nwm_ana`` streamflow is downloaded; ``nwm_retro`` is read
+        straight from the S3 Zarr store, so it has no directory here.
+        """
+        return Path(cls.HYDRO_SUBDIR) / "nwm" / SimulationConfig.nwm_domain_for(coastal_domain)
+
+    def streamflow_dir(self, coastal_domain: str = "conus") -> Path:
+        """Directory for downloaded ``nwm_ana`` streamflow data."""
+        return self.download_dir / self.streamflow_subdir(coastal_domain)
 
     def coastal_dir(self, coastal_source: str) -> Path:
         """Directory for coastal boundary data."""
@@ -990,9 +1012,20 @@ class SfincsModelConfig(ModelConfig):
     sfincs_exe: Path | None = None
     omp_num_threads: int = field(default=0)
     run_param_overrides: dict[str, Any] = field(default_factory=dict)
+    # Obsolete: the flood-map stage reads the elevation raster recorded by
+    # `coastal-calibration create`. Kept only so models built before that
+    # record existed still produce a flood map; setting it otherwise logs a
+    # warning and has no effect.
     floodmap_dem: Path | None = None
     floodmap_hmin: float = 0.05
     floodmap_enabled: bool = True
+    # Restrict the flood map to inundated land. With this off the raster also
+    # covers the permanently wet sea, where "depth" is just the water column
+    # over the bathymetry. The cut is the vertical datum, so terrain lying
+    # *below* the datum but hydraulically dry (leveed polders, subsided urban
+    # land, dredged basins) is dropped too even when the model floods it. Turn
+    # this off for such domains and mask the sea some other way.
+    floodmap_land_only: bool = True
     create_water_level_animation: bool = False
     animation_fps: int = 10
     animation_time_stride: int = 1
@@ -1135,6 +1168,7 @@ class SfincsModelConfig(ModelConfig):
             "floodmap_dem": (str(self.floodmap_dem) if self.floodmap_dem else None),
             "floodmap_hmin": self.floodmap_hmin,
             "floodmap_enabled": self.floodmap_enabled,
+            "floodmap_land_only": self.floodmap_land_only,
             "create_water_level_animation": self.create_water_level_animation,
             "animation_fps": self.animation_fps,
             "animation_time_stride": self.animation_time_stride,

@@ -173,34 +173,31 @@ class TestPathConfig:
 
     def test_meteo_dir(self, tmp_work_dir, tmp_download_dir):
         cfg = PathConfig(work_dir=tmp_work_dir, raw_download_dir=tmp_download_dir)
-        assert cfg.meteo_dir("nwm_retro") == tmp_download_dir / "meteo" / "nwm_retro"
-
-    def test_streamflow_dir_retro(self, tmp_work_dir, tmp_download_dir):
-        cfg = PathConfig(work_dir=tmp_work_dir, raw_download_dir=tmp_download_dir)
-        assert cfg.streamflow_dir("nwm_retro") == tmp_download_dir / "streamflow" / "nwm_retro"
+        assert (
+            cfg.meteo_dir("nwm_retro", "prvi") == tmp_download_dir / "meteo" / "nwm_retro" / "prvi"
+        )
+        # atlgulf and pacific pull byte-identical CONUS forcing, so they share one copy.
+        assert (
+            cfg.meteo_dir("nwm_retro", "atlgulf")
+            == tmp_download_dir / "meteo" / "nwm_retro" / "conus"
+        )
+        assert cfg.meteo_dir("nwm_retro", "pacific") == cfg.meteo_dir("nwm_retro", "atlgulf")
 
     def test_streamflow_dir_ana_default(self, tmp_work_dir, tmp_download_dir):
         cfg = PathConfig(work_dir=tmp_work_dir, raw_download_dir=tmp_download_dir)
-        assert cfg.streamflow_dir("nwm_ana") == tmp_download_dir / "hydro" / "nwm" / "conus"
+        assert cfg.streamflow_dir() == tmp_download_dir / "hydro" / "nwm" / "conus"
 
     def test_streamflow_dir_ana_atlgulf(self, tmp_work_dir, tmp_download_dir):
         cfg = PathConfig(work_dir=tmp_work_dir, raw_download_dir=tmp_download_dir)
-        assert (
-            cfg.streamflow_dir("nwm_ana", "atlgulf") == tmp_download_dir / "hydro" / "nwm" / "conus"
-        )
+        assert cfg.streamflow_dir("atlgulf") == tmp_download_dir / "hydro" / "nwm" / "conus"
 
     def test_streamflow_dir_ana_hawaii(self, tmp_work_dir, tmp_download_dir):
         cfg = PathConfig(work_dir=tmp_work_dir, raw_download_dir=tmp_download_dir)
-        assert (
-            cfg.streamflow_dir("nwm_ana", "hawaii") == tmp_download_dir / "hydro" / "nwm" / "hawaii"
-        )
+        assert cfg.streamflow_dir("hawaii") == tmp_download_dir / "hydro" / "nwm" / "hawaii"
 
     def test_streamflow_dir_ana_prvi(self, tmp_work_dir, tmp_download_dir):
         cfg = PathConfig(work_dir=tmp_work_dir, raw_download_dir=tmp_download_dir)
-        assert (
-            cfg.streamflow_dir("nwm_ana", "prvi")
-            == tmp_download_dir / "hydro" / "nwm" / "puertorico"
-        )
+        assert cfg.streamflow_dir("prvi") == tmp_download_dir / "hydro" / "nwm" / "prvi"
 
     def test_coastal_dir(self, tmp_work_dir, tmp_download_dir):
         cfg = PathConfig(work_dir=tmp_work_dir, raw_download_dir=tmp_download_dir)

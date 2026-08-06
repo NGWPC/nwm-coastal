@@ -1395,7 +1395,7 @@ class SfincsDischargeStage(_SfincsStageBase):
                 domain=sim.coastal_domain,
             )
         else:
-            streamflow_dir = self.config.paths.streamflow_dir(sim.meteo_source, sim.coastal_domain)
+            streamflow_dir = self.config.paths.streamflow_dir(sim.coastal_domain)
             files = _filter_chrtout_files(
                 sorted(streamflow_dir.glob("*.CHRTOUT_DOMAIN1*")),
                 start_dt,
@@ -2314,11 +2314,12 @@ class SfincsSymlinksStage(WorkflowStage):
             }
 
         self._update_substep("Creating .nc symlinks")
-        meteo_source = self.config.simulation.meteo_source
+        sim = self.config.simulation
 
         created, existing = create_nc_symlinks(
             download_dir,
-            meteo_source=meteo_source,
+            meteo_source=sim.meteo_source,
+            coastal_domain=sim.coastal_domain,
             include_meteo=True,
             include_streamflow=True,
         )

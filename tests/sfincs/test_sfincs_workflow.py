@@ -196,15 +196,16 @@ def fake_download_dir(tmp_path: Path) -> Path:
     """Create a fake download directory with tiny synthetic NetCDF files.
 
     Directory structure mirrors the real download layout:
-    - meteo/nwm_ana/YYYYMMDDHH.LDASIN_DOMAIN1 (+ .nc symlink)
-    - hydro/nwm/YYYYMMDDHH.CHRTOUT_DOMAIN1 (+ .nc symlink)
+    - meteo/nwm_ana/conus/YYYYMMDDHH.LDASIN_DOMAIN1 (+ .nc symlink)
+    - hydro/nwm/conus/YYYYMMDDHH.CHRTOUT_DOMAIN1 (+ .nc symlink)
     - coastal/stofs/stofs_2d_glo.YYYYMMDD/stofs_2d_glo.t00z.fields.cwl.nc
     """
     dl_dir = tmp_path / "downloads"
     start = datetime(2025, 6, 1, 0, 0, 0)
 
     # --- Meteo ---
-    meteo_dir = dl_dir / "meteo" / "nwm_ana"
+    # The fixture config uses coastal_domain="atlgulf", which runs on CONUS forcing.
+    meteo_dir = dl_dir / "meteo" / "nwm_ana" / "conus"
     meteo_dir.mkdir(parents=True)
     # Create two LDASIN files covering 0h and 1h
     for hour in range(2):
