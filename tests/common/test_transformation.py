@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING
 import geopandas as gpd
 import numpy as np
 import rasterio
+import rioxarray  # noqa: F401  (registers the .rio accessor)
+import xarray as xr
 from rasterio.transform import from_bounds
 from shapely import box
 
@@ -87,3 +89,30 @@ class TestClipToAoi:
             assert src.shape[1] < 200
             data = src.read(1)
         assert np.nanmax(data) == np.float32(1.5)
+
+
+class TestRioxarrayForwardsCreationOptions:
+    """`topobathy_nws` writes its temp raster through rioxarray, not gdalwarp.
+
+    That call passes ``BIGTIFF="YES"`` as a keyword, which only helps if
+    rioxarray forwards unknown keywords to GDAL as creation options. Nothing
+    in our own code would fail if it stopped doing so; the raster would just
+    go back to a classic header and hit the 4 GB ceiling again on a large AOI.
+    """
+
+    def _write(self, path: Path, **kwargs: object) -> Path:
+        da = xr.DataArray(
+            np.ones((32, 32), dtype="float32"),
+            dims=("y", "x"),
+            coords={"y": np.linspace(28.9, 28.2, 32), "x": np.linspace(-96.9, -95.9, 32)},
+        )
+        da.rio.write_crs("EPSG:4326", inplace=True)
+        da.rio.to_raster(path, driver="GTiff", compress="deflate", **kwargs)
+        return path
+
+    def test_bigtiff_reaches_gdal(self, tmp_path: Path) -> None:
+        assert _tiff_version(self._write(tmp_path / "big.tif", BIGTIFF="YES")) == _BIGTIFF_VERSION
+
+    def test_the_default_is_still_classic(self, tmp_path: Path) -> None:
+        """Without it the header is classic, so the check above means something."""
+        assert _tiff_version(self._write(tmp_path / "plain.tif")) != _BIGTIFF_VERSION
