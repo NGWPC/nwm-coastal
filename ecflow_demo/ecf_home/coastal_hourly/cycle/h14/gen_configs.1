@@ -1,0 +1,42 @@
+++ export ECF_NAME=/coastal_hourly/cycle/h14/gen_configs
+++ ECF_NAME=/coastal_hourly/cycle/h14/gen_configs
+++ export ECF_HOST=zhengtaocui-opertestbed-00023-mgmt
+++ ECF_HOST=zhengtaocui-opertestbed-00023-mgmt
+++ export ECF_PORT=39411
+++ ECF_PORT=39411
+++ export ECF_PASS=szhe3s/W
+++ ECF_PASS=szhe3s/W
+++ export ECF_TRYNO=1
+++ ECF_TRYNO=1
+++ export ECF_RID=2247576
+++ ECF_RID=2247576
+++ export PATH=/contrib/software/ecflow/5.6.0/bin:/contrib/software/ecflow/5.6.0/bin:/usr/lib64/openmpi/bin:/usr/lib64/openmpi/bin:/home/lauren.schambach/.local/bin:/home/lauren.schambach/bin:/usr/lib64/openmpi/bin:/usr/share/Modules/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin
+++ PATH=/contrib/software/ecflow/5.6.0/bin:/contrib/software/ecflow/5.6.0/bin:/usr/lib64/openmpi/bin:/usr/lib64/openmpi/bin:/home/lauren.schambach/.local/bin:/home/lauren.schambach/bin:/usr/lib64/openmpi/bin:/usr/share/Modules/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin
+++ ecflow_client --init=2247576
+++ _ERROR_HANDLED=0
+++ trap 'ERROR $?' ERR
+++ trap 'ERROR $?' EXIT
+++ YMD=20260805
+++ HH=14
+++ CYCLE=2026080514
+++ CYCLE_DT='2026-08-05 14:00:00'
+++ STAMP=202608051400
+++ FORCING_FILE=/contrib/LaurenSchambach/ngwpc/run_ngen/data/scratch/short_range_coastal/CONUS_202608051400.nc
+++ TROUTE_FILE=/contrib/LaurenSchambach/ngwpc/run_ngen/regionalization/region_sr_2026080514/03S/troute_output_202608051400.nc
+++ for f in "${FORCING_FILE}" "${TROUTE_FILE}"
+++ '[' -f /contrib/LaurenSchambach/ngwpc/run_ngen/data/scratch/short_range_coastal/CONUS_202608051400.nc ']'
+++ for f in "${FORCING_FILE}" "${TROUTE_FILE}"
+++ '[' -f /contrib/LaurenSchambach/ngwpc/run_ngen/regionalization/region_sr_2026080514/03S/troute_output_202608051400.nc ']'
+++ SCHISM_CYCLE_DIR=/contrib/LaurenSchambach/ngwpc/run_coastal/schism_sims/cycles/2026080514
+++ SFINCS_CYCLE_DIR=/contrib/LaurenSchambach/ngwpc/run_coastal/sfincs_sims/cycles/2026080514
+++ /contrib/LaurenSchambach/ngwpc/nwm-coastal/nwm-coastal-py /contrib/LaurenSchambach/ngwpc/nwm-coastal/ecflow_demo/bin/gen_cycle_config.py --model schism --base-yaml /contrib/LaurenSchambach/ngwpc/run_coastal/schism_sims/run.yaml --cycle 2026080514 --start-date '2026-08-05 14:00:00' --forecast-meteo-file /contrib/LaurenSchambach/ngwpc/run_ngen/data/scratch/short_range_coastal/CONUS_202608051400.nc --troute-file /contrib/LaurenSchambach/ngwpc/run_ngen/regionalization/region_sr_2026080514/03S/troute_output_202608051400.nc --cycle-dir /contrib/LaurenSchambach/ngwpc/run_coastal/schism_sims/cycles/2026080514
+/contrib/LaurenSchambach/ngwpc/run_coastal/schism_sims/cycles/2026080514/run.yaml
+++ /contrib/LaurenSchambach/ngwpc/nwm-coastal/nwm-coastal-py /contrib/LaurenSchambach/ngwpc/nwm-coastal/ecflow_demo/bin/gen_cycle_config.py --model sfincs --base-yaml /contrib/LaurenSchambach/ngwpc/run_coastal/sfincs_sims/run.yaml --cycle 2026080514 --start-date '2026-08-05 14:00:00' --forecast-meteo-file /contrib/LaurenSchambach/ngwpc/run_ngen/data/scratch/short_range_coastal/CONUS_202608051400.nc --troute-file /contrib/LaurenSchambach/ngwpc/run_ngen/regionalization/region_sr_2026080514/03S/troute_output_202608051400.nc --cycle-dir /contrib/LaurenSchambach/ngwpc/run_coastal/sfincs_sims/cycles/2026080514
+/contrib/LaurenSchambach/ngwpc/run_coastal/sfincs_sims/cycles/2026080514/run.yaml
+++ for f in "${SCHISM_CYCLE_DIR}/run.yaml" "${SFINCS_CYCLE_DIR}/run.yaml"
+++ '[' -s /contrib/LaurenSchambach/ngwpc/run_coastal/schism_sims/cycles/2026080514/run.yaml ']'
+++ for f in "${SCHISM_CYCLE_DIR}/run.yaml" "${SFINCS_CYCLE_DIR}/run.yaml"
+++ '[' -s /contrib/LaurenSchambach/ngwpc/run_coastal/sfincs_sims/cycles/2026080514/run.yaml ']'
+++ ecflow_client --complete
+++ trap 0
+++ exit 0

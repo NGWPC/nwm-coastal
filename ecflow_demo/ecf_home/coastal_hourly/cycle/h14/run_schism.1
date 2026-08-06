@@ -1,0 +1,38 @@
+++ export ECF_NAME=/coastal_hourly/cycle/h14/run_schism
+++ ECF_NAME=/coastal_hourly/cycle/h14/run_schism
+++ export ECF_HOST=zhengtaocui-opertestbed-00023-mgmt
+++ ECF_HOST=zhengtaocui-opertestbed-00023-mgmt
+++ export ECF_PORT=39411
+++ ECF_PORT=39411
+++ export ECF_PASS=3nbGZkpX
+++ ECF_PASS=3nbGZkpX
+++ export ECF_TRYNO=1
+++ ECF_TRYNO=1
+++ export ECF_RID=2247735
+++ ECF_RID=2247735
+++ export PATH=/contrib/software/ecflow/5.6.0/bin:/contrib/software/ecflow/5.6.0/bin:/usr/lib64/openmpi/bin:/usr/lib64/openmpi/bin:/home/lauren.schambach/.local/bin:/home/lauren.schambach/bin:/usr/lib64/openmpi/bin:/usr/share/Modules/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin
+++ PATH=/contrib/software/ecflow/5.6.0/bin:/contrib/software/ecflow/5.6.0/bin:/usr/lib64/openmpi/bin:/usr/lib64/openmpi/bin:/home/lauren.schambach/.local/bin:/home/lauren.schambach/bin:/usr/lib64/openmpi/bin:/usr/share/Modules/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin
+++ ecflow_client --init=2247735
+++ _ERROR_HANDLED=0
+++ trap 'ERROR $?' ERR
+++ trap 'ERROR $?' EXIT
+++ YMD=20260805
+++ HH=14
+++ CYCLE=2026080514
+++ CONFIG_FILE=/contrib/LaurenSchambach/ngwpc/run_coastal/schism_sims/cycles/2026080514/run.yaml
+++ '[' -f /contrib/LaurenSchambach/ngwpc/run_coastal/schism_sims/cycles/2026080514/run.yaml ']'
+++ /contrib/LaurenSchambach/ngwpc/nwm-coastal/nwm-coastal-cli run /contrib/LaurenSchambach/ngwpc/run_coastal/schism_sims/cycles/2026080514/run.yaml
+  - STOFS (operational) data is available from 2020-12-30 to present. Requested 
+start date 2026-08-05 is in the future.                                         
+╭─ Error ──────────────────────────────────────────────────────────────────────╮
+│ Workflow failed with errors (see above).                                     │
+╰──────────────────────────────────────────────────────────────────────────────╯
+                                                                                
++++ ERROR 1
++++ local rc=1
++++ set +e
++++ '[' 0 -eq 1 ']'
++++ _ERROR_HANDLED=1
++++ trap - ERR EXIT
++++ ecflow_client '--abort=task failed (rc=1)'
++++ exit 1

@@ -1,0 +1,85 @@
+++ export ECF_NAME=/coastal_hourly/cycle/h21/regionalize
+++ ECF_NAME=/coastal_hourly/cycle/h21/regionalize
+++ export ECF_HOST=zhengtaocui-opertestbed-00023-mgmt
+++ ECF_HOST=zhengtaocui-opertestbed-00023-mgmt
+++ export ECF_PORT=39411
+++ ECF_PORT=39411
+++ export ECF_PASS=6hpH4Jdc
+++ ECF_PASS=6hpH4Jdc
+++ export ECF_TRYNO=1
+++ ECF_TRYNO=1
+++ export ECF_RID=2104779
+++ ECF_RID=2104779
+++ export PATH=/contrib/software/ecflow/5.6.0/bin:/contrib/software/ecflow/5.6.0/bin:/usr/lib64/openmpi/bin:/usr/lib64/openmpi/bin:/home/lauren.schambach/.local/bin:/home/lauren.schambach/bin:/usr/lib64/openmpi/bin:/usr/share/Modules/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin
+++ PATH=/contrib/software/ecflow/5.6.0/bin:/contrib/software/ecflow/5.6.0/bin:/usr/lib64/openmpi/bin:/usr/lib64/openmpi/bin:/home/lauren.schambach/.local/bin:/home/lauren.schambach/bin:/usr/lib64/openmpi/bin:/usr/share/Modules/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin
+++ ecflow_client --init=2104779
+++ _ERROR_HANDLED=0
+++ trap 'ERROR $?' ERR
+++ trap 'ERROR $?' EXIT
+++ YMD=20260805
+++ HH=21
+++ CYCLE=2026080521
+++ CYCLE_DT='2026-08-05 21:00:00'
+++ STAMP=202608052100
+++ TROUTE_OUT_FILE=/contrib/LaurenSchambach/ngwpc/run_ngen/regionalization/region_sr/03S/troute_output_202608052100.nc
+++ cd /contrib/LaurenSchambach/ngwpc/nwm-rte
+++ export CYCLE_DT
+++ ./run_region_03S_standalone.sh
++ TEST_FORM_ASSIGN_VPU=/ngen-app/ngen-python/lib/python3.11/site-packages/mswm/example_inputs/regionalization/vpu_03S/formulation_assignment.csv
++ TEST_CAT_GRP_VPU=/ngen-app/ngen-python/lib/python3.11/site-packages/mswm/example_inputs/regionalization/vpu_03S/catchment_groups.csv
++ docker_run python -um ngen_rte.run_regionalization_standalone -n 12 -faf /ngen-app/ngen-python/lib/python3.11/site-packages/mswm/example_inputs/regionalization/vpu_03S/formulation_assignment.csv -cgf /ngen-app/ngen-python/lib/python3.11/site-packages/mswm/example_inputs/regionalization/vpu_03S/catchment_groups.csv -fconfig short_range -dt '2026-08-05 21:00:00' -rname region_sr -v 03S -outfmt NetCDF
++ entrypoint=python
++ '[' python = /bin/sh ']'
++ interactive_terminal=
+++ pwd
+++ pwd
+++ pwd
+++ pwd
++ sudo docker run --entrypoint python --ulimit nofile=100000:100000 -v /contrib/LaurenSchambach/ngwpc/nwm-rte/bin_mounted/ngen_rte:/ngen-app/bin/ngen_rte/ -w /ngen-app/bin -v /contrib/LaurenSchambach/ngwpc/run_ngen:/ngwpc/run_ngen -v /contrib/LaurenSchambach/ngwpc/run_ngen/data/esmf_mesh/:/ngen-app/data/esmf_mesh/ -v /contrib/LaurenSchambach/ngwpc/run_ngen/data/scratch:/ngen-app/data/scratch -v /contrib/LaurenSchambach/ngwpc/run_ngen/data/raw_input:/ngen-app/data/raw_input -v /contrib/LaurenSchambach/ngwpc/nwm-rte/logs/docker/run:/ngencerf/data/run-logs -v /contrib/LaurenSchambach/ngwpc/nwm-rte/logs:/ngen-app/logs_rte -v /contrib/LaurenSchambach/ngwpc/nwm-rte/.devcontainer/tmp:/tmp -e NGEN_LOG_TO_RTE=NO -v /contrib/LaurenSchambach/ngwpc/nwm-automation-scripts/:/ngen-app/nwm-automation-scripts/ --rm ngen_rte_ghcr -um ngen_rte.run_regionalization_standalone -n 12 -faf /ngen-app/ngen-python/lib/python3.11/site-packages/mswm/example_inputs/regionalization/vpu_03S/formulation_assignment.csv -cgf /ngen-app/ngen-python/lib/python3.11/site-packages/mswm/example_inputs/regionalization/vpu_03S/catchment_groups.csv -fconfig short_range -dt '2026-08-05 21:00:00' -rname region_sr -v 03S -outfmt NetCDF
+EWTS CALMGR logging is ENABLED
+EWTS CALMGR no module-specific or default EWTS log level env var found; defaulting to INFO
+EWTS CALMGR log level set to INFO
+EWTS CALMGR using stdout logging
+2026-08-05 21:00:02,809 - matplotlib.font_manager - INFO - generated new fontManager
+RTE: initializing EWTS log at: /ngen-app/logs_rte/rte/rte_20260805_210003_695995.log
+EWTS RTE logging is ENABLED
+EWTS RTE no module-specific or default EWTS log level env var found; defaulting to INFO
+EWTS RTE log level set to INFO
+EWTS RTE logging to /ngen-app/logs_rte/rte/rte_20260805_210003_695995.log
+RTE: done initializing EWTS log at: /ngen-app/logs_rte/rte/rte_20260805_210003_695995.log
+EWTS FCSTMGR logging is ENABLED
+EWTS FCSTMGR no module-specific or default EWTS log level env var found; defaulting to INFO
+EWTS FCSTMGR log level set to INFO
+EWTS FCSTMGR logging to /ngencerf/data/run-logs/fcst-mgr/fcst_mgr_20260805T210003.log
+2026-08-05 21:00:03,849 - root - INFO - Initialized RealizationBuilder with None
+2026-08-05 21:00:03,859 - root - INFO - Skipping load of config file since overrides will replace entire config (no amend)
+2026-08-05 21:00:03,859 - root - INFO - Will apply config overrides with self.config_overrides_mode__amend=False
+2026-08-05 21:00:03,860 - root - INFO - Applying config overrides
+2026-08-05 21:00:03,865 - root - INFO - Input directory created at: /ngwpc/run_ngen/regionalization/region_sr/03S/Input/
+EWTS MSWMGR logging is ENABLED
+EWTS MSWMGR no module-specific or default EWTS log level env var found; defaulting to INFO
+EWTS MSWMGR log level set to INFO
+EWTS MSWMGR logging to /ngwpc/run_ngen/regionalization/region_sr/03S/logs/msw_mgr_regionalization.log
+2026-08-05 21:00:04,121 - httpx - INFO - HTTP Request: GET http://edfs.test.nextgenwaterprediction.com/api/v1/hydrofabric/03S/gpkg?id_type=vpu_id&source=nhf&domain=CONUS "HTTP/1.1 200 OK"
+Saved geopackage file from Icefabric API to /ngwpc/run_ngen/regionalization/region_sr/03S/Input/vpu_03S.gpkg
+EWTS FCSTMGR logging is ENABLED
+EWTS FCSTMGR no module-specific or default EWTS log level env var found; defaulting to INFO
+EWTS FCSTMGR log level set to INFO
+EWTS FCSTMGR logging to /ngwpc/run_ngen/regionalization/region_sr/03S/fcst_mgr_03S.log
+
+real	50m5.983s
+user	0m0.070s
+sys	0m0.035s
++ exit 0
+++ '[' '!' -f /contrib/LaurenSchambach/ngwpc/run_ngen/regionalization/region_sr/03S/troute_output_202608052100.nc ']'
+++ echo 'ERROR: expected t-route output missing: /contrib/LaurenSchambach/ngwpc/run_ngen/regionalization/region_sr/03S/troute_output_202608052100.nc'
+ERROR: expected t-route output missing: /contrib/LaurenSchambach/ngwpc/run_ngen/regionalization/region_sr/03S/troute_output_202608052100.nc
+++ exit 1
+++ ERROR 1
+++ local rc=1
+++ set +e
+++ '[' 0 -eq 1 ']'
+++ _ERROR_HANDLED=1
+++ trap - ERR EXIT
+++ ecflow_client '--abort=task failed (rc=1)'
+++ exit 1

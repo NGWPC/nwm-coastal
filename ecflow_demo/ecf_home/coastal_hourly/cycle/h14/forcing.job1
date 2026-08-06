@@ -1,0 +1,79 @@
+set -e -u -x   # abort on error/unset var, print commands as executed
+
+# Variables ecFlow substitutes at job-generation time (ecflow 5.6.0)
+export ECF_NAME=/coastal_hourly/cycle/h14/forcing
+export ECF_HOST=zhengtaocui-opertestbed-00023-mgmt
+export ECF_PORT=39411
+export ECF_PASS=rx9OOuga
+export ECF_TRYNO=1
+export ECF_RID=$$              # no batch scheduler wrapping this job -> use the shell PID
+
+export PATH="/contrib/software/ecflow/5.6.0/bin:${PATH}"
+
+# Tell ecFlow this task has started
+ecflow_client --init="${ECF_RID}"
+
+# Error handler: report --abort to ecFlow instead of leaving the task
+# stuck 'active' forever. Guarded against double-firing (ERR then EXIT).
+_ERROR_HANDLED=0
+ERROR() {
+  local rc=$1
+  set +e
+  if [ "${_ERROR_HANDLED}" -eq 1 ]; then
+    exit "${rc}"
+  fi
+  _ERROR_HANDLED=1
+  trap - ERR EXIT
+  ecflow_client --abort="task failed (rc=${rc})" || true
+  exit "${rc}"
+}
+trap 'ERROR $?' ERR
+trap 'ERROR $?' EXIT
+
+YMD=20260805
+HH=14
+CYCLE=${YMD}${HH}                       # YYYYMMDDHH
+CYCLE_DT="${YMD:0:4}-${YMD:4:2}-${YMD:6:2} ${HH}:00:00"
+STAMP=${CYCLE}00                        # YYYYMMDDHHMM (matches output filename convention)
+
+FORCING_OUT_FILE="/contrib/LaurenSchambach/ngwpc/run_ngen/data/scratch/short_range_coastal/CONUS_${STAMP}.nc"
+
+export CYCLE_DT
+
+# ---- LAUNCH (placeholder for future Slurm submission) --------------------
+# Today: direct execution on this shared node.
+#
+# This owns the full docker_run invocation itself rather than depending on
+# nwm-rte's run_coastal.sh -- that script is a shared, hand-curated menu of
+# example commands where a human toggles which line is "active" by
+# commenting/uncommenting, so its active line can (and has) changed out
+# from under us for reasons unrelated to this pipeline. Only run.sh and
+# config.bashrc (stable, shared infra providing the docker_run function and
+# env vars) are sourced from nwm-rte.
+#
+# config.bashrc derives REPOS_COMMON_ROOT__HOST from dirname(dirname($0))
+# unconditionally (not a ${VAR:-default} fallback), so it must see $0 as if
+# run_coastal.sh were invoked directly from the nwm-rte directory. bash -c's
+# argument after the script string becomes $0 inside that invocation, so
+# passing nwm-rte/run.sh here reproduces that exactly.
+#
+# Future migration, e.g.: wrap the whole bash -c invocation below in
+# `sbatch --wait --job-name="coastal_forcing_${CYCLE}" --wrap="..."`.
+bash -c '
+  set -euo pipefail
+  cd "/contrib/LaurenSchambach/ngwpc/nwm-rte"
+  source config.bashrc
+  source run.sh
+  docker_run python -um "ngen_rte.run_coastal" -dt "${CYCLE_DT}" -rname "coastal_short_range" -fconfig short_range -gdomain CONUS
+' "/contrib/LaurenSchambach/ngwpc/nwm-rte/run.sh"
+# ---- END LAUNCH ------------------------------------------------------------
+
+if [ ! -f "${FORCING_OUT_FILE}" ]; then
+  echo "ERROR: expected forcing output missing: ${FORCING_OUT_FILE}" >&2
+  exit 1
+fi
+echo "forcing OK: ${FORCING_OUT_FILE}"
+
+ecflow_client --complete   # tell ecFlow the task finished successfully
+trap 0                     # clear all traps so ERROR() doesn't also fire on exit
+exit 0

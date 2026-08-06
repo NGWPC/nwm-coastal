@@ -1,0 +1,188 @@
+++ export ECF_NAME=/coastal_hourly/cycle/h14/forcing
+++ ECF_NAME=/coastal_hourly/cycle/h14/forcing
+++ export ECF_HOST=zhengtaocui-opertestbed-00023-mgmt
+++ ECF_HOST=zhengtaocui-opertestbed-00023-mgmt
+++ export ECF_PORT=39411
+++ ECF_PORT=39411
+++ export ECF_PASS=rx9OOuga
+++ ECF_PASS=rx9OOuga
+++ export ECF_TRYNO=1
+++ ECF_TRYNO=1
+++ export ECF_RID=2159392
+++ ECF_RID=2159392
+++ export PATH=/contrib/software/ecflow/5.6.0/bin:/contrib/software/ecflow/5.6.0/bin:/usr/lib64/openmpi/bin:/usr/lib64/openmpi/bin:/home/lauren.schambach/.local/bin:/home/lauren.schambach/bin:/usr/lib64/openmpi/bin:/usr/share/Modules/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin
+++ PATH=/contrib/software/ecflow/5.6.0/bin:/contrib/software/ecflow/5.6.0/bin:/usr/lib64/openmpi/bin:/usr/lib64/openmpi/bin:/home/lauren.schambach/.local/bin:/home/lauren.schambach/bin:/usr/lib64/openmpi/bin:/usr/share/Modules/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin
+++ ecflow_client --init=2159392
+++ _ERROR_HANDLED=0
+++ trap 'ERROR $?' ERR
+++ trap 'ERROR $?' EXIT
+++ YMD=20260805
+++ HH=14
+++ CYCLE=2026080514
+++ CYCLE_DT='2026-08-05 14:00:00'
+++ STAMP=202608051400
+++ FORCING_OUT_FILE=/contrib/LaurenSchambach/ngwpc/run_ngen/data/scratch/short_range_coastal/CONUS_202608051400.nc
+++ export CYCLE_DT
+++ bash -c '
+  set -euo pipefail
+  cd "/contrib/LaurenSchambach/ngwpc/nwm-rte"
+  source config.bashrc
+  source run.sh
+  docker_run python -um "ngen_rte.run_coastal" -dt "${CYCLE_DT}" -rname "coastal_short_range" -fconfig short_range -gdomain CONUS
+' /contrib/LaurenSchambach/ngwpc/nwm-rte/run.sh
+EWTS CALMGR logging is ENABLED
+EWTS CALMGR no module-specific or default EWTS log level env var found; defaulting to INFO
+EWTS CALMGR log level set to INFO
+EWTS CALMGR using stdout logging
+2026-08-05 21:53:54,276 - matplotlib.font_manager - INFO - generated new fontManager
+RTE: initializing EWTS log at: /ngen-app/logs_rte/rte/rte_20260805_215355_338703.log
+EWTS RTE logging is ENABLED
+EWTS RTE no module-specific or default EWTS log level env var found; defaulting to INFO
+EWTS RTE log level set to INFO
+EWTS RTE logging to /ngen-app/logs_rte/rte/rte_20260805_215355_338703.log
+RTE: done initializing EWTS log at: /ngen-app/logs_rte/rte/rte_20260805_215355_338703.log
+EWTS FORCING logging is ENABLED
+EWTS FORCING no module-specific or default EWTS log level env var found; defaulting to INFO
+EWTS FORCING log level set to INFO
+EWTS FORCING using stdout logging
+/ngen-app/ngen-python/lib/python3.11/site-packages/esmpy/interface/loadESMF.py:94: VersionWarning: ESMF installation version 8.8.0, ESMPy version 8.8.0b0
+  warnings.warn("ESMF installation version {}, ESMPy version {}".format(
+Running coastal forcing engine:
+  fcst_run_name         : coastal_short_range
+  forcing_configuration : short_range
+  global_domain         : CONUS
+  cycle_datetime        : 2026-08-05 14:00:00
+  start_time            : 2026-08-05 15:00:00
+  end_time              : 2026-08-06 08:00:00
+  ana_flag              : 0
+  RefcstBDateProc       : 202608051400
+  config                : /tmp/tmpi5tulsk4.yml
+  geogrid               : /ngen-app/data/esmf_mesh/NWM/domain/geo_em_CONUS.nc
+  output                : /ngen-app/data/scratch/short_range_coastal/CONUS_202608051400.nc
+Initializing the BMI model
+Creating an instance of the BMI model object
+2026-08-05T21:53:56.954Z FORCING  WARNING ewts package installed but EWTS_USE_NGEN_BRIDGE not on. Falling back to default logging. [bmi_model.py.__init__(L161)]
+2026-08-05T21:53:56.954Z FORCING  INFO    ---------------------------
+2026-08-05T21:53:56.954Z FORCING  INFO    BMI Forcing Engine initializing with /tmp/tmpi5tulsk4.yml<MSG_DATA>{"status": "INITIALIZING", "prog": null, "msg": null, "modnm": "forcing"}</MSG_DATA>
+2026-08-05T21:53:56.958Z FORCING  INFO    Reading config file: /tmp/tmpi5tulsk4.yml
+2026-08-05T21:53:56.988Z FORCING  INFO    Begin date: 202608051400
+2026-08-05T21:53:57.015Z FORCING  INFO    RANK: 0 - About to fetch raw forcing data
+2026-08-05T21:53:57.017Z FORCING  WARNING ewts package installed but EWTS_USE_NGEN_BRIDGE not on. Falling back to default logging. [forecast_download_base.py.__init__(L104)]
+2026-08-05T21:53:57.019Z FORCING  INFO    ForecastDownloader: Download data. lookback: 1 lagback: 0
+2026-08-05T21:53:57.024Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf00.grib2
+2026-08-05T21:53:57.026Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf00.grib2
+2026-08-05T21:53:57.026Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf01.grib2
+2026-08-05T21:53:57.030Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf01.grib2
+2026-08-05T21:53:57.030Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf02.grib2
+2026-08-05T21:53:57.034Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf02.grib2
+2026-08-05T21:53:57.034Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf03.grib2
+2026-08-05T21:53:57.043Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf03.grib2
+2026-08-05T21:53:57.043Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf04.grib2
+2026-08-05T21:53:57.044Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf04.grib2
+2026-08-05T21:53:57.044Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf05.grib2
+2026-08-05T21:53:57.045Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf05.grib2
+2026-08-05T21:53:57.045Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf06.grib2
+2026-08-05T21:53:57.049Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf06.grib2
+2026-08-05T21:53:57.049Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf07.grib2
+2026-08-05T21:53:57.054Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf07.grib2
+2026-08-05T21:53:57.054Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf08.grib2
+2026-08-05T21:53:57.062Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf08.grib2
+2026-08-05T21:53:57.062Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf09.grib2
+2026-08-05T21:53:57.063Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf09.grib2
+2026-08-05T21:53:57.063Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf10.grib2
+2026-08-05T21:53:57.064Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf10.grib2
+2026-08-05T21:53:57.064Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf11.grib2
+2026-08-05T21:53:57.067Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf11.grib2
+2026-08-05T21:53:57.067Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf12.grib2
+2026-08-05T21:53:57.072Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf12.grib2
+2026-08-05T21:53:57.072Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf13.grib2
+2026-08-05T21:53:57.078Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf13.grib2
+2026-08-05T21:53:57.078Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf14.grib2
+2026-08-05T21:53:57.079Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf14.grib2
+2026-08-05T21:53:57.079Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf15.grib2
+2026-08-05T21:53:57.080Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf15.grib2
+2026-08-05T21:53:57.080Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf16.grib2
+2026-08-05T21:53:57.084Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf16.grib2
+2026-08-05T21:53:57.084Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf17.grib2
+2026-08-05T21:53:57.090Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf17.grib2
+2026-08-05T21:53:57.091Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf18.grib2
+2026-08-05T21:53:57.094Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf18.grib2
+2026-08-05T21:53:57.094Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf19.grib2
+2026-08-05T21:53:57.096Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf19.grib2
+2026-08-05T21:53:57.096Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf20.grib2
+2026-08-05T21:53:57.096Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf20.grib2
+2026-08-05T21:53:57.097Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf21.grib2
+2026-08-05T21:53:57.098Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/RAP/rap.20260805/rap.t14z.awp130bgrbf21.grib2
+2026-08-05T21:53:57.099Z FORCING  WARNING ewts package installed but EWTS_USE_NGEN_BRIDGE not on. Falling back to default logging. [forecast_download_base.py.__init__(L104)]
+2026-08-05T21:53:57.102Z FORCING  INFO    ForecastDownloader: Download data. lookback: 1 lagback: 0
+2026-08-05T21:53:57.116Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf00.grib2
+2026-08-05T21:53:57.117Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf00.grib2
+2026-08-05T21:53:57.118Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf01.grib2
+2026-08-05T21:53:57.119Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf01.grib2
+2026-08-05T21:53:57.119Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf02.grib2
+2026-08-05T21:53:57.119Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf02.grib2
+2026-08-05T21:53:57.120Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf03.grib2
+2026-08-05T21:53:57.120Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf03.grib2
+2026-08-05T21:53:57.121Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf04.grib2
+2026-08-05T21:53:57.121Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf04.grib2
+2026-08-05T21:53:57.122Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf05.grib2
+2026-08-05T21:53:57.122Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf05.grib2
+2026-08-05T21:53:57.122Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf06.grib2
+2026-08-05T21:53:57.123Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf06.grib2
+2026-08-05T21:53:57.123Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf07.grib2
+2026-08-05T21:53:57.124Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf07.grib2
+2026-08-05T21:53:57.124Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf08.grib2
+2026-08-05T21:53:57.125Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf08.grib2
+2026-08-05T21:53:57.125Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf09.grib2
+2026-08-05T21:53:57.126Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf09.grib2
+2026-08-05T21:53:57.126Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf10.grib2
+2026-08-05T21:53:57.127Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf10.grib2
+2026-08-05T21:53:57.127Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf11.grib2
+2026-08-05T21:53:57.128Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf11.grib2
+2026-08-05T21:53:57.128Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf12.grib2
+2026-08-05T21:53:57.130Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf12.grib2
+2026-08-05T21:53:57.130Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf13.grib2
+2026-08-05T21:53:57.130Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf13.grib2
+2026-08-05T21:53:57.130Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf14.grib2
+2026-08-05T21:53:57.132Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf14.grib2
+2026-08-05T21:53:57.132Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf15.grib2
+2026-08-05T21:53:57.132Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf15.grib2
+2026-08-05T21:53:57.133Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf16.grib2
+2026-08-05T21:53:57.134Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf16.grib2
+2026-08-05T21:53:57.134Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf17.grib2
+2026-08-05T21:53:57.135Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf17.grib2
+2026-08-05T21:53:57.135Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf18.grib2
+2026-08-05T21:53:57.136Z FORCING  INFO    Skipping existing: /ngen-app/data/raw_input/HRRR/hrrr.20260805/conus/hrrr.t14z.wrfsfcf18.grib2
+2026-08-05T21:53:57.136Z FORCING  INFO    RANK: 0 - Finished fetching raw forcing data
+2026-08-05T21:53:58.786Z FORCING  INFO    BMI Forcing Engine initialized<MSG_DATA>{"status": "INITIALIZED", "prog": null, "msg": null, "modnm": "forcing"}</MSG_DATA>
+
+Now looping through 18 timesteps, updating the model, and extracting forcing data
+
+rank: 0
+grid_type: gridded
+
+---------------------------------------------------
+Iteration #0 of 18 for 2026-08-05 15:00:00
+2026-08-05T21:53:59.387Z FORCING  INFO    RANK: 0 - Regrid CONUS RAP
+2026-08-05T21:59:44.242Z FORCING  INFO    RANK: 0 - Deleted file: /ngen-app/data/scratch/short_range_coastal/812676bd87d818a2/grib2.tbl
+2026-08-05T21:59:44.248Z FORCING  INFO    RANK: 0 - Deleted file: /ngen-app/data/scratch/short_range_coastal/812676bd87d818a2/812676bd87d818a2_RAP_CONUS_TMP-1.nc
+--------------------------------------------------------------------------
+MPI_ABORT was invoked on rank 0 in communicator MPI_COMM_WORLD
+with errorcode 15.
+
+NOTE: invoking MPI_ABORT causes Open MPI to kill all MPI processes.
+You may or may not see output from other processes, depending on
+exactly when Open MPI kills them.
+--------------------------------------------------------------------------
+
+real	5m59.203s
+user	0m0.021s
+sys	0m0.023s
++++ ERROR 15
++++ local rc=15
++++ set +e
++++ '[' 0 -eq 1 ']'
++++ _ERROR_HANDLED=1
++++ trap - ERR EXIT
++++ ecflow_client '--abort=task failed (rc=15)'
++++ exit 15

@@ -1,0 +1,44 @@
+%include <head.h>
+
+YMD=%YMD%
+HH=%HOUR%
+CYCLE=${YMD}${HH}
+CYCLE_DT="${YMD:0:4}-${YMD:4:2}-${YMD:6:2} ${HH}:00:00"
+STAMP=${CYCLE}00
+
+FORCING_FILE="%FORCING_OUT_DIR%/CONUS_${STAMP}.nc"
+TROUTE_FILE="%TROUTE_REGIONALIZATION_ROOT%/region_sr_${CYCLE}/%VPU%/troute_output_${STAMP}.nc"
+
+for f in "${FORCING_FILE}" "${TROUTE_FILE}"; do
+  [ -f "$f" ] || { echo "ERROR: upstream file missing: $f" >&2; exit 1; }
+done
+
+SCHISM_CYCLE_DIR="%SCHISM_CYCLES_DIR%/${CYCLE}"
+SFINCS_CYCLE_DIR="%SFINCS_CYCLES_DIR%/${CYCLE}"
+
+# ---- LAUNCH (placeholder for future Slurm submission) --------------------
+# Today: direct execution (sub-second; unlikely to ever need Slurm).
+%NWM_COASTAL_PY% %GEN_SCRIPT% \
+  --model schism \
+  --base-yaml "%SCHISM_BASE_YAML%" \
+  --cycle "${CYCLE}" \
+  --start-date "${CYCLE_DT}" \
+  --forecast-meteo-file "${FORCING_FILE}" \
+  --troute-file "${TROUTE_FILE}" \
+  --cycle-dir "${SCHISM_CYCLE_DIR}"
+
+%NWM_COASTAL_PY% %GEN_SCRIPT% \
+  --model sfincs \
+  --base-yaml "%SFINCS_BASE_YAML%" \
+  --cycle "${CYCLE}" \
+  --start-date "${CYCLE_DT}" \
+  --forecast-meteo-file "${FORCING_FILE}" \
+  --troute-file "${TROUTE_FILE}" \
+  --cycle-dir "${SFINCS_CYCLE_DIR}"
+# ---- END LAUNCH ------------------------------------------------------------
+
+for f in "${SCHISM_CYCLE_DIR}/run.yaml" "${SFINCS_CYCLE_DIR}/run.yaml"; do
+  [ -s "$f" ] || { echo "ERROR: generated config missing/empty: $f" >&2; exit 1; }
+done
+
+%include <tail.h>

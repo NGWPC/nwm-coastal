@@ -1,0 +1,51 @@
+set -e -u -x   # abort on error/unset var, print commands as executed
+
+# Variables ecFlow substitutes at job-generation time (ecflow 5.6.0)
+export ECF_NAME=/coastal_hourly/cycle/h14/run_sfincs
+export ECF_HOST=zhengtaocui-opertestbed-00023-mgmt
+export ECF_PORT=39411
+export ECF_PASS=r48fWQVC
+export ECF_TRYNO=1
+export ECF_RID=$$              # no batch scheduler wrapping this job -> use the shell PID
+
+export PATH="/contrib/software/ecflow/5.6.0/bin:${PATH}"
+
+# Tell ecFlow this task has started
+ecflow_client --init="${ECF_RID}"
+
+# Error handler: report --abort to ecFlow instead of leaving the task
+# stuck 'active' forever. Guarded against double-firing (ERR then EXIT).
+_ERROR_HANDLED=0
+ERROR() {
+  local rc=$1
+  set +e
+  if [ "${_ERROR_HANDLED}" -eq 1 ]; then
+    exit "${rc}"
+  fi
+  _ERROR_HANDLED=1
+  trap - ERR EXIT
+  ecflow_client --abort="task failed (rc=${rc})" || true
+  exit "${rc}"
+}
+trap 'ERROR $?' ERR
+trap 'ERROR $?' EXIT
+
+YMD=20260805
+HH=14
+CYCLE=${YMD}${HH}
+
+CONFIG_FILE="/contrib/LaurenSchambach/ngwpc/run_coastal/sfincs_sims/cycles/${CYCLE}/run.yaml"
+[ -f "${CONFIG_FILE}" ] || { echo "ERROR: missing config: ${CONFIG_FILE}" >&2; exit 1; }
+
+# ---- LAUNCH (placeholder for future Slurm submission) --------------------
+# Today: direct execution on this shared node.
+# Future migration, e.g.:
+#   sbatch --wait --job-name="sfincs_${CYCLE}" \
+#     --output="/contrib/LaurenSchambach/ngwpc/run_coastal/sfincs_sims/cycles/${CYCLE}/slurm.out" \
+#     --wrap="/contrib/LaurenSchambach/ngwpc/nwm-coastal/nwm-coastal-cli run ${CONFIG_FILE}"
+/contrib/LaurenSchambach/ngwpc/nwm-coastal/nwm-coastal-cli run "${CONFIG_FILE}"
+# ---- END LAUNCH ------------------------------------------------------------
+
+ecflow_client --complete   # tell ecFlow the task finished successfully
+trap 0                     # clear all traps so ERROR() doesn't also fire on exit
+exit 0

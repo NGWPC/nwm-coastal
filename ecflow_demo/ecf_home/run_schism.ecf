@@ -1,0 +1,19 @@
+%include <head.h>
+
+YMD=%YMD%
+HH=%HOUR%
+CYCLE=${YMD}${HH}
+
+CONFIG_FILE="%SCHISM_CYCLES_DIR%/${CYCLE}/run.yaml"
+[ -f "${CONFIG_FILE}" ] || { echo "ERROR: missing config: ${CONFIG_FILE}" >&2; exit 1; }
+
+# ---- LAUNCH (placeholder for future Slurm submission) --------------------
+# Today: direct execution on this shared node.
+# Future migration, e.g.:
+#   sbatch --wait --job-name="schism_${CYCLE}" \
+#     --output="%SCHISM_CYCLES_DIR%/${CYCLE}/slurm.out" \
+#     --wrap="%NWM_COASTAL_CLI% run ${CONFIG_FILE}"
+%NWM_COASTAL_CLI% run "${CONFIG_FILE}"
+# ---- END LAUNCH ------------------------------------------------------------
+
+%include <tail.h>

@@ -1,0 +1,123 @@
+++ export ECF_NAME=/coastal_hourly/cycle/h14/ngen_troute
+++ ECF_NAME=/coastal_hourly/cycle/h14/ngen_troute
+++ export ECF_HOST=zhengtaocui-opertestbed-00023-mgmt
+++ ECF_HOST=zhengtaocui-opertestbed-00023-mgmt
+++ export ECF_PORT=39411
+++ ECF_PORT=39411
+++ export ECF_PASS=H0OBpffl
+++ ECF_PASS=H0OBpffl
+++ export ECF_TRYNO=1
+++ ECF_TRYNO=1
+++ export ECF_RID=2203495
+++ ECF_RID=2203495
+++ export PATH=/contrib/software/ecflow/5.6.0/bin:/contrib/software/ecflow/5.6.0/bin:/usr/lib64/openmpi/bin:/usr/lib64/openmpi/bin:/home/lauren.schambach/.local/bin:/home/lauren.schambach/bin:/usr/lib64/openmpi/bin:/usr/share/Modules/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin
+++ PATH=/contrib/software/ecflow/5.6.0/bin:/contrib/software/ecflow/5.6.0/bin:/usr/lib64/openmpi/bin:/usr/lib64/openmpi/bin:/home/lauren.schambach/.local/bin:/home/lauren.schambach/bin:/usr/lib64/openmpi/bin:/usr/share/Modules/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin
+++ ecflow_client --init=2203495
+++ _ERROR_HANDLED=0
+++ trap 'ERROR $?' ERR
+++ trap 'ERROR $?' EXIT
+++ YMD=20260805
+++ HH=14
+++ CYCLE=2026080514
+++ CYCLE_DT='2026-08-05 14:00:00'
+++ STAMP=202608051400
+++ RNAME=region_sr_2026080514
+++ TROUTE_OUT_FILE=/contrib/LaurenSchambach/ngwpc/run_ngen/regionalization/region_sr_2026080514/03S/troute_output_202608051400.nc
+++ export CYCLE_DT
+++ export RNAME
+++ bash -c '
+  set -euo pipefail
+  cd "/contrib/LaurenSchambach/ngwpc/nwm-rte"
+  source config.bashrc
+  source run.sh
+  TEST_VPU="vpu_03S"
+  TEST_FORM_ASSIGN_VPU="${INSTALLED_REGIONALIZATION_RESULTS}/${TEST_VPU}/formulation_assignment.csv"
+  TEST_CAT_GRP_VPU="${INSTALLED_REGIONALIZATION_RESULTS}/${TEST_VPU}/catchment_groups.csv"
+  docker_run python -um "ngen_rte.run_regionalization_standalone" -n 12 -faf "${TEST_FORM_ASSIGN_VPU}" -cgf "${TEST_CAT_GRP_VPU}" -fconfig "short_range" -dt "${CYCLE_DT}" -rname "${RNAME}" -v "03S" -outfmt NetCDF
+' /contrib/LaurenSchambach/ngwpc/nwm-rte/run.sh
+EWTS CALMGR logging is ENABLED
+EWTS CALMGR no module-specific or default EWTS log level env var found; defaulting to INFO
+EWTS CALMGR log level set to INFO
+EWTS CALMGR using stdout logging
+2026-08-05 22:56:38,508 - matplotlib.font_manager - INFO - generated new fontManager
+RTE: initializing EWTS log at: /ngen-app/logs_rte/rte/rte_20260805_225639_364970.log
+EWTS RTE logging is ENABLED
+EWTS RTE no module-specific or default EWTS log level env var found; defaulting to INFO
+EWTS RTE log level set to INFO
+EWTS RTE logging to /ngen-app/logs_rte/rte/rte_20260805_225639_364970.log
+RTE: done initializing EWTS log at: /ngen-app/logs_rte/rte/rte_20260805_225639_364970.log
+EWTS FCSTMGR logging is ENABLED
+EWTS FCSTMGR no module-specific or default EWTS log level env var found; defaulting to INFO
+EWTS FCSTMGR log level set to INFO
+EWTS FCSTMGR logging to /ngencerf/data/run-logs/fcst-mgr/fcst_mgr_20260805T225639.log
+2026-08-05 22:56:39,469 - root - INFO - Initialized RealizationBuilder with None
+2026-08-05 22:56:39,480 - root - INFO - Skipping load of config file since overrides will replace entire config (no amend)
+2026-08-05 22:56:39,480 - root - INFO - Will apply config overrides with self.config_overrides_mode__amend=False
+2026-08-05 22:56:39,480 - root - INFO - Applying config overrides
+2026-08-05 22:56:39,501 - root - INFO - Input directory created at: /ngwpc/run_ngen/regionalization/region_sr_2026080514/03S/Input/
+EWTS MSWMGR logging is ENABLED
+EWTS MSWMGR no module-specific or default EWTS log level env var found; defaulting to INFO
+EWTS MSWMGR log level set to INFO
+EWTS MSWMGR logging to /ngwpc/run_ngen/regionalization/region_sr_2026080514/03S/logs/msw_mgr_regionalization.log
+2026-08-05 22:56:39,715 - httpx - INFO - HTTP Request: GET http://edfs.test.nextgenwaterprediction.com/api/v1/hydrofabric/03S/gpkg?id_type=vpu_id&source=nhf&domain=CONUS "HTTP/1.1 200 OK"
+Saved geopackage file from Icefabric API to /ngwpc/run_ngen/regionalization/region_sr_2026080514/03S/Input/vpu_03S.gpkg
+EWTS FCSTMGR logging is ENABLED
+EWTS FCSTMGR no module-specific or default EWTS log level env var found; defaulting to INFO
+EWTS FCSTMGR log level set to INFO
+EWTS FCSTMGR logging to /ngwpc/run_ngen/regionalization/region_sr_2026080514/03S/fcst_mgr_03S.log
+--- Logging error ---
+Traceback (most recent call last):
+  File "/ngen-app/ngen-python/lib/python3.11/site-packages/ewts/logger.py", line 127, in emit
+    self.ewts_logger._write(level, msg)
+  File "/ngen-app/ngen-python/lib/python3.11/site-packages/ewts/logger.py", line 319, in _write
+    with log_path.open("a", encoding="utf-8") as f:
+  File "/ngen-app/ngen-python/lib/python3.11/site-packages/nwm_fcst_mgr/forecast.py", line 170, in _handler_sigterm
+    self.close()
+  File "/ngen-app/ngen-python/lib/python3.11/site-packages/nwm_fcst_mgr/forecast.py", line 214, in close
+    self._stop_ngen()
+  File "/ngen-app/ngen-python/lib/python3.11/site-packages/nwm_fcst_mgr/forecast.py", line 288, in _stop_ngen
+    raise NgenIntentionallyStoppedError(self.proc.returncode, self.cmd, self.cwd)
+nwm_fcst_mgr.exceptions.NgenIntentionallyStoppedError: (0, ['mpirun', '-n', '12', '/ngen-app/ngen/cmake_build/ngen', '/ngwpc/run_ngen/regionalization/region_sr_2026080514/03S/Input/vpu_03S.gpkg', 'all', '/ngwpc/run_ngen/regionalization/region_sr_2026080514/03S/Input/vpu_03S.gpkg', 'all', '/ngwpc/run_ngen/regionalization/region_sr_2026080514/03S/03S_realization_config_bmi_region.json', '/ngwpc/run_ngen/regionalization/region_sr_2026080514/03S/Input/03S_partition_config.json'], '/ngwpc/run_ngen/regionalization/region_sr_2026080514/03S')
+Call stack:
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/ngen-app/bin/ngen_rte/run_regionalization_standalone.py", line 90, in <module>
+    main(cfg=RTERegionConfig(**vars(args)))
+  File "/ngen-app/bin/ngen_rte/run_regionalization_standalone.py", line 66, in main
+    _main(cfg)
+  File "/ngen-app/bin/ngen_rte/run_regionalization_standalone.py", line 60, in _main
+    run_region(rb)
+  File "/ngen-app/bin/ngen_rte/run_regionalization_standalone.py", line 39, in run_region
+    ngen_runner.stream_status_until_complete()
+  File "/ngen-app/bin/ngen_rte/execution/ngen_async.py", line 147, in stream_status_until_complete
+    transmit(new_log_parts, log_file)
+  File "/ngen-app/bin/ngen_rte/utils.py", line 112, in transmit
+    transmitter(f"tx: {tx_dict}")
+  File "/ngen-app/ngen-python/lib/python3.11/site-packages/ewts/logger.py", line 342, in info
+    self._logger.info(msg, *args, **kwargs)
+  File "/usr/lib64/python3.11/logging/__init__.py", line 1489, in info
+    self._log(INFO, msg, args, **kwargs)
+  File "/usr/lib64/python3.11/logging/__init__.py", line 1634, in _log
+    self.handle(record)
+  File "/usr/lib64/python3.11/logging/__init__.py", line 1644, in handle
+    self.callHandlers(record)
+  File "/usr/lib64/python3.11/logging/__init__.py", line 1706, in callHandlers
+    hdlr.handle(record)
+  File "/usr/lib64/python3.11/logging/__init__.py", line 978, in handle
+    self.emit(record)
+  File "/ngen-app/ngen-python/lib/python3.11/site-packages/ewts/logger.py", line 129, in emit
+    self.handleError(record)
+Message: "tx: {'concern': False, 'log_parts': {'dt': '2026-08-05 23:03:30', 'module': 'NOAHOWP', 'level': 'INFO', 'msg': 'enddate=202608060800', 'payload': None}, 'payload': None, 'log_file': '03S_ngen_mpi_process_11.log', 'exc_info': None}"
+Arguments: ()
+
+real	55m14.788s
+user	0m0.085s
+sys	0m0.026s
++++ ERROR 137
++++ local rc=137
++++ set +e
++++ '[' 0 -eq 1 ']'
++++ _ERROR_HANDLED=1
++++ trap - ERR EXIT
++++ ecflow_client '--abort=task failed (rc=137)'
++++ exit 137

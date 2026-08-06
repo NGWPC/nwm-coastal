@@ -1,0 +1,354 @@
+# =============================================================================
+# ecflow 5.6.0 suite: coastal_hourly
+#
+# Hourly demo pipeline: nwm-rte forcing + VPU 03S regionalization (t-route)
+# -> per-cycle SCHISM/SFINCS run.yaml generation -> SCHISM + SFINCS runs.
+#
+# Each hour of the day is a permanent, individually-inspectable/rerunnable
+# family (h00..h23), gated by its own `time HH:00`. The enclosing `repeat
+# date YMD` auto-increments (and auto-requeues all 24 children) once every
+# hNN family for the day has completed -- see `ecflow_client --help force`.
+#
+# Load / start with server/load_and_begin.sh:
+#   ecflow_client --load=coastal_hourly.def check_only   # syntax-check first
+#   ecflow_client --load=coastal_hourly.def
+#   ecflow_client --begin=coastal_hourly
+# =============================================================================
+
+suite coastal_hourly
+
+  # ---- ecFlow bookkeeping ----
+  edit ECF_HOME    '/contrib/LaurenSchambach/ngwpc/nwm-coastal/ecflow_demo/ecf_home'
+  edit ECF_FILES   '/contrib/LaurenSchambach/ngwpc/nwm-coastal/ecflow_demo/ecf_home'
+  edit ECF_INCLUDE '/contrib/LaurenSchambach/ngwpc/nwm-coastal/ecflow_demo/ecf_home'
+  edit ECF_TRIES   '1'
+
+  # ---- Pipeline paths (single source of truth for all tasks) ----
+  edit NWM_RTE_DIR           '/contrib/LaurenSchambach/ngwpc/nwm-rte'
+  # Single source of truth for which VPU this suite targets -- used for the
+  # ngen_troute -v flag, TEST_VPU, and the troute output path (see
+  # ngen_troute.ecf/gen_configs.ecf). Change this and everything downstream
+  # follows automatically. Note: the SCHISM/SFINCS prebuilt models
+  # (SCHISM_BASE_YAML/SFINCS_BASE_YAML below) are geography-specific to
+  # VPU 03S (Tampa Bay) and are NOT re-derived from this -- swapping VPU
+  # without also swapping those base configs would mismatch the coastal
+  # domain from the hydrology domain.
+  edit VPU                   '03S'
+  edit FORCING_OUT_DIR       '/contrib/LaurenSchambach/ngwpc/run_ngen/data/scratch/short_range_coastal'
+  # Shared regionalization root (data/raw_input etc. stay shared too, on
+  # purpose -- see ngen_troute.ecf). Cycle+VPU isolation comes from -rname
+  # being cycle-specific, not from a separate root: this resolves to
+  # TROUTE_REGIONALIZATION_ROOT/region_sr_<cycle>/<VPU>/troute_output_*.nc.
+  edit TROUTE_REGIONALIZATION_ROOT '/contrib/LaurenSchambach/ngwpc/run_ngen/regionalization'
+  edit NWM_COASTAL_CLI       '/contrib/LaurenSchambach/ngwpc/nwm-coastal/nwm-coastal-cli'
+  edit NWM_COASTAL_PY        '/contrib/LaurenSchambach/ngwpc/nwm-coastal/nwm-coastal-py'
+  edit GEN_SCRIPT            '/contrib/LaurenSchambach/ngwpc/nwm-coastal/ecflow_demo/bin/gen_cycle_config.py'
+  edit SCHISM_BASE_YAML       '/contrib/LaurenSchambach/ngwpc/run_coastal/schism_sims/run.yaml'
+  edit SFINCS_BASE_YAML       '/contrib/LaurenSchambach/ngwpc/run_coastal/sfincs_sims/run.yaml'
+  # Everything ecflow generates (per-cycle configs + work dirs) lives under
+  # run_coastal/, nested next to the base templates and the S3-staged
+  # prebuilt models -- nothing generated ever lands inside the nwm-coastal
+  # repo checkout itself.
+  edit SCHISM_CYCLES_DIR      '/contrib/LaurenSchambach/ngwpc/run_coastal/schism_sims/cycles'
+  edit SFINCS_CYCLES_DIR      '/contrib/LaurenSchambach/ngwpc/run_coastal/sfincs_sims/cycles'
+
+  family cycle
+    # Day-rollover odometer. Per `ecflow_client --help force`: "A repeat
+    # attribute is incremented when all the child nodes are complete" --
+    # once the last hNN family of the day completes, YMD increments and
+    # h00..h23 auto-requeue for the new date.
+    # NOTE: bump the start bound to today's date before the first
+    # `--load`+`--begin`; ecflow's checkpoint preserves state across
+    # server restarts after that, so this literal is only read once.
+    repeat date YMD 20260805 20991231 1
+
+    family h00
+      edit HOUR '00'
+      time 00:00
+      task ngen_forcing
+      task ngen_troute
+      task gen_configs
+        trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism
+        trigger gen_configs == complete
+      task run_sfincs
+        trigger gen_configs == complete
+    endfamily
+    family h01
+      edit HOUR '01'
+      time 01:00
+      task ngen_forcing
+      task ngen_troute
+      task gen_configs
+        trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism
+        trigger gen_configs == complete
+      task run_sfincs
+        trigger gen_configs == complete
+    endfamily
+    family h02
+      edit HOUR '02'
+      time 02:00
+      task ngen_forcing
+      task ngen_troute
+      task gen_configs
+        trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism
+        trigger gen_configs == complete
+      task run_sfincs
+        trigger gen_configs == complete
+    endfamily
+    family h03
+      edit HOUR '03'
+      time 03:00
+      task ngen_forcing
+      task ngen_troute
+      task gen_configs
+        trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism
+        trigger gen_configs == complete
+      task run_sfincs
+        trigger gen_configs == complete
+    endfamily
+    family h04
+      edit HOUR '04'
+      time 04:00
+      task ngen_forcing
+      task ngen_troute
+      task gen_configs
+        trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism
+        trigger gen_configs == complete
+      task run_sfincs
+        trigger gen_configs == complete
+    endfamily
+    family h05
+      edit HOUR '05'
+      time 05:00
+      task ngen_forcing
+      task ngen_troute
+      task gen_configs
+        trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism
+        trigger gen_configs == complete
+      task run_sfincs
+        trigger gen_configs == complete
+    endfamily
+    family h06
+      edit HOUR '06'
+      time 06:00
+      task ngen_forcing
+      task ngen_troute
+      task gen_configs
+        trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism
+        trigger gen_configs == complete
+      task run_sfincs
+        trigger gen_configs == complete
+    endfamily
+    family h07
+      edit HOUR '07'
+      time 07:00
+      task ngen_forcing
+      task ngen_troute
+      task gen_configs
+        trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism
+        trigger gen_configs == complete
+      task run_sfincs
+        trigger gen_configs == complete
+    endfamily
+    family h08
+      edit HOUR '08'
+      time 08:00
+      task ngen_forcing
+      task ngen_troute
+      task gen_configs
+        trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism
+        trigger gen_configs == complete
+      task run_sfincs
+        trigger gen_configs == complete
+    endfamily
+    family h09
+      edit HOUR '09'
+      time 09:00
+      task ngen_forcing
+      task ngen_troute
+      task gen_configs
+        trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism
+        trigger gen_configs == complete
+      task run_sfincs
+        trigger gen_configs == complete
+    endfamily
+    family h10
+      edit HOUR '10'
+      time 10:00
+      task ngen_forcing
+      task ngen_troute
+      task gen_configs
+        trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism
+        trigger gen_configs == complete
+      task run_sfincs
+        trigger gen_configs == complete
+    endfamily
+    family h11
+      edit HOUR '11'
+      time 11:00
+      task ngen_forcing
+      task ngen_troute
+      task gen_configs
+        trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism
+        trigger gen_configs == complete
+      task run_sfincs
+        trigger gen_configs == complete
+    endfamily
+    family h12
+      edit HOUR '12'
+      time 12:00
+      task ngen_forcing
+      task ngen_troute
+      task gen_configs
+        trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism
+        trigger gen_configs == complete
+      task run_sfincs
+        trigger gen_configs == complete
+    endfamily
+    family h13
+      edit HOUR '13'
+      time 13:00
+      task ngen_forcing
+      task ngen_troute
+      task gen_configs
+        trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism
+        trigger gen_configs == complete
+      task run_sfincs
+        trigger gen_configs == complete
+    endfamily
+    family h14
+      edit HOUR '14'
+      time 14:00
+      task ngen_forcing
+      task ngen_troute
+      task gen_configs
+        trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism
+        trigger gen_configs == complete
+      task run_sfincs
+        trigger gen_configs == complete
+    endfamily
+    family h15
+      edit HOUR '15'
+      time 15:00
+      task ngen_forcing
+      task ngen_troute
+      task gen_configs
+        trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism
+        trigger gen_configs == complete
+      task run_sfincs
+        trigger gen_configs == complete
+    endfamily
+    family h16
+      edit HOUR '16'
+      time 16:00
+      task ngen_forcing
+      task ngen_troute
+      task gen_configs
+        trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism
+        trigger gen_configs == complete
+      task run_sfincs
+        trigger gen_configs == complete
+    endfamily
+    family h17
+      edit HOUR '17'
+      time 17:00
+      task ngen_forcing
+      task ngen_troute
+      task gen_configs
+        trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism
+        trigger gen_configs == complete
+      task run_sfincs
+        trigger gen_configs == complete
+    endfamily
+    family h18
+      edit HOUR '18'
+      time 18:00
+      task ngen_forcing
+      task ngen_troute
+      task gen_configs
+        trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism
+        trigger gen_configs == complete
+      task run_sfincs
+        trigger gen_configs == complete
+    endfamily
+    family h19
+      edit HOUR '19'
+      time 19:00
+      task ngen_forcing
+      task ngen_troute
+      task gen_configs
+        trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism
+        trigger gen_configs == complete
+      task run_sfincs
+        trigger gen_configs == complete
+    endfamily
+    family h20
+      edit HOUR '20'
+      time 20:00
+      task ngen_forcing
+      task ngen_troute
+      task gen_configs
+        trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism
+        trigger gen_configs == complete
+      task run_sfincs
+        trigger gen_configs == complete
+    endfamily
+    family h21
+      edit HOUR '21'
+      time 21:00
+      task ngen_forcing
+      task ngen_troute
+      task gen_configs
+        trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism
+        trigger gen_configs == complete
+      task run_sfincs
+        trigger gen_configs == complete
+    endfamily
+    family h22
+      edit HOUR '22'
+      time 22:00
+      task ngen_forcing
+      task ngen_troute
+      task gen_configs
+        trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism
+        trigger gen_configs == complete
+      task run_sfincs
+        trigger gen_configs == complete
+    endfamily
+    family h23
+      edit HOUR '23'
+      time 23:00
+      task ngen_forcing
+      task ngen_troute
+      task gen_configs
+        trigger ngen_forcing == complete and ngen_troute == complete
+      task run_schism
+        trigger gen_configs == complete
+      task run_sfincs
+        trigger gen_configs == complete
+    endfamily
+  endfamily
+endsuite
