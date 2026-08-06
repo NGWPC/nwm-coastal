@@ -1799,3 +1799,51 @@ class TestResumeFingerprint:
 
         assert "have not completed" in errors[0]
 
+
+class TestResumeCatalogRegistration:
+    """A resume past ``create_fetch_data`` must still find the fetched rasters."""
+
+    def _with_catalogs(self, cfg: SfincsCreateConfig, names: list[str]) -> None:
+        dl = cfg.effective_download_dir
+        dl.mkdir(parents=True, exist_ok=True)
+        for name in names:
+            (dl / f"{name}_catalog.yml").write_text(f"{name}:\n  data_type: RasterDataset\n")
+
+    def test_catalogs_are_registered(
+        self, minimal_create_config: SfincsCreateConfig, tmp_path: Path
+    ) -> None:
+        """Without this, hydromt read the dataset name as a relative path."""
+        cfg = minimal_create_config
+        cfg.download_dir = tmp_path / "downloads"
+        self._with_catalogs(cfg, ["noaa_crm", "gebco_15arcs"])
+
+        SfincsCreator(cfg)._register_fetched_catalogs()
+
+        assert [Path(p).name for p in cfg.data_catalog.data_libs] == [
+            "gebco_15arcs_catalog.yml",
+            "noaa_crm_catalog.yml",
+        ]
+
+    def test_registration_is_idempotent(
+        self, minimal_create_config: SfincsCreateConfig, tmp_path: Path
+    ) -> None:
+        cfg = minimal_create_config
+        cfg.download_dir = tmp_path / "downloads"
+        self._with_catalogs(cfg, ["noaa_crm"])
+        creator = SfincsCreator(cfg)
+
+        creator._register_fetched_catalogs()
+        creator._register_fetched_catalogs()
+
+        assert len(cfg.data_catalog.data_libs) == 1
+
+    def test_a_missing_download_dir_is_not_an_error(
+        self, minimal_create_config: SfincsCreateConfig, tmp_path: Path
+    ) -> None:
+        """Configs whose datasets all come from a catalog never fetch anything."""
+        cfg = minimal_create_config
+        cfg.download_dir = tmp_path / "never_created"
+
+        SfincsCreator(cfg)._register_fetched_catalogs()
+
+        assert cfg.data_catalog.data_libs == []

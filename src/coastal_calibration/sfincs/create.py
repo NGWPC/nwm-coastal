@@ -1527,6 +1527,20 @@ class SfincsCreator:
         status["stage_fingerprints"] = fingerprints
         self._status_path.write_text(json.dumps(status, indent=2) + "\n")
 
+    def _register_fetched_catalogs(self) -> None:
+        """Re-add the catalogs ``create_fetch_data`` wrote, when it is skipped.
+
+        That stage registers one catalog per dataset in memory, so a resume
+        past it left ``data_libs`` empty and hydromt fell back to reading the
+        dataset name as a path.  The files themselves persist under the
+        download directory, which the fingerprint check has already confirmed
+        was built from this config.
+        """
+        for catalog in sorted(self.config.effective_download_dir.glob("*_catalog.yml")):
+            path_str = str(catalog.resolve())
+            if path_str not in self.config.data_catalog.data_libs:
+                self.config.data_catalog.data_libs.append(path_str)
+
     def _check_prerequisites(self, start_from: str) -> list[str]:
         """Verify that all stages before *start_from* can be skipped safely.
 
@@ -1693,6 +1707,8 @@ class SfincsCreator:
         # When resuming from a later stage, load the existing model so
         # that stages which reference ``self.sfincs`` can find it.
         if start_from and "create_grid" not in stages_to_run:
+            if "create_fetch_data" not in stages_to_run:
+                self._register_fetched_catalogs()
             _load_existing_model(self.config)
 
         current_stage = ""
