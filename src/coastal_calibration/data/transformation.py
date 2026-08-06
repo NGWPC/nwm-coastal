@@ -173,6 +173,13 @@ def clip_to_aoi(
         output_type,
         "-co",
         f"COMPRESS={compress.upper()}",
+        # A clip over a large AOI at 1/9 arc-second exceeds the 4 GB classic
+        # TIFF limit. Compression makes the final size unpredictable, so GDAL
+        # cannot decide for itself part-way through a write -- IF_NEEDED fails
+        # exactly here with "Maximum TIFF file size exceeded". Everything in
+        # this stack reads BigTIFF, so ask for it unconditionally.
+        "-co",
+        "BIGTIFF=YES",
         "-multi",
         "-wo",
         "NUM_THREADS=ALL_CPUS",

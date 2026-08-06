@@ -169,7 +169,9 @@ def fetch_topobathy(
     # SFINCS reads bathymetry as real*4; avoid writing unnecessary float64.
     if clipped.dtype != "float32":
         clipped = clipped.astype("float32")
-    clipped.rio.to_raster(str(temp_tif), driver="GTiff", compress="deflate")
+    # Same 4 GB ceiling as clip_to_aoi: this temp write is upstream of it
+    # and blows up first on a large AOI.
+    clipped.rio.to_raster(str(temp_tif), driver="GTiff", compress="deflate", BIGTIFF="YES")
 
     crs_epsg = clipped.rio.crs.to_epsg()
     if crs_epsg is None:

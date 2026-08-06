@@ -1785,33 +1785,41 @@ class SfincsFloodMapStage(_SfincsStageBase):
     name = "sfincs_floodmap"
     description = "Downscale flood depth map"
 
-    def _dem_from_model_build(self) -> Path | None:
-        """Return the elevation raster the model was built from, if recorded.
+    def _dem_from_model_build(self) -> tuple[Path, float] | None:
+        """Return the elevation raster the model was built from, and its offset.
 
         ``create_fetch_data`` records every raster it *fetched*, in the order
         they are listed under ``elevation.datasets``, so the first recorded
         one is the highest-priority fetched source. Datasets without a
         ``source`` are supplied through the user's own catalog and never
         appear here; set ``floodmap_dem`` explicitly in that case.
+
+        The recorded path is the *raw* fetched file. When that dataset was
+        merged with a vertical ``offset``, the model bed sits on the shifted
+        datum while the file does not, so the offset comes back with the path
+        and the caller re-applies it. Records written before offsets existed
+        carry none, which reads as zero.
         """
         record = Path(self.sfincs.prebuilt_dir) / "create_result.json"
         if not record.is_file():
             return None
         try:
-            rasters = json.loads(record.read_text())["outputs"]["create_fetch_data"][
-                "elevation_rasters"
-            ]
+            fetched = json.loads(record.read_text())["outputs"]["create_fetch_data"]
+            rasters = fetched["elevation_rasters"]
+            offsets = fetched.get("elevation_offsets", {})
         except (OSError, ValueError, KeyError, TypeError):
             self._log(f"Could not read elevation rasters from {record.name}", "warning")
             return None
 
         for name, path in rasters.items():
             if Path(path).is_file():
-                self._log(f"Using '{name}' from the model build as the flood-map DEM")
-                return Path(path)
+                offset = float(offsets.get(name, 0.0))
+                note = f" (offset {offset:+.3f} m)" if offset else ""
+                self._log(f"Using '{name}' from the model build as the flood-map DEM{note}")
+                return Path(path), offset
         return None
 
-    def _resolve_dem(self) -> Path | None:
+    def _resolve_dem(self) -> tuple[Path, float] | None:
         """Return the DEM to downscale onto.
 
         ``floodmap_dem`` wins when set, and stays necessary for a model that
@@ -1825,7 +1833,9 @@ class SfincsFloodMapStage(_SfincsStageBase):
         """
         if self.sfincs.floodmap_dem is not None:
             self._log(f"Using model_config.floodmap_dem: {self.sfincs.floodmap_dem}")
-            return self.sfincs.floodmap_dem
+            # An explicitly supplied raster is taken as already being on the
+            # model's datum; only the recorded build knows about an offset.
+            return self.sfincs.floodmap_dem, 0.0
         return self._dem_from_model_build()
 
     def run(self) -> dict[str, Any]:
@@ -1834,8 +1844,8 @@ class SfincsFloodMapStage(_SfincsStageBase):
             self._log("Flood map generation disabled, skipping")
             return {"status": "skipped", "reason": "disabled"}
 
-        dem_path = self._resolve_dem()
-        if dem_path is None:
+        resolved = self._resolve_dem()
+        if resolved is None:
             self._log(
                 "No flood-map DEM. Either build the model with "
                 "`coastal-calibration create`, which records the elevation raster it "
@@ -1843,6 +1853,7 @@ class SfincsFloodMapStage(_SfincsStageBase):
                 "model domain. Skipping the flood map."
             )
             return {"status": "skipped", "reason": "no DEM configured"}
+        dem_path, dem_offset = resolved
 
         model_root = get_model_root(self.config)
         map_file = model_root / "sfincs_map.nc"
@@ -1870,6 +1881,7 @@ class SfincsFloodMapStage(_SfincsStageBase):
                 dem_path=dem_path,
                 hmin=self.sfincs.floodmap_hmin,
                 land_only=self.sfincs.floodmap_land_only,
+                dem_offset=dem_offset,
                 model=model,
                 log=self._log,
             )

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -92,6 +93,29 @@ class ElevationDataset:
     #: ``"hi"``, ``"prvi"``, ``"pacific"``, ``"ak"``).
     #: Only used when ``source`` is ``"nws_30m"``.
     coastal_domain: str | None = None
+
+    #: Vertical offset in meters *added* to this dataset's elevations before
+    #: it is merged with the others.  Elevation sources do not share a
+    #: vertical datum -- NCEI CRM volumes 9 (Puerto Rico) and 10 (Hawaii) are
+    #: MSL while volumes 1-5 and 7-8 are EGM2008, the CUDEM 1/9 arc-second
+    #: tiles behind ``noaa_3m`` are NAVD88, and GEBCO is nominally MSL.  A
+    #: merge of two sources on different datums leaves a step wherever the
+    #: finer source's footprint ends, silently, since neither the merge nor
+    #: the mask knows the datums differ.  Set this to bring a dataset onto
+    #: the same datum as the others; the merge applies it before the ``zmin``
+    #: filter, so ``zmin`` refers to the shifted elevations.
+    #:
+    #: Example: a CUDEM (NAVD88) primary filled by GEBCO (MSL) on the Texas
+    #: coast, where MSL sits about 0.24 m above NAVD88, needs ``offset:
+    #: -0.24`` on the GEBCO entry to put both on NAVD88.
+    #:
+    #: A single number is a *local* approximation.  Datum separations vary in
+    #: space -- MSL against NAVD88 changes by 0.25 m across the four gauges
+    #: around Matagorda Bay alone -- so a scalar removes the step near where
+    #: it was measured and leaves a residual elsewhere.  Record where the
+    #: value came from, and for a domain wide enough that one number will not
+    #: do, pre-transform the raster instead.
+    offset: float = 0.0
 
 
 @dataclass
@@ -544,6 +568,18 @@ class SfincsCreateConfig:
         if not self.elevation.datasets:
             errors.append("elevation.datasets must contain at least one entry")
         for ds in self.elevation.datasets:
+            # NaN would silently void the dataset (hydromt adds the offset,
+            # turning every cell of that source invalid, and the coarser fill
+            # takes over its whole footprint); inf would poison the bed. A
+            # bool is an int in Python and never a real elevation shift.
+            if isinstance(ds.offset, bool) or not isinstance(ds.offset, (int, float)):
+                errors.append(
+                    f"elevation.datasets[{ds.name}].offset must be a number, got {ds.offset!r}"
+                )
+            elif not math.isfinite(ds.offset):
+                errors.append(
+                    f"elevation.datasets[{ds.name}].offset must be finite, got {ds.offset!r}"
+                )
             if ds.source is not None and ds.source not in self._VALID_ELEV_SOURCES:
                 errors.append(
                     f"elevation.datasets[{ds.name}].source must be one of "
@@ -648,6 +684,7 @@ class SfincsCreateConfig:
                         **({"source": d.source} if d.source else {}),
                         **({"noaa_dataset": d.noaa_dataset} if d.noaa_dataset else {}),
                         **({"coastal_domain": d.coastal_domain} if d.coastal_domain else {}),
+                        **({"offset": d.offset} if d.offset else {}),
                     }
                     for d in self.elevation.datasets
                 ],
