@@ -140,8 +140,9 @@ class TestStageChrtoutFiles:
 class TestWriteThFile:
     def test_writes_correct_format(self, tmp_path):
         data = np.array([[1.0, 2.0], [3.0, 4.0]])
+        times = np.array([0.0, 3600.0])
         path = tmp_path / "test.th"
-        _write_th_file(path, data, tstep=3600.0)
+        _write_th_file(path, data, times)
         lines = path.read_text().splitlines()
         assert len(lines) == 2
         # First line: time=0, then values
@@ -152,6 +153,16 @@ class TestWriteThFile:
         # Second line: time=3600
         parts = lines[1].split("\t")
         assert parts[0] == "3600.0"
+
+    def test_writes_times_as_given(self, tmp_path):
+        """The caller (make_discharge) owns t=0 padding; this just writes
+        whatever elapsed-time array it's handed, verbatim."""
+        data = np.array([[1.0], [2.0], [3.0]])
+        times = np.array([0.0, 3600.0, 7200.0])
+        path = tmp_path / "test.th"
+        _write_th_file(path, data, times)
+        lines = path.read_text().splitlines()
+        assert [line.split("\t")[0] for line in lines] == ["0.0", "3600.0", "7200.0"]
 
 
 # ---------------------------------------------------------------------------

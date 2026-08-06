@@ -239,15 +239,18 @@ def _parse_reach_rows(rows: list[str], count: int, kind: str) -> tuple[list[int]
     return [int(p[0]) for p in parts], [int(p[1]) for p in parts]
 
 
-def _write_th_file(path: Path, data: NDArray[np.floating[Any]], tstep: float) -> None:
-    """Write a SCHISM time-history (.th) file."""
-    t = 0.0
+def _write_th_file(path: Path, data: NDArray[np.floating[Any]], times: NDArray[np.floating[Any]]) -> None:
+    """Write a SCHISM time-history (.th) file.
+
+    *times* are elapsed seconds since the simulation start, one per row of
+    *data*, and must already include a t=0 row -- SCHISM requires the first
+    row of a .th file to be at t=0 (see the t=0 padding in ``make_discharge``).
+    """
     with path.open("w") as f:
         for i in range(data.shape[0]):
-            parts = [str(t)]
+            parts = [str(times[i])]
             parts.extend(str(data[i, j]) for j in range(data.shape[1]))
             f.write("\t".join(parts) + "\n")
-            t += tstep
 
 
 # ---------------------------------------------------------------------------
@@ -368,10 +371,21 @@ def make_discharge(  # noqa: PLR0912
         if sid in df.columns:
             vsink[:, i] = -1.0 * df[sid].to_numpy()
 
-    tstep = 3600.0
+    # Elapsed seconds since simulation start for each row of real data.
+    # SCHISM requires the first vsource.th/vsink.th row to be at t=0, but
+    # t-route's first output is at T+1h (not T+0h) -- when the real data
+    # doesn't start exactly at start_date, backfill a synthetic t=0 row by
+    # persisting the first available real values (assume discharge is
+    # unchanged during the ungauged gap before routed flow becomes
+    # available; there is no better information for that window).
+    elapsed = (df.index - start_date).total_seconds().to_numpy()
+    if elapsed[0] != 0.0:
+        elapsed = np.concatenate(([0.0], elapsed))
+        vsource = np.vstack([vsource[0], vsource])
+        vsink = np.vstack([vsink[0], vsink])
 
-    _write_th_file(work_dir / "vsource.th", vsource, tstep)
-    _write_th_file(work_dir / "vsink.th", vsink, tstep)
+    _write_th_file(work_dir / "vsource.th", vsource, elapsed)
+    _write_th_file(work_dir / "vsink.th", vsink, elapsed)
 
     # source_sink.in
     with (work_dir / "source_sink.in").open("w") as f:

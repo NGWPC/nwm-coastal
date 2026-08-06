@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -22,10 +22,12 @@ from coastal_calibration.data.downloader import (
     _build_stofs_urls,
     _execute_download,
     _hour_range,
+    _stofs_cycle_url,
     get_date_range,
     get_default_sources,
     get_overlapping_range,
     get_stofs_path,
+    resolve_stofs_cycle,
     validate_date_ranges,
     write_nwm_grid_sidecar,
 )
@@ -604,3 +606,72 @@ class TestForcingCacheIsolation:
         _, pacific = _build_nwm_retro_forcing_urls(start, end, tmp_path, "pacific")
 
         assert atlgulf == pacific
+
+
+class TestStofsCycleUrl:
+    def test_exact_cycle_no_rounding(self):
+        url = _stofs_cycle_url(datetime(2024, 1, 9, 12))
+        assert url.endswith("stofs_2d_glo.20240109/stofs_2d_glo.t12z.fields.cwl.nc")
+
+    def test_old_product_naming(self):
+        url = _stofs_cycle_url(datetime(2022, 9, 28, 0))
+        assert url.endswith("estofs.20220928/estofs.t00z.fields.cwl.nc")
+
+
+class TestResolveStofsCycle:
+    """`exists` is injected so this is fully offline/deterministic."""
+
+    def test_naive_candidate_exists_returns_immediately(self):
+        checked = []
+
+        def exists(cycle: datetime) -> bool:
+            checked.append(cycle)
+            return True
+
+        result = resolve_stofs_cycle(datetime(2025, 9, 15, 12, 30), exists=exists)
+        assert result == datetime(2025, 9, 15, 12)
+        assert checked == [datetime(2025, 9, 15, 12)]
+
+    def test_walks_backward_until_found(self):
+        # Naive candidate (18z) and the next one back (12z) don't exist yet
+        # (publish lag) -- 06z does.
+        available = {datetime(2026, 8, 5, 6)}
+
+        result = resolve_stofs_cycle(
+            datetime(2026, 8, 5, 19), exists=lambda c: c in available
+        )
+        assert result == datetime(2026, 8, 5, 6)
+
+    def test_crosses_day_boundary(self):
+        available = {datetime(2026, 8, 4, 18)}
+
+        result = resolve_stofs_cycle(
+            datetime(2026, 8, 5, 2), exists=lambda c: c in available
+        )
+        assert result == datetime(2026, 8, 4, 18)
+
+    def test_raises_when_nothing_found_within_lookback(self):
+        with pytest.raises(ValueError, match="No STOFS cycle found"):
+            resolve_stofs_cycle(
+                datetime(2026, 8, 5, 12),
+                exists=lambda _c: False,
+                max_lookback_hours=12,
+            )
+
+    def test_only_checks_within_lookback_window(self):
+        checked = []
+
+        def exists(cycle: datetime) -> bool:
+            checked.append(cycle)
+            return False
+
+        with pytest.raises(ValueError, match="No STOFS cycle found"):
+            resolve_stofs_cycle(
+                datetime(2026, 8, 5, 12), exists=exists, max_lookback_hours=12
+            )
+        assert checked == [
+            datetime(2026, 8, 5, 12),
+            datetime(2026, 8, 5, 6),
+            datetime(2026, 8, 5, 0),
+        ]
+        assert min(checked) >= datetime(2026, 8, 5, 12) - timedelta(hours=12)

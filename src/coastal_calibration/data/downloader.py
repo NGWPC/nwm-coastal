@@ -9,8 +9,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
+import fsspec
 import pandas as pd
 from tiny_retriever import download
 
@@ -614,6 +615,212 @@ def _build_stofs_mesh_urls(
     return [url], [main.with_name(f"{main.stem}.maxele{main.suffix}")]
 
 
+def _stofs_cycle_url(cycle: datetime) -> str:
+    """Build the STOFS fields-file URL for an exact cycle datetime.
+
+    Unlike :func:`_build_stofs_urls`, *cycle* must already be a valid
+    6-hourly cycle time (00/06/12/18Z) -- this does not round.
+    """
+    product = "estofs" if cycle < STOFS_NAME_CHANGE_DATE else "stofs_2d_glo"
+    date_str = cycle.strftime("%Y%m%d")
+    hour_str = f"{cycle.hour:02d}"
+    return f"{STOFS_BASE_URL}/{product}.{date_str}/{product}.t{hour_str}z.fields.cwl.nc"
+
+
+def _stofs_cycle_exists(cycle: datetime, timeout: int = 15) -> bool:
+    """Check whether a STOFS cycle's fields file actually exists on S3."""
+    import requests
+
+    try:
+        resp = requests.head(_stofs_cycle_url(cycle), timeout=timeout)
+    except requests.RequestException:
+        return False
+    return resp.status_code == 200
+
+
+def resolve_stofs_cycle(
+    start: datetime,
+    *,
+    exists: Callable[[datetime], bool] = _stofs_cycle_exists,
+    max_lookback_hours: int = 96,
+) -> datetime:
+    """Find the STOFS cycle closest to (at or before) *start* that actually exists.
+
+    STOFS publishes on a fixed 6-hourly cadence (00/06/12/18Z), but a
+    cycle's file isn't necessarily live the instant that cycle time
+    passes -- there's a publish lag. Naively rounding *start* down to
+    the nearest 6-hourly boundary can therefore name a cycle that
+    doesn't exist yet.
+
+    This starts at that naive candidate and walks backward in 6-hour
+    steps, checking each one with *exists*, until it finds a cycle that
+    is actually published. One rule covers both real usage patterns:
+
+    * **Historical *start*** (well in the past): the naive candidate
+      already exists, so this returns immediately on the first check --
+      matches the deterministic behavior needed for e.g. calibration
+      runs against a known-good archived date.
+    * **Live/"now" *start***: the naive candidate is often not published
+      yet, so this walks back to whatever the latest actually-available
+      cycle is -- exactly "give me the latest forecast."
+
+    Parameters
+    ----------
+    start : datetime
+        Requested simulation start time (naive UTC).
+    exists : callable, optional
+        ``(datetime) -> bool`` existence check, injectable for testing
+        without hitting the network. Defaults to a real HTTP HEAD check
+        against S3.
+    max_lookback_hours : int, optional
+        How far back to search before giving up. Default 96h (16
+        cycles / 4 days) comfortably covers normal publish lag while
+        still failing fast on a genuine outage or bad date.
+
+    Returns
+    -------
+    datetime
+        The resolved cycle time (always one of 00/06/12/18Z on some day
+        at or before *start*).
+
+    Raises
+    ------
+    ValueError
+        No existing cycle was found within *max_lookback_hours*.
+    """
+    naive_cycle_hour = (start.hour // 6) * 6
+    candidate = start.replace(hour=naive_cycle_hour, minute=0, second=0, microsecond=0)
+    earliest = candidate - timedelta(hours=max_lookback_hours)
+
+    while candidate >= earliest:
+        if exists(candidate):
+            return candidate
+        candidate -= timedelta(hours=6)
+
+    msg = (
+        f"No STOFS cycle found at or before {start:%Y-%m-%d %H:%M} "
+        f"within the last {max_lookback_hours}h -- checked back to {earliest:%Y-%m-%d %H:%M}."
+    )
+    raise ValueError(msg)
+
+
+# Variables copied verbatim (no time slicing) from the source STOFS file --
+# static mesh geometry that regrid_estofs.py needs regardless of which
+# timesteps are requested. Kept minimal and matching exactly what
+# regrid_estofs._resolve_source_elements / build_unstructured_mesh actually
+# read (time and zeta are handled separately since they get sliced).
+_STOFS_STATIC_VARS = ("x", "y", "element")
+
+
+def _download_stofs_time_subset(
+    cycle: datetime,
+    fetch_start: datetime,
+    fetch_end: datetime,
+    out_path: Path,
+) -> None:
+    """Fetch only the needed time window of a STOFS fields file, not the whole thing.
+
+    STOFS fields files are ~12 GB (the full ~186-hour global forecast
+    cycle), but a single simulation only ever needs a handful of hours
+    out of it. This opens the *remote* file lazily over HTTP range
+    requests (the file is HDF5/NETCDF4_CLASSIC, and S3 supports byte
+    ranges on any object) and reads only the ``[fetch_start, fetch_end]``
+    slice of ``time``/``zeta``, writing a small local NetCDF file with
+    that slice plus the static mesh variables (``x``, ``y``, ``element``)
+    -- everything ``regrid_estofs.py`` and the SFINCS xarray-based STOFS
+    reader actually use. No download of the full remote file ever
+    happens; only the bytes needed for this slice cross the network.
+
+    Time values in the written file are the *real* STOFS timestamps
+    (not reindexed), so both downstream consumers -- regrid_estofs.py
+    (searches for the requested time by value) and the SFINCS
+    xarray/HydroMT reader (``.sel(time=...)``) -- work against this
+    trimmed file exactly as they would against the full one.
+    """
+    import h5netcdf
+    import netCDF4
+    import numpy as np
+    from cftime import num2date
+
+    # Plain https:// URL -- fsspec routes this through its generic HTTP
+    # backend, not s3fs, so no `anon=True` kwarg here (the bucket is
+    # public and needs no credentials either way).
+    url = _stofs_cycle_url(cycle)
+    with (
+        fsspec.open(url) as remote_f,
+        h5netcdf.File(remote_f, mode="r", decode_vlen_strings=False) as src,
+    ):
+        time_var = src.variables["time"]
+        units = time_var.attrs["units"].split("!")[0].strip()
+        calendar = time_var.attrs.get("calendar", "standard")
+        times_raw = time_var[:]
+        times = num2date(times_raw, units=units, calendar=calendar)
+
+        # First/last index whose decoded time falls in [fetch_start, fetch_end].
+        in_window = [i for i, t in enumerate(times) if fetch_start <= t <= fetch_end]
+        if not in_window:
+            msg = (
+                f"STOFS cycle {cycle:%Y-%m-%d %HZ} has no timesteps in "
+                f"[{fetch_start:%Y-%m-%d %H:%M}, {fetch_end:%Y-%m-%d %H:%M}] "
+                f"(file covers {times[0]:%Y-%m-%d %H:%M} to {times[-1]:%Y-%m-%d %H:%M})"
+            )
+            raise ValueError(msg)
+        lo, hi = in_window[0], in_window[-1] + 1
+
+        zeta_var = src.variables["zeta"]
+        zeta_slice = np.asarray(zeta_var[lo:hi, :])
+        time_slice = np.asarray(times_raw[lo:hi])
+
+        static: dict[str, np.ndarray] = {
+            name: np.asarray(src.variables[name][:]) for name in _STOFS_STATIC_VARS
+        }
+        node_count = static["x"].shape[0]
+
+        tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
+        tmp_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path.unlink(missing_ok=True)
+        with netCDF4.Dataset(tmp_path, mode="w", format="NETCDF4_CLASSIC") as dst:
+            dst.createDimension("time", None)
+            dst.createDimension("node", node_count)
+            dst.createDimension("nele", static["element"].shape[0])
+            dst.createDimension("nvertex", static["element"].shape[1])
+
+            from coastal_calibration._nc_io import create_var, write_var
+
+            t_out = create_var(dst, "time", "f8", ("time",), attrs=dict(time_var.attrs))
+            write_var(t_out, time_slice)
+
+            x_out = create_var(dst, "x", "f8", ("node",), attrs=dict(src.variables["x"].attrs))
+            write_var(x_out, static["x"])
+            y_out = create_var(dst, "y", "f8", ("node",), attrs=dict(src.variables["y"].attrs))
+            write_var(y_out, static["y"])
+            elem_out = create_var(
+                dst,
+                "element",
+                "i4",
+                ("nele", "nvertex"),
+                attrs=dict(src.variables["element"].attrs),
+            )
+            write_var(elem_out, static["element"])
+
+            # _FillValue must be set only via createVariable's fill_value=
+            # kwarg -- netCDF4 rejects a later setncatts() that includes it,
+            # so it's popped out of the copied source attrs here.
+            zeta_attrs = dict(zeta_var.attrs)
+            fill_value = zeta_attrs.pop("_FillValue", None)
+            zeta_out = create_var(
+                dst,
+                "zeta",
+                "f4",
+                ("time", "node"),
+                attrs=zeta_attrs,
+                fill_value=fill_value,
+            )
+            write_var(zeta_out, zeta_slice)
+
+        tmp_path.replace(out_path)
+
+
 def _build_glofs_urls(
     start: datetime,
     end: datetime,
@@ -937,18 +1144,48 @@ def download_data(
                 file_paths=[atlas_path],
             )
     elif coastal_source == "stofs":
-        urls, paths = _build_stofs_urls(start, out_dir)
-        # STOFS fields file is ~12 GB -- give it a generous timeout.
-        stofs_timeout = max(timeout, 3600)
-        coastal_result = _execute_download(
-            urls, paths, "coastal/stofs", stofs_timeout, raise_on_error
-        )
+        # STOFS fields file is ~12 GB for the full cycle, but a simulation
+        # only ever needs a handful of hours out of it -- fetch just the
+        # [start, end+1h] window (the +1h matches regrid_estofs.py's own
+        # total_hours = length_hrs + 1 convention) from whichever cycle is
+        # actually the latest available at/before start, rather than
+        # downloading the whole thing. See resolve_stofs_cycle /
+        # _download_stofs_time_subset. The local path is unchanged
+        # (get_stofs_path(start, ...)) so downstream lookups in
+        # schism/boundary.py and sfincs/data_catalog.py need no changes --
+        # only *where the data is sourced from* is resolution-aware, not
+        # where it lands on disk.
+        stofs_out_path = get_stofs_path(start, out_dir)
+        if stofs_out_path.exists() and stofs_out_path.stat().st_size > 0:
+            coastal_result = DownloadResult(
+                source="coastal/stofs",
+                total_files=1,
+                successful=1,
+                file_paths=[stofs_out_path],
+            )
+        else:
+            coastal_result = DownloadResult(
+                source="coastal/stofs", total_files=1, file_paths=[stofs_out_path]
+            )
+            try:
+                cycle = resolve_stofs_cycle(start)
+                logger.info("STOFS: using cycle %s for start %s", cycle, start)
+                _download_stofs_time_subset(
+                    cycle, start, end + timedelta(hours=1), stofs_out_path
+                )
+                coastal_result.successful = 1
+            except Exception as e:  # noqa: BLE001 -- surfaced via DownloadResult, not raised here
+                coastal_result.failed = 1
+                coastal_result.errors.append(str(e))
+                if raise_on_error:
+                    raise
+
         # Best effort: regrid_estofs synthesizes a triangulation when this
         # companion mesh file is absent, so a failure is not fatal. The
         # lists are empty for the newer product, where this is a no-op.
         mesh_urls, mesh_paths = _build_stofs_mesh_urls(start, out_dir)
         _execute_download(
-            mesh_urls, mesh_paths, "coastal/stofs-mesh", stofs_timeout, raise_on_error=False
+            mesh_urls, mesh_paths, "coastal/stofs-mesh", max(timeout, 3600), raise_on_error=False
         )
     else:
         urls, paths = _build_glofs_urls(start, end, out_dir, glofs_model)
