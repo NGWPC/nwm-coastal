@@ -84,6 +84,64 @@ def _write_quadtree_map(path: Path) -> None:
     ds.to_netcdf(path)
 
 
+#: Face -> (n, m) mapping for the synthetic structured quadtree, deliberately
+#: not in row-major order so an identity gather would fail the test.
+_NM_PER_FACE = ((1, 1), (2, 2), (1, 2), (2, 1))
+
+
+def _write_structured_nm_pair(
+    path: Path,
+    *,
+    include_msk: bool = False,
+    write_grid: bool = True,
+    n_per_face: tuple[tuple[int, int], ...] = _NM_PER_FACE,
+) -> xr.Dataset:
+    """Write a structured ``(n, m)`` map plus its ``sfincs.nc`` grid file.
+
+    Mirrors what the SFINCS executable emits for a quadtree model: the map
+    output is on a regular 2x2 ``(n, m)`` grid with no topology, and the
+    mesh lives in the separate grid file.
+    """
+    times = pd.date_range("2024-01-01", periods=3, freq="1h")
+    # Distinct value per (time, n, m) cell: 100*t + 10*n + m.
+    zs = (
+        100.0 * np.arange(3).reshape(-1, 1, 1)
+        + 10.0 * np.arange(2).reshape(1, -1, 1)
+        + np.arange(2).reshape(1, 1, -1)
+    )
+    zb = np.array([[-2.0, -1.5], [-1.0, -0.5]], dtype=np.float32)
+
+    data_vars: dict[str, tuple[tuple[str, ...], NDArray[Any]]] = {
+        "zs": (("time", "n", "m"), zs.astype(np.float32)),
+        "zb": (("n", "m"), zb),
+    }
+    if include_msk:
+        data_vars["msk"] = (("n", "m"), np.array([[1, 2], [3, 4]], dtype=np.int8))
+    ds = xr.Dataset(data_vars=data_vars, coords={"time": times})
+    ds.to_netcdf(path)
+
+    if write_grid:
+        node_x = np.array([0.0, 1.0, 2.0, 0.0, 1.0, 2.0, 0.0, 1.0, 2.0], dtype=np.float64)
+        node_y = np.array([0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0], dtype=np.float64)
+        face_nodes = np.array(
+            [[1, 2, 5, 4], [2, 3, 6, 5], [4, 5, 8, 7], [5, 6, 9, 8]], dtype=np.float64
+        )
+        grid = xr.Dataset(
+            data_vars={
+                "n": (("mesh2d_nFaces",), np.array([nm[0] for nm in n_per_face], dtype=np.int32)),
+                "m": (("mesh2d_nFaces",), np.array([nm[1] for nm in n_per_face], dtype=np.int32)),
+                "mesh2d_node_x": (("mesh2d_nNodes",), node_x),
+                "mesh2d_node_y": (("mesh2d_nNodes",), node_y),
+                "mesh2d_face_nodes": (
+                    ("mesh2d_nFaces", "mesh2d_nMax_face_nodes"),
+                    face_nodes,
+                ),
+            }
+        )
+        grid.to_netcdf(path.parent / "sfincs.nc")
+    return ds
+
+
 def _write_ugrid_quadtree_map(path: Path, *, include_msk: bool = False) -> xr.Dataset:
     """Write a minimal UGRID-style quadtree ``sfincs_map.nc``.
 
@@ -288,9 +346,103 @@ class TestErrors:
         with pytest.raises(KeyError, match=r"'zb'"):
             load_sfincs_water_level(tmp_path)
 
-    def test_structured_nm_not_implemented(self, tmp_path: Path):
-        _write_quadtree_map(tmp_path / "sfincs_map.nc")
-        with pytest.raises(NotImplementedError, match=r"Structured \(n, m\)"):
+    def test_structured_nm_missing_grid_file(self, tmp_path: Path):
+        """Without ``sfincs.nc`` there is no topology to re-index onto."""
+        _write_structured_nm_pair(tmp_path / "sfincs_map.nc", write_grid=False)
+        with pytest.raises(FileNotFoundError, match=r"mesh topology"):
+            load_sfincs_water_level(tmp_path)
+
+    def test_structured_nm_grid_file_from_another_run(self, tmp_path: Path):
+        """A mismatched grid file must raise, not gather the wrong cells."""
+        _write_structured_nm_pair(
+            tmp_path / "sfincs_map.nc",
+            n_per_face=((1, 1), (2, 2), (1, 2), (3, 1)),  # row 3 is off the 2x2 grid
+        )
+        with pytest.raises(ValueError, match=r"does not match this run"):
+            load_sfincs_water_level(tmp_path)
+
+
+class TestStructuredNmQuadtree:
+    """SFINCS writes quadtree map output on a structured ``(n, m)`` grid."""
+
+    def test_regrids_onto_mesh_faces(self, tmp_path: Path):
+        src = _write_structured_nm_pair(tmp_path / "sfincs_map.nc", include_msk=True)
+        ds = load_sfincs_water_level(tmp_path)
+
+        assert ds.attrs["mesh_type"] == "ugrid-quadtree"
+        assert ds.sizes == {"time": 3, "face": 4, "node": 9, "face_node": 4}
+
+        # Each face must carry the value of its own (n, m) cell.
+        for face, (n, m) in enumerate(_NM_PER_FACE):
+            np.testing.assert_allclose(
+                ds["zs"].isel(face=face).values,
+                src["zs"].isel(n=n - 1, m=m - 1).values,
+            )
+            np.testing.assert_allclose(
+                ds["zb"].isel(face=face).values, src["zb"].isel(n=n - 1, m=m - 1).values
+            )
+            assert ds["msk"].isel(face=face).values == src["msk"].isel(n=n - 1, m=m - 1).values
+
+        np.testing.assert_allclose(ds["h"].values, ds["zs"].values - ds["zb"].values)
+
+    def test_face_nodes_are_zero_based(self, tmp_path: Path):
+        """The grid file stores 1-based connectivity, as in the UGRID path."""
+        _write_structured_nm_pair(tmp_path / "sfincs_map.nc")
+        ds = load_sfincs_water_level(tmp_path)
+
+        np.testing.assert_array_equal(ds["face_nodes"].isel(face=0).values, [0, 1, 4, 3])
+        assert ds["node_x"].size == 9
+
+    @pytest.mark.parametrize(
+        ("overrides", "match"),
+        [
+            ({"n": (("fewer",), np.array([1, 2], dtype=np.int32))}, r"one-dimensional"),
+            ({"n": (("mesh2d_nFaces",), np.array([1.9, 2.0, 1.0, 2.0]))}, r"non-integer"),
+            (
+                {"mesh2d_node_y": (("fewer",), np.zeros(8, dtype=np.float64))},
+                r"y-coordinates",
+            ),
+        ],
+        ids=["face-count-mismatch", "fractional-indices", "node-coord-mismatch"],
+    )
+    def test_inconsistent_grid_file(self, tmp_path: Path, overrides, match):
+        """Cardinality and dtype problems must raise, not gather silently."""
+        _write_structured_nm_pair(tmp_path / "sfincs_map.nc")
+        grid_file = tmp_path / "sfincs.nc"
+        with xr.open_dataset(grid_file) as grid:
+            kept = {
+                str(name): (tuple(str(d) for d in var.dims), var.to_numpy())
+                for name, var in grid.data_vars.items()
+                if name not in overrides
+            }
+        xr.Dataset(data_vars={**kept, **overrides}).to_netcdf(grid_file)
+
+        with pytest.raises(ValueError, match=match):
+            load_sfincs_water_level(tmp_path)
+
+    def test_transposed_map_dims(self, tmp_path: Path):
+        """``zs`` is transposed to (time, n, m) before the gather."""
+        src = _write_structured_nm_pair(tmp_path / "sfincs_map.nc")
+        map_file = tmp_path / "sfincs_map.nc"
+        with xr.open_dataset(map_file) as ds:
+            flipped = ds.transpose("m", "n", "time").load()
+        flipped.to_netcdf(map_file)
+
+        ds = load_sfincs_water_level(tmp_path)
+
+        for face, (n, m) in enumerate(_NM_PER_FACE):
+            np.testing.assert_allclose(
+                ds["zs"].isel(face=face).values, src["zs"].isel(n=n - 1, m=m - 1).values
+            )
+
+    def test_missing_grid_variable(self, tmp_path: Path):
+        _write_structured_nm_pair(tmp_path / "sfincs_map.nc")
+        grid_file = tmp_path / "sfincs.nc"
+        with xr.open_dataset(grid_file) as grid:
+            trimmed = grid.drop_vars("m").load()
+        trimmed.to_netcdf(grid_file)
+
+        with pytest.raises(KeyError, match=r"'m'"):
             load_sfincs_water_level(tmp_path)
 
 
