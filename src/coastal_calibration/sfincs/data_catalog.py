@@ -9,14 +9,67 @@ from typing import TYPE_CHECKING, Any, Literal
 import yaml
 
 from coastal_calibration.config.schema import MeteoSource, PathConfig
+from coastal_calibration.data.nwm_forcing import normalize_wrf_forcing
 from coastal_calibration.logging import logger
 from coastal_calibration.sfincs._hydromt_compat import apply_all_patches
 
-apply_all_patches()
-
 if TYPE_CHECKING:
+    import xarray as xr
+
     from coastal_calibration.config.schema import CoastalCalibConfig, SimulationConfig
     from coastal_calibration.data.downloader import CoastalSource
+
+#: hydromt's ConventionResolver expands ``{year}``/``{month}`` across the
+#: requested time range, so one entry covers a run of any length. Emitting one
+#: entry per month instead would suffix the extras ``_1``, ``_2``, ... and every
+#: consumer asks for the bare name, so those months were silently never loaded.
+_MONTH_GLOB = "{year}{month:02d}"
+
+#: Name under which :func:`_register_ldasin_preprocessor` registers our reader
+#: hook with hydromt, and the value written as ``preprocess`` in the catalog.
+LDASIN_PREPROCESSOR = "nwm_ldasin"
+
+
+def _register_ldasin_preprocessor() -> None:
+    """Teach hydromt how to read NWM LDASIN forcing.
+
+    This is not a patch: :func:`normalize_wrf_forcing` supplies coordinates
+    and timestamps that the PRVI and Alaska files simply do not carry, and no
+    hydromt release can make that unnecessary. It lives here, beside the code
+    that writes ``preprocess`` into the catalog, rather than in
+    :mod:`coastal_calibration.sfincs._hydromt_compat`, so that module stays
+    deletable.
+
+    The rounding *is* a hydromt workaround and can go once upstream widens its
+    regularity tolerance: NWM stores projected coordinates in meters with
+    float error up to ~0.25 m, and hydromt's ``atol=5e-4`` rejects the grid as
+    irregular. Coordinates rebuilt by ``normalize_wrf_forcing`` are already
+    exact, so this only matters for the CF-layout CONUS files.
+    """
+    try:
+        from hydromt.data_catalog.drivers.preprocessing import PREPROCESSORS
+    except ImportError:
+        return
+
+    if LDASIN_PREPROCESSOR in PREPROCESSORS:
+        return
+
+    import numpy as np
+
+    def _preprocess(ds: xr.Dataset) -> xr.Dataset:
+        ds = normalize_wrf_forcing(ds)
+        x_dim, y_dim = ds.raster.x_dim, ds.raster.y_dim
+        ds[x_dim] = np.round(ds[x_dim], decimals=0)
+        ds[y_dim] = np.round(ds[y_dim], decimals=0)
+        return ds
+
+    PREPROCESSORS[LDASIN_PREPROCESSOR] = _preprocess
+    logger.debug("Registered '%s' preprocessor in hydromt.", LDASIN_PREPROCESSOR)
+
+
+apply_all_patches()
+_register_ldasin_preprocessor()
+
 
 DataType = Literal["RasterDataset", "GeoDataset", "GeoDataFrame", "DataFrame"]
 Category = Literal[
@@ -280,24 +333,6 @@ def _get_temporal_extent(
     return (start.isoformat(), end.isoformat())
 
 
-def _simulation_month_prefixes(sim: SimulationConfig) -> list[str]:
-    """Return sorted unique YYYYMM prefixes covering the simulation window."""
-    from datetime import timedelta
-
-    start = sim.start_date
-    end = start + timedelta(hours=sim.duration_hours)
-    prefixes: list[str] = []
-    current = start.replace(day=1)
-    while current <= end:
-        prefixes.append(current.strftime("%Y%m"))
-        # Advance to the first day of next month
-        if current.month == 12:
-            current = current.replace(year=current.year + 1, month=1)
-        else:
-            current = current.replace(month=current.month + 1)
-    return sorted(set(prefixes))
-
-
 def _build_meteo_entry(
     sim: SimulationConfig,
     meteo_source: MeteoSource,
@@ -320,8 +355,6 @@ def _build_meteo_entry(
     list[CatalogEntry]
         One catalog entry per simulation month.
     """
-    month_prefixes = _simulation_month_prefixes(sim)
-
     temporal_extent = _get_temporal_extent(sim)
 
     # Both NWM Retrospective and Analysis LDASIN files use the same projected
@@ -355,12 +388,9 @@ def _build_meteo_entry(
         unit_add=NWM_METEO_UNIT_ADD,
     )
 
-    # NWM LDASIN files store projected (LCC) coordinates with floating-point
-    # rounding errors up to ~0.125 m.  hydromt's raster accessor rejects
-    # them as non-regular because its tolerance (atol=5e-4) is far too tight
-    # for meter-scale coordinates.  The custom ``round_coords`` preprocessor
-    # (registered in ``_hydromt_compat``) rounds x/y to the nearest integer,
-    # making the grid perfectly regular.
+    # ``_register_ldasin_preprocessor`` rebuilds the coordinates and
+    # timestamps the raw WRF-layout files omit, then rounds x/y so hydromt
+    # accepts the grid as regular.
     #
     # Each LDASIN file also carries a scalar ``reference_time`` coordinate
     # (model initialization time).  When ``open_mfdataset`` concatenates
@@ -370,36 +400,37 @@ def _build_meteo_entry(
     driver: dict[str, Any] = {
         "name": "raster_xarray",
         "options": {
-            "preprocess": "round_coords",
+            "preprocess": LDASIN_PREPROCESSOR,
             "drop_variables": ["reference_time", "crs"],
         },
     }
 
-    entries: list[CatalogEntry] = []
-    for i, prefix in enumerate(month_prefixes):
-        uri = f"{PathConfig.METEO_SUBDIR}/{meteo_source}/{prefix}*.LDASIN_DOMAIN1.nc"
-        suffix = f"_{i}" if i > 0 else ""
-        entries.append(
-            CatalogEntry(
-                name=f"{meteo_source}_meteo{suffix}",
-                data_type="RasterDataset",
-                driver=driver,
-                uri=uri,
-                metadata=metadata,
-                data_adapter=data_adapter,
-                version=temporal_extent[0][:10],
-            )
+    meteo_subdir = PathConfig.meteo_subdir(meteo_source, sim.coastal_domain).as_posix()
+
+    return [
+        CatalogEntry(
+            name=f"{meteo_source}_meteo",
+            data_type="RasterDataset",
+            driver=driver,
+            uri=f"{meteo_subdir}/{_MONTH_GLOB}*.LDASIN_DOMAIN1.nc",
+            metadata=metadata,
+            data_adapter=data_adapter,
+            version=temporal_extent[0][:10],
         )
-    return entries
+    ]
 
 
 def _build_streamflow_entry(
     sim: SimulationConfig,
     meteo_source: MeteoSource,
 ) -> list[CatalogEntry]:
-    """Build catalog entries for streamflow data (CHRTOUT).
+    """Build catalog entries for downloaded streamflow data (CHRTOUT).
 
-    Returns one entry per month covered by the simulation window.
+    Returns one entry per month covered by the simulation window, and
+    nothing at all for ``nwm_retro``, whose streamflow is read straight
+    from the S3 Zarr store by
+    :func:`coastal_calibration.data.streamflow.read_streamflow` and never
+    lands on disk.
 
     Parameters
     ----------
@@ -413,18 +444,13 @@ def _build_streamflow_entry(
     list[CatalogEntry]
         One catalog entry per simulation month.
     """
-    month_prefixes = _simulation_month_prefixes(sim)
-
     if meteo_source == "nwm_retro":
-        subdir = f"{PathConfig.STREAMFLOW_SUBDIR}/nwm_retro"
-        source_url = "https://noaa-nwm-retrospective-3-0-pds.s3.amazonaws.com"
-        notes = "NWM Retrospective 3.0 CHRTOUT streamflow files"
-        source_version = "3.0"
-    else:
-        subdir = f"{PathConfig.HYDRO_SUBDIR}/nwm"
-        source_url = "https://storage.googleapis.com/national-water-model"
-        notes = "NWM Analysis channel_rt streamflow files"
-        source_version = "operational"
+        return []
+
+    subdir = PathConfig.streamflow_subdir(sim.coastal_domain).as_posix()
+    source_url = "https://storage.googleapis.com/national-water-model"
+    notes = "NWM Analysis channel_rt streamflow files"
+    source_version = "operational"
 
     temporal_extent = _get_temporal_extent(sim)
 
@@ -445,22 +471,17 @@ def _build_streamflow_entry(
         },
     )
 
-    entries: list[CatalogEntry] = []
-    for i, prefix in enumerate(month_prefixes):
-        uri = f"{subdir}/{prefix}*.CHRTOUT_DOMAIN1.nc"
-        suffix = f"_{i}" if i > 0 else ""
-        entries.append(
-            CatalogEntry(
-                name=f"{meteo_source}_streamflow{suffix}",
-                data_type="GeoDataset",
-                driver="geodataset_xarray",
-                uri=uri,
-                metadata=metadata,
-                data_adapter=data_adapter,
-                version=temporal_extent[0][:10],
-            )
+    return [
+        CatalogEntry(
+            name=f"{meteo_source}_streamflow",
+            data_type="GeoDataset",
+            driver="geodataset_xarray",
+            uri=f"{subdir}/{_MONTH_GLOB}*.CHRTOUT_DOMAIN1.nc",
+            metadata=metadata,
+            data_adapter=data_adapter,
+            version=temporal_extent[0][:10],
         )
-    return entries
+    ]
 
 
 def _stofs_uri(sim: SimulationConfig) -> str:
@@ -572,8 +593,12 @@ def _build_coastal_stofs_entry(
 def _build_coastal_glofs_entry(
     sim: SimulationConfig,
     glofs_model: str = "leofs",
-) -> CatalogEntry:
-    """Build catalog entry for GLOFS coastal water level data.
+) -> list[CatalogEntry]:
+    """Build catalog entries for GLOFS coastal water level data.
+
+    Returns one entry per month covered by the simulation window, so a
+    download directory holding several runs of the same lake is not swept
+    up wholesale. This mirrors the meteo and streamflow entries.
 
     Parameters
     ----------
@@ -584,13 +609,9 @@ def _build_coastal_glofs_entry(
 
     Returns
     -------
-    CatalogEntry
-        Catalog entry for GLOFS data.
+    list[CatalogEntry]
+        One catalog entry per simulation month.
     """
-    # URI is relative to the root (download_dir)
-    # GLOFS files: {model}.t{cycle}z.{date}.fields.n{hour}.nc
-    uri = f"{PathConfig.COASTAL_SUBDIR}/glofs/{glofs_model}.*.fields.*.nc"
-
     temporal_extent = _get_temporal_extent(sim)
 
     metadata = CatalogMetadata(
@@ -609,15 +630,18 @@ def _build_coastal_glofs_entry(
         },
     )
 
-    return CatalogEntry(
-        name=f"glofs_{glofs_model}_waterlevel",
-        data_type="GeoDataset",
-        driver="geodataset_xarray",
-        uri=uri,
-        metadata=metadata,
-        data_adapter=data_adapter,
-        version=temporal_extent[0][:10],
-    )
+    # GLOFS files: {model}.t{cycle}z.{YYYYMMDD}.fields.n{hour}.nc
+    return [
+        CatalogEntry(
+            name=f"glofs_{glofs_model}_waterlevel",
+            data_type="GeoDataset",
+            driver="geodataset_xarray",
+            uri=f"{PathConfig.COASTAL_SUBDIR}/glofs/{glofs_model}.*.{_MONTH_GLOB}*.fields.*.nc",
+            metadata=metadata,
+            data_adapter=data_adapter,
+            version=temporal_extent[0][:10],
+        )
+    ]
 
 
 def generate_data_catalog(
@@ -690,20 +714,16 @@ def generate_data_catalog(
             catalog.add_entry(entry)
 
     if include_coastal:
+        # ``harmonic`` forcing is handled directly by SfincsForcingStage via
+        # pyTMD, so it contributes no catalog entry.
+        coastal_entries: list[CatalogEntry] = []
         if effective_coastal_source == "stofs":
-            coastal_entry = _build_coastal_stofs_entry(sim)
+            coastal_entries = [_build_coastal_stofs_entry(sim)]
         elif effective_coastal_source == "glofs":
-            coastal_entry = _build_coastal_glofs_entry(sim, glofs_model)
-        elif effective_coastal_source == "harmonic":
-            # Harmonic-tide forcing is handled directly by
-            # SfincsForcingStage via pyTMD, not via the HydroMT data
-            # catalog.
-            coastal_entry = None
-        else:
-            coastal_entry = None
+            coastal_entries = _build_coastal_glofs_entry(sim, glofs_model)
 
-        if coastal_entry is not None:
-            catalog.add_entry(coastal_entry)
+        for entry in coastal_entries:
+            catalog.add_entry(entry)
 
     if output_path is not None:
         catalog.to_yaml(output_path)
@@ -733,6 +753,7 @@ def create_nc_symlinks(
     download_dir: Path | str,
     *,
     meteo_source: MeteoSource = "nwm_retro",
+    coastal_domain: str,
     include_meteo: bool = True,
     include_streamflow: bool = True,
 ) -> tuple[dict[str, list[Path]], dict[str, int]]:
@@ -748,6 +769,8 @@ def create_nc_symlinks(
         Root download directory containing meteo and streamflow subdirectories.
     meteo_source : MeteoSource, optional
         Meteorological data source (nwm_retro or nwm_ana). Default is "nwm_retro".
+    coastal_domain : str
+        Coastal domain, which selects the per-domain meteo subdirectory.
     include_meteo : bool, optional
         Create symlinks for LDASIN meteo files. Default is True.
     include_streamflow : bool, optional
@@ -781,7 +804,7 @@ def create_nc_symlinks(
     existing: dict[str, int] = {"meteo": 0, "streamflow": 0}
 
     if include_meteo:
-        meteo_dir = download_dir / PathConfig.METEO_SUBDIR / meteo_source
+        meteo_dir = download_dir / PathConfig.meteo_subdir(meteo_source, coastal_domain)
         # Both nwm_retro and nwm_ana downloads use extension-less
         # YYYYMMDDHH.LDASIN_DOMAIN1 naming.  We create .nc symlinks to
         # work around a HydroMT ext_override bug.
@@ -789,11 +812,10 @@ def create_nc_symlinks(
         created["meteo"] = new
         existing["meteo"] = n_existing
 
-    if include_streamflow:
-        if meteo_source == "nwm_retro":
-            streamflow_dir = download_dir / PathConfig.STREAMFLOW_SUBDIR / "nwm_retro"
-        else:
-            streamflow_dir = download_dir / PathConfig.HYDRO_SUBDIR / "nwm"
+    # nwm_retro streamflow is read from the S3 Zarr store, so only nwm_ana
+    # ever puts CHRTOUT files on disk.
+    if include_streamflow and meteo_source != "nwm_retro":
+        streamflow_dir = download_dir / PathConfig.streamflow_subdir(coastal_domain)
 
         new, n_existing = _symlink_dir(streamflow_dir, "*.CHRTOUT_DOMAIN1", ".CHRTOUT_DOMAIN1.nc")
         created["streamflow"] = new
@@ -806,6 +828,7 @@ def remove_nc_symlinks(
     download_dir: Path | str,
     *,
     meteo_source: MeteoSource = "nwm_retro",
+    coastal_domain: str,
     include_meteo: bool = True,
     include_streamflow: bool = True,
 ) -> dict[str, int]:
@@ -817,6 +840,8 @@ def remove_nc_symlinks(
         Root download directory containing meteo and streamflow subdirectories.
     meteo_source : MeteoSource, optional
         Meteorological data source (nwm_retro or nwm_ana). Default is "nwm_retro".
+    coastal_domain : str
+        Coastal domain, which selects the per-domain meteo subdirectory.
     include_meteo : bool, optional
         Remove symlinks for LDASIN meteo files. Default is True.
     include_streamflow : bool, optional
@@ -832,7 +857,7 @@ def remove_nc_symlinks(
     removed: dict[str, int] = {"meteo": 0, "streamflow": 0}
 
     if include_meteo:
-        meteo_dir = download_dir / PathConfig.METEO_SUBDIR / meteo_source
+        meteo_dir = download_dir / PathConfig.meteo_subdir(meteo_source, coastal_domain)
         # Both sources use extension-less LDASIN_DOMAIN1 naming; remove
         # the .nc symlinks we created as a HydroMT workaround.
         if meteo_dir.exists():
@@ -841,11 +866,8 @@ def remove_nc_symlinks(
                     link.unlink()
                     removed["meteo"] += 1
 
-    if include_streamflow:
-        if meteo_source == "nwm_retro":
-            streamflow_dir = download_dir / PathConfig.STREAMFLOW_SUBDIR / "nwm_retro"
-        else:
-            streamflow_dir = download_dir / PathConfig.HYDRO_SUBDIR / "nwm"
+    if include_streamflow and meteo_source != "nwm_retro":
+        streamflow_dir = download_dir / PathConfig.streamflow_subdir(coastal_domain)
 
         if streamflow_dir.exists():
             for link in streamflow_dir.glob("*.CHRTOUT_DOMAIN1.nc"):
