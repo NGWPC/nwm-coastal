@@ -102,13 +102,13 @@ urls.Source = "https://github.com/NGWPC/nwm-coastal"
 scripts.coastal-calibration = "coastal_calibration.cli:main"
 
 [tool.hatch]
-build.targets.sdist.exclude = [
-  "*.tar.gz",
-]
+version.source = "vcs"
 build.targets.wheel.packages = [
   "src/coastal_calibration",
 ]
-version.source = "vcs"
+build.targets.sdist.exclude = [
+  "*.tar.gz",
+]
 
 [tool.pixi.dependencies]
 proj = "*"
@@ -330,6 +330,10 @@ lint.ignore = [
   # top-level imports
   "PLC0415",
   "PLR0913",
+  # positional-arg sibling of PLR0913, promoted out of preview in ruff 0.16;
+  # the project already declined PLR0913, so enforcing it would mean
+  # reworking 23 existing signatures for no behavior change
+  "PLR0917",
   "PLR2004",
   # url schema
   "S310",
@@ -401,52 +405,92 @@ lint.isort.required-imports = [ "from __future__ import annotations" ]
 lint.pydocstyle.convention = "numpy"
 
 [tool.codespell]
-skip = "__pycache__,_build,.git,./htmlcov,pixi.lock,./site,./cache,*.ipynb,./legacy-coastal/,CHANGELOG.md"
 ignore-words-list = "gages,parm,oce,gage,nd"
+skip = "__pycache__,_build,.git,./htmlcov,pixi.lock,./site,./cache,*.ipynb,./legacy-coastal/,CHANGELOG.md"
+
+[tool.vulture]
+paths = [ "src", "tests" ]
+exclude = [
+  # Notebook .py files are jupytext mirrors of .ipynb; cell-level dead
+  # code is intentional (e.g. final-cell expressions for display).
+  "docs/examples/notebooks/",
+  # Frozen reference implementations from the pre-pixi era; not part of
+  # the live codebase.
+  "tests/legacy_scripts/",
+]
+ignore_names = [
+  # CLI command callbacks share a `ctx` parameter that goes unused
+  # whenever the subcommand doesn't need click's context.
+  "ctx",
+  # Dataclass / NamedTuple fields aren't "called" but are accessed via
+  # attribute lookup that vulture can't always trace.
+  "model_config",
+  "setUp",
+  "tearDown",
+  # pytest naming conventions.
+  "test_*",
+]
+ignore_decorators = [
+  # rich-click subcommands are registered via decorator and dispatched
+  # by name from the CLI entry point.
+  "@*.command",
+  "@*.group",
+  # Properties may be invoked dynamically (getattr / dataclass / pydantic).
+  "@property",
+  # pytest fixtures and parametrize args look unused but are wired up
+  # by pytest at collection time.
+  "@pytest.fixture",
+  "@pytest.mark.*",
+]
+# Dead-code detection. Pre-commit runs `vulture --quiet` and reads this
+# config; raise the bar to >=80% confidence so it stays signal, not
+# noise. Drop the threshold (e.g. `pixi r -e dev python -m vulture
+# --min-confidence=60 src tests`) for an exploratory sweep.
+min_confidence = 80
 
 [tool.pyproject-fmt]
-expand_tables = [ "tool.pixi", "tool.git-cliff" ]
+expand_tables = [ "tool.git-cliff", "tool.pixi" ]
 
 [tool.pyright]
 pythonVersion = "3.13"
+typeCheckingMode = "strict"
 include = [ "src" ]
 ignore = [ "tests/" ]
-typeCheckingMode = "strict"
 reportMissingSuperCall = false
-reportMissingTypeStubs = false
-reportUnknownMemberType = false
-reportUnknownVariableType = false
-reportUnknownArgumentType = false
-reportUnknownParameterType = false
 reportMissingTypeArgument = false
+reportMissingTypeStubs = false
+reportUnknownArgumentType = false
+reportUnknownMemberType = false
+reportUnknownParameterType = false
+reportUnknownVariableType = false
 reportUnnecessaryIsInstance = false
 reportUnnecessaryTypeIgnoreComment = true
 
 [tool.pytest]
+ini_options.testpaths = [
+  "tests/common",
+  "tests/schism",
+  "tests/sfincs",
+]
 ini_options.addopts = [
   "--import-mode=importlib",
   "--doctest-modules",
   "-v",
   "--durations=5",
 ]
-ini_options.doctest_optionflags = "NORMALIZE_WHITESPACE IGNORE_EXCEPTION_DETAIL NUMBER"
-ini_options.filterwarnings = [
-  "ignore:.*distutils.*",
-  "ignore:.*--rsyncdir command line argument.*",
-  "ignore:.*numpy.ndarray size changed.*",
-  "ignore:.*'cgi' is deprecated.*",
-  "ignore:.*Ensure you extract a single element.*",
-  "ignore:.*Deprecated in Pydantic V2.0.*",
-]
 ini_options.markers = [
   "schism: SCHISM compilation and workflow tests (require pixi schism env)",
   "sfincs: SFINCS workflow integration tests (require HydroMT-SFINCS + plot deps)",
 ]
-ini_options.testpaths = [
-  "tests/common",
-  "tests/schism",
-  "tests/sfincs",
+ini_options.filterwarnings = [
+  "ignore:.*'cgi' is deprecated.*",
+  "ignore:.*--rsyncdir command line argument.*",
+  "ignore:.*Deprecated in Pydantic V2.0.*",
+  "ignore:.*distutils.*",
+  "ignore:.*Ensure you extract a single element.*",
+  "ignore:.*numpy.ndarray size changed.*",
 ]
+ini_options.doctest_optionflags = "NORMALIZE_WHITESPACE IGNORE_EXCEPTION_DETAIL NUMBER"
 
 [tool.coverage]
 run.branch = true
@@ -468,46 +512,6 @@ report.omit = [
   "*/legacy_scripts/*",
 ]
 
-[tool.vulture]
-# Dead-code detection. Pre-commit runs `vulture --quiet` and reads this
-# config; raise the bar to >=80% confidence so it stays signal, not
-# noise. Drop the threshold (e.g. `pixi r -e dev python -m vulture
-# --min-confidence=60 src tests`) for an exploratory sweep.
-min_confidence = 80
-paths = [ "src", "tests" ]
-exclude = [
-  # Frozen reference implementations from the pre-pixi era; not part of
-  # the live codebase.
-  "tests/legacy_scripts/",
-  # Notebook .py files are jupytext mirrors of .ipynb; cell-level dead
-  # code is intentional (e.g. final-cell expressions for display).
-  "docs/examples/notebooks/",
-]
-ignore_decorators = [
-  # pytest fixtures and parametrize args look unused but are wired up
-  # by pytest at collection time.
-  "@pytest.fixture",
-  "@pytest.mark.*",
-  # rich-click subcommands are registered via decorator and dispatched
-  # by name from the CLI entry point.
-  "@*.command",
-  "@*.group",
-  # Properties may be invoked dynamically (getattr / dataclass / pydantic).
-  "@property",
-]
-ignore_names = [
-  # pytest naming conventions.
-  "test_*",
-  "setUp",
-  "tearDown",
-  # Dataclass / NamedTuple fields aren't "called" but are accessed via
-  # attribute lookup that vulture can't always trace.
-  "model_config",
-  # CLI command callbacks share a `ctx` parameter that goes unused
-  # whenever the subcommand doesn't need click's context.
-  "ctx",
-]
-
 [tool.jupytext]
 notebook_metadata_filter = "kernelspec,jupytext"
 cell_metadata_filter = "-all"
@@ -522,8 +526,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 """
-body = """
-{%- macro remote_url() -%}
+body = '''{%- macro remote_url() -%}
   https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}
 {%- endmacro -%}
 
@@ -536,13 +539,7 @@ body = """
 {% for group, commits in commits | group_by(attribute="group") %}
 ### {{ group }}
 {% for commit in commits %}
-- {% if commit.scope %}**{{ commit.scope }}**: {% endif %}\
-{{ commit.message | split(pat="\\n") | first | upper_first | trim }}\
-{% if commit.breaking %} (**breaking**){% endif %}\
-{% if commit.remote.username and commit.remote.username != "github-actions[bot]" %} by @{{ commit.remote.username }}{% endif %}\
-{% if commit.remote.pr_number %} in \
-[#{{ commit.remote.pr_number }}]({{ self::remote_url() }}/pull/{{ commit.remote.pr_number }})\
-{% endif %}
+- {% if commit.scope %}**{{ commit.scope }}**: {% endif %}{{ commit.message | split(pat="\n") | first | upper_first | trim }}{% if commit.breaking %} (**breaking**){% endif %}{% if commit.remote.username and commit.remote.username != "github-actions[bot]" %} by @{{ commit.remote.username }}{% endif %}{% if commit.remote.pr_number %} in [#{{ commit.remote.pr_number }}]({{ self::remote_url() }}/pull/{{ commit.remote.pr_number }}){% endif %}
 {%- endfor %}
 {% endfor -%}
 
@@ -550,34 +547,30 @@ body = """
 ### New Contributors
 {% for contributor in github.contributors | filter(attribute="is_first_time", value=true) %}
 {%- if contributor.username and contributor.username != "github-actions[bot]" %}
-- @{{ contributor.username }} made their first contribution\
-{% if contributor.pr_number %} in \
-[#{{ contributor.pr_number }}]({{ self::remote_url() }}/pull/{{ contributor.pr_number }})\
-{% endif %}
+- @{{ contributor.username }} made their first contribution{% if contributor.pr_number %} in [#{{ contributor.pr_number }}]({{ self::remote_url() }}/pull/{{ contributor.pr_number }}){% endif %}
 {%- endif -%}
 {%- endfor %}
 {% endif %}
-"""
-footer = """
-{%- macro remote_url() -%}
+'''
+footer = '''{%- macro remote_url() -%}
   https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}
 {%- endmacro -%}
 
 {% for release in releases -%}
 {% if release.version -%}
 {% if release.previous.version -%}
-[{{ release.version | trim_start_matches(pat="v") }}]: \
-<{{ self::remote_url() }}/compare/{{ release.previous.version }}...{{ release.version }}>
+
+[{{ release.version | trim_start_matches(pat="v") }}]: <{{ self::remote_url() }}/compare/{{ release.previous.version }}...{{ release.version }}>
 {% else -%}
-[{{ release.version | trim_start_matches(pat="v") }}]: \
-<{{ self::remote_url() }}/releases/tag/{{ release.version }}>
+[{{ release.version | trim_start_matches(pat="v") }}]: <{{ self::remote_url() }}/releases/tag/{{ release.version }}>
 {% endif -%}
 {% else -%}
 {% if release.previous.version -%}
+
 [unreleased]: <{{ self::remote_url() }}/compare/{{ release.previous.version }}...HEAD>
 {% endif -%}
 {% endif -%}
-{% endfor %}"""
+{% endfor %}'''
 trim = true
 
 [tool.git-cliff.git]

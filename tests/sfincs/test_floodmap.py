@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+from datetime import datetime
+
 import numpy as np
 import pytest
 import rasterio
@@ -10,6 +13,8 @@ import xugrid as xu
 from rasterio.transform import from_bounds
 
 from coastal_calibration.sfincs.floodmap import (
+    _assert_index_hits_the_model,
+    _blank_dry_cells,
     _ensure_overviews,
     _reduce_zsmax,
     _write_floodmap_cog,
@@ -212,6 +217,7 @@ class TestWriteFloodmapCog:
             hmin=0.05,
             reproj_method="nearest",
             nrmax=500,
+            baseline=None,
         )
 
         with rasterio.open(out) as src:
@@ -240,6 +246,7 @@ class TestWriteFloodmapCog:
             hmin=0.05,
             reproj_method="nearest",
             nrmax=500,
+            baseline=None,
         )
 
         with rasterio.open(out) as src:
@@ -268,6 +275,7 @@ class TestWriteFloodmapCog:
             hmin=0.05,
             reproj_method="nearest",
             nrmax=500,
+            baseline=None,
         )
 
         with rasterio.open(out) as src:
@@ -305,6 +313,7 @@ class TestWriteFloodmapCog:
             hmin=0.05,
             reproj_method="nearest",
             nrmax=500,
+            baseline=None,
         )
 
         with rasterio.open(out) as src:
@@ -329,6 +338,7 @@ class TestWriteFloodmapCog:
             hmin=0.05,
             reproj_method="nearest",
             nrmax=500,
+            baseline=None,
         )
 
         with rasterio.open(out) as src:
@@ -355,12 +365,135 @@ class TestWriteFloodmapCog:
             hmin=0.05,
             reproj_method="nearest",
             nrmax=500,
+            baseline=None,
         )
 
         with rasterio.open(out) as src:
             data = src.read(1)
             # All depths should be NaN because 0.04 < 0.05
             assert np.all(np.isnan(data))
+
+
+class TestPermanentWaterMasking:
+    """Inundation is what the model wets; the sea was already wet."""
+
+    def _write(self, tmp_path, *, baseline_level, dem_fill):
+        zsmax = _make_quadtree_zsmax(water_level=1.5)
+        baseline = (
+            None if baseline_level is None else _make_quadtree_zsmax(water_level=baseline_level)
+        )
+        dem = tmp_path / "dem.tif"
+        out = tmp_path / f"flood_{baseline_level}_{dem_fill}.tif"
+        _make_dem_tif(dem, fill=dem_fill, shape=(50, 50))
+        _make_index_tif(tmp_path / "idx.tif", shape=(50, 50), n_faces=100)
+        _write_floodmap_cog(
+            zsmax=zsmax,
+            dem_path=dem,
+            index_path=tmp_path / "idx.tif",
+            output_path=out,
+            hmin=0.05,
+            reproj_method="nearest",
+            nrmax=500,
+            baseline=baseline,
+        )
+        with rasterio.open(out) as src:
+            return src.read(1)
+
+    def test_already_wet_terrain_is_dropped(self, tmp_path):
+        """Sea: under water at the model's driest moment, so not a flood."""
+        data = self._write(tmp_path, baseline_level=0.0, dem_fill=-5.0)
+
+        assert np.all(np.isnan(data))
+
+    def test_dry_land_below_the_datum_is_kept(self, tmp_path):
+        """Regression: the old DEM-sign cut discarded polders and subsided land.
+
+        Terrain at -5 m that the model leaves dry at its minimum is genuinely
+        flooded when the peak reaches +1.5 m, and must survive.
+        """
+        data = self._write(tmp_path, baseline_level=-6.0, dem_fill=-5.0)
+
+        np.testing.assert_allclose(data[np.isfinite(data)], 6.5)
+
+    def test_masking_off_keeps_everything(self, tmp_path):
+        data = self._write(tmp_path, baseline_level=None, dem_fill=-5.0)
+
+        np.testing.assert_allclose(data[np.isfinite(data)], 6.5)
+
+    def test_dry_cell_baseline_does_not_mask(self, tmp_path):
+        """Regression: on a dry cell SFINCS writes ``zs == zb``.
+
+        Comparing that against the DEM would read every sub-cell pixel below
+        the cell bed as already wet, silently erasing them. A cell holding no
+        water at baseline must mask nothing.
+        """
+        from coastal_calibration.sfincs.floodmap import _baseline_water_surface
+
+        n = 4
+        out = {
+            "zs": xr.DataArray(np.full((2, n), 5.0, dtype="float32"), dims=("time", "face")),
+            "zb": xr.DataArray(np.full(n, 5.0, dtype="float32"), dims=("face",)),
+        }
+
+        baseline = _baseline_water_surface(out)
+
+        assert np.all(np.isnan(np.asarray(baseline.to_numpy())))
+
+    def test_land_above_the_datum_is_unaffected(self, tmp_path):
+        data = self._write(tmp_path, baseline_level=0.0, dem_fill=0.5)
+
+        np.testing.assert_allclose(data[np.isfinite(data)], 1.0)
+
+
+class TestBlankDryCells:
+    """SFINCS writes ``zsmax == zb`` on cells that never got wet."""
+
+    def _output(self, *, water_level, bed, msk=1, n_faces=100):
+        zsmax = _make_quadtree_zsmax(n_faces=n_faces, water_level=water_level)
+        return zsmax, {
+            "zb": xr.DataArray(np.full(n_faces, bed, dtype="float32"), dims=("face",)),
+            "msk": xr.DataArray(np.full(n_faces, msk, dtype="int8"), dims=("face",)),
+        }
+
+    def test_never_wet_cells_are_blanked(self):
+        """Regression: a dry cell's bed level used to leak in as flood depth."""
+        zsmax, out = self._output(water_level=120.0, bed=120.0)
+
+        blanked = _blank_dry_cells(zsmax, out, log=lambda _m: None)
+
+        assert np.all(np.isnan(np.asarray(blanked.to_numpy())))
+
+    def test_genuinely_wet_cells_survive(self):
+        zsmax, out = self._output(water_level=1.5, bed=-2.0)
+
+        blanked = _blank_dry_cells(zsmax, out, log=lambda _m: None)
+
+        np.testing.assert_allclose(np.asarray(blanked.to_numpy()), 1.5)
+
+    def test_inactive_cells_are_blanked(self):
+        zsmax, out = self._output(water_level=1.5, bed=-2.0, msk=0)
+
+        blanked = _blank_dry_cells(zsmax, out, log=lambda _m: None)
+
+        assert np.all(np.isnan(np.asarray(blanked.to_numpy())))
+
+    def test_barely_wet_cells_are_kept(self):
+        """Regression: the cell test is "ever wet", not the pixel threshold.
+
+        A cell holding less than ``hmin`` can still contain DEM pixels below
+        its recorded minimum that carry more, so it must survive to be
+        downscaled and judged per pixel.
+        """
+        zsmax, out = self._output(water_level=-1.98, bed=-2.0)  # 0.02 m, under hmin
+
+        blanked = _blank_dry_cells(zsmax, out, log=lambda _m: None)
+
+        np.testing.assert_allclose(np.asarray(blanked.to_numpy()), -1.98)
+
+    def test_output_without_zb_is_passed_through(self):
+        zsmax, _ = self._output(water_level=1.5, bed=-2.0)
+
+        assert _blank_dry_cells(zsmax, {}, log=lambda _m: None) is zsmax
 
 
 # ── _reduce_zsmax ───────────────────────────────────────────────────
@@ -478,3 +611,121 @@ class TestCreateFloodDepthMapIntegration:
                 f"Max depth {finite.max():.1f} m is unreasonably high; "
                 "index likely maps to wrong cells"
             )
+
+
+class TestIndexCoverageGuard:
+    """An index that hits no model cell would write an empty flood map."""
+
+    def _index_tif(self, path, value):
+        transform = from_bounds(0, 0, 1000, 1000, 20, 20)
+        with rasterio.open(
+            path,
+            "w",
+            driver="GTiff",
+            width=20,
+            height=20,
+            count=1,
+            dtype="uint32",
+            crs="EPSG:32619",
+            transform=transform,
+            nodata=2147483647,
+        ) as dst:
+            dst.write(np.full((20, 20), value, dtype="uint32"), 1)
+
+    def test_all_nodata_index_raises(self, tmp_path):
+        idx = tmp_path / "idx.tif"
+        self._index_tif(idx, 2147483647)
+
+        with pytest.raises(ValueError, match="maps no DEM pixel"):
+            _assert_index_hits_the_model(idx, tmp_path / "dem.tif")
+
+    def test_partially_populated_index_passes(self, tmp_path):
+        idx = tmp_path / "idx.tif"
+        self._index_tif(idx, 2147483647)
+        with rasterio.open(idx, "r+") as dst:
+            band = dst.read(1)
+            band[0, 0] = 7
+            dst.write(band, 1)
+
+        _assert_index_hits_the_model(idx, tmp_path / "dem.tif")
+
+
+class TestFloodmapDemResolution:
+    """The model build records its DEM, so the config setting is obsolete."""
+
+    def _stage(self, tmp_path, *, recorded, configured):
+        from coastal_calibration.config.schema import (
+            BoundaryConfig,
+            CoastalCalibConfig,
+            DownloadConfig,
+            PathConfig,
+            SfincsModelConfig,
+            SimulationConfig,
+        )
+        from coastal_calibration.sfincs.stages import SfincsFloodMapStage
+
+        prebuilt = tmp_path / "output"
+        prebuilt.mkdir(exist_ok=True)
+        if recorded is not None:
+            (prebuilt / "create_result.json").write_text(
+                json.dumps({"outputs": {"create_fetch_data": {"elevation_rasters": recorded}}})
+            )
+        config = CoastalCalibConfig(
+            simulation=SimulationConfig(
+                start_date=datetime(2021, 6, 11),
+                duration_hours=1,
+                coastal_domain="atlgulf",
+                meteo_source="nwm_ana",
+            ),
+            boundary=BoundaryConfig(source="harmonic"),
+            paths=PathConfig(work_dir=tmp_path / "work"),
+            model_config=SfincsModelConfig(prebuilt_dir=prebuilt, floodmap_dem=configured),
+            download=DownloadConfig(enabled=False),
+        )
+        return SfincsFloodMapStage(config)
+
+    def test_uses_the_first_recorded_raster(self, tmp_path):
+        best = tmp_path / "noaa_crm.tif"
+        best.write_text("x")
+        (tmp_path / "gebco.tif").write_text("x")
+        stage = self._stage(
+            tmp_path,
+            recorded={"noaa_crm": str(best), "gebco_15arcs": str(tmp_path / "gebco.tif")},
+            configured=None,
+        )
+
+        assert stage._resolve_dem() == best
+
+    def test_configured_path_wins_over_the_record(self, tmp_path):
+        """Only the user knows they want a different raster.
+
+        The record covers just the datasets this package fetched, so a
+        user-supplied catalog DEM can only be selected this way.
+        """
+        recorded = tmp_path / "noaa_crm.tif"
+        recorded.write_text("x")
+        chosen = tmp_path / "my_lidar.tif"
+        chosen.write_text("x")
+        stage = self._stage(tmp_path, recorded={"noaa_crm": str(recorded)}, configured=chosen)
+
+        assert stage._resolve_dem() == chosen
+
+    def test_configured_path_still_works_without_a_record(self, tmp_path):
+        """Models built before the record existed must not lose their flood map."""
+        legacy = tmp_path / "legacy.tif"
+        legacy.write_text("x")
+        stage = self._stage(tmp_path, recorded=None, configured=legacy)
+
+        assert stage._resolve_dem() == legacy
+
+    def test_nothing_configured_and_nothing_recorded(self, tmp_path):
+        assert self._stage(tmp_path, recorded=None, configured=None)._resolve_dem() is None
+
+    def test_record_pointing_at_a_deleted_file_falls_through(self, tmp_path):
+        legacy = tmp_path / "legacy.tif"
+        legacy.write_text("x")
+        stage = self._stage(
+            tmp_path, recorded={"noaa_crm": str(tmp_path / "gone.tif")}, configured=legacy
+        )
+
+        assert stage._resolve_dem() == legacy

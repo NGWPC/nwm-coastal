@@ -39,7 +39,7 @@ class PreForcingStage(WorkflowStage):
         self._log("Creating forcing symlinks and output directories")
 
         sim = self.config.simulation
-        nwm_forcing_dir = self.config.paths.meteo_dir(sim.meteo_source)
+        nwm_forcing_dir = self.config.paths.meteo_dir(sim.meteo_source, sim.coastal_domain)
 
         _forcing_input_dir, coastal_forcing_output = stage_ldasin_files(
             work_dir=work_dir,

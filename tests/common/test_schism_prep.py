@@ -79,6 +79,53 @@ class TestStageChrtoutFiles:
         out_files = list(nwm_out.iterdir())
         assert len(out_files) > 0
 
+    def test_reruns_do_not_mix_dates(self, tmp_path):
+        """Regression: staged links from an earlier run must not survive.
+
+        ``make_discharge`` globs the staging directory and derives every
+        timestamp from the files themselves, so a leftover link would
+        silently splice another run's dates into the discharge series.
+        """
+        streamflow = tmp_path / "streamflow"
+        streamflow.mkdir()
+        for day in ("20211001", "20240520"):
+            for hour in range(4):
+                (streamflow / f"{day}{hour:02d}00.CHRTOUT_DOMAIN1").write_text("dummy")
+
+        staged_dates = []
+        for day in ("20211001", "20240520"):
+            nwm_out, _ = stage_chrtout_files(
+                work_dir=tmp_path,
+                start_date=datetime(int(day[:4]), int(day[4:6]), int(day[6:]), tzinfo=UTC),
+                duration_hours=1,
+                coastal_domain="atlgulf",
+                streamflow_dir=streamflow,
+            )
+            staged_dates.append({p.name[:8] for p in nwm_out.glob("*CHRTOUT*")})
+
+        assert staged_dates == [{"20211001"}, {"20240520"}]
+
+    def test_rerun_drops_files_beyond_a_shorter_window(self, tmp_path):
+        """A shorter rerun at the same start date must not keep extra hours."""
+        streamflow = tmp_path / "streamflow"
+        streamflow.mkdir()
+        for hour in range(6):
+            (streamflow / f"202106110{hour}00.CHRTOUT_DOMAIN1").write_text("dummy")
+
+        dt = datetime(2021, 6, 11, tzinfo=UTC)
+        kwargs = {
+            "work_dir": tmp_path,
+            "start_date": dt,
+            "coastal_domain": "atlgulf",
+            "streamflow_dir": streamflow,
+        }
+        long_out, _ = stage_chrtout_files(duration_hours=4, **kwargs)
+        n_long = len(list(long_out.glob("*CHRTOUT*")))
+        short_out, _ = stage_chrtout_files(duration_hours=1, **kwargs)
+        n_short = len(list(short_out.glob("*CHRTOUT*")))
+
+        assert n_short < n_long
+
 
 # ---------------------------------------------------------------------------
 # _write_th_file

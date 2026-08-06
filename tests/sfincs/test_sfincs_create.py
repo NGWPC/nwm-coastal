@@ -150,6 +150,41 @@ def mock_sfincs_model() -> MagicMock:
 # ===================================================================
 
 
+class TestAoiScopedDownloadDir:
+    """Fetched rasters are clipped to the AOI, so the cache is per AOI."""
+
+    def _config(self, tmp_path: Path, bbox: tuple[float, float, float, float], name: str):
+        import geopandas as gpd
+        from shapely import box
+
+        aoi = tmp_path / f"{name}.geojson"
+        gpd.GeoDataFrame(geometry=[box(*bbox)], crs="EPSG:4326").to_file(aoi, driver="GeoJSON")
+        return SfincsCreateConfig(
+            aoi=aoi, output_dir=tmp_path / "out", download_dir=tmp_path / "dl"
+        )
+
+    def test_same_aoi_reuses_one_directory(self, tmp_path: Path) -> None:
+        """Reruns must still hit the cache, whatever the AOI file is called."""
+        a = self._config(tmp_path, (-95.5, 29.0, -95.0, 29.5), "first")
+        b = self._config(tmp_path, (-95.5, 29.0, -95.0, 29.5), "second")
+
+        assert a.effective_download_dir == b.effective_download_dir
+
+    def test_different_aois_do_not_share_rasters(self, tmp_path: Path) -> None:
+        """Regression: ``noaa_crm.tif`` used to be reused across AOIs."""
+        prvi = self._config(tmp_path, (-67.3, 17.9, -65.2, 18.6), "prvi")
+        hawaii = self._config(tmp_path, (-156.1, 18.9, -154.8, 20.3), "hawaii")
+
+        assert prvi.effective_download_dir != hawaii.effective_download_dir
+        assert prvi.effective_download_dir.parent == hawaii.effective_download_dir.parent
+
+    def test_key_is_stable_and_readable(self, tmp_path: Path) -> None:
+        cfg = self._config(tmp_path, (-95.5, 29.0, -95.0, 29.5), "aoi")
+        assert cfg.aoi_key == cfg.aoi_key
+        assert cfg.aoi_key.startswith("aoi_")
+        assert cfg.effective_download_dir.name == cfg.aoi_key
+
+
 class TestSfincsCreateConfig:
     """Test SfincsCreateConfig loading and validation."""
 
@@ -423,13 +458,13 @@ class TestSfincsCreateConfig:
     def test_download_dir_defaults(self, minimal_create_config: SfincsCreateConfig) -> None:
         assert minimal_create_config.download_dir is None
         assert minimal_create_config.effective_download_dir == (
-            minimal_create_config.output_dir / "downloads"
+            minimal_create_config.output_dir / "downloads" / minimal_create_config.aoi_key
         )
 
     def test_download_dir_explicit(self, aoi_file: Path, output_dir: Path) -> None:
         dl = output_dir / "my_dl"
         cfg = SfincsCreateConfig(aoi=aoi_file, output_dir=output_dir, download_dir=dl)
-        assert cfg.effective_download_dir == dl.resolve()
+        assert cfg.effective_download_dir == dl.resolve() / cfg.aoi_key
 
     def test_to_dict_with_noaa_source(self, aoi_file: Path, output_dir: Path) -> None:
         cfg = SfincsCreateConfig(
