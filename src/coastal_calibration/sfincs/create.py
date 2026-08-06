@@ -74,6 +74,26 @@ def _get_model(config: SfincsCreateConfig) -> SfincsModel:
         ) from None
 
 
+def _elevation_list(cfg: SfincsCreateConfig) -> list[dict[str, Any]]:
+    """Build the ``elevation_list`` hydromt-sfincs merges datasets from.
+
+    ``offset`` is only emitted when non-zero, so configs that do not set it
+    produce exactly the request they did before. hydromt-sfincs applies the
+    offset before the ``zmin`` filter, which is why ``zmin`` is documented
+    against the shifted elevations.
+
+    Shared by the elevation and subgrid stages: they must merge the same way
+    or the subgrid tables describe a different bed than the grid.
+    """
+    entries: list[dict[str, Any]] = []
+    for d in cfg.elevation.datasets:
+        entry: dict[str, Any] = {"elevation": d.name, "zmin": d.zmin}
+        if d.offset:
+            entry["offset"] = d.offset
+        entries.append(entry)
+    return entries
+
+
 def _clear_model(config: SfincsCreateConfig) -> None:
     """Remove the SfincsModel from the registry."""
     _MODEL_REGISTRY.pop(id(config), None)
@@ -541,7 +561,7 @@ class CreateElevationStage(_CreateStageBase):
         cfg = self.config
 
         self._update_substep("Creating elevation layers")
-        elevation_list = [{"elevation": d.name, "zmin": d.zmin} for d in cfg.elevation.datasets]
+        elevation_list = _elevation_list(cfg)
         self._log(f"Elevation datasets: {[d.name for d in cfg.elevation.datasets]}")
 
         self.sfincs.quadtree_elevation.create(
@@ -1303,7 +1323,7 @@ class CreateSubgridStage(_CreateStageBase):
         self._update_substep("Creating subgrid tables")
         self._log(f"nr_subgrid_pixels={cfg.subgrid.nr_subgrid_pixels}")
 
-        elevation_list = [{"elevation": d.name, "zmin": d.zmin} for d in cfg.elevation.datasets]
+        elevation_list = _elevation_list(cfg)
         roughness_entry: dict[str, Any] = {"lulc": cfg.subgrid.lulc_dataset}
         if cfg.subgrid.reclass_table is not None:
             roughness_entry["reclass_table"] = str(cfg.subgrid.reclass_table)

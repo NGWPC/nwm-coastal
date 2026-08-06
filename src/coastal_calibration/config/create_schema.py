@@ -93,6 +93,22 @@ class ElevationDataset:
     #: Only used when ``source`` is ``"nws_30m"``.
     coastal_domain: str | None = None
 
+    #: Vertical offset in meters *added* to this dataset's elevations before
+    #: it is merged with the others.  Elevation sources do not share a
+    #: vertical datum -- NCEI CRM volumes 9 (Puerto Rico) and 10 (Hawaii) are
+    #: MSL while volumes 1-5 and 7-8 are EGM2008, the CUDEM 1/9 arc-second
+    #: tiles behind ``noaa_3m`` are NAVD88, and GEBCO is nominally MSL.  A
+    #: merge of two sources on different datums leaves a step wherever the
+    #: finer source's footprint ends, silently, since neither the merge nor
+    #: the mask knows the datums differ.  Set this to bring a dataset onto
+    #: the same datum as the others; the merge applies it before the ``zmin``
+    #: filter, so ``zmin`` refers to the shifted elevations.
+    #:
+    #: Example: a CUDEM (NAVD88) primary filled by GEBCO (MSL) on the Texas
+    #: coast, where MSL sits about 0.24 m above NAVD88, needs ``offset:
+    #: -0.24`` on the GEBCO entry to put both on NAVD88.
+    offset: float = 0.0
+
 
 @dataclass
 class ElevationConfig:
@@ -648,6 +664,7 @@ class SfincsCreateConfig:
                         **({"source": d.source} if d.source else {}),
                         **({"noaa_dataset": d.noaa_dataset} if d.noaa_dataset else {}),
                         **({"coastal_domain": d.coastal_domain} if d.coastal_domain else {}),
+                        **({"offset": d.offset} if d.offset else {}),
                     }
                     for d in self.elevation.datasets
                 ],

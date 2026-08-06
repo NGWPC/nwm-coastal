@@ -40,6 +40,7 @@ from coastal_calibration.sfincs.create import (
     CreateWriteStage,
     SfincsCreator,
     _clear_model,
+    _elevation_list,
     _get_model,
     _set_model,
     create_stages,
@@ -1552,3 +1553,57 @@ class TestDischargeStageRun:
         stages_dict = create_stages(discharge_create_config)
         assert "create_discharge" in stages_dict
         assert isinstance(stages_dict["create_discharge"], CreateDischargeStage)
+
+
+class TestElevationOffset:
+    """Elevation sources do not share a vertical datum."""
+
+    def _config(self, tmp_path: Path, offsets):
+        import geopandas as gpd
+        from shapely import box
+
+        aoi = tmp_path / "aoi.geojson"
+        gpd.GeoDataFrame(geometry=[box(-96.9, 28.2, -95.9, 28.9)], crs="EPSG:4326").to_file(
+            aoi, driver="GeoJSON"
+        )
+        return SfincsCreateConfig(
+            aoi=aoi,
+            output_dir=tmp_path / "out",
+            elevation=ElevationConfig(
+                datasets=[
+                    ElevationDataset(name=f"d{i}", zmin=-20000, source="gebco_15arcs", offset=o)
+                    for i, o in enumerate(offsets)
+                ]
+            ),
+        )
+
+    def test_offset_defaults_to_zero_and_is_omitted(self, tmp_path: Path) -> None:
+        """A config that never mentions offset must request exactly what it did before."""
+        entries = _elevation_list(self._config(tmp_path, [0.0, 0.0]))
+
+        assert entries == [
+            {"elevation": "d0", "zmin": -20000},
+            {"elevation": "d1", "zmin": -20000},
+        ]
+
+    def test_offset_is_passed_to_the_merge(self, tmp_path: Path) -> None:
+        entries = _elevation_list(self._config(tmp_path, [0.0, -0.24]))
+
+        assert entries[0] == {"elevation": "d0", "zmin": -20000}
+        assert entries[1] == {"elevation": "d1", "zmin": -20000, "offset": -0.24}
+
+    def test_round_trips_through_yaml(self, tmp_path: Path) -> None:
+        cfg = self._config(tmp_path, [0.0, -0.24])
+        out = tmp_path / "create.yaml"
+        cfg.to_yaml(out)
+
+        reloaded = SfincsCreateConfig.from_yaml(out)
+
+        assert [d.offset for d in reloaded.elevation.datasets] == [0.0, -0.24]
+
+    def test_offset_does_not_change_the_download_cache_key(self, tmp_path: Path) -> None:
+        """The offset is applied when merging, not when fetching."""
+        plain = self._config(tmp_path, [0.0, 0.0]).aoi_key
+        shifted = self._config(tmp_path, [0.0, -0.24]).aoi_key
+
+        assert plain == shifted
