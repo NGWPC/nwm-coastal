@@ -232,6 +232,7 @@ def _write_floodmap_cog(
     reproj_method: str,
     nrmax: int,
     baseline: Any,
+    dem_offset: float,
 ) -> None:
     """Write a flood-depth COG at the full DEM resolution.
 
@@ -242,6 +243,11 @@ def _write_floodmap_cog(
     already under water at the model's driest moment are dropped, so the
     result is inundation rather than inundation plus the permanently wet
     sea.
+
+    *dem_offset* is added to the DEM as it is read. The model bed carries any
+    vertical offset its elevation dataset was merged with, but the raster on
+    disk does not, and subtracting an unshifted DEM from a shifted water
+    surface biases every depth by exactly that offset.
     """
     import rasterio
     from rasterio.windows import Window
@@ -294,6 +300,8 @@ def _write_floodmap_cog(
 
                         window = Window(bm0, bn0, bm1_val - bm0, bn1_val - bn0)  # pyright: ignore[reportCallIssue]
                         dep_block: Any = src.read(1, window=window).astype("float32")
+                        if dem_offset:
+                            dep_block += dem_offset
 
                         if np.all(np.isnan(dep_block)):
                             continue
@@ -336,6 +344,7 @@ def create_flood_depth_map(
     create_index: bool = True,
     hmin: float = 0.05,
     land_only: bool = True,
+    dem_offset: float = 0.0,
     reproj_method: str = "nearest",
     nrmax: int = 2000,
     model: SfincsModel | None = None,
@@ -369,6 +378,11 @@ def create_flood_depth_map(
     land_only : bool
         Drop pixels the model shows as permanently wet, so the map is
         inundation rather than inundation plus the sea.
+    dem_offset : float
+        Vertical offset (m) added to *dem_path* to put it on the model's
+        datum. Non-zero when the dataset this DEM came from was merged with
+        an ``offset``; see
+        :attr:`~coastal_calibration.config.create_schema.ElevationDataset.offset`.
     reproj_method : str
         Reprojection method (``"nearest"`` or ``"bilinear"``).
     nrmax : int
@@ -482,6 +496,7 @@ def create_flood_depth_map(
         hmin=hmin,
         reproj_method=reproj_method,
         nrmax=nrmax,
+        dem_offset=dem_offset,
         baseline=_baseline_water_surface(model.output.data) if land_only else None,
     )
 

@@ -82,8 +82,12 @@ def _elevation_list(cfg: SfincsCreateConfig) -> list[dict[str, Any]]:
     offset before the ``zmin`` filter, which is why ``zmin`` is documented
     against the shifted elevations.
 
-    Shared by the elevation and subgrid stages: they must merge the same way
-    or the subgrid tables describe a different bed than the grid.
+    Shared by the elevation and subgrid stages so the two cannot drift apart
+    in which datasets they merge, in what order, or with what offset. They
+    still differ in ways this does not control: the subgrid builder merges
+    with ``buffer_cells=0`` and fills nodata by inverse-distance
+    interpolation, so grid bed and subgrid bed can still disagree at dataset
+    seams and holes.
     """
     entries: list[dict[str, Any]] = []
     for d in cfg.elevation.datasets:
@@ -411,7 +415,9 @@ class CreateFetchDataStage(_CreateStageBase):
             self.config.data_catalog.data_libs.append(path_str)
         self.sfincs.data_catalog.from_yml(path_str)
 
-    def _fetch_elevation(self, fetched: list[str], rasters: dict[str, str]) -> None:
+    def _fetch_elevation(
+        self, fetched: list[str], rasters: dict[str, str], offsets: dict[str, float]
+    ) -> None:
         """Fetch elevation datasets that have a ``source`` set.
 
         Records each raster's path in *rasters*, in config order, so the run
@@ -435,6 +441,7 @@ class CreateFetchDataStage(_CreateStageBase):
                 self._register_catalog(cat)
                 fetched.append(catalog_name)
                 rasters[catalog_name] = str(tif)
+                offsets[catalog_name] = ds.offset
                 continue
 
             if ds.source == "nws_30m":
@@ -502,6 +509,7 @@ class CreateFetchDataStage(_CreateStageBase):
             self._register_catalog(cat_path)
             fetched.append(catalog_name)
             rasters[catalog_name] = str(tif)
+            offsets[catalog_name] = ds.offset
 
     def _fetch_lulc(self, fetched: list[str]) -> None:
         """Fetch the LULC dataset if ``lulc_source`` is set."""
@@ -540,13 +548,18 @@ class CreateFetchDataStage(_CreateStageBase):
         """Fetch elevation and LULC datasets for the AOI."""
         fetched: list[str] = []
         elevation_rasters: dict[str, str] = {}
-        self._fetch_elevation(fetched, elevation_rasters)
+        # The flood-map stage downscales onto one of these rasters, which is
+        # the raw fetched file -- the model bed carries the offset, so the
+        # stage has to re-apply it or every depth is wrong by that much.
+        elevation_offsets: dict[str, float] = {}
+        self._fetch_elevation(fetched, elevation_rasters, elevation_offsets)
         self._fetch_lulc(fetched)
         self._log(f"Fetched {len(fetched)} dataset(s): {fetched}")
         return {
             "status": "completed",
             "fetched": fetched,
             "elevation_rasters": elevation_rasters,
+            "elevation_offsets": elevation_offsets,
         }
 
 

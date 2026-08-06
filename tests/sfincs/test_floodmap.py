@@ -218,6 +218,7 @@ class TestWriteFloodmapCog:
             reproj_method="nearest",
             nrmax=500,
             baseline=None,
+            dem_offset=0.0,
         )
 
         with rasterio.open(out) as src:
@@ -247,6 +248,7 @@ class TestWriteFloodmapCog:
             reproj_method="nearest",
             nrmax=500,
             baseline=None,
+            dem_offset=0.0,
         )
 
         with rasterio.open(out) as src:
@@ -276,6 +278,7 @@ class TestWriteFloodmapCog:
             reproj_method="nearest",
             nrmax=500,
             baseline=None,
+            dem_offset=0.0,
         )
 
         with rasterio.open(out) as src:
@@ -314,6 +317,7 @@ class TestWriteFloodmapCog:
             reproj_method="nearest",
             nrmax=500,
             baseline=None,
+            dem_offset=0.0,
         )
 
         with rasterio.open(out) as src:
@@ -339,6 +343,7 @@ class TestWriteFloodmapCog:
             reproj_method="nearest",
             nrmax=500,
             baseline=None,
+            dem_offset=0.0,
         )
 
         with rasterio.open(out) as src:
@@ -366,6 +371,7 @@ class TestWriteFloodmapCog:
             reproj_method="nearest",
             nrmax=500,
             baseline=None,
+            dem_offset=0.0,
         )
 
         with rasterio.open(out) as src:
@@ -395,6 +401,7 @@ class TestPermanentWaterMasking:
             reproj_method="nearest",
             nrmax=500,
             baseline=baseline,
+            dem_offset=0.0,
         )
         with rasterio.open(out) as src:
             return src.read(1)
@@ -438,6 +445,33 @@ class TestPermanentWaterMasking:
         baseline = _baseline_water_surface(out)
 
         assert np.all(np.isnan(np.asarray(baseline.to_numpy())))
+
+    def test_dem_offset_shifts_the_depth(self, tmp_path):
+        """The DEM must be put on the model's datum before subtracting."""
+        zsmax = _make_quadtree_zsmax(water_level=1.5)
+        dem = tmp_path / "dem.tif"
+        _make_dem_tif(dem, fill=0.5, shape=(50, 50))
+        _make_index_tif(tmp_path / "idx.tif", shape=(50, 50), n_faces=100)
+        depths = {}
+        for off in (0.0, -0.5):
+            out = tmp_path / f"flood_{off}.tif"
+            _write_floodmap_cog(
+                zsmax=zsmax,
+                dem_path=dem,
+                index_path=tmp_path / "idx.tif",
+                output_path=out,
+                hmin=0.05,
+                reproj_method="nearest",
+                nrmax=500,
+                baseline=None,
+                dem_offset=off,
+            )
+            with rasterio.open(out) as src:
+                d = src.read(1)
+            depths[off] = float(np.nanmax(d[np.isfinite(d)]))
+        # Lowering the bed by 0.5 m deepens the water by the same amount.
+        assert depths[0.0] == pytest.approx(1.0)
+        assert depths[-0.5] == pytest.approx(1.5)
 
     def test_land_above_the_datum_is_unaffected(self, tmp_path):
         data = self._write(tmp_path, baseline_level=0.0, dem_fill=0.5)
@@ -694,7 +728,7 @@ class TestFloodmapDemResolution:
             configured=None,
         )
 
-        assert stage._resolve_dem() == best
+        assert stage._resolve_dem() == (best, 0.0)
 
     def test_configured_path_wins_over_the_record(self, tmp_path):
         """Only the user knows they want a different raster.
@@ -708,7 +742,7 @@ class TestFloodmapDemResolution:
         chosen.write_text("x")
         stage = self._stage(tmp_path, recorded={"noaa_crm": str(recorded)}, configured=chosen)
 
-        assert stage._resolve_dem() == chosen
+        assert stage._resolve_dem() == (chosen, 0.0)
 
     def test_configured_path_still_works_without_a_record(self, tmp_path):
         """Models built before the record existed must not lose their flood map."""
@@ -716,7 +750,30 @@ class TestFloodmapDemResolution:
         legacy.write_text("x")
         stage = self._stage(tmp_path, recorded=None, configured=legacy)
 
-        assert stage._resolve_dem() == legacy
+        assert stage._resolve_dem() == (legacy, 0.0)
+
+    def test_recorded_offset_comes_back_with_the_path(self, tmp_path):
+        """Regression: the recorded raster is raw, the model bed is shifted.
+
+        Downscaling an unshifted DEM against a shifted water surface biases
+        every depth by exactly the offset, silently.
+        """
+        best = tmp_path / "noaa_crm.tif"
+        best.write_text("x")
+        stage = self._stage(tmp_path, recorded={"noaa_crm": str(best)}, configured=None)
+        record = json.loads((tmp_path / "output" / "create_result.json").read_text())
+        record["outputs"]["create_fetch_data"]["elevation_offsets"] = {"noaa_crm": -0.5}
+        (tmp_path / "output" / "create_result.json").write_text(json.dumps(record))
+
+        assert stage._resolve_dem() == (best, -0.5)
+
+    def test_record_without_offsets_reads_as_zero(self, tmp_path):
+        """Models built before offsets existed carry no elevation_offsets key."""
+        best = tmp_path / "noaa_crm.tif"
+        best.write_text("x")
+        stage = self._stage(tmp_path, recorded={"noaa_crm": str(best)}, configured=None)
+
+        assert stage._resolve_dem() == (best, 0.0)
 
     def test_nothing_configured_and_nothing_recorded(self, tmp_path):
         assert self._stage(tmp_path, recorded=None, configured=None)._resolve_dem() is None
@@ -728,4 +785,4 @@ class TestFloodmapDemResolution:
             tmp_path, recorded={"noaa_crm": str(tmp_path / "gone.tif")}, configured=legacy
         )
 
-        assert stage._resolve_dem() == legacy
+        assert stage._resolve_dem() == (legacy, 0.0)

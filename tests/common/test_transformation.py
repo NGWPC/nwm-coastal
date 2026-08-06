@@ -83,6 +83,7 @@ class TestClipToAoi:
 
         with rasterio.open(out) as src:
             assert src.crs.to_epsg() == 4326
-            assert src.shape[0] < 200 and src.shape[1] < 200  # cut down from the source
+            assert src.shape[0] < 200
+            assert src.shape[1] < 200
             data = src.read(1)
         assert np.nanmax(data) == np.float32(1.5)

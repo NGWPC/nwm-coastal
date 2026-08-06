@@ -1607,3 +1607,50 @@ class TestElevationOffset:
         shifted = self._config(tmp_path, [0.0, -0.24]).aoi_key
 
         assert plain == shifted
+
+
+class TestElevationOffsetValidation:
+    """A bad offset must be rejected, not silently void a dataset."""
+
+    def _config(self, tmp_path: Path, offset):
+        import geopandas as gpd
+        from shapely import box
+
+        aoi = tmp_path / "aoi.geojson"
+        gpd.GeoDataFrame(geometry=[box(-96.9, 28.2, -95.9, 28.9)], crs="EPSG:4326").to_file(
+            aoi, driver="GeoJSON"
+        )
+        return SfincsCreateConfig(
+            aoi=aoi,
+            output_dir=tmp_path / "out",
+            elevation=ElevationConfig(
+                datasets=[
+                    ElevationDataset(name="d0", zmin=-20000, source="gebco_15arcs", offset=offset)
+                ]
+            ),
+        )
+
+    def test_nan_offset_is_rejected(self, tmp_path: Path) -> None:
+        """Hydromt adds the offset, so NaN turns every cell of the source invalid."""
+        errors = self._config(tmp_path, float("nan")).validate()
+
+        assert any("offset must be finite" in e for e in errors)
+
+    def test_infinite_offset_is_rejected(self, tmp_path: Path) -> None:
+        errors = self._config(tmp_path, float("inf")).validate()
+
+        assert any("offset must be finite" in e for e in errors)
+
+    def test_non_numeric_offset_is_rejected(self, tmp_path: Path) -> None:
+        """A quoted YAML value would otherwise reach hydromt as a raster name."""
+        errors = self._config(tmp_path, "-0.24").validate()
+
+        assert any("offset must be a number" in e for e in errors)
+
+    def test_bool_offset_is_rejected(self, tmp_path: Path) -> None:
+        errors = self._config(tmp_path, True).validate()
+
+        assert any("offset must be a number" in e for e in errors)
+
+    def test_valid_offset_passes(self, tmp_path: Path) -> None:
+        assert not [e for e in self._config(tmp_path, -0.24).validate() if "offset" in e]

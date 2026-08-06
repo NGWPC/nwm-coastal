@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -107,6 +108,13 @@ class ElevationDataset:
     #: Example: a CUDEM (NAVD88) primary filled by GEBCO (MSL) on the Texas
     #: coast, where MSL sits about 0.24 m above NAVD88, needs ``offset:
     #: -0.24`` on the GEBCO entry to put both on NAVD88.
+    #:
+    #: A single number is a *local* approximation.  Datum separations vary in
+    #: space -- MSL against NAVD88 changes by 0.25 m across the four gauges
+    #: around Matagorda Bay alone -- so a scalar removes the step near where
+    #: it was measured and leaves a residual elsewhere.  Record where the
+    #: value came from, and for a domain wide enough that one number will not
+    #: do, pre-transform the raster instead.
     offset: float = 0.0
 
 
@@ -560,6 +568,18 @@ class SfincsCreateConfig:
         if not self.elevation.datasets:
             errors.append("elevation.datasets must contain at least one entry")
         for ds in self.elevation.datasets:
+            # NaN would silently void the dataset (hydromt adds the offset,
+            # turning every cell of that source invalid, and the coarser fill
+            # takes over its whole footprint); inf would poison the bed. A
+            # bool is an int in Python and never a real elevation shift.
+            if isinstance(ds.offset, bool) or not isinstance(ds.offset, (int, float)):
+                errors.append(
+                    f"elevation.datasets[{ds.name}].offset must be a number, got {ds.offset!r}"
+                )
+            elif not math.isfinite(ds.offset):
+                errors.append(
+                    f"elevation.datasets[{ds.name}].offset must be finite, got {ds.offset!r}"
+                )
             if ds.source is not None and ds.source not in self._VALID_ELEV_SOURCES:
                 errors.append(
                     f"elevation.datasets[{ds.name}].source must be one of "
