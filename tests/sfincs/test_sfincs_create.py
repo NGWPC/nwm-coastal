@@ -45,6 +45,7 @@ from coastal_calibration.sfincs.create import (
     _elevation_list,
     _get_model,
     _set_model,
+    _stage_fingerprint,
     create_stages,
 )
 
@@ -832,7 +833,8 @@ class TestSfincsCreator:
     def test_status_tracking(self, minimal_create_config: SfincsCreateConfig) -> None:
         creator = SfincsCreator(minimal_create_config)
         assert creator._load_status() == {}
-        creator._save_stage_status("create_grid")
+        creator._record_stage("create_grid")
+        creator._commit_status()
         status = creator._load_status()
         assert "create_grid" in status["completed_stages"]
 
@@ -1665,7 +1667,8 @@ class TestResumeFingerprint:
         """Record every stage before *start_from* under the current config."""
         order = creator.stage_order
         for stage in order[: order.index(start_from)]:
-            creator._save_stage_status(stage)
+            creator._record_stage(stage)
+        creator._commit_status()
 
     def test_every_stage_declares_its_config(
         self, minimal_create_config: SfincsCreateConfig
@@ -1674,6 +1677,9 @@ class TestResumeFingerprint:
         creator = SfincsCreator(minimal_create_config)
 
         assert not set(creator.stage_order) - set(_STAGE_CONFIG_DEPS)
+        # Only the write stage reads no config; an empty tuple anywhere else
+        # would silently opt that stage out of the check.
+        assert not [s for s, deps in _STAGE_CONFIG_DEPS.items() if not deps and s != "create_write"]
 
     def test_unchanged_config_resumes(self, minimal_create_config: SfincsCreateConfig) -> None:
         creator = SfincsCreator(minimal_create_config)
@@ -1793,7 +1799,8 @@ class TestResumeFingerprint:
     ) -> None:
         """The fingerprint check must not shadow the completeness check."""
         creator = SfincsCreator(minimal_create_config)
-        creator._save_stage_status("create_grid")
+        creator._record_stage("create_grid")
+        creator._commit_status()
 
         errors = creator._check_prerequisites("create_mask")
 
@@ -1847,3 +1854,337 @@ class TestResumeCatalogRegistration:
         SfincsCreator(cfg)._register_fetched_catalogs()
 
         assert cfg.data_catalog.data_libs == []
+
+
+class TestResumeGuardHoles:
+    """Regressions for the ways the guard could be passed with stale state."""
+
+    def _completed_through(self, creator: SfincsCreator, start_from: str) -> None:
+        order = creator.stage_order
+        for stage in order[: order.index(start_from)]:
+            creator._record_stage(stage)
+        creator._commit_status()
+
+    def test_nested_file_edits_count(self, minimal_create_config: SfincsCreateConfig) -> None:
+        """A path nested in a dataclass was serialized by name, not content.
+
+        Rewriting a reclassification table in place left the subgrid
+        fingerprint untouched, so a resume reused the old tables.
+        """
+        cfg = minimal_create_config
+        cfg.subgrid.reclass_table = cfg.output_dir / "reclass.csv"
+        cfg.subgrid.reclass_table.write_text("lulc,manning\n10,0.04\n")
+        before = _stage_fingerprint(cfg, "create_subgrid")
+
+        cfg.subgrid.reclass_table.write_text("lulc,manning\n10,0.99\n")
+
+        assert _stage_fingerprint(cfg, "create_subgrid") != before
+
+    def test_a_moved_nested_file_does_not_count(
+        self, minimal_create_config: SfincsCreateConfig, tmp_path: Path
+    ) -> None:
+        """The other half: same contents at a new path is not a change."""
+        cfg = minimal_create_config
+        first = cfg.output_dir / "reclass.csv"
+        first.write_text("lulc,manning\n10,0.04\n")
+        cfg.subgrid.reclass_table = first
+        before = _stage_fingerprint(cfg, "create_subgrid")
+
+        moved = tmp_path / "moved.csv"
+        moved.write_text(first.read_text())
+        cfg.subgrid.reclass_table = moved
+
+        assert _stage_fingerprint(cfg, "create_subgrid") == before
+
+    def test_a_missing_file_is_distinct_from_a_present_one(
+        self, minimal_create_config: SfincsCreateConfig
+    ) -> None:
+        """Existence must not silently change how a path is represented."""
+        cfg = minimal_create_config
+        cfg.subgrid.reclass_table = cfg.output_dir / "gone.csv"
+        missing = _stage_fingerprint(cfg, "create_subgrid")
+
+        cfg.subgrid.reclass_table.write_text("lulc,manning\n10,0.04\n")
+
+        assert _stage_fingerprint(cfg, "create_subgrid") != missing
+
+    def test_boundary_tuning_is_not_blocked_by_the_mask(
+        self, minimal_create_config: SfincsCreateConfig
+    ) -> None:
+        """`boundary_zmax` belongs to create_boundary, not create_mask.
+
+        Fingerprinting the whole `MaskConfig` refused the ordinary
+        boundary-tuning loop and demanded a mask rebuild.
+        """
+        cfg = minimal_create_config
+        creator = SfincsCreator(cfg)
+        self._completed_through(creator, "create_boundary")
+
+        cfg.mask.boundary_zmax = -9.0
+
+        assert SfincsCreator(cfg)._check_prerequisites("create_boundary") == []
+
+    def test_a_changed_mask_zmin_still_blocks(
+        self, minimal_create_config: SfincsCreateConfig
+    ) -> None:
+        """Splitting the section must not drop the fields that do matter."""
+        cfg = minimal_create_config
+        creator = SfincsCreator(cfg)
+        self._completed_through(creator, "create_boundary")
+
+        cfg.mask.zmin = -99.0
+
+        assert "create_mask" in SfincsCreator(cfg)._check_prerequisites("create_boundary")[0]
+
+    def test_a_changed_data_catalog_blocks(self, minimal_create_config: SfincsCreateConfig) -> None:
+        """Datasets with no `source` resolve through the user's catalogs.
+
+        Repointing one at a different raster changed the merged bed with
+        nothing in the fingerprint to notice.
+        """
+        cfg = minimal_create_config
+        creator = SfincsCreator(cfg)
+        self._completed_through(creator, "create_mask")
+
+        cfg.data_catalog.data_libs = ["/data/other_catalog.yml"]
+
+        assert "create_elevation" in SfincsCreator(cfg)._check_prerequisites("create_mask")[0]
+
+    def test_a_changed_download_dir_blocks(
+        self, minimal_create_config: SfincsCreateConfig, tmp_path: Path
+    ) -> None:
+        """Otherwise the resume dies later on hydromt's unhelpful path error."""
+        cfg = minimal_create_config
+        cfg.download_dir = tmp_path / "downloads"
+        creator = SfincsCreator(cfg)
+        self._completed_through(creator, "create_mask")
+
+        cfg.download_dir = tmp_path / "elsewhere"
+
+        assert "create_fetch_data" in SfincsCreator(cfg)._check_prerequisites("create_mask")[0]
+
+    def test_a_dropped_stage_blocks(
+        self, minimal_create_config: SfincsCreateConfig, tmp_path: Path
+    ) -> None:
+        """A stage the config no longer runs still left artifacts behind.
+
+        `stage_order` is computed, so the stage simply vanished from the
+        comparison and the resume was waved through.
+        """
+        import geopandas as gpd
+        from shapely import box
+
+        flowlines = tmp_path / "flow.geojson"
+        gpd.GeoDataFrame(geometry=[box(-95.4, 29.1, -95.1, 29.4)], crs="EPSG:4326").to_file(
+            flowlines, driver="GeoJSON"
+        )
+        cfg = minimal_create_config
+        cfg.river_discharge = RiverDischargeConfig(flowlines=flowlines, nwm_id_column="feature_id")
+        creator = SfincsCreator(cfg)
+        for stage in creator.stage_order:
+            creator._record_stage(stage)
+        creator._commit_status()
+
+        cfg.river_discharge = None
+
+        errors = SfincsCreator(cfg)._check_prerequisites("create_subgrid")
+        assert "create_discharge" in errors[0]
+        assert "no longer part of the configured pipeline" in errors[0]
+
+    def test_a_run_that_never_wrote_records_nothing(
+        self, minimal_create_config: SfincsCreateConfig
+    ) -> None:
+        """Only create_write puts the model on disk.
+
+        Recording each stage as it finished let a `--stop-after` run rewrite
+        the fingerprints for work it discarded, so the previous model's files
+        then looked like they matched the new config.
+        """
+        creator = SfincsCreator(minimal_create_config)
+        creator._record_stage("create_grid")
+
+        assert not creator._status_path.exists()
+
+    def test_a_null_fingerprint_map_is_tolerated(
+        self, minimal_create_config: SfincsCreateConfig
+    ) -> None:
+        """A hand-edited status file must not raise a bare TypeError."""
+        creator = SfincsCreator(minimal_create_config)
+        order = creator.stage_order
+        creator._status_path.write_text(
+            json.dumps(
+                {
+                    "completed_stages": order[: order.index("create_mask")],
+                    "stage_fingerprints": None,
+                }
+            )
+        )
+
+        assert creator._check_prerequisites("create_mask") == []
+
+
+class TestRunPersistsStatusOnlyWhenWritten:
+    """The `run()` wiring itself, not just the helpers it calls."""
+
+    def _stub_stages(self, creator: SfincsCreator, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Replace every stage with a no-op that reports success.
+
+        `run()` calls `validate()`, which re-initializes the stages, so the
+        stubs have to be installed from there rather than assigned once.
+        """
+
+        def _install() -> None:
+            creator._stages = {}
+            for name in creator.stage_order:
+                stub = MagicMock()
+                stub.run.return_value = {}
+                stub.description = name
+                stub.validate.return_value = []
+                creator._stages[name] = stub
+
+        monkeypatch.setattr(creator, "_init_stages", _install)
+        _install()
+
+    def test_a_run_stopped_before_the_write_records_nothing(
+        self, minimal_create_config: SfincsCreateConfig, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        creator = SfincsCreator(minimal_create_config)
+        self._stub_stages(creator, monkeypatch)
+
+        result = creator.run(stop_after="create_boundary")
+
+        assert result.success
+        assert creator._load_status() == {}
+
+    def test_a_completed_run_records_every_stage(
+        self, minimal_create_config: SfincsCreateConfig, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        creator = SfincsCreator(minimal_create_config)
+        self._stub_stages(creator, monkeypatch)
+
+        result = creator.run()
+
+        assert result.success
+        status = creator._load_status()
+        assert status["completed_stages"] == creator.stage_order
+        assert set(status["stage_fingerprints"]) == set(creator.stage_order)
+
+
+class TestRecordedOffsetsFollowTheConfig:
+    """The flood map reads these back, so a resume must not leave them stale."""
+
+    def _record(self, offsets: dict[str, float]) -> dict[str, Any]:
+        return {
+            "create_fetch_data": {
+                "elevation_rasters": {n: f"/tmp/{n}.tif" for n in offsets},
+                "elevation_offsets": dict(offsets),
+            }
+        }
+
+    def test_a_resume_refreshes_them(self, minimal_create_config: SfincsCreateConfig) -> None:
+        """The recorded offsets must follow the config, not the last fetch.
+
+        Changing an offset sends the user to create_elevation, so the fetch
+        stage never re-runs and its record stayed on the old datum.
+        """
+        cfg = minimal_create_config
+        cfg.elevation.datasets = [
+            ElevationDataset(name="noaa_crm", offset=-0.24),
+            ElevationDataset(name="gebco_15arcs", offset=0.0),
+        ]
+        outputs = self._record({"noaa_crm": 0.0, "gebco_15arcs": 0.0})
+
+        SfincsCreator(cfg)._refresh_recorded_offsets(outputs)
+
+        assert outputs["create_fetch_data"]["elevation_offsets"] == {
+            "noaa_crm": -0.24,
+            "gebco_15arcs": 0.0,
+        }
+
+    def test_unknown_datasets_are_left_alone(
+        self, minimal_create_config: SfincsCreateConfig
+    ) -> None:
+        """A name the config no longer has keeps whatever was recorded."""
+        cfg = minimal_create_config
+        cfg.elevation.datasets = [ElevationDataset(name="noaa_crm", offset=-0.24)]
+        outputs = self._record({"noaa_crm": 0.0, "retired": 1.5})
+
+        SfincsCreator(cfg)._refresh_recorded_offsets(outputs)
+
+        assert outputs["create_fetch_data"]["elevation_offsets"]["retired"] == 1.5
+
+    def test_a_record_without_offsets_is_untouched(
+        self, minimal_create_config: SfincsCreateConfig
+    ) -> None:
+        """Models built before offsets existed have no such key."""
+        outputs: dict[str, Any] = {"create_fetch_data": {"elevation_rasters": {}}}
+
+        SfincsCreator(minimal_create_config)._refresh_recorded_offsets(outputs)
+
+        assert outputs == {"create_fetch_data": {"elevation_rasters": {}}}
+
+    def test_a_resumed_run_refreshes_the_record_on_disk(
+        self, minimal_create_config: SfincsCreateConfig, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """End to end: the refresh must actually be wired into `run()`.
+
+        A resume folds the previous run's outputs back in, which is what
+        carried the stale offsets forward.
+        """
+        cfg = minimal_create_config
+        cfg.elevation.datasets = [ElevationDataset(name="noaa_crm", offset=-0.24)]
+        creator = SfincsCreator(cfg)
+
+        def _install() -> None:
+            creator._stages = {}
+            for name in creator.stage_order:
+                stub = MagicMock()
+                stub.run.return_value = {}
+                stub.description = name
+                stub.validate.return_value = []
+                creator._stages[name] = stub
+
+        monkeypatch.setattr(creator, "_init_stages", _install)
+        monkeypatch.setattr(
+            "coastal_calibration.sfincs.create._load_existing_model", lambda _cfg: None
+        )
+        _install()
+
+        order = creator.stage_order
+        for stage in order[: order.index("create_mask")]:
+            creator._record_stage(stage)
+        creator._commit_status()
+        result_file = cfg.output_dir / "create_result.json"
+        result_file.write_text(
+            json.dumps(
+                {
+                    "outputs": {
+                        "create_fetch_data": {
+                            "elevation_rasters": {"noaa_crm": "/tmp/noaa_crm.tif"},
+                            "elevation_offsets": {"noaa_crm": 0.0},
+                        }
+                    }
+                }
+            )
+        )
+
+        assert creator.run(start_from="create_mask").success
+        recorded = json.loads(result_file.read_text())["outputs"]["create_fetch_data"]
+        assert recorded["elevation_offsets"] == {"noaa_crm": -0.24}
+        assert recorded["elevation_rasters"] == {"noaa_crm": "/tmp/noaa_crm.tif"}
+
+    def test_catalogs_the_fetch_stage_appends_are_ignored(
+        self, minimal_create_config: SfincsCreateConfig
+    ) -> None:
+        """`data_libs` is mutated at runtime, so only user entries compare.
+
+        create_fetch_data appends one catalog per fetched raster in memory.
+        Fingerprinting the whole list made every ordinary resume look like a
+        config change, because the list is empty again when the check runs.
+        """
+        cfg = minimal_create_config
+        before = _stage_fingerprint(cfg, "create_elevation")
+        cfg.effective_download_dir.mkdir(parents=True, exist_ok=True)
+        cfg.data_catalog.data_libs.append(str(cfg.effective_download_dir / "noaa_crm_catalog.yml"))
+
+        assert _stage_fingerprint(cfg, "create_elevation") == before

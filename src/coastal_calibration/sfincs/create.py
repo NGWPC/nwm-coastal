@@ -79,16 +79,22 @@ def _get_model(config: SfincsCreateConfig) -> SfincsModel:
 #: :class:`SfincsCreateConfig`.  ``--start-from`` skips earlier stages and
 #: reuses their outputs, so these are fingerprinted to catch a config edit
 #: that would pair those stale outputs with new settings.  Entries name only
-#: what changes a stage's result, so that editing a setting only blocks the
-#: stages it actually reaches: ``offset`` and ``zmin`` change the merged bed
-#: but not which rasters are downloaded, and :attr:`~SfincsCreateConfig.aoi_key`
-#: is already the identity the fetcher caches under.
+#: what changes a stage's result, down to the field where a whole section
+#: would refuse a resume the user is entitled to: ``create_mask`` and
+#: ``create_boundary`` split :class:`MaskConfig` between them so that tuning
+#: ``boundary_zmax`` does not read as a mask change.
+#:
+#: Known limit: ``data_catalog`` covers which catalogs are listed, not what is
+#: inside them, so editing a catalog file in place is invisible here.
 _STAGE_CONFIG_DEPS: dict[str, tuple[str, ...]] = {
-    "create_grid": ("aoi", "aoi_simplify_neck_m", "grid"),
-    "create_fetch_data": ("aoi_key",),
-    "create_elevation": ("elevation",),
-    "create_mask": ("mask",),
-    "create_boundary": ("mask",),
+    "create_grid": ("aoi", "aoi_simplify_neck_m", "grid", "data_catalog"),
+    # ``aoi_key`` is the identity the fetcher already caches under, so a
+    # setting that changes the merge but not the download does not force a
+    # re-fetch.  ``download_dir`` decides where the catalogs are looked for.
+    "create_fetch_data": ("aoi_key", "download_dir"),
+    "create_elevation": ("elevation", "data_catalog"),
+    "create_mask": ("mask.zmin", "mask.keep_largest_only"),
+    "create_boundary": ("mask.boundary_zmax", "mask.reset_bounds"),
     "create_discharge": ("river_discharge",),
     "create_obs": (
         "add_noaa_gages",
@@ -99,28 +105,64 @@ _STAGE_CONFIG_DEPS: dict[str, tuple[str, ...]] = {
         "obs_snap_search_radius_m",
     ),
     # Merges the elevation datasets a second time, so it moves with them.
-    "create_subgrid": ("subgrid", "elevation"),
+    "create_subgrid": ("subgrid", "elevation", "data_catalog"),
     "create_write": (),
 }
+
+#: The only stage that puts the model on disk.
+_WRITE_STAGE = "create_write"
+
+
+def _canonical(value: Any) -> Any:
+    """Represent *value* so that equal configs hash equally.
+
+    Files stand for their contents at any depth, not for where they sit, so
+    editing a refinement polygon or a reclassification table in place counts
+    as a change while relocating a project does not.  A path with no file
+    behind it keeps a distinct shape of its own rather than borrowing the
+    representation of a file that happens to exist.
+    """
+    if isinstance(value, Path):
+        if value.is_file():
+            return {"sha256": hashlib.sha256(value.read_bytes()).hexdigest()[:16]}
+        return {"missing": str(value)}
+    if is_dataclass(value) and not isinstance(value, type):
+        return _canonical(asdict(value))
+    if isinstance(value, dict):
+        return {str(k): _canonical(v) for k, v in cast("dict[Any, Any]", value).items()}
+    if isinstance(value, (list, tuple)):
+        return [_canonical(v) for v in cast("list[Any]", value)]
+    return value
+
+
+def _user_data_libs(cfg: SfincsCreateConfig) -> list[str]:
+    """Return the configured catalogs, minus the ones the fetch stage adds.
+
+    ``create_fetch_data`` appends a catalog per fetched raster to
+    ``data_libs`` in memory, so the list differs between a fresh run and a
+    resume that has not reached that stage.  Only the user's own entries are
+    stable enough to compare, and they are the ones that decide where a
+    dataset with no ``source`` resolves from.
+    """
+    derived = f"{cfg.effective_download_dir}/"
+    return [lib for lib in cfg.data_catalog.data_libs if not lib.startswith(derived)]
 
 
 def _stage_fingerprint(cfg: SfincsCreateConfig, stage: str) -> str:
     """Hash the config *stage* consumes.
 
     Lists keep their order, so reordering ``elevation.datasets`` registers as
-    a change.  Files are hashed by content rather than by path, so editing the
-    AOI counts but moving the project does not.
+    a change.
     """
     payload: dict[str, Any] = {}
     for dep in _STAGE_CONFIG_DEPS.get(stage, ()):
+        if dep == "data_catalog":
+            payload[dep] = _user_data_libs(cfg)
+            continue
         value: Any = cfg
         for part in dep.split("."):
             value = getattr(value, part)
-        if isinstance(value, Path) and value.is_file():
-            value = hashlib.sha256(value.read_bytes()).hexdigest()[:16]
-        elif is_dataclass(value) and not isinstance(value, type):
-            value = asdict(value)
-        payload[dep] = value
+        payload[dep] = _canonical(value)
     blob = json.dumps(payload, sort_keys=True, default=str)
     return hashlib.sha256(blob.encode()).hexdigest()[:16]
 
@@ -1476,6 +1518,7 @@ class SfincsCreator:
 
     def __init__(self, config: SfincsCreateConfig) -> None:
         self.config = config
+        self._pending_status: dict[str, str] = {}
 
         # Ensure the output directory exists early so file logging can start.
         config.output_dir.mkdir(parents=True, exist_ok=True)
@@ -1515,17 +1558,33 @@ class SfincsCreator:
             return json.loads(self._status_path.read_text())
         return {}
 
-    def _save_stage_status(self, stage_name: str) -> None:
-        """Mark *stage_name* as completed in the status file."""
+    def _record_stage(self, stage_name: str) -> None:
+        """Buffer *stage_name* as completed until the model reaches disk."""
+        self._pending_status[stage_name] = _stage_fingerprint(self.config, stage_name)
+
+    def _commit_status(self) -> None:
+        """Write the buffered completions, once the model is written.
+
+        Every stage before ``create_write`` builds in memory, so a run that
+        stops or fails ahead of it leaves nothing on disk to resume from.
+        Recording each stage as it finished let such a run rewrite the
+        fingerprints for work it then discarded: ``--stop-after`` in the
+        middle of a resume made the *previous* model's files look like they
+        matched the current config, and the next resume read that as an
+        all-clear.  Buffering means a discarded run records nothing, so the
+        status keeps describing the model that is actually there.
+        """
         status = self._load_status()
         completed: list[str] = status.get("completed_stages", [])
-        if stage_name not in completed:
-            completed.append(stage_name)
+        fingerprints: dict[str, str] = status.get("stage_fingerprints") or {}
+        for stage_name, fingerprint in self._pending_status.items():
+            if stage_name not in completed:
+                completed.append(stage_name)
+            fingerprints[stage_name] = fingerprint
         status["completed_stages"] = completed
-        fingerprints: dict[str, str] = status.get("stage_fingerprints", {})
-        fingerprints[stage_name] = _stage_fingerprint(self.config, stage_name)
         status["stage_fingerprints"] = fingerprints
         self._status_path.write_text(json.dumps(status, indent=2) + "\n")
+        self._pending_status.clear()
 
     def _register_fetched_catalogs(self) -> None:
         """Re-add the catalogs ``create_fetch_data`` wrote, when it is skipped.
@@ -1541,6 +1600,46 @@ class SfincsCreator:
             if path_str not in self.config.data_catalog.data_libs:
                 self.config.data_catalog.data_libs.append(path_str)
 
+    def _refresh_recorded_offsets(self, outputs: dict[str, Any]) -> None:
+        """Bring the recorded elevation offsets back in line with the config.
+
+        ``create_fetch_data`` snapshots each dataset's offset, and the
+        flood-map stage reads that record to shift the DEM it downscales onto.
+        Changing an offset does not change what is fetched, so the guard sends
+        the user to ``create_elevation`` and the fetch stage never re-runs:
+        the bed moved to the new datum while the record still described the
+        old one, and every later flood map came out wrong by the difference.
+        Which rasters were fetched is keyed by ``aoi_key``, so a resume that
+        gets this far is reusing the right files under the wrong offsets.
+        """
+        fetched = outputs.get("create_fetch_data")
+        if not isinstance(fetched, dict) or "elevation_offsets" not in fetched:
+            return
+        recorded = cast("dict[str, Any]", fetched)["elevation_offsets"]
+        if not isinstance(recorded, dict):
+            return
+        current = {d.name: d.offset for d in self.config.elevation.datasets}
+        for name in cast("dict[str, Any]", recorded):
+            if name in current:
+                cast("dict[str, Any]", recorded)[name] = current[name]
+
+    def _save_result(self, result: WorkflowResult, start_from: str | None) -> None:
+        """Write ``create_result.json``, folding in a resumed run's history.
+
+        A resume only re-executes some stages, so overwriting would drop
+        ``create_fetch_data`` and with it the elevation raster the flood-map
+        stage resolves its DEM from.
+        """
+        result_file = self.config.output_dir / "create_result.json"
+        if start_from and result_file.is_file():
+            try:
+                previous = json.loads(result_file.read_text()).get("outputs", {})
+            except (OSError, ValueError):
+                previous = {}
+            result.outputs = {**previous, **result.outputs}
+            self._refresh_recorded_offsets(result.outputs)
+        result.save(result_file)
+
     def _check_prerequisites(self, start_from: str) -> list[str]:
         """Verify that all stages before *start_from* can be skipped safely.
 
@@ -1553,6 +1652,22 @@ class SfincsCreator:
         all_stages = self.stage_order
         if start_from not in all_stages:
             return [f"Unknown stage: {start_from}"]
+
+        # A stage the config no longer asks for still left its artifacts in the
+        # model, and dropping out of ``stage_order`` would take it out of the
+        # comparison below entirely.
+        dropped = [s for s in completed if s not in all_stages]
+        if dropped:
+            return [
+                (
+                    f"Cannot start from '{start_from}': stage(s) "
+                    f"{', '.join(repr(s) for s in sorted(dropped))} completed for this "
+                    f"model but are no longer part of the configured pipeline.  Their "
+                    f"output is still in the model and a resume would write it back "
+                    f"out.  Rebuild the model from scratch.  "
+                    f"(Status file: {self._status_path})"
+                )
+            ]
 
         start_idx = all_stages.index(start_from)
         skipped = all_stages[:start_idx]
@@ -1569,7 +1684,7 @@ class SfincsCreator:
 
         # Models built before fingerprints were recorded have no entry, and
         # resume for them behaves as it always did.
-        recorded: dict[str, str] = status.get("stage_fingerprints", {})
+        recorded: dict[str, str] = status.get("stage_fingerprints") or {}
         changed = [
             s
             for s in skipped
@@ -1722,7 +1837,9 @@ class SfincsCreator:
                         self._results[current_stage] = result
                         outputs[current_stage] = result
                         stages_completed.append(current_stage)
-                        self._save_stage_status(current_stage)
+                        self._record_stage(current_stage)
+                        if current_stage == _WRITE_STAGE:
+                            self._commit_status()
 
             self.monitor.end_workflow(success=True)
             success = True
@@ -1745,18 +1862,7 @@ class SfincsCreator:
             errors=errors,
         )
 
-        result_file = self.config.output_dir / "create_result.json"
-        # A resumed run only re-executes some stages, so fold its outputs into
-        # whatever the previous run recorded. Overwriting would drop
-        # create_fetch_data, and with it the elevation raster the flood-map
-        # stage resolves its DEM from.
-        if start_from and result_file.is_file():
-            try:
-                previous = json.loads(result_file.read_text()).get("outputs", {})
-            except (OSError, ValueError):
-                previous = {}
-            result.outputs = {**previous, **result.outputs}
-        result.save(result_file)
+        self._save_result(result, start_from)
         self.monitor.save_progress(self.config.output_dir / "create_progress.json")
 
         return result
