@@ -17,7 +17,16 @@ if TYPE_CHECKING:
     from hydromt_sfincs import SfincsModel
     from numpy.typing import NDArray
 
-__all__ = ["create_flood_depth_map"]
+__all__ = ["FloodmapInputError", "create_flood_depth_map"]
+
+
+class FloodmapInputError(Exception):
+    """A flood map was asked for but its inputs are not there.
+
+    Distinct from the errors hydromt and rasterio raise, so the workflow
+    stage can skip on "this run has nothing to downscale" without also
+    swallowing a genuine defect from deeper down.
+    """
 
 
 def _ensure_overviews(tif_path: Path, log: Any) -> None:
@@ -56,6 +65,7 @@ def _reduce_zsmax(zsmax: Any) -> tuple[Any, NDArray[np.float32]]:
     time-collapsed DataArray and *zs_flat* is a 1-D float32 numpy array
     suitable for index-based lookup.
     """
+    import hydromt  # noqa: F401  # pyright: ignore[reportUnusedImport]  # registers .raster
     import xugrid as xu
 
     if isinstance(zsmax, xu.UgridDataArray):
@@ -78,6 +88,90 @@ def _reduce_zsmax(zsmax: Any) -> tuple[Any, NDArray[np.float32]]:
         zs_flat = np.asarray(zsmax.values, dtype=np.float32).flatten(order="F")
     zs_flat[~np.isfinite(zs_flat)] = np.nan
     return zsmax, zs_flat
+
+
+def _assert_index_hits_the_model(index_path: Path, dem_path: Path) -> None:
+    """Fail loudly when the index COG maps no DEM pixel to any model cell.
+
+    This is the one failure in the whole flood-map path that is otherwise
+    silent: every pixel lands on nodata, the depths all come out NaN, and an
+    empty GeoTIFF is written as if nothing were wrong. The usual cause is a
+    DEM whose CRS differs from the model's, which puts every sampled point
+    outside the grid -- exactly the upstream ``make_index_cog`` bug that
+    :func:`~coastal_calibration.sfincs._hydromt_compat.patch_make_index_cog`
+    exists to fix. Checking here means that patch can be removed and the
+    result re-tested without an empty map slipping through.
+    """
+    import rasterio
+
+    with rasterio.open(index_path) as src:
+        nodata = 2147483647 if src.nodata is None else int(src.nodata)
+        for _, window in src.block_windows(1):
+            if (src.read(1, window=window) != nodata).any():
+                return
+
+    msg = (
+        f"The index in {index_path.name} maps no DEM pixel to a model cell, so the "
+        f"flood map would come out empty. Check that {dem_path.name} overlaps the "
+        "model domain and that its CRS is handled when sampling the grid."
+    )
+    raise ValueError(msg)
+
+
+#: A cell counts as never wet only at (numerically) zero depth. Deliberately
+#: not ``hmin``: that is the threshold for calling a *pixel* flooded, and a cell
+#: holding less than it can still contain DEM pixels below the cell's recorded
+#: minimum that carry more.
+_DRY_CELL_TOL = 1e-6
+
+
+def _blank_dry_cells(zsmax: Any, output: Any, log: Any) -> Any:
+    """Blank out model cells the simulation never actually flooded.
+
+    On a cell that stayed dry, SFINCS writes ``zsmax`` equal to that cell's
+    bed level.  Downscaling subtracts the *high-resolution* DEM instead, so
+    every DEM pixel lying below the cell's mean bed elevation comes out as
+    flooded, by as much as the relief within one cell.  Setting those cells
+    to NaN drops them from the map: the model itself reports zero depth
+    there.  ``msk == 0`` cells are outside the active domain entirely.
+    """
+    if "zb" not in output:
+        return zsmax
+
+    zb = np.asarray(output["zb"].to_numpy(), dtype=np.float64)
+    reduced, _ = _reduce_zsmax(zsmax)
+    depth = np.asarray(reduced.to_numpy(), dtype=np.float64) - zb
+
+    drop = ~np.isfinite(depth) | (depth <= _DRY_CELL_TOL)
+    if "msk" in output:
+        drop |= np.asarray(output["msk"].to_numpy()) == 0
+
+    n_drop = int(drop.sum())
+    if n_drop:
+        log(f"Excluding {n_drop} of {drop.size} model cells that never flooded")
+    return reduced.where(~drop)
+
+
+def _baseline_water_surface(output: Any) -> Any:
+    """Return the lowest water surface each cell reaches, or *None*.
+
+    A pixel under water even at the model's driest moment is permanently
+    wet: sea, estuary, lake. Deriving that from the model beats cutting on
+    DEM elevation, which also discards land lying below the vertical datum
+    but hydraulically dry, such as leveed polders or subsided urban ground.
+    """
+    if "zs" not in output or "zb" not in output:
+        return None
+    zs = output["zs"]
+    timedim = [d for d in zs.dims if "time" in str(d).lower()]
+    baseline = zs.min(timedim) if timedim else zs
+
+    # On a dry cell SFINCS writes zs == zb, so a naive comparison against the
+    # DEM would read every sub-cell pixel below the cell bed as already wet.
+    # A cell holding no water at baseline has no permanently wet pixels at
+    # all, so blank it and let those pixels be judged on depth alone.
+    zb = output["zb"]
+    return baseline.where((baseline - zb) > _DRY_CELL_TOL)
 
 
 def _depth_from_index(
@@ -107,6 +201,7 @@ def _depth_from_rasterize(
     reproj_method: str,
 ) -> Any:
     """Compute flood depth for a DEM block by rasterizing zsmax."""
+    import hydromt  # noqa: F401  # pyright: ignore[reportUnusedImport]  # registers .raster
     import xarray as xr
     import xugrid as xu
 
@@ -136,16 +231,23 @@ def _write_floodmap_cog(
     hmin: float,
     reproj_method: str,
     nrmax: int,
+    baseline: Any,
 ) -> None:
     """Write a flood-depth COG at the full DEM resolution.
 
     Reads the DEM (and optional index COG) at full resolution---avoiding
     the upstream ``overview_level=0`` bug---and writes block-by-block.
+
+    When *baseline* is given (the per-cell minimum water surface), pixels
+    already under water at the model's driest moment are dropped, so the
+    result is inundation rather than inundation plus the permanently wet
+    sea.
     """
     import rasterio
     from rasterio.windows import Window
 
     zsmax, zs_flat = _reduce_zsmax(zsmax)
+    base_flat = None if baseline is None else _reduce_zsmax(baseline)[1]
 
     with rasterio.open(dem_path) as src:
         dem_crs: Any = src.crs
@@ -213,6 +315,12 @@ def _write_floodmap_cog(
 
                         h[~np.isfinite(h)] = np.nan
                         h[h <= hmin] = np.nan
+                        if base_flat is not None and idx_src is not None:
+                            # Permanently wet: under water even at the minimum.
+                            wet = _depth_from_index(
+                                idx_src, base_flat, dep_block, window, idx_nodata
+                            )
+                            h[np.isfinite(wet) & (wet > 0.0)] = np.nan
                         dst.write(h[np.newaxis, :, :], window=window)
         finally:
             if idx_src is not None:
@@ -227,6 +335,7 @@ def create_flood_depth_map(
     index_path: Path | str | None = None,
     create_index: bool = True,
     hmin: float = 0.05,
+    land_only: bool = True,
     reproj_method: str = "nearest",
     nrmax: int = 2000,
     model: SfincsModel | None = None,
@@ -257,6 +366,9 @@ def create_flood_depth_map(
         significantly for large DEMs.
     hmin : float
         Minimum flood depth (m) to classify a pixel as flooded.
+    land_only : bool
+        Drop pixels the model shows as permanently wet, so the map is
+        inundation rather than inundation plus the sea.
     reproj_method : str
         Reprojection method (``"nearest"`` or ``"bilinear"``).
     nrmax : int
@@ -278,7 +390,7 @@ def create_flood_depth_map(
     ------
     FileNotFoundError
         If the DEM or ``sfincs_map.nc`` cannot be found.
-    KeyError
+    FloodmapInputError
         If ``zsmax`` is not present in the SFINCS map output.
     """
     # registers the ``DataArray.raster`` accessor used below
@@ -327,10 +439,11 @@ def create_flood_depth_map(
         model.output.read()
 
     if "zsmax" not in model.output.data:
-        raise KeyError(
+        msg = (
             "Variable 'zsmax' not found in SFINCS map output. "
             "Ensure SFINCS was configured to write zsmax (storzsmax = 1 in sfincs.inp)."
         )
+        raise FloodmapInputError(msg)
     zsmax = model.output.data["zsmax"]
     _info(f"Loaded zsmax from {map_file}")
 
@@ -348,6 +461,7 @@ def create_flood_depth_map(
                 topobathy_fn=str(dem_path),
                 nrmax=nrmax,
             )
+        _assert_index_hits_the_model(index_path, dem_path)
         _ensure_overviews(index_path, _info)
         _info(f"Index COG created ({index_path.stat().st_size / 1e6:.1f} MB)")
 
@@ -361,13 +475,14 @@ def create_flood_depth_map(
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     _write_floodmap_cog(
-        zsmax=zsmax,
+        zsmax=_blank_dry_cells(zsmax, model.output.data, _info),
         dem_path=dem_path,
         index_path=index_path if index_path.exists() else None,
         output_path=output_path,
         hmin=hmin,
         reproj_method=reproj_method,
         nrmax=nrmax,
+        baseline=_baseline_water_surface(model.output.data) if land_only else None,
     )
 
     _ensure_overviews(output_path, _info)

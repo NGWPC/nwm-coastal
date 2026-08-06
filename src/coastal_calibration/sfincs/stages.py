@@ -11,6 +11,7 @@ module-level registry keyed by config ``id``.
 
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 from datetime import datetime, timedelta
@@ -1402,12 +1403,16 @@ class SfincsDischargeStage(_SfincsStageBase):
                 end_dt,
             )
             if not files:
-                self._log(
-                    f"No CHRTOUT files found in {streamflow_dir} "
-                    f"for {start_dt:%Y-%m-%d %H:%M}-{end_dt:%Y-%m-%d %H:%M}, "
-                    "discharge points will use default (zero) values"
+                # Zero discharge is a plausible-looking wrong answer: the run
+                # completes and the water levels are simply missing every river
+                # inflow. SCHISM raises here, so SFINCS does too.
+                msg = (
+                    f"No CHRTOUT files found in {streamflow_dir} for "
+                    f"{start_dt:%Y-%m-%d %H:%M}-{end_dt:%Y-%m-%d %H:%M}. Run the "
+                    "download stage for this window, or set model_config."
+                    "merge_discharge to false to run without river inflow."
                 )
-                return
+                raise FileNotFoundError(msg)
             df_fid = read_streamflow(
                 needed_fids,
                 start_dt,
@@ -1780,15 +1785,64 @@ class SfincsFloodMapStage(_SfincsStageBase):
     name = "sfincs_floodmap"
     description = "Downscale flood depth map"
 
+    def _dem_from_model_build(self) -> Path | None:
+        """Return the elevation raster the model was built from, if recorded.
+
+        ``create_fetch_data`` records every raster it *fetched*, in the order
+        they are listed under ``elevation.datasets``, so the first recorded
+        one is the highest-priority fetched source. Datasets without a
+        ``source`` are supplied through the user's own catalog and never
+        appear here; set ``floodmap_dem`` explicitly in that case.
+        """
+        record = Path(self.sfincs.prebuilt_dir) / "create_result.json"
+        if not record.is_file():
+            return None
+        try:
+            rasters = json.loads(record.read_text())["outputs"]["create_fetch_data"][
+                "elevation_rasters"
+            ]
+        except (OSError, ValueError, KeyError, TypeError):
+            self._log(f"Could not read elevation rasters from {record.name}", "warning")
+            return None
+
+        for name, path in rasters.items():
+            if Path(path).is_file():
+                self._log(f"Using '{name}' from the model build as the flood-map DEM")
+                return Path(path)
+        return None
+
+    def _resolve_dem(self) -> Path | None:
+        """Return the DEM to downscale onto.
+
+        ``floodmap_dem`` wins when set, and stays necessary for a model that
+        was never built by ``coastal-calibration create`` (a prebuilt SFINCS
+        model driven by ``run`` alone has no record to read). It is also the
+        only way to select an ``elevation.datasets`` entry with no ``source``,
+        since those come from the user's own catalog and are never recorded.
+
+        Otherwise the DEM comes from the model build, so a config that ran
+        ``create`` does not have to repeat a path only that stage knew.
+        """
+        if self.sfincs.floodmap_dem is not None:
+            self._log(f"Using model_config.floodmap_dem: {self.sfincs.floodmap_dem}")
+            return self.sfincs.floodmap_dem
+        return self._dem_from_model_build()
+
     def run(self) -> dict[str, Any]:
         """Generate a downscaled flood depth COG from SFINCS output."""
-        if self.sfincs.floodmap_dem is None:
-            self._log("floodmap_dem not configured, skipping flood map stage")
-            return {"status": "skipped", "reason": "no DEM configured"}
-
         if not self.sfincs.floodmap_enabled:
             self._log("Flood map generation disabled, skipping")
             return {"status": "skipped", "reason": "disabled"}
+
+        dem_path = self._resolve_dem()
+        if dem_path is None:
+            self._log(
+                "No flood-map DEM. Either build the model with "
+                "`coastal-calibration create`, which records the elevation raster it "
+                "fetched, or set model_config.floodmap_dem to a DEM covering the "
+                "model domain. Skipping the flood map."
+            )
+            return {"status": "skipped", "reason": "no DEM configured"}
 
         model_root = get_model_root(self.config)
         map_file = model_root / "sfincs_map.nc"
@@ -1797,7 +1851,6 @@ class SfincsFloodMapStage(_SfincsStageBase):
             self._log("sfincs_map.nc not found, skipping flood map stage")
             return {"status": "skipped", "reason": "no map output"}
 
-        dem_path = self.sfincs.floodmap_dem
         if not dem_path.exists():
             self._log(f"DEM not found: {dem_path}, skipping flood map stage", "warning")
             return {"status": "skipped", "reason": "DEM not found"}
@@ -1805,7 +1858,10 @@ class SfincsFloodMapStage(_SfincsStageBase):
         self._update_substep("Reading SFINCS output")
         model = _get_model(self.config)
 
-        from coastal_calibration.sfincs.floodmap import create_flood_depth_map
+        from coastal_calibration.sfincs.floodmap import (
+            FloodmapInputError,
+            create_flood_depth_map,
+        )
 
         self._update_substep("Downscaling flood depth")
         try:
@@ -1813,10 +1869,14 @@ class SfincsFloodMapStage(_SfincsStageBase):
                 model_root=model_root,
                 dem_path=dem_path,
                 hmin=self.sfincs.floodmap_hmin,
+                land_only=self.sfincs.floodmap_land_only,
                 model=model,
                 log=self._log,
             )
-        except (KeyError, FileNotFoundError) as exc:
+        except (FloodmapInputError, FileNotFoundError) as exc:
+            # Deliberately narrow: anything else -- a hydromt KeyError, a
+            # rasterio failure -- is a defect and must not be downgraded to a
+            # silently skipped stage.
             self._log(
                 f"Flood map generation failed ({exc}); skipping flood map stage",
                 "warning",
