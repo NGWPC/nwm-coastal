@@ -298,9 +298,44 @@ class SfincsCreateConfig:
             self.download_dir = Path(self.download_dir).expanduser().resolve()
 
     @property
+    def aoi_key(self) -> str:
+        """Short identifier for this cache, e.g. ``aoi_3f9c1a2b``.
+
+        Every fetcher clips to the AOI's buffered WGS 84 bounding box, so
+        those bounds determine the raster's extent. Rasters are named after
+        their dataset (``noaa_crm.tif``) and reused whenever the file is
+        already there, so the key also has to cover the other inputs that
+        change a raster's *content* under an unchanged name: which source
+        is fetched, which NOAA dataset, and which NWS domain. Without that,
+        flipping ``noaa_dataset`` from one survey to another would silently
+        reuse the first one.
+        """
+        import hashlib
+
+        import geopandas as gpd
+
+        bounds = gpd.read_file(self.aoi).to_crs(4326).total_bounds
+        parts = [
+            ",".join(f"{v:.6f}" for v in bounds),
+            *(
+                f"{ds.name}|{ds.source}|{ds.noaa_dataset}|{ds.coastal_domain}"
+                for ds in self.elevation.datasets
+            ),
+            f"lulc|{self.subgrid.lulc_dataset}|{self.subgrid.lulc_source}",
+        ]
+        digest = hashlib.sha256("\n".join(parts).encode()).hexdigest()
+        return f"aoi_{digest[:8]}"
+
+    @property
     def effective_download_dir(self) -> Path:
-        """Effective download directory (fallback to output_dir/downloads)."""
-        return self.download_dir or self.output_dir / "downloads"
+        """Per-AOI download directory for fetched rasters.
+
+        Rasters are named after their dataset (``noaa_crm.tif``), so two
+        AOIs sharing one download directory would silently reuse the first
+        one's clipped extent.  The :attr:`aoi_key` subdirectory keeps them
+        apart while still letting reruns of the same AOI hit the cache.
+        """
+        return (self.download_dir or self.output_dir / "downloads") / self.aoi_key
 
     # ------------------------------------------------------------------
     # Stage ordering

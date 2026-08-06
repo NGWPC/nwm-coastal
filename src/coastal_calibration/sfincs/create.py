@@ -391,8 +391,13 @@ class CreateFetchDataStage(_CreateStageBase):
             self.config.data_catalog.data_libs.append(path_str)
         self.sfincs.data_catalog.from_yml(path_str)
 
-    def _fetch_elevation(self, fetched: list[str]) -> None:
-        """Fetch elevation datasets that have a ``source`` set."""
+    def _fetch_elevation(self, fetched: list[str], rasters: dict[str, str]) -> None:
+        """Fetch elevation datasets that have a ``source`` set.
+
+        Records each raster's path in *rasters*, in config order, so the run
+        workflow can find the DEM to downscale onto without the user having
+        to repeat a path only this workflow knows.
+        """
         cfg = self.config
         dl_dir = cfg.effective_download_dir
 
@@ -409,6 +414,7 @@ class CreateFetchDataStage(_CreateStageBase):
                 self._log(f"Reusing existing {tif.name}")
                 self._register_catalog(cat)
                 fetched.append(catalog_name)
+                rasters[catalog_name] = str(tif)
                 continue
 
             if ds.source == "nws_30m":
@@ -475,6 +481,7 @@ class CreateFetchDataStage(_CreateStageBase):
 
             self._register_catalog(cat_path)
             fetched.append(catalog_name)
+            rasters[catalog_name] = str(tif)
 
     def _fetch_lulc(self, fetched: list[str]) -> None:
         """Fetch the LULC dataset if ``lulc_source`` is set."""
@@ -512,10 +519,15 @@ class CreateFetchDataStage(_CreateStageBase):
     def run(self) -> dict[str, Any]:
         """Fetch elevation and LULC datasets for the AOI."""
         fetched: list[str] = []
-        self._fetch_elevation(fetched)
+        elevation_rasters: dict[str, str] = {}
+        self._fetch_elevation(fetched, elevation_rasters)
         self._fetch_lulc(fetched)
         self._log(f"Fetched {len(fetched)} dataset(s): {fetched}")
-        return {"status": "completed", "fetched": fetched}
+        return {
+            "status": "completed",
+            "fetched": fetched,
+            "elevation_rasters": elevation_rasters,
+        }
 
 
 class CreateElevationStage(_CreateStageBase):
@@ -1441,10 +1453,12 @@ class SfincsCreator:
         missing = [s for s in all_stages[:start_idx] if s not in completed]
         if missing:
             return [
-                f"Cannot start from '{start_from}': prerequisite stage(s) "
-                f"{', '.join(repr(s) for s in missing)} have not completed.  "
-                f"Run them first or start from an earlier stage.  "
-                f"(Status file: {self._status_path})"
+                (
+                    f"Cannot start from '{start_from}': prerequisite stage(s) "
+                    f"{', '.join(repr(s) for s in missing)} have not completed.  "
+                    f"Run them first or start from an earlier stage.  "
+                    f"(Status file: {self._status_path})"
+                )
             ]
         return []
 
@@ -1604,6 +1618,16 @@ class SfincsCreator:
         )
 
         result_file = self.config.output_dir / "create_result.json"
+        # A resumed run only re-executes some stages, so fold its outputs into
+        # whatever the previous run recorded. Overwriting would drop
+        # create_fetch_data, and with it the elevation raster the flood-map
+        # stage resolves its DEM from.
+        if start_from and result_file.is_file():
+            try:
+                previous = json.loads(result_file.read_text()).get("outputs", {})
+            except (OSError, ValueError):
+                previous = {}
+            result.outputs = {**previous, **result.outputs}
         result.save(result_file)
         self.monitor.save_progress(self.config.output_dir / "create_progress.json")
 
