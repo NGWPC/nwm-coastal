@@ -10,11 +10,15 @@ from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
+import netCDF4
 import numpy as np
+import pandas as pd
 import pytest
 
 from coastal_calibration.schism.prep import (
     _write_th_file,
+    make_discharge,
+    merge_source_sink,
     partition_mesh,
     run_combine_sink_source,
     stage_chrtout_files,
@@ -147,6 +151,117 @@ class TestWriteThFile:
         # Second line: time=3600
         parts = lines[1].split("\t")
         assert parts[0] == "3600.0"
+
+
+# ---------------------------------------------------------------------------
+# make_discharge
+# ---------------------------------------------------------------------------
+
+
+class TestMakeDischarge:
+    """Reading the source and sink blocks of ``nwmReaches.csv``."""
+
+    @staticmethod
+    def _run(work_dir: Path, reaches_text: str, fids: list[int]):
+        """Run ``make_discharge`` against a canned streamflow frame."""
+        (work_dir / "nwmReaches.csv").write_text(reaches_text)
+        start = datetime(2021, 6, 11, tzinfo=UTC)
+        # Distinct series per feature ID so an assertion pins which column
+        # a discharge series landed in, not just its shape.
+        df = pd.DataFrame(
+            {fid: [(i + 1) * 10.0 + step for step in range(3)] for i, fid in enumerate(fids)},
+            index=pd.date_range(start, periods=3, freq="h"),
+        )
+        with patch(
+            "coastal_calibration.data.streamflow.read_streamflow", return_value=df
+        ) as mock_read:
+            make_discharge(
+                work_dir=work_dir,
+                nwm_output_dir=work_dir,
+                meteo_source="nwm_retro",
+                start_date=start,
+                end_date=start + timedelta(hours=2),
+            )
+        return mock_read
+
+    def test_reads_sources_and_sinks(self, tmp_path):
+        self._run(tmp_path, "1\n101 5001\n\n1\n301 6001\n", [5001, 6001])
+
+        assert (tmp_path / "source_sink.in").read_text() == "1\n101\n\n1\n301\n"
+        # Reach 5001 feeds the source column, 6001 the sink column, negated.
+        src_rows = [ln.split("\t") for ln in (tmp_path / "vsource.th").read_text().splitlines()]
+        assert [r[1] for r in src_rows] == ["10.0", "11.0", "12.0"]
+        sink_rows = [ln.split("\t") for ln in (tmp_path / "vsink.th").read_text().splitlines()]
+        assert [r[1] for r in sink_rows] == ["-20.0", "-21.0", "-22.0"]
+
+    def test_accepts_a_missing_sink_block(self, tmp_path):
+        """A subset with only sources may end right after the source block."""
+        mock_read = self._run(tmp_path, "2\n101 5001\n205 5002\n", [5001, 5002])
+
+        assert mock_read.call_args.args[0] == [5001, 5002]
+        assert (tmp_path / "source_sink.in").read_text() == "2\n101\n205\n\n0\n"
+        # vsink.th keeps its time column and carries no discharge values.
+        assert [ln.split("\t") for ln in (tmp_path / "vsink.th").read_text().splitlines()] == [
+            ["0.0"],
+            ["3600.0"],
+            ["7200.0"],
+        ]
+
+    def test_accepts_an_explicit_zero_sink_count(self, tmp_path):
+        self._run(tmp_path, "2\n101 5001\n205 5002\n\n0\n", [5001, 5002])
+
+        assert (tmp_path / "source_sink.in").read_text() == "2\n101\n205\n\n0\n"
+
+    def test_rejects_a_truncated_block(self, tmp_path):
+        """A declared count with missing rows is a corrupt file, not zero sinks."""
+        with pytest.raises(ValueError, match="declares 2 sink rows but has 1"):
+            self._run(tmp_path, "1\n101 5001\n\n2\n301 6001\n", [5001, 6001])
+
+    def test_rejects_sink_rows_beyond_the_declared_count(self, tmp_path):
+        """An under-declared count would silently drop sink forcing."""
+        with pytest.raises(ValueError, match="declares 1 sink rows but has 2"):
+            self._run(tmp_path, "1\n101 5001\n\n1\n301 6001\n302 6002\n", [5001, 6001])
+
+    def test_rejects_sink_rows_under_a_zero_count(self, tmp_path):
+        with pytest.raises(ValueError, match="declares 0 sink rows but has 1"):
+            self._run(tmp_path, "1\n101 5001\n\n0\n301 6001\n", [5001, 6001])
+
+
+# ---------------------------------------------------------------------------
+# merge_source_sink
+# ---------------------------------------------------------------------------
+
+
+class TestMergeSourceSink:
+    def test_writes_source_nc_without_sinks(self, tmp_path):
+        """The sink-free path must still produce a readable ``source.nc``.
+
+        ``combine_sink_source`` echoes a time-only ``vsink.th.1`` back when
+        the mesh subset has no sinks, and netCDF turns a zero-length
+        ``nsinks`` dimension into an unlimited one.
+        """
+        ntime, n_elem = 4, 6
+        (tmp_path / "source_sink.in").write_text("2\n2\n5\n\n0\n")
+        (tmp_path / "vsink.th.1").write_text("".join(f"{i * 3600.0}\n" for i in range(ntime)))
+        (tmp_path / "vsource.th.1").write_text(
+            "".join(f"{i * 3600.0}\t10.0\t20.0\n" for i in range(ntime))
+        )
+        with netCDF4.Dataset(tmp_path / "precip_source.nc", "w") as ds:
+            ds.createDimension("time", ntime)
+            ds.createDimension("nsources", n_elem)
+            ds.createVariable("vsource", "f8", ("time", "nsources"))[:] = np.ones((ntime, n_elem))
+
+        merge_source_sink(work_dir=tmp_path, element_areas=np.full(n_elem, 100.0))
+
+        with netCDF4.Dataset(tmp_path / "source.nc") as ds:
+            assert ds.dimensions["nsinks"].size == 0
+            assert ds.variables["vsink"].shape == (ntime, 0)
+            assert ds.variables["sink_elem"].shape == (0,)
+            # Elements 2 and 5 (1-based) carry precipitation plus discharge.
+            src = ds.variables["vsource"][:]
+            assert src[0, 1] == 11.0
+            assert src[0, 4] == 21.0
+            assert src[0, 0] == 1.0
 
 
 # ---------------------------------------------------------------------------

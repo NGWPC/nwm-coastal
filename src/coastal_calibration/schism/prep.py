@@ -229,6 +229,16 @@ def stage_chrtout_files(
     return nwm_output_dir, nwm_ana_dir
 
 
+def _parse_reach_rows(rows: list[str], count: int, kind: str) -> tuple[list[int], list[int]]:
+    """Split ``elem_id feature_id`` rows into element IDs and feature IDs."""
+    parts = [r.split() for r in rows]
+    if len(parts) != count:
+        raise ValueError(f"nwmReaches.csv declares {count} {kind} rows but has {len(parts)}")
+    if any(len(p) < 2 for p in parts):
+        raise ValueError(f"nwmReaches.csv has a {kind} row that is not 'elem_id feature_id'")
+    return [int(p[0]) for p in parts], [int(p[1]) for p in parts]
+
+
 def _write_th_file(path: Path, data: NDArray[np.floating[Any]], tstep: float) -> None:
     """Write a SCHISM time-history (.th) file."""
     t = 0.0
@@ -245,7 +255,7 @@ def _write_th_file(path: Path, data: NDArray[np.floating[Any]], tstep: float) ->
 # ---------------------------------------------------------------------------
 
 
-def make_discharge(  # noqa: PLR0912, PLR0915
+def make_discharge(  # noqa: PLR0912
     *,
     work_dir: Path,
     nwm_output_dir: Path,
@@ -259,7 +269,9 @@ def make_discharge(  # noqa: PLR0912, PLR0915
     """Create discharge files from NWM CHRT output.
 
     Writes ``vsource.th``, ``vsink.th``, and ``source_sink.in`` into
-    *work_dir*.
+    *work_dir*.  The sink block of ``nwmReaches.csv`` is optional, since a
+    mesh subset can hold sources and no sinks; ``source_sink.in`` still
+    declares a sink count of ``0`` in that case.
 
     For ``nwm_retro`` the streamflow is read directly from the S3 Zarr
     store (requires *start_date* and *end_date*).  For ``nwm_ana`` the
@@ -268,22 +280,22 @@ def make_discharge(  # noqa: PLR0912, PLR0915
     from coastal_calibration.data.streamflow import read_streamflow
 
     reaches_path = work_dir / "nwmReaches.csv"
-    soelems: list[int] = []
-    soids: list[int] = []
-    sielems: list[int] = []
-    siids: list[int] = []
-    with reaches_path.open() as f:
-        nso = int(f.readline())
-        for _ in range(nso):
-            parts = f.readline().split()
-            soelems.append(int(parts[0]))
-            soids.append(int(parts[1]))
-        next(f)
-        nsi = int(f.readline())
-        for _ in range(nsi):
-            parts = f.readline().split()
-            sielems.append(int(parts[0]))
-            siids.append(int(parts[1]))
+    # Blank separator lines are dropped, which makes the trailing sink
+    # block optional: a mesh subset can contain sources and no sinks, and
+    # such a file may end right after the source block instead of writing
+    # the "0" count.  Both spellings read as zero sinks.
+    lines = [ln for ln in reaches_path.read_text().splitlines() if ln.strip()]
+    if not lines:
+        raise ValueError(f"{reaches_path} is empty")
+
+    nso = int(lines[0])
+    soelems, soids = _parse_reach_rows(lines[1 : 1 + nso], nso, "source")
+
+    # The whole remainder is handed over so an under-declared count or a
+    # trailing block raises instead of silently dropping sink forcing.
+    sink_lines = lines[1 + nso :]
+    nsi = int(sink_lines[0]) if sink_lines else 0
+    sielems, siids = _parse_reach_rows(sink_lines[1:], nsi, "sink")
 
     all_fids = soids + siids
 
