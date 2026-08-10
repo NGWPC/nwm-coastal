@@ -358,21 +358,43 @@ def make_discharge(  # noqa: PLR0912
         if freq < timedelta(hours=1):  # pyright: ignore[reportOperatorIssue]
             df = df.resample("h").mean()
 
-    # Build vsource / vsink arrays from the DataFrame
-    n_rows = len(df)
-    vsource = np.zeros((n_rows, len(soids)))
-    vsink = np.zeros((n_rows, len(siids)))
+    # SCHISM reads vsource/vsink from source.nc purely positionally -- row i
+    # is always taken to mean "elapsed i*3600s from start_date" (see
+    # schism_init.F90's "nc" branch and schism_step.F90's STEP: vsource
+    # read: both index by time/th_dt3(1), never by the stored time_vsource
+    # values). merge_source_sink() later adds discharge into precip
+    # row-for-row by array position too, not by matching time labels. So
+    # writing df's rows in arrival order (the old behavior) only happened
+    # to be correct when df's first row landed exactly on start_date with
+    # no gaps -- any mismatch between troute's real window and start_date
+    # would silently misalign every row downstream. Scatter into a
+    # gapless hourly grid spanning [start_date, end_date] by each row's
+    # real elapsed time instead, so row i is genuinely i*3600s regardless
+    # of what troute actually returned. Unmatched slots stay at zero --
+    # deliberately not backfilled (e.g. hot-started runs load their t=0
+    # state from the restart file and don't need forcing to describe it).
+    n_hours = round((end_date - start_date).total_seconds() / 3600)
+    elapsed = np.arange(n_hours + 1, dtype=float) * 3600.0
+    vsource = np.zeros((n_hours + 1, len(soids)))
+    vsink = np.zeros((n_hours + 1, len(siids)))
+
+    row_idx = np.round((df.index - start_date).total_seconds().to_numpy() / 3600).astype(int)
+    in_range = (row_idx >= 0) & (row_idx <= n_hours)
+    if not in_range.all():
+        logger.warning(
+            "    make_discharge: dropping %d row(s) outside [start_date, end_date]",
+            int((~in_range).sum()),
+        )
+    row_idx = row_idx[in_range]
+    df = df.iloc[in_range]
 
     for i, sid in enumerate(soids):
         if sid in df.columns:
-            vsource[:, i] = df[sid].to_numpy()
+            vsource[row_idx, i] = df[sid].to_numpy()
 
     for i, sid in enumerate(siids):
         if sid in df.columns:
-            vsink[:, i] = -1.0 * df[sid].to_numpy()
-
-    # Elapsed seconds since simulation start for each row of real data.
-    elapsed = (df.index - start_date).total_seconds().to_numpy()
+            vsink[row_idx, i] = -1.0 * df[sid].to_numpy()
 
     _write_th_file(work_dir / "vsource.th", vsource, elapsed)
     _write_th_file(work_dir / "vsink.th", vsink, elapsed)
@@ -971,12 +993,15 @@ def update_params(  # noqa: PLR0912, PLR0915
     ihfskip = int(overrides_remaining.pop("ihfskip", ihfskip_default))
 
     # SCHISM requires ``nhot_write`` to be a multiple of ihfskip when
-    # nhot=1. We aim for "hotstart roughly every 18 simulation hours"
-    # at the canonical dt=200 (nhot_target = 324 timesteps) but rescale
-    # for other timesteps so the wall-clock cadence stays similar, then
-    # round up to the next multiple of ihfskip so the constraint holds.
-    # The user can still override ``nhot_write`` directly.
-    nhot_target = max(1, round(18 * 3600 / timestep_seconds))
+    # nhot=1. We aim for "hotstart every simulated hour" (nhot_target =
+    # 18 timesteps at the canonical dt=200) so a hotstart lands at every
+    # hour boundary regardless of the run's total length -- this is what
+    # AnA cycling needs (a checkpoint at the 1h mark and another at the
+    # run's end), and it degrades gracefully for longer forecast runs
+    # (just more, unused, intermediate hotstarts). Round up to the next
+    # multiple of ihfskip so the divisibility constraint holds. The user
+    # can still override ``nhot_write`` directly.
+    nhot_target = max(1, round(1 * 3600 / timestep_seconds))
     nhot_write_default = max(1, -(-nhot_target // ihfskip)) * ihfskip
     nhot_write = int(overrides_remaining.pop("nhot_write", nhot_write_default))
 
@@ -1327,17 +1352,45 @@ def make_stofs_boundary(
 # ---------------------------------------------------------------------------
 
 
-def combine_hotstart(outputs_dir: Path) -> None:
-    """Run ``combine_hotstart7`` in the outputs directory."""
-    result = subprocess.run(
-        ["combine_hotstart7"],
-        cwd=outputs_dir,
-        capture_output=True,
-        text=True,
-        check=False,
+def combine_hotstart(outputs_dir: Path) -> list[Path]:
+    """Run ``combine_hotstart7`` for every hotstart iteration in *outputs_dir*.
+
+    SCHISM writes one set of per-rank ``hotstart_<rank>_<iteration>.nc``
+    files at each ``nhot_write`` interval (see ``make_param_nml``).
+    ``combine_hotstart7`` requires an explicit ``-i <iteration>`` to know
+    which set to merge -- it does not auto-detect it -- and produces
+    ``hotstart_it=<iteration>.nc``. This finds every iteration actually
+    present (via rank 0's files) and combines each one in turn.
+
+    Returns the combined file paths, in iteration order.
+    """
+    iterations = sorted(
+        int(m.group(1))
+        for f in outputs_dir.glob("hotstart_000000_*.nc")
+        if (m := re.match(r"hotstart_000000_(\d+)\.nc$", f.name))
     )
-    if result.returncode != 0:
-        raise RuntimeError(
-            f"combine_hotstart7 failed (exit {result.returncode}): {result.stderr[-2000:]}"
+    if not iterations:
+        logger.info("    No hotstart_000000_*.nc files found in %s; nothing to combine", outputs_dir)
+        return []
+
+    combined_paths = []
+    for iteration in iterations:
+        result = subprocess.run(
+            ["combine_hotstart7", "-i", str(iteration)],
+            cwd=outputs_dir,
+            capture_output=True,
+            text=True,
+            check=False,
         )
-    logger.info("    combine_hotstart7 completed")
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"combine_hotstart7 -i {iteration} failed (exit {result.returncode}): "
+                f"{result.stderr[-2000:]}"
+            )
+        combined_path = outputs_dir / f"hotstart_it={iteration}.nc"
+        if not combined_path.exists():
+            raise RuntimeError(f"combine_hotstart7 -i {iteration} did not produce {combined_path}")
+        combined_paths.append(combined_path)
+        logger.info("    combine_hotstart7 -i %d completed -> %s", iteration, combined_path.name)
+
+    return combined_paths

@@ -7,10 +7,14 @@ CYCLE=${YMD}${HH}
 CONFIG_FILE="%SCHISM_CYCLES_DIR%/${CYCLE}/run.yaml"
 [ -f "${CONFIG_FILE}" ] || { echo "ERROR: missing config: ${CONFIG_FILE}" >&2; exit 1; }
 
-# Resumes after run_schism_download.ecf's --stop-after download. Runner
+# Resumes after run_schism_download_sr.ecf's --stop-after download. Runner
 # skips clean_run_directory() whenever --start-from is set, so the
 # already-downloaded inputs are preserved, not wiped. See
-# run_schism_download.ecf for why the download stage is split out.
+# run_schism_download_sr.ecf for why the download stage is split out.
+#
+# Warm-started from this cycle's own schism_ana T0 checkpoint --
+# gen_configs_sr.ecf already located it and set paths.hot_start_file in
+# this run.yaml (ihot=1), so nothing extra to do here.
 #
 # ---- LAUNCH (placeholder for future Slurm submission) --------------------
 # Today: direct execution on this shared node.

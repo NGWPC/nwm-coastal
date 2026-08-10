@@ -1,0 +1,157 @@
+set -e -u -x   # abort on error/unset var, print commands as executed
+
+# Variables ecFlow substitutes at job-generation time (ecflow 5.6.0)
+export ECF_NAME=/coastal_hourly/cycle/h05/troute_ana_a
+export ECF_HOST=zhengtaocui-opertestbed-00023-mgmt
+export ECF_PORT=39411
+export ECF_PASS=8UhczA9R
+export ECF_TRYNO=1
+export ECF_RID=$$              # no batch scheduler wrapping this job -> use the shell PID
+
+export PATH="/contrib/software/ecflow/5.6.0/bin:${PATH}"
+
+# Tell ecFlow this task has started
+ecflow_client --init="${ECF_RID}"
+
+# Error handler: report --abort to ecFlow instead of leaving the task
+# stuck 'active' forever. Guarded against double-firing (ERR then EXIT).
+_ERROR_HANDLED=0
+ERROR() {
+  local rc=$1
+  set +e
+  if [ "${_ERROR_HANDLED}" -eq 1 ]; then
+    exit "${rc}"
+  fi
+  _ERROR_HANDLED=1
+  trap - ERR EXIT
+  ecflow_client --abort="task failed (rc=${rc})" || true
+  exit "${rc}"
+}
+trap 'ERROR $?' ERR
+trap 'ERROR $?' EXIT
+
+YMD=20260809
+HH=05
+CYCLE=${YMD}${HH}
+CYCLE_DT="${YMD:0:4}-${YMD:4:2}-${YMD:6:2} ${HH}:00:00"
+
+# troute AnA-A: the 1-hour rolling self-chain (T-3 -> T-2 relative to this
+# cycle's own time). This is the ONLY state that ever gets fed forward to
+# a future cycle -- AnA-B (troute_ana_b.ecf) and SR (troute_sr.ecf) both
+# branch off it but never feed anything back. See the plan doc
+# (state-saving/AnA extension) for the full T-3/T-2/T0 rationale --
+# troute can only save state at wherever a run stops, not mid-run, hence
+# two separate 1h/3h invocations from the same starting state instead of
+# one longer run with an internal checkpoint (unlike SCHISM/SFINCS, which
+# *can* checkpoint mid-run -- see coastal_ana_schism.ecf/coastal_ana_sfincs.ecf).
+#
+# PREV_CYCLE is this cycle's own start point (T-3) via simple date
+# arithmetic -- handles month/day/year rollover for free, unlike trying
+# to derive it from 20260809/05 substitution alone.
+#
+# IMPORTANT: the relative adjustment must come BEFORE the timestamp in the
+# string passed to `date -d`. "${CYCLE_DT} -1 hour" silently parses wrong
+# (GNU date reads the "-1" right after the time as a UTC offset, not a
+# relative adjustment, then applies a stray default +1h for the leftover
+# "hour" word) -- confirmed live: "2026-08-05 14:00:00 -1 hour" evaluates
+# to 16:00:00, not 13:00:00. "-1 hour ${CYCLE_DT}" (adjustment first)
+# evaluates correctly.
+PREV_DT="-1 hour ${CYCLE_DT}"
+PREV_CYCLE=$(date -u -d "${PREV_DT}" +"%Y%m%d%H")
+END_DT=$(date -u -d "-2 hours ${CYCLE_DT}" +"%Y-%m-%d %H:%M:%S")
+# troute names its output file after the run's actual start_time, not the
+# cycle time -- confirmed live from the realization config's own "time"
+# block (start_time/end_time), for both this task and troute_ana_b.ecf.
+# This run's fcst_start is T-3 (CYCLE_DT-3h): -dt is END_DT (T-2, already
+# CYCLE_DT-2h) and -lb 120 pulls it back one more hour to T-3 -- see the
+# -lb 120 note on the LAUNCH block below for why 120, not 60. But troute's
+# own restart/output timestamp is a further 1h before fcst_start by design
+# (see troute_ana_b.ecf for the mswm rationale and live confirmation) --
+# T-4, not T-3. This task doesn't check TROUTE_OUT_FILE (only the
+# state_save), so this wasn't caught until troute_ana_b's own check
+# failed -- fixed here too for consistency, since other tasks may come to
+# depend on it.
+STAMP=$(date -u -d "-4 hours ${CYCLE_DT}" +"%Y%m%d%H")00
+
+RNAME="region_ana_a_${CYCLE}"
+# netCDF outputs (troute_output_*.nc etc.) land in an Output/ subdirectory
+# for AnA runs -- confirmed live across all 3 AnA test runs. state_save/
+# stays directly under VPU/ (unaffected, confirmed separately).
+TROUTE_OUT_FILE="/contrib/LaurenSchambach/ngwpc/run_ngen/regionalization/${RNAME}/03S/Output/troute_output_${STAMP}.nc"
+# HOST-side paths -- for the [ -f ... ] existence checks below, which run
+# in this .ecf script's own shell, outside docker.
+SAVE_STATE_DIR="/contrib/LaurenSchambach/ngwpc/run_ngen/regionalization/${RNAME}/03S/state_save"
+LOAD_STATE_DIR="/contrib/LaurenSchambach/ngwpc/run_ngen/regionalization/region_ana_a_${PREV_CYCLE}/03S/state_save"
+# CONTAINER-side paths -- for the -ssd/-lsf flags below, which are read by
+# run_regionalization_standalone.py INSIDE the container. Passing it the
+# HOST path instead (as this script originally did) silently no-ops the
+# save/load: confirmed live, ngen logs "Saving end of run simulation
+# data..." for every rank, but never writes a file, because
+# TROUTE_REGIONALIZATION_ROOT's HOST prefix doesn't exist in the
+# container's filesystem (only TROUTE_REGIONALIZATION_ROOT_CONTAINER's
+# does, per nwm-rte's docker_run mount).
+SAVE_STATE_DIR_CONTAINER="/ngwpc/run_ngen/regionalization/${RNAME}/03S/state_save"
+LOAD_STATE_DIR_CONTAINER="/ngwpc/run_ngen/regionalization/region_ana_a_${PREV_CYCLE}/03S/state_save"
+
+export CYCLE_DT
+export END_DT
+export RNAME
+
+# Bootstrap handling: only the true first cycle in the suite's history has
+# no prior troute_ana_a save to load -- see gen_cycle_config.py's
+# --hot-start-file/--sfincs-rst-file for the same pattern applied to the
+# coastal models. Anywhere else, a missing LOAD_STATE_DIR would mean the
+# ecflow trigger graph let this run before the prior cycle's troute_ana_a
+# actually finished, which the trigger above is supposed to prevent.
+# Existence check against the HOST path; -lsf arg built from the
+# CONTAINER path (see note above).
+if [ -f "${LOAD_STATE_DIR}/troute" ]; then
+  LOAD_STATE_ARGS="-lsf ${LOAD_STATE_DIR_CONTAINER}"
+  echo "Warm-starting troute AnA-A from ${LOAD_STATE_DIR}"
+else
+  LOAD_STATE_ARGS=""
+  echo "No prior troute_ana_a state at ${LOAD_STATE_DIR} -- cold-starting (expected only at bootstrap)"
+fi
+export LOAD_STATE_ARGS
+export SAVE_STATE_DIR_CONTAINER
+
+# ---- LAUNCH (placeholder for future Slurm submission) --------------------
+# Today: direct execution on this shared node. Mirrors troute_sr.ecf's
+# LAUNCH block exactly, adding -lb/-dt for the 1h AnA window and the
+# state save/load flags. -lsf/-ss/-ssd are confirmed-real flags on
+# run_regionalization_standalone.py (cli_args.py's REGIONALIZATION script
+# args), forwarded verbatim into the realization's state_saving block
+# (mswm.build_inputs.RealizationBuilder) -- confirmed live end to end
+# (config correctly shows up in the generated realization JSON, ngen logs
+# the save at end of run) once the host/container path bug above is
+# fixed. -dt "${END_DT}" (== CYCLE_DT-2h, i.e. T-2, this run's window
+# end) with -lb 120: mswm's create_fcst_times() (ana_flag==1 branch,
+# unmodified upstream -- do not edit that codebase, see plan notes)
+# computes forcing_lookback = int(LookBack/60) - 1, so -lb 120 resolves
+# to a 1h lookback (int(120/60)-1 == 1), not -lb 60 (int(60/60)-1 == 0,
+# which zeroes the window out entirely -- fcst_start == fcst_end,
+# confirmed live to fail _parse_time()'s validation). Empirically,
+# -dt X -lb N (N already net of that -1) produces an output stamped
+# X-minus-(N/60-1)-hours, so END_DT - 1h == CYCLE_DT-3h == T-3 -- giving
+# exactly the T-3->T-2, 1h window this task is meant to cover.
+bash -c '
+  set -euo pipefail
+  cd "/contrib/LaurenSchambach/ngwpc/nwm-rte"
+  source config.bashrc
+  source run.sh
+  TEST_VPU="vpu_03S"
+  TEST_FORM_ASSIGN_VPU="${INSTALLED_REGIONALIZATION_RESULTS}/${TEST_VPU}/formulation_assignment.csv"
+  TEST_CAT_GRP_VPU="${INSTALLED_REGIONALIZATION_RESULTS}/${TEST_VPU}/catchment_groups.csv"
+  docker_run python -um "ngen_rte.run_regionalization_standalone" -n 12 -faf "${TEST_FORM_ASSIGN_VPU}" -cgf "${TEST_CAT_GRP_VPU}" -fconfig "standard_ana" -dt "${END_DT}" -lb 120 -rname "${RNAME}" -v "03S" -outfmt NetCDF -ss -ssd "${SAVE_STATE_DIR_CONTAINER}" ${LOAD_STATE_ARGS}
+' "/contrib/LaurenSchambach/ngwpc/nwm-rte/run.sh"
+# ---- END LAUNCH ------------------------------------------------------------
+
+if [ ! -f "${SAVE_STATE_DIR}/troute" ]; then
+  echo "ERROR: expected troute_ana_a state save missing: ${SAVE_STATE_DIR}/troute" >&2
+  exit 1
+fi
+echo "troute AnA-A OK: ${SAVE_STATE_DIR}/troute"
+
+ecflow_client --complete   # tell ecFlow the task finished successfully
+trap 0                     # clear all traps so ERROR() doesn't also fire on exit
+exit 0

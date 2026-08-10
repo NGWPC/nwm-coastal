@@ -138,6 +138,7 @@ class CoastalForcingRegridder:
         *,
         job_index: int | None = None,
         job_count: int | None = None,
+        sim_start_epoch: float | None = None,
     ):
         self.input_dir = input_dir
         self.output_dir = output_dir
@@ -145,6 +146,16 @@ class CoastalForcingRegridder:
 
         self.job_idx = job_index
         self.job_count = job_count
+        # Explicit simulation start (Unix epoch seconds), when known -- used
+        # to anchor precip_source.nc's vsource row 0 to SCHISM's own
+        # start_date, matching SCHISM's read (schism_init.F90/schism_step.F90):
+        # it indexes "vsource" purely positionally (row i == elapsed i*dt from
+        # its own start_date), never reading time_vsource's stored values, so
+        # the row that lands at index 0 MUST really be valid at start_date.
+        # Falls back to the first slab's own timestamp (old behavior) only
+        # when the caller doesn't know the true start (should not happen via
+        # the CLI entry point below, which always has it).
+        self.sim_start_epoch = sim_start_epoch
 
         # Load SCHISM mesh
         self.schism_mesh = ESMF.Mesh(
@@ -291,9 +302,19 @@ class CoastalForcingRegridder:
                 step_time = self._read_start_time(input_ds, time_index)
                 output_ts = int(step_time - self.schism_first_timestep)  # pyright: ignore[reportOperatorIssue]
                 output_idx = output_ts // 3600
-                vsource_ds["time_vsource"][output_idx] = output_ts
-                vsource_ds["vsource"][output_idx, :] = all_elements
-                vsource_ds.sync()
+                ntimes = vsource_ds.dimensions["time_vsource"].size
+                if 0 <= output_idx < ntimes:
+                    vsource_ds["time_vsource"][output_idx] = output_ts
+                    vsource_ds["vsource"][output_idx, :] = all_elements
+                    vsource_ds.sync()
+                else:
+                    logger.warning(
+                        "    _regrid_to_schism: slab at %s (elapsed %ds) falls outside "
+                        "the SCHISM window [0, %ds] -- dropping",
+                        input_ds.filepath(),
+                        output_ts,
+                        (ntimes - 1) * 3600,
+                    )
 
             in_field.destroy()
             out_field.destroy()
@@ -472,6 +493,7 @@ class CoastalForcingRegridder:
         file_filter: str = "**/*LDASIN_DOMAIN*",
         skip_latlon: bool = False,
         apply_slp: bool = True,
+        n_hours: int | None = None,
     ):
         """Process all forcing files: regrid to lat-lon and/or SCHISM mesh.
 
@@ -483,6 +505,13 @@ class CoastalForcingRegridder:
             If True, skip the lat-lon regridding step.
         apply_slp
             If True, convert PSFC to sea-level pressure in lat-lon output.
+        n_hours
+            Number of hours the SCHISM run actually needs (i.e.
+            ``duration_hours``). ``precip_source.nc`` is sized to
+            ``n_hours + 1`` rows (0..n_hours, matching SCHISM's own
+            positional read) regardless of how many slabs the met input
+            actually contains -- falls back to ``len(slabs)`` when not
+            given (should only happen for callers that predate this fix).
         """
         input_files = sorted(self.input_dir.glob(file_filter))
         if not input_files:
@@ -501,19 +530,34 @@ class CoastalForcingRegridder:
             idx = 0
             sub_slabs = set(slabs)
 
-        # Determine first timestep for SCHISM time offsets
+        # Anchor for SCHISM time offsets. SCHISM reads vsource from
+        # precip_source.nc purely positionally (row i == elapsed i*3600s
+        # from ITS OWN start_date -- see schism_init.F90/schism_step.F90,
+        # neither ever reads time_vsource's stored values), so row 0 must
+        # really be valid at start_date or every later row silently
+        # misaligns. Prefer the caller-supplied sim_start_epoch (the
+        # SCHISM run's true start_date) over the met file's own first
+        # slab -- the two only coincide when the met window happens to
+        # start exactly at start_date, which isn't guaranteed.
         if self.root:
-            first_file, first_ti = slabs[0]
-            with netCDF4.Dataset(first_file) as ds0:
-                self.schism_first_timestep = self._read_start_time(ds0, first_ti)
+            if self.sim_start_epoch is not None:
+                self.schism_first_timestep = self.sim_start_epoch
+            else:
+                first_file, first_ti = slabs[0]
+                with netCDF4.Dataset(first_file) as ds0:
+                    self.schism_first_timestep = self._read_start_time(ds0, first_ti)
 
-        # Initialize SCHISM vsource output on idx=0
+        # Initialize SCHISM vsource output on idx=0. Sized to the full
+        # required window, not len(slabs) -- a slab short of that window
+        # (e.g. the met engine's own window starting later than
+        # start_date) must leave real gaps, not shrink the array to fit.
         schism_vsource = None
         if idx == 0 and self.root:
             schism_vsource = netCDF4.Dataset(
                 self.output_dir / "precip_source.nc", "w", format="NETCDF4"
             )
-            self._init_vsource_nc(schism_vsource, len(slabs))
+            ntimes = (n_hours + 1) if n_hours is not None else len(slabs)
+            self._init_vsource_nc(schism_vsource, ntimes)
 
         try:
             # Process slabs
@@ -561,6 +605,22 @@ def main() -> None:
     schism_mesh = Path(args.schism_mesh)
     geogrid = Path(args.geogrid_file)
 
+    # forcing_begin_date is always the SCHISM run's own start_date
+    # chronologically, even in reanalysis mode (negative length-hrs, where
+    # forcing_end_date is the earlier boundary) -- see NWMForcingStage.run()
+    # in forcing.py, which derives it directly from sim.start_pdy/start_cyc.
+    sim_start_epoch = None
+    n_hours = None
+    if args.forcing_begin_date:
+        from datetime import datetime, timezone
+
+        fmt = "%Y%m%d%H%M" if len(args.forcing_begin_date) == 12 else "%Y%m%d%H"
+        sim_start_dt = datetime.strptime(args.forcing_begin_date, fmt).replace(
+            tzinfo=timezone.utc
+        )
+        sim_start_epoch = sim_start_dt.timestamp()
+        n_hours = abs(args.length_hrs)
+
     logger.info("Regridding forcings: %s -> %s", input_path, output_path)
     app = CoastalForcingRegridder(
         input_path,
@@ -569,8 +629,9 @@ def main() -> None:
         schism_mesh,
         job_index=args.job_index,
         job_count=args.job_count,
+        sim_start_epoch=sim_start_epoch,
     )
-    app.run(file_filter="**/*LDASIN_DOMAIN*", skip_latlon=True)
+    app.run(file_filter="**/*LDASIN_DOMAIN*", skip_latlon=True, n_hours=n_hours)
 
 
 if __name__ == "__main__":

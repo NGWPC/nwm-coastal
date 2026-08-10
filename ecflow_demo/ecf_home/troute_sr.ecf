@@ -23,8 +23,26 @@ STAMP=${CYCLE}00
 RNAME="region_sr_${CYCLE}"
 TROUTE_OUT_FILE="%TROUTE_REGIONALIZATION_ROOT%/${RNAME}/%VPU%/troute_output_${STAMP}.nc"
 
+# Warm start from THIS cycle's own troute_ana_b save (T0 state) -- this
+# task now triggers on troute_ana_b == complete (see suite_def), so the
+# save should already exist by the time this runs. See troute_ana_b.ecf
+# for why AnA-B, not AnA-A, is SR's warm-start source: AnA-B is the run
+# that reaches T0 (SR's own start time), AnA-A only reaches T-2.
+# HOST path for the existence check; CONTAINER path for -lsf itself (see
+# troute_ana_a.ecf -- passing the HOST path here silently no-ops the load).
+LOAD_STATE_DIR="%TROUTE_REGIONALIZATION_ROOT%/region_ana_b_${CYCLE}/%VPU%/state_save"
+LOAD_STATE_DIR_CONTAINER="%TROUTE_REGIONALIZATION_ROOT_CONTAINER%/region_ana_b_${CYCLE}/%VPU%/state_save"
+if [ -f "${LOAD_STATE_DIR}/troute" ]; then
+  LOAD_STATE_ARGS="-lsf ${LOAD_STATE_DIR_CONTAINER}"
+  echo "Warm-starting SR troute from ${LOAD_STATE_DIR}"
+else
+  LOAD_STATE_ARGS=""
+  echo "No troute_ana_b state at ${LOAD_STATE_DIR} -- cold-starting (expected only at bootstrap; the trigger on troute_ana_b == complete should otherwise guarantee this exists)"
+fi
+
 export CYCLE_DT
 export RNAME
+export LOAD_STATE_ARGS
 
 # ---- LAUNCH (placeholder for future Slurm submission) --------------------
 # Today: direct execution on this shared node.
@@ -33,7 +51,7 @@ export RNAME
 # our own run_region_03S_standalone.sh wrapper -- only run.sh and
 # config.bashrc (stable, shared infra providing the docker_run function and
 # env vars like INSTALLED_REGIONALIZATION_RESULTS) are sourced from
-# nwm-rte. See ngen_forcing.ecf for why $0 is pinned via bash -c's second
+# nwm-rte. See ngen_forcing_sr.ecf for why $0 is pinned via bash -c's second
 # argument (config.bashrc derives REPOS_COMMON_ROOT__HOST from
 # dirname(dirname($0)) unconditionally).
 #
@@ -52,7 +70,7 @@ bash -c '
   TEST_VPU="vpu_%VPU%"
   TEST_FORM_ASSIGN_VPU="${INSTALLED_REGIONALIZATION_RESULTS}/${TEST_VPU}/formulation_assignment.csv"
   TEST_CAT_GRP_VPU="${INSTALLED_REGIONALIZATION_RESULTS}/${TEST_VPU}/catchment_groups.csv"
-  docker_run python -um "ngen_rte.run_regionalization_standalone" -n 12 -faf "${TEST_FORM_ASSIGN_VPU}" -cgf "${TEST_CAT_GRP_VPU}" -fconfig "short_range" -dt "${CYCLE_DT}" -rname "${RNAME}" -v "%VPU%" -outfmt NetCDF
+  docker_run python -um "ngen_rte.run_regionalization_standalone" -n 12 -faf "${TEST_FORM_ASSIGN_VPU}" -cgf "${TEST_CAT_GRP_VPU}" -fconfig "short_range" -dt "${CYCLE_DT}" -rname "${RNAME}" -v "%VPU%" -outfmt NetCDF ${LOAD_STATE_ARGS}
 ' "%NWM_RTE_DIR%/run.sh"
 # ---- END LAUNCH ------------------------------------------------------------
 

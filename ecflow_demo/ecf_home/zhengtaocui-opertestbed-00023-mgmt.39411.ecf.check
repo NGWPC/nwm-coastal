@@ -1,5 +1,5 @@
 #5.6.0
-defs_state MIGRATE state>:queued flag:message state_change:5922 modify_change:42 cal_count:1187
+defs_state MIGRATE state>:aborted flag:message state_change:12127 modify_change:66 cal_count:6135
 edit ECF_MICRO '%' # server
 edit ECF_HOME '/contrib/LaurenSchambach/ngwpc/nwm-coastal/ecflow_demo/ecf_home' # server
 edit ECF_JOB_CMD '%ECF_JOB% 1> %ECF_JOBOUT% 2>&1' # server
@@ -23,15 +23,29 @@ edit ECF_PORT '39411' # server
 edit ECF_HOST 'zhengtaocui-opertestbed-00023-mgmt' # server
 edit ECF_CHECK_CMD 'ps --pid %ECF_RID% -f' # server
 edit ECF_PID '2080910' # server
-history /coastal_hourly/cycle/h14/ngen_troute MSG:[13:51:10 6.8.2026] --run force /coastal_hourly/cycle/h14/ngen_troute :lauren.schambach@zhengtaocui-opertestbed-00023-mgmtMSG:[14:29:13 6.8.2026] --kill /coastal_hourly/cycle/h14/ngen_troute :lauren.schambach@zhengtaocui-opertestbed-00023-mgmtMSG:[14:29:56 6.8.2026] --requeue force /coastal_hourly/cycle/h14/ngen_troute :lauren.schambach@zhengtaocui-opertestbed-00023-mgmt
-history /coastal_hourly/cycle/h14/gen_configs MSG:[04:13:40 6.8.2026] --requeue force /coastal_hourly/cycle/h14/gen_configs :lauren.schambach@zhengtaocui-opertestbed-00023-mgmtMSG:[04:13:40 6.8.2026] --run force /coastal_hourly/cycle/h14/gen_configs :lauren.schambach@zhengtaocui-opertestbed-00023-mgmt
-history /coastal_hourly/cycle/h15/ngen_troute MSG:[03:13:40 6.8.2026] --requeue force /coastal_hourly/cycle/h15/ngen_troute :lauren.schambach@zhengtaocui-opertestbed-00023-mgmtMSG:[03:13:40 6.8.2026] --run force /coastal_hourly/cycle/h15/ngen_troute :lauren.schambach@zhengtaocui-opertestbed-00023-mgmtMSG:[04:16:37 6.8.2026] --kill /coastal_hourly/cycle/h15/ngen_troute :lauren.schambach@zhengtaocui-opertestbed-00023-mgmt
-history /coastal_hourly/cycle/h14/run_sfincs MSG:[02:32:30 6.8.2026] --requeue force /coastal_hourly/cycle/h14/run_sfincs :lauren.schambach@zhengtaocui-opertestbed-00023-mgmtMSG:[02:32:30 6.8.2026] --run force /coastal_hourly/cycle/h14/run_sfincs :lauren.schambach@zhengtaocui-opertestbed-00023-mgmt
-history /coastal_hourly/cycle/h14/run_schism MSG:[02:32:30 6.8.2026] --requeue force /coastal_hourly/cycle/h14/run_schism :lauren.schambach@zhengtaocui-opertestbed-00023-mgmtMSG:[02:32:30 6.8.2026] --run force /coastal_hourly/cycle/h14/run_schism :lauren.schambach@zhengtaocui-opertestbed-00023-mgmt
-history /coastal_hourly/cycle/h14/run_schism_download MSG:[02:30:42 6.8.2026] --run force /coastal_hourly/cycle/h14/run_schism_download :lauren.schambach@zhengtaocui-opertestbed-00023-mgmt
-history /coastal_hourly MSG:[02:30:26 6.8.2026] --replace=/coastal_hourly suite_def/coastal_hourly.def parent :lauren.schambach@zhengtaocui-opertestbed-00023-mgmtMSG:[13:22:43 6.8.2026] --requeue force /coastal_hourly :lauren.schambach@zhengtaocui-opertestbed-00023-mgmt
+history /coastal_hourly/cycle/h05/ngen_forcing_sr MSG:[02:22:04 10.8.2026] --run force /coastal_hourly/cycle/h05/ngen_forcing_sr :lauren.schambach@zhengtaocui-opertestbed-00023-mgmt
+history /coastal_hourly/cycle/h05/troute_ana_b MSG:[02:11:38 10.8.2026] --run force /coastal_hourly/cycle/h05/troute_ana_b :lauren.schambach@zhengtaocui-opertestbed-00023-mgmt
+history /coastal_hourly/cycle/h05/troute_ana_a MSG:[02:11:38 10.8.2026] --run force /coastal_hourly/cycle/h05/troute_ana_a :lauren.schambach@zhengtaocui-opertestbed-00023-mgmt
+history /coastal_hourly/cycle/h05/ngen_forcing_ana MSG:[02:09:42 10.8.2026] --run force /coastal_hourly/cycle/h05/ngen_forcing_ana :lauren.schambach@zhengtaocui-opertestbed-00023-mgmt
+history /coastal_hourly/cycle/h04/schism_ana MSG:[23:37:10 9.8.2026] --run force /coastal_hourly/cycle/h04/schism_ana :lauren.schambach@zhengtaocui-opertestbed-00023-mgmt
 history / MSG:[20:13:02 5.8.2026] --load=/contrib/LaurenSchambach/ngwpc/nwm-coastal/ecflow_demo/suite_def/coastal_hourly.def :lauren.schambach@zhengtaocui-opertestbed-00023-mgmtMSG:[20:13:02 5.8.2026] --begin=coastal_hourly :lauren.schambach@zhengtaocui-opertestbed-00023-mgmtMSG:[20:14:14 5.8.2026] --restart :lauren.schambach@zhengtaocui-opertestbed-00023-mgmt
-suite coastal_hourly # begun:1 state:queued dur:01:06:31 flag:message suspended:1
+history /coastal_hourly/cycle/h04/sfincs_ana MSG:[23:48:09 9.8.2026] --run force /coastal_hourly/cycle/h04/sfincs_ana :lauren.schambach@zhengtaocui-opertestbed-00023-mgmt
+history /coastal_hourly MSG:[21:12:30 6.8.2026] --replace=/coastal_hourly suite_def/coastal_hourly.def parent :lauren.schambach@zhengtaocui-opertestbed-00023-mgmt
+history /coastal_hourly/cycle/h14/gen_configs_ana MSG:[05:44:55 9.8.2026] --run force /coastal_hourly/cycle/h14/gen_configs_ana :lauren.schambach@zhengtaocui-opertestbed-00023-mgmt
+history /coastal_hourly/cycle/h03/ngen_forcing_ana MSG:[17:30:17 9.8.2026] --run force /coastal_hourly/cycle/h03/ngen_forcing_ana :lauren.schambach@zhengtaocui-opertestbed-00023-mgmtMSG:[17:35:46 9.8.2026] --kill /coastal_hourly/cycle/h03/ngen_forcing_ana :lauren.schambach@zhengtaocui-opertestbed-00023-mgmtMSG:[17:38:28 9.8.2026] --run force /coastal_hourly/cycle/h03/ngen_forcing_ana :lauren.schambach@zhengtaocui-opertestbed-00023-mgmt
+history /coastal_hourly/cycle/h04/ngen_forcing_ana MSG:[18:23:43 9.8.2026] --run force /coastal_hourly/cycle/h04/ngen_forcing_ana :lauren.schambach@zhengtaocui-opertestbed-00023-mgmt
+history /coastal_hourly/cycle/h14/troute_ana_a MSG:[03:42:07 9.8.2026] --run /coastal_hourly/cycle/h14/troute_ana_a :lauren.schambach@zhengtaocui-opertestbed-00023-mgmtMSG:[03:44:03 9.8.2026] --run /coastal_hourly/cycle/h14/troute_ana_a :lauren.schambach@zhengtaocui-opertestbed-00023-mgmtMSG:[04:46:20 9.8.2026] --run /coastal_hourly/cycle/h14/troute_ana_a :lauren.schambach@zhengtaocui-opertestbed-00023-mgmtMSG:[04:55:25 9.8.2026] --run /coastal_hourly/cycle/h14/troute_ana_a :lauren.schambach@zhengtaocui-opertestbed-00023-mgmtMSG:[16:38:41 9.8.2026] --run force /coastal_hourly/cycle/h14/troute_ana_a :lauren.schambach@zhengtaocui-opertestbed-00023-mgmt
+history /coastal_hourly/cycle/h14/troute_ana_b MSG:[05:09:22 9.8.2026] --run /coastal_hourly/cycle/h14/troute_ana_b :lauren.schambach@zhengtaocui-opertestbed-00023-mgmtMSG:[05:32:09 9.8.2026] --run force /coastal_hourly/cycle/h14/troute_ana_b :lauren.schambach@zhengtaocui-opertestbed-00023-mgmt
+history /coastal_hourly/cycle/h14/schism_ana MSG:[05:46:53 9.8.2026] --run force /coastal_hourly/cycle/h14/schism_ana :lauren.schambach@zhengtaocui-opertestbed-00023-mgmtMSG:[06:00:35 9.8.2026] --run force /coastal_hourly/cycle/h14/schism_ana :lauren.schambach@zhengtaocui-opertestbed-00023-mgmt
+history /coastal_hourly/cycle/h14/run_schism_download_ana MSG:[05:45:20 9.8.2026] --run force /coastal_hourly/cycle/h14/run_schism_download_ana :lauren.schambach@zhengtaocui-opertestbed-00023-mgmt
+history /coastal_hourly/cycle/h04/troute_ana_a MSG:[18:42:44 9.8.2026] --run force /coastal_hourly/cycle/h04/troute_ana_a :lauren.schambach@zhengtaocui-opertestbed-00023-mgmt
+history /coastal_hourly/cycle/h04/gen_configs_ana MSG:[19:08:43 9.8.2026] --run force /coastal_hourly/cycle/h04/gen_configs_ana :lauren.schambach@zhengtaocui-opertestbed-00023-mgmtMSG:[19:10:54 9.8.2026] --run force /coastal_hourly/cycle/h04/gen_configs_ana :lauren.schambach@zhengtaocui-opertestbed-00023-mgmt
+history /coastal_hourly/cycle/h14/ngen_forcing_ana MSG:[03:23:03 9.8.2026] --run /coastal_hourly/cycle/h14/ngen_forcing_ana :lauren.schambach@zhengtaocui-opertestbed-00023-mgmtMSG:[13:56:26 9.8.2026] --run force /coastal_hourly/cycle/h14/ngen_forcing_ana :lauren.schambach@zhengtaocui-opertestbed-00023-mgmtMSG:[14:19:19 9.8.2026] --run force /coastal_hourly/cycle/h14/ngen_forcing_ana :lauren.schambach@zhengtaocui-opertestbed-00023-mgmt
+history /coastal_hourly/cycle MSG:[17:29:43 9.8.2026] --alter change repeat 20260809 /coastal_hourly/cycle :lauren.schambach@zhengtaocui-opertestbed-00023-mgmtMSG:[17:29:50 9.8.2026] --requeue force /coastal_hourly/cycle :lauren.schambach@zhengtaocui-opertestbed-00023-mgmtMSG:[17:30:11 9.8.2026] --alter change repeat 20260809 /coastal_hourly/cycle :lauren.schambach@zhengtaocui-opertestbed-00023-mgmt
+history /coastal_hourly/cycle/h03/troute_ana_a MSG:[18:11:22 9.8.2026] --run force /coastal_hourly/cycle/h03/troute_ana_a :lauren.schambach@zhengtaocui-opertestbed-00023-mgmt
+history /coastal_hourly/cycle/h04/troute_ana_b MSG:[18:54:33 9.8.2026] --run force /coastal_hourly/cycle/h04/troute_ana_b :lauren.schambach@zhengtaocui-opertestbed-00023-mgmt
+history /coastal_hourly/cycle/h04/run_schism_download_ana MSG:[19:11:17 9.8.2026] --run force /coastal_hourly/cycle/h04/run_schism_download_ana :lauren.schambach@zhengtaocui-opertestbed-00023-mgmtMSG:[23:36:02 9.8.2026] --run force /coastal_hourly/cycle/h04/run_schism_download_ana :lauren.schambach@zhengtaocui-opertestbed-00023-mgmt
+suite coastal_hourly # begun:1 state:aborted dur:77:09:30 flag:message suspended:1 rt:00:13:00
 edit ECF_HOME '/contrib/LaurenSchambach/ngwpc/nwm-coastal/ecflow_demo/ecf_home'
 edit ECF_FILES '/contrib/LaurenSchambach/ngwpc/nwm-coastal/ecflow_demo/ecf_home'
 edit ECF_INCLUDE '/contrib/LaurenSchambach/ngwpc/nwm-coastal/ecflow_demo/ecf_home'
@@ -39,7 +53,9 @@ edit ECF_TRIES '1'
 edit NWM_RTE_DIR '/contrib/LaurenSchambach/ngwpc/nwm-rte'
 edit VPU '03S'
 edit FORCING_OUT_DIR '/contrib/LaurenSchambach/ngwpc/run_ngen/data/scratch/short_range_coastal'
+edit FORCING_OUT_DIR_ANA '/contrib/LaurenSchambach/ngwpc/run_ngen/data/scratch/standard_ana_coastal'
 edit TROUTE_REGIONALIZATION_ROOT '/contrib/LaurenSchambach/ngwpc/run_ngen/regionalization'
+edit TROUTE_REGIONALIZATION_ROOT_CONTAINER '/ngwpc/run_ngen/regionalization'
 edit NWM_COASTAL_CLI '/contrib/LaurenSchambach/ngwpc/nwm-coastal/nwm-coastal-cli'
 edit NWM_COASTAL_PY '/contrib/LaurenSchambach/ngwpc/nwm-coastal/nwm-coastal-py'
 edit GEN_SCRIPT '/contrib/LaurenSchambach/ngwpc/nwm-coastal/ecflow_demo/bin/gen_cycle_config.py'
@@ -47,344 +63,680 @@ edit SCHISM_BASE_YAML '/contrib/LaurenSchambach/ngwpc/run_coastal/schism_sims/ru
 edit SFINCS_BASE_YAML '/contrib/LaurenSchambach/ngwpc/run_coastal/sfincs_sims/run.yaml'
 edit SCHISM_CYCLES_DIR '/contrib/LaurenSchambach/ngwpc/run_coastal/schism_sims/cycles'
 edit SFINCS_CYCLES_DIR '/contrib/LaurenSchambach/ngwpc/run_coastal/sfincs_sims/cycles'
-calendar initTime:2026-Aug-06 13:22:43 suiteTime:2026-Aug-06 16:00:00 duration:02:37:17 initLocalTime:2026-Aug-06 13:22:43 lastTime:2026-Aug-06 16:00:00 calendarIncrement:00:01:00
-family cycle # state:queued dur:01:06:31
-repeat date YMD 20260805 20991231 1
-family h00 # state:queued
+calendar initTime:2026-Aug-06 21:12:30 suiteTime:2026-Aug-10 02:28:00 duration:77:15:30 initLocalTime:2026-Aug-06 21:12:30 lastTime:2026-Aug-10 02:28:00 calendarIncrement:00:01:00
+family cycle # state:aborted dur:77:09:30 flag:message rt:00:13:00
+repeat date YMD 20260805 20991231 1 # 20260809
+family h00 # state:queued dur:68:17:13
 edit HOUR '00'
-time 00:00 # isValid:false
-task ngen_forcing # state:queued
-task ngen_troute # state:queued
-task gen_configs # state:queued
-trigger ngen_forcing == complete and ngen_troute == complete
-task run_schism_download # state:queued
-trigger gen_configs == complete
-task run_schism # state:queued
-trigger run_schism_download == complete
-task run_sfincs # state:queued
-trigger run_schism_download == complete
+time 00:00 # free
+task ngen_forcing_sr # state:queued dur:68:17:13
+task ngen_forcing_ana # state:queued dur:68:17:13
+task troute_ana_a # state:queued dur:68:17:13
+trigger ../h23/troute_ana_a == complete
+task troute_ana_b # state:queued dur:68:17:13
+trigger ../h23/troute_ana_a == complete
+task troute_sr # state:queued dur:68:17:13
+trigger troute_ana_b == complete
+task gen_configs_ana # state:queued dur:68:17:13
+trigger troute_ana_b == complete and ngen_forcing_ana == complete
+task run_schism_download_ana # state:queued dur:68:17:13
+trigger gen_configs_ana == complete
+task schism_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h23/schism_ana == complete
+task sfincs_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h23/sfincs_ana == complete
+task gen_configs_sr # state:queued dur:68:17:13
+trigger ngen_forcing_sr == complete and troute_sr == complete and schism_ana == complete and sfincs_ana == complete
+task run_schism_download_sr # state:queued dur:68:17:13
+trigger gen_configs_sr == complete
+task schism_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
+task sfincs_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
 endfamily
-family h01 # state:queued
+family h01 # state:queued dur:68:17:13
 edit HOUR '01'
-time 01:00 # isValid:false
-task ngen_forcing # state:queued
-task ngen_troute # state:queued
-task gen_configs # state:queued
-trigger ngen_forcing == complete and ngen_troute == complete
-task run_schism_download # state:queued
-trigger gen_configs == complete
-task run_schism # state:queued
-trigger run_schism_download == complete
-task run_sfincs # state:queued
-trigger run_schism_download == complete
+time 01:00 # free
+task ngen_forcing_sr # state:queued dur:68:17:13
+task ngen_forcing_ana # state:queued dur:68:17:13
+task troute_ana_a # state:queued dur:68:17:13
+trigger ../h00/troute_ana_a == complete
+task troute_ana_b # state:queued dur:68:17:13
+trigger ../h00/troute_ana_a == complete
+task troute_sr # state:queued dur:68:17:13
+trigger troute_ana_b == complete
+task gen_configs_ana # state:queued dur:68:17:13
+trigger troute_ana_b == complete and ngen_forcing_ana == complete
+task run_schism_download_ana # state:queued dur:68:17:13
+trigger gen_configs_ana == complete
+task schism_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h00/schism_ana == complete
+task sfincs_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h00/sfincs_ana == complete
+task gen_configs_sr # state:queued dur:68:17:13
+trigger ngen_forcing_sr == complete and troute_sr == complete and schism_ana == complete and sfincs_ana == complete
+task run_schism_download_sr # state:queued dur:68:17:13
+trigger gen_configs_sr == complete
+task schism_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
+task sfincs_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
 endfamily
-family h02 # state:queued
+family h02 # state:queued dur:68:17:13
 edit HOUR '02'
-time 02:00 # isValid:false
-task ngen_forcing # state:queued
-task ngen_troute # state:queued
-task gen_configs # state:queued
-trigger ngen_forcing == complete and ngen_troute == complete
-task run_schism_download # state:queued
-trigger gen_configs == complete
-task run_schism # state:queued
-trigger run_schism_download == complete
-task run_sfincs # state:queued
-trigger run_schism_download == complete
+time 02:00 # free
+task ngen_forcing_sr # state:queued dur:68:17:13
+task ngen_forcing_ana # state:queued dur:68:17:13
+task troute_ana_a # state:queued dur:68:17:13
+trigger ../h01/troute_ana_a == complete
+task troute_ana_b # state:queued dur:68:17:13
+trigger ../h01/troute_ana_a == complete
+task troute_sr # state:queued dur:68:17:13
+trigger troute_ana_b == complete
+task gen_configs_ana # state:queued dur:68:17:13
+trigger troute_ana_b == complete and ngen_forcing_ana == complete
+task run_schism_download_ana # state:queued dur:68:17:13
+trigger gen_configs_ana == complete
+task schism_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h01/schism_ana == complete
+task sfincs_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h01/sfincs_ana == complete
+task gen_configs_sr # state:queued dur:68:17:13
+trigger ngen_forcing_sr == complete and troute_sr == complete and schism_ana == complete and sfincs_ana == complete
+task run_schism_download_sr # state:queued dur:68:17:13
+trigger gen_configs_sr == complete
+task schism_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
+task sfincs_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
 endfamily
-family h03 # state:queued
+family h03 # state:queued dur:69:10:30
 edit HOUR '03'
-time 03:00 # isValid:false
-task ngen_forcing # state:queued
-task ngen_troute # state:queued
-task gen_configs # state:queued
-trigger ngen_forcing == complete and ngen_troute == complete
-task run_schism_download # state:queued
-trigger gen_configs == complete
-task run_schism # state:queued
-trigger run_schism_download == complete
-task run_sfincs # state:queued
-trigger run_schism_download == complete
+time 03:00
+task ngen_forcing_sr # state:queued dur:68:17:13
+task ngen_forcing_ana # try:2 state:complete dur:68:44:30 flag:message rt:00:19:00
+task troute_ana_a # try:1 state:complete dur:69:10:30 flag:message rt:00:12:00
+trigger ../h02/troute_ana_a == complete
+task troute_ana_b # state:queued dur:68:17:13
+trigger ../h02/troute_ana_a == complete
+task troute_sr # state:queued dur:68:17:13
+trigger troute_ana_b == complete
+task gen_configs_ana # state:queued dur:68:17:13
+trigger troute_ana_b == complete and ngen_forcing_ana == complete
+task run_schism_download_ana # state:queued dur:68:17:13
+trigger gen_configs_ana == complete
+task schism_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h02/schism_ana == complete
+task sfincs_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h02/sfincs_ana == complete
+task gen_configs_sr # state:queued dur:68:17:13
+trigger ngen_forcing_sr == complete and troute_sr == complete and schism_ana == complete and sfincs_ana == complete
+task run_schism_download_sr # state:queued dur:68:17:13
+trigger gen_configs_sr == complete
+task schism_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
+task sfincs_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
 endfamily
-family h04 # state:queued
+family h04 # state:queued dur:74:37:30
 edit HOUR '04'
-time 04:00 # isValid:false
-task ngen_forcing # state:queued
-task ngen_troute # state:queued
-task gen_configs # state:queued
-trigger ngen_forcing == complete and ngen_troute == complete
-task run_schism_download # state:queued
-trigger gen_configs == complete
-task run_schism # state:queued
-trigger run_schism_download == complete
-task run_sfincs # state:queued
-trigger run_schism_download == complete
+time 04:00
+task ngen_forcing_sr # state:queued dur:68:17:13
+task ngen_forcing_ana # try:1 state:complete dur:69:29:30 flag:message rt:00:18:52
+task troute_ana_a # try:1 state:complete dur:69:41:30 flag:message rt:00:11:30
+trigger ../h03/troute_ana_a == complete
+task troute_ana_b # try:1 state:complete dur:69:54:30 flag:message rt:00:12:53
+trigger ../h03/troute_ana_a == complete
+task troute_sr # state:queued dur:68:17:13
+trigger troute_ana_b == complete
+task gen_configs_ana # try:2 state:complete dur:69:58:25 flag:message rt:00:00:55
+trigger troute_ana_b == complete and ngen_forcing_ana == complete
+task run_schism_download_ana # try:2 state:complete dur:74:23:32 flag:message rt:00:00:02
+trigger gen_configs_ana == complete
+task schism_ana # try:1 state:complete dur:74:34:30 flag:message rt:00:10:00
+trigger run_schism_download_ana == complete and ../h03/schism_ana == complete
+task sfincs_ana # try:1 state:complete dur:74:37:30 flag:message rt:00:02:00
+trigger run_schism_download_ana == complete and ../h03/sfincs_ana == complete
+task gen_configs_sr # state:queued dur:68:17:13
+trigger ngen_forcing_sr == complete and troute_sr == complete and schism_ana == complete and sfincs_ana == complete
+task run_schism_download_sr # state:queued dur:68:17:13
+trigger gen_configs_sr == complete
+task schism_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
+task sfincs_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
 endfamily
-family h05 # state:queued
+family h05 # state:aborted dur:77:09:30 rt:00:13:00
 edit HOUR '05'
-time 05:00 # isValid:false
-task ngen_forcing # state:queued
-task ngen_troute # state:queued
-task gen_configs # state:queued
-trigger ngen_forcing == complete and ngen_troute == complete
-task run_schism_download # state:queued
-trigger gen_configs == complete
-task run_schism # state:queued
-trigger run_schism_download == complete
-task run_sfincs # state:queued
-trigger run_schism_download == complete
+time 05:00
+task ngen_forcing_sr # passwd:c5UVpmxi rid:2101012 try:1 state:active dur:77:09:32 flag:message
+task ngen_forcing_ana # passwd:dRQLJKq3 rid:2095793 abort<:ECF_JOB_CMD PID(2095791) path(/coastal_hourly/cycle/h05/ngen_forcing_ana) exited with status 137 [ /contrib/LaurenSchambach/ngwpc/nwm-coastal/ecflow_demo/ecf_home/coastal_hourly/cycle/h05/ngen_forcing_ana.job1 1> /contrib/LaurenSchambach/ngwpc/nwm-coastal/ecflow_demo/ecf_home/coastal_hourly/cycle/h05/ngen_forcing_ana.1 2>&1 ]>abort try:1 state:aborted dur:77:09:30 flag:task_aborted,ecfcmd_failed,message rt:00:13:00
+task troute_ana_a # try:1 state:complete dur:77:12:30 flag:message rt:00:14:00
+trigger ../h04/troute_ana_a == complete
+task troute_ana_b # try:1 state:complete dur:77:14:30 flag:message rt:00:16:00
+trigger ../h04/troute_ana_a == complete
+task troute_sr # state:queued dur:68:17:13
+trigger troute_ana_b == complete
+task gen_configs_ana # state:queued dur:68:17:13
+trigger troute_ana_b == complete and ngen_forcing_ana == complete
+task run_schism_download_ana # state:queued dur:68:17:13
+trigger gen_configs_ana == complete
+task schism_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h04/schism_ana == complete
+task sfincs_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h04/sfincs_ana == complete
+task gen_configs_sr # state:queued dur:68:17:13
+trigger ngen_forcing_sr == complete and troute_sr == complete and schism_ana == complete and sfincs_ana == complete
+task run_schism_download_sr # state:queued dur:68:17:13
+trigger gen_configs_sr == complete
+task schism_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
+task sfincs_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
 endfamily
-family h06 # state:queued
+family h06 # state:queued dur:68:17:13
 edit HOUR '06'
-time 06:00 # isValid:false
-task ngen_forcing # state:queued
-task ngen_troute # state:queued
-task gen_configs # state:queued
-trigger ngen_forcing == complete and ngen_troute == complete
-task run_schism_download # state:queued
-trigger gen_configs == complete
-task run_schism # state:queued
-trigger run_schism_download == complete
-task run_sfincs # state:queued
-trigger run_schism_download == complete
+time 06:00
+task ngen_forcing_sr # state:queued dur:68:17:13
+task ngen_forcing_ana # state:queued dur:68:17:13
+task troute_ana_a # state:queued dur:68:17:13
+trigger ../h05/troute_ana_a == complete
+task troute_ana_b # state:queued dur:68:17:13
+trigger ../h05/troute_ana_a == complete
+task troute_sr # state:queued dur:68:17:13
+trigger troute_ana_b == complete
+task gen_configs_ana # state:queued dur:68:17:13
+trigger troute_ana_b == complete and ngen_forcing_ana == complete
+task run_schism_download_ana # state:queued dur:68:17:13
+trigger gen_configs_ana == complete
+task schism_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h05/schism_ana == complete
+task sfincs_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h05/sfincs_ana == complete
+task gen_configs_sr # state:queued dur:68:17:13
+trigger ngen_forcing_sr == complete and troute_sr == complete and schism_ana == complete and sfincs_ana == complete
+task run_schism_download_sr # state:queued dur:68:17:13
+trigger gen_configs_sr == complete
+task schism_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
+task sfincs_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
 endfamily
-family h07 # state:queued
+family h07 # state:queued dur:68:17:13
 edit HOUR '07'
-time 07:00 # isValid:false
-task ngen_forcing # state:queued
-task ngen_troute # state:queued
-task gen_configs # state:queued
-trigger ngen_forcing == complete and ngen_troute == complete
-task run_schism_download # state:queued
-trigger gen_configs == complete
-task run_schism # state:queued
-trigger run_schism_download == complete
-task run_sfincs # state:queued
-trigger run_schism_download == complete
+time 07:00
+task ngen_forcing_sr # state:queued dur:68:17:13
+task ngen_forcing_ana # state:queued dur:68:17:13
+task troute_ana_a # state:queued dur:68:17:13
+trigger ../h06/troute_ana_a == complete
+task troute_ana_b # state:queued dur:68:17:13
+trigger ../h06/troute_ana_a == complete
+task troute_sr # state:queued dur:68:17:13
+trigger troute_ana_b == complete
+task gen_configs_ana # state:queued dur:68:17:13
+trigger troute_ana_b == complete and ngen_forcing_ana == complete
+task run_schism_download_ana # state:queued dur:68:17:13
+trigger gen_configs_ana == complete
+task schism_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h06/schism_ana == complete
+task sfincs_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h06/sfincs_ana == complete
+task gen_configs_sr # state:queued dur:68:17:13
+trigger ngen_forcing_sr == complete and troute_sr == complete and schism_ana == complete and sfincs_ana == complete
+task run_schism_download_sr # state:queued dur:68:17:13
+trigger gen_configs_sr == complete
+task schism_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
+task sfincs_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
 endfamily
-family h08 # state:queued
+family h08 # state:queued dur:68:17:13
 edit HOUR '08'
-time 08:00 # isValid:false
-task ngen_forcing # state:queued
-task ngen_troute # state:queued
-task gen_configs # state:queued
-trigger ngen_forcing == complete and ngen_troute == complete
-task run_schism_download # state:queued
-trigger gen_configs == complete
-task run_schism # state:queued
-trigger run_schism_download == complete
-task run_sfincs # state:queued
-trigger run_schism_download == complete
+time 08:00
+task ngen_forcing_sr # state:queued dur:68:17:13
+task ngen_forcing_ana # state:queued dur:68:17:13
+task troute_ana_a # state:queued dur:68:17:13
+trigger ../h07/troute_ana_a == complete
+task troute_ana_b # state:queued dur:68:17:13
+trigger ../h07/troute_ana_a == complete
+task troute_sr # state:queued dur:68:17:13
+trigger troute_ana_b == complete
+task gen_configs_ana # state:queued dur:68:17:13
+trigger troute_ana_b == complete and ngen_forcing_ana == complete
+task run_schism_download_ana # state:queued dur:68:17:13
+trigger gen_configs_ana == complete
+task schism_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h07/schism_ana == complete
+task sfincs_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h07/sfincs_ana == complete
+task gen_configs_sr # state:queued dur:68:17:13
+trigger ngen_forcing_sr == complete and troute_sr == complete and schism_ana == complete and sfincs_ana == complete
+task run_schism_download_sr # state:queued dur:68:17:13
+trigger gen_configs_sr == complete
+task schism_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
+task sfincs_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
 endfamily
-family h09 # state:queued
+family h09 # state:queued dur:68:17:13
 edit HOUR '09'
-time 09:00 # isValid:false
-task ngen_forcing # state:queued
-task ngen_troute # state:queued
-task gen_configs # state:queued
-trigger ngen_forcing == complete and ngen_troute == complete
-task run_schism_download # state:queued
-trigger gen_configs == complete
-task run_schism # state:queued
-trigger run_schism_download == complete
-task run_sfincs # state:queued
-trigger run_schism_download == complete
+time 09:00
+task ngen_forcing_sr # state:queued dur:68:17:13
+task ngen_forcing_ana # state:queued dur:68:17:13
+task troute_ana_a # state:queued dur:68:17:13
+trigger ../h08/troute_ana_a == complete
+task troute_ana_b # state:queued dur:68:17:13
+trigger ../h08/troute_ana_a == complete
+task troute_sr # state:queued dur:68:17:13
+trigger troute_ana_b == complete
+task gen_configs_ana # state:queued dur:68:17:13
+trigger troute_ana_b == complete and ngen_forcing_ana == complete
+task run_schism_download_ana # state:queued dur:68:17:13
+trigger gen_configs_ana == complete
+task schism_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h08/schism_ana == complete
+task sfincs_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h08/sfincs_ana == complete
+task gen_configs_sr # state:queued dur:68:17:13
+trigger ngen_forcing_sr == complete and troute_sr == complete and schism_ana == complete and sfincs_ana == complete
+task run_schism_download_sr # state:queued dur:68:17:13
+trigger gen_configs_sr == complete
+task schism_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
+task sfincs_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
 endfamily
-family h10 # state:queued
+family h10 # state:queued dur:68:17:13
 edit HOUR '10'
-time 10:00 # isValid:false
-task ngen_forcing # state:queued
-task ngen_troute # state:queued
-task gen_configs # state:queued
-trigger ngen_forcing == complete and ngen_troute == complete
-task run_schism_download # state:queued
-trigger gen_configs == complete
-task run_schism # state:queued
-trigger run_schism_download == complete
-task run_sfincs # state:queued
-trigger run_schism_download == complete
+time 10:00
+task ngen_forcing_sr # state:queued dur:68:17:13
+task ngen_forcing_ana # state:queued dur:68:17:13
+task troute_ana_a # state:queued dur:68:17:13
+trigger ../h09/troute_ana_a == complete
+task troute_ana_b # state:queued dur:68:17:13
+trigger ../h09/troute_ana_a == complete
+task troute_sr # state:queued dur:68:17:13
+trigger troute_ana_b == complete
+task gen_configs_ana # state:queued dur:68:17:13
+trigger troute_ana_b == complete and ngen_forcing_ana == complete
+task run_schism_download_ana # state:queued dur:68:17:13
+trigger gen_configs_ana == complete
+task schism_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h09/schism_ana == complete
+task sfincs_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h09/sfincs_ana == complete
+task gen_configs_sr # state:queued dur:68:17:13
+trigger ngen_forcing_sr == complete and troute_sr == complete and schism_ana == complete and sfincs_ana == complete
+task run_schism_download_sr # state:queued dur:68:17:13
+trigger gen_configs_sr == complete
+task schism_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
+task sfincs_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
 endfamily
-family h11 # state:queued
+family h11 # state:queued dur:68:17:13
 edit HOUR '11'
-time 11:00 # isValid:false
-task ngen_forcing # state:queued
-task ngen_troute # state:queued
-task gen_configs # state:queued
-trigger ngen_forcing == complete and ngen_troute == complete
-task run_schism_download # state:queued
-trigger gen_configs == complete
-task run_schism # state:queued
-trigger run_schism_download == complete
-task run_sfincs # state:queued
-trigger run_schism_download == complete
+time 11:00
+task ngen_forcing_sr # state:queued dur:68:17:13
+task ngen_forcing_ana # state:queued dur:68:17:13
+task troute_ana_a # state:queued dur:68:17:13
+trigger ../h10/troute_ana_a == complete
+task troute_ana_b # state:queued dur:68:17:13
+trigger ../h10/troute_ana_a == complete
+task troute_sr # state:queued dur:68:17:13
+trigger troute_ana_b == complete
+task gen_configs_ana # state:queued dur:68:17:13
+trigger troute_ana_b == complete and ngen_forcing_ana == complete
+task run_schism_download_ana # state:queued dur:68:17:13
+trigger gen_configs_ana == complete
+task schism_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h10/schism_ana == complete
+task sfincs_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h10/sfincs_ana == complete
+task gen_configs_sr # state:queued dur:68:17:13
+trigger ngen_forcing_sr == complete and troute_sr == complete and schism_ana == complete and sfincs_ana == complete
+task run_schism_download_sr # state:queued dur:68:17:13
+trigger gen_configs_sr == complete
+task schism_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
+task sfincs_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
 endfamily
-family h12 # state:queued
+family h12 # state:queued dur:68:17:13
 edit HOUR '12'
-time 12:00 # isValid:false
-task ngen_forcing # state:queued
-task ngen_troute # state:queued
-task gen_configs # state:queued
-trigger ngen_forcing == complete and ngen_troute == complete
-task run_schism_download # state:queued
-trigger gen_configs == complete
-task run_schism # state:queued
-trigger run_schism_download == complete
-task run_sfincs # state:queued
-trigger run_schism_download == complete
+time 12:00
+task ngen_forcing_sr # state:queued dur:68:17:13
+task ngen_forcing_ana # state:queued dur:68:17:13
+task troute_ana_a # state:queued dur:68:17:13
+trigger ../h11/troute_ana_a == complete
+task troute_ana_b # state:queued dur:68:17:13
+trigger ../h11/troute_ana_a == complete
+task troute_sr # state:queued dur:68:17:13
+trigger troute_ana_b == complete
+task gen_configs_ana # state:queued dur:68:17:13
+trigger troute_ana_b == complete and ngen_forcing_ana == complete
+task run_schism_download_ana # state:queued dur:68:17:13
+trigger gen_configs_ana == complete
+task schism_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h11/schism_ana == complete
+task sfincs_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h11/sfincs_ana == complete
+task gen_configs_sr # state:queued dur:68:17:13
+trigger ngen_forcing_sr == complete and troute_sr == complete and schism_ana == complete and sfincs_ana == complete
+task run_schism_download_sr # state:queued dur:68:17:13
+trigger gen_configs_sr == complete
+task schism_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
+task sfincs_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
 endfamily
-family h13 # state:queued
+family h13 # state:queued dur:68:17:13
 edit HOUR '13'
-time 13:00 # isValid:false
-task ngen_forcing # state:queued
-task ngen_troute # state:queued
-task gen_configs # state:queued
-trigger ngen_forcing == complete and ngen_troute == complete
-task run_schism_download # state:queued
-trigger gen_configs == complete
-task run_schism # state:queued
-trigger run_schism_download == complete
-task run_sfincs # state:queued
-trigger run_schism_download == complete
+time 13:00
+task ngen_forcing_sr # state:queued dur:68:17:13
+task ngen_forcing_ana # state:queued dur:68:17:13
+task troute_ana_a # state:queued dur:68:17:13
+trigger ../h12/troute_ana_a == complete
+task troute_ana_b # state:queued dur:68:17:13
+trigger ../h12/troute_ana_a == complete
+task troute_sr # state:queued dur:68:17:13
+trigger troute_ana_b == complete
+task gen_configs_ana # state:queued dur:68:17:13
+trigger troute_ana_b == complete and ngen_forcing_ana == complete
+task run_schism_download_ana # state:queued dur:68:17:13
+trigger gen_configs_ana == complete
+task schism_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h12/schism_ana == complete
+task sfincs_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h12/sfincs_ana == complete
+task gen_configs_sr # state:queued dur:68:17:13
+trigger ngen_forcing_sr == complete and troute_sr == complete and schism_ana == complete and sfincs_ana == complete
+task run_schism_download_sr # state:queued dur:68:17:13
+trigger gen_configs_sr == complete
+task schism_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
+task sfincs_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
 endfamily
-family h14 # state:queued dur:01:06:31
+family h14 # state:queued dur:68:17:13
 edit HOUR '14'
-time 14:00 # free
-task ngen_forcing # state:queued
-task ngen_troute # state:queued dur:01:06:31 flag:message
-task gen_configs # state:queued flag:message
-trigger ngen_forcing == complete and ngen_troute == complete
-task run_schism_download # state:queued flag:message
-trigger gen_configs == complete
-task run_schism # state:queued flag:message
-trigger run_schism_download == complete
-task run_sfincs # state:queued flag:message
-trigger run_schism_download == complete
+time 14:00
+task ngen_forcing_sr # state:queued dur:68:17:13
+task ngen_forcing_ana # state:queued dur:68:17:13 flag:message
+task troute_ana_a # state:queued dur:68:17:13 flag:message
+trigger ../h13/troute_ana_a == complete
+task troute_ana_b # state:queued dur:68:17:13 flag:message
+trigger ../h13/troute_ana_a == complete
+task troute_sr # state:queued dur:68:17:13
+trigger troute_ana_b == complete
+task gen_configs_ana # state:queued dur:68:17:13 flag:message
+trigger troute_ana_b == complete and ngen_forcing_ana == complete
+task run_schism_download_ana # state:queued dur:68:17:13 flag:message
+trigger gen_configs_ana == complete
+task schism_ana # state:queued dur:68:17:13 flag:message
+trigger run_schism_download_ana == complete and ../h13/schism_ana == complete
+task sfincs_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h13/sfincs_ana == complete
+task gen_configs_sr # state:queued dur:68:17:13
+trigger ngen_forcing_sr == complete and troute_sr == complete and schism_ana == complete and sfincs_ana == complete
+task run_schism_download_sr # state:queued dur:68:17:13
+trigger gen_configs_sr == complete
+task schism_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
+task sfincs_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
 endfamily
-family h15 # state:queued
+family h15 # state:queued dur:68:17:13
 edit HOUR '15'
-time 15:00 # free
-task ngen_forcing # state:queued
-task ngen_troute # state:queued flag:message
-task gen_configs # state:queued
-trigger ngen_forcing == complete and ngen_troute == complete
-task run_schism_download # state:queued
-trigger gen_configs == complete
-task run_schism # state:queued
-trigger run_schism_download == complete
-task run_sfincs # state:queued
-trigger run_schism_download == complete
+time 15:00
+task ngen_forcing_sr # state:queued dur:68:17:13
+task ngen_forcing_ana # state:queued dur:68:17:13
+task troute_ana_a # state:queued dur:68:17:13
+trigger ../h14/troute_ana_a == complete
+task troute_ana_b # state:queued dur:68:17:13
+trigger ../h14/troute_ana_a == complete
+task troute_sr # state:queued dur:68:17:13
+trigger troute_ana_b == complete
+task gen_configs_ana # state:queued dur:68:17:13
+trigger troute_ana_b == complete and ngen_forcing_ana == complete
+task run_schism_download_ana # state:queued dur:68:17:13
+trigger gen_configs_ana == complete
+task schism_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h14/schism_ana == complete
+task sfincs_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h14/sfincs_ana == complete
+task gen_configs_sr # state:queued dur:68:17:13
+trigger ngen_forcing_sr == complete and troute_sr == complete and schism_ana == complete and sfincs_ana == complete
+task run_schism_download_sr # state:queued dur:68:17:13
+trigger gen_configs_sr == complete
+task schism_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
+task sfincs_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
 endfamily
-family h16 # state:queued
+family h16 # state:queued dur:68:17:13
 edit HOUR '16'
-time 16:00 # free
-task ngen_forcing # state:queued
-task ngen_troute # state:queued
-task gen_configs # state:queued
-trigger ngen_forcing == complete and ngen_troute == complete
-task run_schism_download # state:queued
-trigger gen_configs == complete
-task run_schism # state:queued
-trigger run_schism_download == complete
-task run_sfincs # state:queued
-trigger run_schism_download == complete
+time 16:00
+task ngen_forcing_sr # state:queued dur:68:17:13
+task ngen_forcing_ana # state:queued dur:68:17:13
+task troute_ana_a # state:queued dur:68:17:13
+trigger ../h15/troute_ana_a == complete
+task troute_ana_b # state:queued dur:68:17:13
+trigger ../h15/troute_ana_a == complete
+task troute_sr # state:queued dur:68:17:13
+trigger troute_ana_b == complete
+task gen_configs_ana # state:queued dur:68:17:13
+trigger troute_ana_b == complete and ngen_forcing_ana == complete
+task run_schism_download_ana # state:queued dur:68:17:13
+trigger gen_configs_ana == complete
+task schism_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h15/schism_ana == complete
+task sfincs_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h15/sfincs_ana == complete
+task gen_configs_sr # state:queued dur:68:17:13
+trigger ngen_forcing_sr == complete and troute_sr == complete and schism_ana == complete and sfincs_ana == complete
+task run_schism_download_sr # state:queued dur:68:17:13
+trigger gen_configs_sr == complete
+task schism_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
+task sfincs_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
 endfamily
-family h17 # state:queued
+family h17 # state:queued dur:68:17:13
 edit HOUR '17'
 time 17:00
-task ngen_forcing # state:queued
-task ngen_troute # state:queued
-task gen_configs # state:queued
-trigger ngen_forcing == complete and ngen_troute == complete
-task run_schism_download # state:queued
-trigger gen_configs == complete
-task run_schism # state:queued
-trigger run_schism_download == complete
-task run_sfincs # state:queued
-trigger run_schism_download == complete
+task ngen_forcing_sr # state:queued dur:68:17:13
+task ngen_forcing_ana # state:queued dur:68:17:13
+task troute_ana_a # state:queued dur:68:17:13
+trigger ../h16/troute_ana_a == complete
+task troute_ana_b # state:queued dur:68:17:13
+trigger ../h16/troute_ana_a == complete
+task troute_sr # state:queued dur:68:17:13
+trigger troute_ana_b == complete
+task gen_configs_ana # state:queued dur:68:17:13
+trigger troute_ana_b == complete and ngen_forcing_ana == complete
+task run_schism_download_ana # state:queued dur:68:17:13
+trigger gen_configs_ana == complete
+task schism_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h16/schism_ana == complete
+task sfincs_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h16/sfincs_ana == complete
+task gen_configs_sr # state:queued dur:68:17:13
+trigger ngen_forcing_sr == complete and troute_sr == complete and schism_ana == complete and sfincs_ana == complete
+task run_schism_download_sr # state:queued dur:68:17:13
+trigger gen_configs_sr == complete
+task schism_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
+task sfincs_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
 endfamily
-family h18 # state:queued
+family h18 # state:queued dur:68:17:13
 edit HOUR '18'
-time 18:00
-task ngen_forcing # state:queued
-task ngen_troute # state:queued
-task gen_configs # state:queued
-trigger ngen_forcing == complete and ngen_troute == complete
-task run_schism_download # state:queued
-trigger gen_configs == complete
-task run_schism # state:queued
-trigger run_schism_download == complete
-task run_sfincs # state:queued
-trigger run_schism_download == complete
+time 18:00 # free
+task ngen_forcing_sr # state:queued dur:68:17:13
+task ngen_forcing_ana # state:queued dur:68:17:13
+task troute_ana_a # state:queued dur:68:17:13
+trigger ../h17/troute_ana_a == complete
+task troute_ana_b # state:queued dur:68:17:13
+trigger ../h17/troute_ana_a == complete
+task troute_sr # state:queued dur:68:17:13
+trigger troute_ana_b == complete
+task gen_configs_ana # state:queued dur:68:17:13
+trigger troute_ana_b == complete and ngen_forcing_ana == complete
+task run_schism_download_ana # state:queued dur:68:17:13
+trigger gen_configs_ana == complete
+task schism_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h17/schism_ana == complete
+task sfincs_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h17/sfincs_ana == complete
+task gen_configs_sr # state:queued dur:68:17:13
+trigger ngen_forcing_sr == complete and troute_sr == complete and schism_ana == complete and sfincs_ana == complete
+task run_schism_download_sr # state:queued dur:68:17:13
+trigger gen_configs_sr == complete
+task schism_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
+task sfincs_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
 endfamily
-family h19 # state:queued
+family h19 # state:queued dur:68:17:13
 edit HOUR '19'
-time 19:00
-task ngen_forcing # state:queued
-task ngen_troute # state:queued
-task gen_configs # state:queued
-trigger ngen_forcing == complete and ngen_troute == complete
-task run_schism_download # state:queued
-trigger gen_configs == complete
-task run_schism # state:queued
-trigger run_schism_download == complete
-task run_sfincs # state:queued
-trigger run_schism_download == complete
+time 19:00 # free
+task ngen_forcing_sr # state:queued dur:68:17:13
+task ngen_forcing_ana # state:queued dur:68:17:13
+task troute_ana_a # state:queued dur:68:17:13
+trigger ../h18/troute_ana_a == complete
+task troute_ana_b # state:queued dur:68:17:13
+trigger ../h18/troute_ana_a == complete
+task troute_sr # state:queued dur:68:17:13
+trigger troute_ana_b == complete
+task gen_configs_ana # state:queued dur:68:17:13
+trigger troute_ana_b == complete and ngen_forcing_ana == complete
+task run_schism_download_ana # state:queued dur:68:17:13
+trigger gen_configs_ana == complete
+task schism_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h18/schism_ana == complete
+task sfincs_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h18/sfincs_ana == complete
+task gen_configs_sr # state:queued dur:68:17:13
+trigger ngen_forcing_sr == complete and troute_sr == complete and schism_ana == complete and sfincs_ana == complete
+task run_schism_download_sr # state:queued dur:68:17:13
+trigger gen_configs_sr == complete
+task schism_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
+task sfincs_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
 endfamily
-family h20 # state:queued
+family h20 # state:queued dur:68:17:13
 edit HOUR '20'
-time 20:00
-task ngen_forcing # state:queued
-task ngen_troute # state:queued
-task gen_configs # state:queued
-trigger ngen_forcing == complete and ngen_troute == complete
-task run_schism_download # state:queued
-trigger gen_configs == complete
-task run_schism # state:queued
-trigger run_schism_download == complete
-task run_sfincs # state:queued
-trigger run_schism_download == complete
+time 20:00 # free
+task ngen_forcing_sr # state:queued dur:68:17:13
+task ngen_forcing_ana # state:queued dur:68:17:13
+task troute_ana_a # state:queued dur:68:17:13
+trigger ../h19/troute_ana_a == complete
+task troute_ana_b # state:queued dur:68:17:13
+trigger ../h19/troute_ana_a == complete
+task troute_sr # state:queued dur:68:17:13
+trigger troute_ana_b == complete
+task gen_configs_ana # state:queued dur:68:17:13
+trigger troute_ana_b == complete and ngen_forcing_ana == complete
+task run_schism_download_ana # state:queued dur:68:17:13
+trigger gen_configs_ana == complete
+task schism_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h19/schism_ana == complete
+task sfincs_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h19/sfincs_ana == complete
+task gen_configs_sr # state:queued dur:68:17:13
+trigger ngen_forcing_sr == complete and troute_sr == complete and schism_ana == complete and sfincs_ana == complete
+task run_schism_download_sr # state:queued dur:68:17:13
+trigger gen_configs_sr == complete
+task schism_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
+task sfincs_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
 endfamily
-family h21 # state:queued
+family h21 # state:queued dur:68:17:13
 edit HOUR '21'
-time 21:00
-task ngen_forcing # state:queued
-task ngen_troute # state:queued
-task gen_configs # state:queued
-trigger ngen_forcing == complete and ngen_troute == complete
-task run_schism_download # state:queued
-trigger gen_configs == complete
-task run_schism # state:queued
-trigger run_schism_download == complete
-task run_sfincs # state:queued
-trigger run_schism_download == complete
+time 21:00 # free
+task ngen_forcing_sr # state:queued dur:68:17:13
+task ngen_forcing_ana # state:queued dur:68:17:13
+task troute_ana_a # state:queued dur:68:17:13
+trigger ../h20/troute_ana_a == complete
+task troute_ana_b # state:queued dur:68:17:13
+trigger ../h20/troute_ana_a == complete
+task troute_sr # state:queued dur:68:17:13
+trigger troute_ana_b == complete
+task gen_configs_ana # state:queued dur:68:17:13
+trigger troute_ana_b == complete and ngen_forcing_ana == complete
+task run_schism_download_ana # state:queued dur:68:17:13
+trigger gen_configs_ana == complete
+task schism_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h20/schism_ana == complete
+task sfincs_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h20/sfincs_ana == complete
+task gen_configs_sr # state:queued dur:68:17:13
+trigger ngen_forcing_sr == complete and troute_sr == complete and schism_ana == complete and sfincs_ana == complete
+task run_schism_download_sr # state:queued dur:68:17:13
+trigger gen_configs_sr == complete
+task schism_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
+task sfincs_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
 endfamily
-family h22 # state:queued
+family h22 # state:queued dur:68:17:13
 edit HOUR '22'
-time 22:00
-task ngen_forcing # state:queued
-task ngen_troute # state:queued
-task gen_configs # state:queued
-trigger ngen_forcing == complete and ngen_troute == complete
-task run_schism_download # state:queued
-trigger gen_configs == complete
-task run_schism # state:queued
-trigger run_schism_download == complete
-task run_sfincs # state:queued
-trigger run_schism_download == complete
+time 22:00 # free
+task ngen_forcing_sr # state:queued dur:68:17:13
+task ngen_forcing_ana # state:queued dur:68:17:13
+task troute_ana_a # state:queued dur:68:17:13
+trigger ../h21/troute_ana_a == complete
+task troute_ana_b # state:queued dur:68:17:13
+trigger ../h21/troute_ana_a == complete
+task troute_sr # state:queued dur:68:17:13
+trigger troute_ana_b == complete
+task gen_configs_ana # state:queued dur:68:17:13
+trigger troute_ana_b == complete and ngen_forcing_ana == complete
+task run_schism_download_ana # state:queued dur:68:17:13
+trigger gen_configs_ana == complete
+task schism_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h21/schism_ana == complete
+task sfincs_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h21/sfincs_ana == complete
+task gen_configs_sr # state:queued dur:68:17:13
+trigger ngen_forcing_sr == complete and troute_sr == complete and schism_ana == complete and sfincs_ana == complete
+task run_schism_download_sr # state:queued dur:68:17:13
+trigger gen_configs_sr == complete
+task schism_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
+task sfincs_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
 endfamily
-family h23 # state:queued
+family h23 # state:queued dur:68:17:13
 edit HOUR '23'
-time 23:00
-task ngen_forcing # state:queued
-task ngen_troute # state:queued
-task gen_configs # state:queued
-trigger ngen_forcing == complete and ngen_troute == complete
-task run_schism_download # state:queued
-trigger gen_configs == complete
-task run_schism # state:queued
-trigger run_schism_download == complete
-task run_sfincs # state:queued
-trigger run_schism_download == complete
+time 23:00 # free
+task ngen_forcing_sr # state:queued dur:68:17:13
+task ngen_forcing_ana # state:queued dur:68:17:13
+task troute_ana_a # state:queued dur:68:17:13
+trigger ../h22/troute_ana_a == complete
+task troute_ana_b # state:queued dur:68:17:13
+trigger ../h22/troute_ana_a == complete
+task troute_sr # state:queued dur:68:17:13
+trigger troute_ana_b == complete
+task gen_configs_ana # state:queued dur:68:17:13
+trigger troute_ana_b == complete and ngen_forcing_ana == complete
+task run_schism_download_ana # state:queued dur:68:17:13
+trigger gen_configs_ana == complete
+task schism_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h22/schism_ana == complete
+task sfincs_ana # state:queued dur:68:17:13
+trigger run_schism_download_ana == complete and ../h22/sfincs_ana == complete
+task gen_configs_sr # state:queued dur:68:17:13
+trigger ngen_forcing_sr == complete and troute_sr == complete and schism_ana == complete and sfincs_ana == complete
+task run_schism_download_sr # state:queued dur:68:17:13
+trigger gen_configs_sr == complete
+task schism_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
+task sfincs_sr # state:queued dur:68:17:13
+trigger run_schism_download_sr == complete
 endfamily
 endfamily
 endsuite

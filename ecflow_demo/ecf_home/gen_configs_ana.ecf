@@ -1,0 +1,138 @@
+%include <head.h>
+
+YMD=%YMD%
+HH=%HOUR%
+CYCLE=${YMD}${HH}
+CYCLE_DT="${YMD:0:4}-${YMD:4:2}-${YMD:6:2} ${HH}:00:00"
+# IMPORTANT: relative adjustment must come BEFORE the timestamp -- see
+# troute_ana_a.ecf for why "${CYCLE_DT} -1 hour" silently parses wrong in
+# GNU date (confirmed live: evaluates to +2h, not -1h).
+PREV_CYCLE=$(date -u -d "-1 hour ${CYCLE_DT}" +"%%Y%%m%%d%%H")
+# T-3 relative to THIS cycle == T-2 relative to PREV_CYCLE -- the exact real
+# time PREV_CYCLE's own schism_ana/sfincs_ana wrote their 1h-mark checkpoint
+# at. See troute_ana_a.ecf for the same PREV_CYCLE derivation rationale
+# (date arithmetic, not string slicing, so day/month/year rollover is free).
+T_MINUS_3_STAMP=$(date -u -d "-3 hours ${CYCLE_DT}" +"%%Y%%m%%d.%%H0000")
+# ngen_forcing_ana's output is named after the raw cycle time (run_coastal.py
+# passes -dt straight through as RefcstBDateProc, unshifted -- see the
+# run_coastal.py AnA windowing fix).
+STAMP=${CYCLE}00
+# troute_ana_b's output, by contrast, is named after its actual restart
+# timestamp, which is a further 1h before its own fcst_start (T-4, not
+# T-3) -- see troute_ana_b.ecf for the mswm rationale and live
+# confirmation. NOT the same value as T_MINUS_3_STAMP above (that one is
+# for SCHISM/SFINCS's own self-chained checkpoint naming, unrelated to
+# troute's mswm-specific shift).
+TROUTE_STAMP=$(date -u -d "-4 hours ${CYCLE_DT}" +"%%Y%%m%%d%%H")00
+
+FORCING_FILE="%FORCING_OUT_DIR_ANA%/CONUS_${STAMP}.nc"
+# troute's netCDF outputs land in an Output/ subdirectory for AnA runs --
+# confirmed live across all 3 AnA test runs (see troute_ana_a.ecf/
+# troute_ana_b.ecf).
+TROUTE_FILE="%TROUTE_REGIONALIZATION_ROOT%/region_ana_b_${CYCLE}/%VPU%/Output/troute_output_${TROUTE_STAMP}.nc"
+
+for f in "${FORCING_FILE}" "${TROUTE_FILE}"; do
+  [ -f "$f" ] || { echo "ERROR: upstream file missing: $f" >&2; exit 1; }
+done
+
+SCHISM_CYCLE_DIR="%SCHISM_CYCLES_DIR%/ana_${CYCLE}"
+SFINCS_CYCLE_DIR="%SFINCS_CYCLES_DIR%/ana_${CYCLE}"
+
+# Self-chain warm start: PREV_CYCLE's own schism_ana/sfincs_ana run wrote a
+# checkpoint at T-2 (relative to PREV_CYCLE) == T-3 (relative to THIS
+# cycle) == this run's own start_date.
+#
+# SCHISM: hotstart_it=<iteration>.nc -- iteration is a timestep count, not
+# derivable without parsing param.nml, but combine_hotstart() writes
+# hourly, so the SMALLEST iteration present is always the first/T-2
+# checkpoint -- discover it by numeric sort.
+PREV_SCHISM_ANA_OUTPUTS_DIR="%SCHISM_CYCLES_DIR%/ana_${PREV_CYCLE}/run/outputs"
+SCHISM_HOT_START_FILE=""
+if [ -d "${PREV_SCHISM_ANA_OUTPUTS_DIR}" ]; then
+  SCHISM_HOT_START_FILE=$(
+    for f in "${PREV_SCHISM_ANA_OUTPUTS_DIR}"/hotstart_it=*.nc; do
+      [ -e "$f" ] || continue
+      n=$(echo "$f" | sed -E 's/.*hotstart_it=([0-9]+)\.nc$/\1/')
+      echo "${n} ${f}"
+    done | sort -n | head -1 | awk '{print $2}'
+  )
+fi
+
+# SFINCS: sfincs.<YYYYMMDD.HHMMSS>.rst, name computed directly (see
+# T_MINUS_3_STAMP above) -- no globbing needed.
+PREV_SFINCS_ANA_RUN_DIR="%SFINCS_CYCLES_DIR%/ana_${PREV_CYCLE}/run"
+SFINCS_RST_FILE="${PREV_SFINCS_ANA_RUN_DIR}/sfincs.${T_MINUS_3_STAMP}.rst"
+
+# Bootstrap skip: the true first cycle in the suite's history has no
+# troute_ana_a state from PREV_CYCLE either (troute itself is at its own
+# bootstrap, no -lsf to load). Confirmed live that troute's T-3 sample is
+# NOT an echo of loaded state when a hotstart IS available (real flow
+# values evolve smoothly hour to hour, see troute_ana_a.ecf/troute_ana_b.ecf
+# -lb fix notes) -- but a truly cold-started troute_ana_b (no prior state
+# at all) still has genuine cold-start spin-up in its first simulated
+# hour(s), a real routing-model concern distinct from that echo theory.
+# Rather than cold-starting SCHISM/SFINCS against that degraded first hour,
+# skip the whole coastal-model chain for this one cycle: run only
+# ngen_forcing_ana/troute_ana_a/troute_ana_b (unaffected, already triggered
+# independently of this task) so troute gets a full cycle of real history,
+# then let coastal models cold-start cleanly next cycle once troute_ana_b
+# itself has a real hotstart to load and produces a genuine T-3-to-T0
+# window.
+#
+# IMPORTANT: this check must be troute_ana_a's own PREV_CYCLE state (NOT
+# SCHISM_HOT_START_FILE/SFINCS_RST_FILE above) -- those stay empty for
+# TWO cycles (the skipped bootstrap cycle produces no coastal-model output
+# at all), which would make every cycle skip forever. troute_ana_a runs
+# unconditionally every cycle (including the bootstrap one), so by the
+# very next cycle it already has real PREV_CYCLE state regardless of
+# whether coastal models have ever run -- making this check self-limiting
+# to exactly the one true bootstrap cycle, same LOAD_STATE_DIR path
+# troute_ana_a.ecf itself already checks.
+TROUTE_PREV_STATE_SAVE="%TROUTE_REGIONALIZATION_ROOT%/region_ana_a_${PREV_CYCLE}/%VPU%/state_save/troute"
+if [ ! -f "${TROUTE_PREV_STATE_SAVE}" ]; then
+  echo "No prior troute_ana_a state at ${TROUTE_PREV_STATE_SAVE} (bootstrap cycle) -- skipping coastal-model chain for ${CYCLE}"
+  SKIP_COASTAL=1
+else
+  SKIP_COASTAL=0
+fi
+
+# A second %include <tail.h> here (one per skip branch, one at the true
+# end) breaks ecflow's own job-generation preprocessing -- confirmed live:
+# "Mismatched ecfmicro(%) count(1) at: %include <tail.h>" -- ecflow's %
+# micro-substitution scanner doesn't tolerate %include appearing twice in
+# one script. Wrap the real work in a shell conditional instead, so there
+# is only ever ONE %include <tail.h>, at the true end of the file.
+if [ "${SKIP_COASTAL}" -eq 0 ]; then
+
+# ---- LAUNCH (placeholder for future Slurm submission) --------------------
+# Today: direct execution (sub-second; unlikely to ever need Slurm).
+%NWM_COASTAL_PY% %GEN_SCRIPT% \
+  --model schism \
+  --run-type ana \
+  --base-yaml "%SCHISM_BASE_YAML%" \
+  --cycle "${CYCLE}" \
+  --start-date "${CYCLE_DT}" \
+  --forecast-meteo-file "${FORCING_FILE}" \
+  --troute-file "${TROUTE_FILE}" \
+  --cycle-dir "${SCHISM_CYCLE_DIR}" \
+  ${SCHISM_HOT_START_FILE:+--hot-start-file "${SCHISM_HOT_START_FILE}"}
+
+%NWM_COASTAL_PY% %GEN_SCRIPT% \
+  --model sfincs \
+  --run-type ana \
+  --base-yaml "%SFINCS_BASE_YAML%" \
+  --cycle "${CYCLE}" \
+  --start-date "${CYCLE_DT}" \
+  --forecast-meteo-file "${FORCING_FILE}" \
+  --troute-file "${TROUTE_FILE}" \
+  --cycle-dir "${SFINCS_CYCLE_DIR}" \
+  --sfincs-rst-file "${SFINCS_RST_FILE}"
+# ---- END LAUNCH ------------------------------------------------------------
+
+for f in "${SCHISM_CYCLE_DIR}/run.yaml" "${SFINCS_CYCLE_DIR}/run.yaml"; do
+  [ -s "$f" ] || { echo "ERROR: generated config missing/empty: $f" >&2; exit 1; }
+done
+
+fi
+
+%include <tail.h>

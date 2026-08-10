@@ -1,0 +1,206 @@
+++ export ECF_NAME=/coastal_hourly/cycle/h05/ngen_forcing_sr
+++ ECF_NAME=/coastal_hourly/cycle/h05/ngen_forcing_sr
+++ export ECF_HOST=zhengtaocui-opertestbed-00023-mgmt
+++ ECF_HOST=zhengtaocui-opertestbed-00023-mgmt
+++ export ECF_PORT=39411
+++ ECF_PORT=39411
+++ export ECF_PASS=c5UVpmxi
+++ ECF_PASS=c5UVpmxi
+++ export ECF_TRYNO=1
+++ ECF_TRYNO=1
+++ export ECF_RID=2101012
+++ ECF_RID=2101012
+++ export PATH=/contrib/software/ecflow/5.6.0/bin:/contrib/software/ecflow/5.6.0/bin:/usr/lib64/openmpi/bin:/usr/lib64/openmpi/bin:/home/lauren.schambach/.local/bin:/home/lauren.schambach/bin:/usr/lib64/openmpi/bin:/usr/share/Modules/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin
+++ PATH=/contrib/software/ecflow/5.6.0/bin:/contrib/software/ecflow/5.6.0/bin:/usr/lib64/openmpi/bin:/usr/lib64/openmpi/bin:/home/lauren.schambach/.local/bin:/home/lauren.schambach/bin:/usr/lib64/openmpi/bin:/usr/share/Modules/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin
+++ ecflow_client --init=2101012
+++ _ERROR_HANDLED=0
+++ trap 'ERROR $?' ERR
+++ trap 'ERROR $?' EXIT
+++ YMD=20260809
+++ HH=05
+++ CYCLE=2026080905
+++ CYCLE_DT='2026-08-09 05:00:00'
+++ STAMP=202608090500
+++ FORCING_OUT_FILE=/contrib/LaurenSchambach/ngwpc/run_ngen/data/scratch/short_range_coastal/CONUS_202608090500.nc
+++ export CYCLE_DT
+++ bash -c '
+  set -euo pipefail
+  cd "/contrib/LaurenSchambach/ngwpc/nwm-rte"
+  source config.bashrc
+  source run.sh
+  docker_run python -um "ngen_rte.run_coastal" -dt "${CYCLE_DT}" -rname "coastal_short_range" -fconfig short_range -gdomain CONUS
+' /contrib/LaurenSchambach/ngwpc/nwm-rte/run.sh
+EWTS CALMGR logging is DISABLED
+2026-08-10 02:22:09,518 - matplotlib.font_manager - INFO - generated new fontManager
+RTE: initializing EWTS log at: /ngen-app/logs_rte/rte/rte_20260810_022211_769007.log
+EWTS RTE logging is DISABLED
+RTE: done initializing EWTS log at: /ngen-app/logs_rte/rte/rte_20260810_022211_769007.log
+EWTS FORCING logging is DISABLED
+/ngen-app/ngen-python/lib/python3.11/site-packages/esmpy/interface/loadESMF.py:94: VersionWarning: ESMF installation version 8.8.0, ESMPy version 8.8.0b0
+  warnings.warn("ESMF installation version {}, ESMPy version {}".format(
+Running coastal forcing engine:
+  fcst_run_name         : coastal_short_range
+  forcing_configuration : short_range
+  global_domain         : CONUS
+  cycle_datetime        : 2026-08-09 05:00:00
+  start_time            : 2026-08-09 05:00:00
+  end_time              : 2026-08-09 23:00:00
+  ana_flag              : 0
+  RefcstBDateProc       : 202608090500
+  config                : /tmp/tmpf295h407.yml
+  geogrid               : /ngen-app/data/esmf_mesh/NWM/domain/geo_em_CONUS.nc
+  output                : /ngen-app/data/scratch/short_range_coastal/CONUS_202608090500.nc
+Initializing the BMI model
+Creating an instance of the BMI model object
+2026-08-10T02:22:14.190Z FORCING  WARNING ewts package installed but EWTS_USE_NGEN_BRIDGE not on. Falling back to default logging. [bmi_model.py.__init__(L161)]
+2026-08-10T02:22:14.191Z FORCING  INFO    ---------------------------
+2026-08-10T02:22:14.191Z FORCING  INFO    BMI Forcing Engine initializing with /tmp/tmpf295h407.yml<MSG_DATA>{"status": "INITIALIZING", "prog": null, "msg": null, "modnm": "forcing"}</MSG_DATA>
+2026-08-10T02:22:14.192Z FORCING  INFO    Reading config file: /tmp/tmpf295h407.yml
+2026-08-10T02:22:14.220Z FORCING  INFO    Begin date: 202608090500
+2026-08-10T02:22:14.239Z FORCING  WARNING ewts package installed but EWTS_USE_NGEN_BRIDGE not on. Falling back to default logging. [forecast_download_base.py.__init__(L104)]
+2026-08-10T02:22:14.242Z FORCING  INFO    ForecastDownloader: Download data. lookback: 1 lagback: 0
+2026-08-10T02:22:14.249Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf00.grib2
+2026-08-10T02:22:14.251Z FORCING  INFO    Attempt 1: Downloading https://noaa-rap-pds.s3.amazonaws.com/rap.20260809/rap.t05z.awp130bgrbf00.grib2 -> /ngen-app/data/raw_input/RAP/rap.20260809/.rap.t05z.awp130bgrbf00.grib2.tmp.f29e0a10-f171-4355-90bd-a0e6fd34ac2f
+2026-08-10T02:22:14.907Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf00.grib2
+2026-08-10T02:22:14.907Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf01.grib2
+2026-08-10T02:22:14.908Z FORCING  INFO    Attempt 1: Downloading https://noaa-rap-pds.s3.amazonaws.com/rap.20260809/rap.t05z.awp130bgrbf01.grib2 -> /ngen-app/data/raw_input/RAP/rap.20260809/.rap.t05z.awp130bgrbf01.grib2.tmp.3f8307aa-4ad9-486a-bf10-8f43d147efe9
+2026-08-10T02:22:15.476Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf01.grib2
+2026-08-10T02:22:15.477Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf02.grib2
+2026-08-10T02:22:15.478Z FORCING  INFO    Attempt 1: Downloading https://noaa-rap-pds.s3.amazonaws.com/rap.20260809/rap.t05z.awp130bgrbf02.grib2 -> /ngen-app/data/raw_input/RAP/rap.20260809/.rap.t05z.awp130bgrbf02.grib2.tmp.d84b7fa3-e366-41cb-a525-af2ca6f70c2a
+2026-08-10T02:22:16.080Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf02.grib2
+2026-08-10T02:22:16.080Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf03.grib2
+2026-08-10T02:22:16.082Z FORCING  INFO    Attempt 1: Downloading https://noaa-rap-pds.s3.amazonaws.com/rap.20260809/rap.t05z.awp130bgrbf03.grib2 -> /ngen-app/data/raw_input/RAP/rap.20260809/.rap.t05z.awp130bgrbf03.grib2.tmp.2b6cf8ee-e5bb-4f11-970f-228527679dde
+2026-08-10T02:22:16.786Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf03.grib2
+2026-08-10T02:22:16.786Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf04.grib2
+2026-08-10T02:22:16.787Z FORCING  INFO    Attempt 1: Downloading https://noaa-rap-pds.s3.amazonaws.com/rap.20260809/rap.t05z.awp130bgrbf04.grib2 -> /ngen-app/data/raw_input/RAP/rap.20260809/.rap.t05z.awp130bgrbf04.grib2.tmp.348f638a-39c8-4ca0-89fa-b9005c3c0dfc
+2026-08-10T02:22:17.629Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf04.grib2
+2026-08-10T02:22:17.629Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf05.grib2
+2026-08-10T02:22:17.631Z FORCING  INFO    Attempt 1: Downloading https://noaa-rap-pds.s3.amazonaws.com/rap.20260809/rap.t05z.awp130bgrbf05.grib2 -> /ngen-app/data/raw_input/RAP/rap.20260809/.rap.t05z.awp130bgrbf05.grib2.tmp.8b108f28-f523-44b5-b074-d6b65d399ba7
+2026-08-10T02:22:18.406Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf05.grib2
+2026-08-10T02:22:18.407Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf06.grib2
+2026-08-10T02:22:18.409Z FORCING  INFO    Attempt 1: Downloading https://noaa-rap-pds.s3.amazonaws.com/rap.20260809/rap.t05z.awp130bgrbf06.grib2 -> /ngen-app/data/raw_input/RAP/rap.20260809/.rap.t05z.awp130bgrbf06.grib2.tmp.f2d0c9b1-fa0c-492c-af3c-b5381d9cf845
+2026-08-10T02:22:19.075Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf06.grib2
+2026-08-10T02:22:19.075Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf07.grib2
+2026-08-10T02:22:19.077Z FORCING  INFO    Attempt 1: Downloading https://noaa-rap-pds.s3.amazonaws.com/rap.20260809/rap.t05z.awp130bgrbf07.grib2 -> /ngen-app/data/raw_input/RAP/rap.20260809/.rap.t05z.awp130bgrbf07.grib2.tmp.026b77e0-ce23-4cda-b5db-742a93a607c9
+2026-08-10T02:22:19.724Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf07.grib2
+2026-08-10T02:22:19.725Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf08.grib2
+2026-08-10T02:22:19.728Z FORCING  INFO    Attempt 1: Downloading https://noaa-rap-pds.s3.amazonaws.com/rap.20260809/rap.t05z.awp130bgrbf08.grib2 -> /ngen-app/data/raw_input/RAP/rap.20260809/.rap.t05z.awp130bgrbf08.grib2.tmp.db99b1c4-c1bb-4bee-92bf-5598fb72c6a3
+2026-08-10T02:22:20.377Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf08.grib2
+2026-08-10T02:22:20.377Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf09.grib2
+2026-08-10T02:22:20.378Z FORCING  INFO    Attempt 1: Downloading https://noaa-rap-pds.s3.amazonaws.com/rap.20260809/rap.t05z.awp130bgrbf09.grib2 -> /ngen-app/data/raw_input/RAP/rap.20260809/.rap.t05z.awp130bgrbf09.grib2.tmp.7b0f184e-c61e-40b9-a129-090c3e311a5c
+2026-08-10T02:22:21.027Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf09.grib2
+2026-08-10T02:22:21.028Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf10.grib2
+2026-08-10T02:22:21.039Z FORCING  INFO    Attempt 1: Downloading https://noaa-rap-pds.s3.amazonaws.com/rap.20260809/rap.t05z.awp130bgrbf10.grib2 -> /ngen-app/data/raw_input/RAP/rap.20260809/.rap.t05z.awp130bgrbf10.grib2.tmp.3587be2d-d736-4bf1-bc58-9c60e35c717f
+2026-08-10T02:22:21.786Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf10.grib2
+2026-08-10T02:22:21.786Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf11.grib2
+2026-08-10T02:22:21.787Z FORCING  INFO    Attempt 1: Downloading https://noaa-rap-pds.s3.amazonaws.com/rap.20260809/rap.t05z.awp130bgrbf11.grib2 -> /ngen-app/data/raw_input/RAP/rap.20260809/.rap.t05z.awp130bgrbf11.grib2.tmp.8fa323d1-7b82-4a00-b3bf-3ed343155be6
+2026-08-10T02:22:22.402Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf11.grib2
+2026-08-10T02:22:22.402Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf12.grib2
+2026-08-10T02:22:22.403Z FORCING  INFO    Attempt 1: Downloading https://noaa-rap-pds.s3.amazonaws.com/rap.20260809/rap.t05z.awp130bgrbf12.grib2 -> /ngen-app/data/raw_input/RAP/rap.20260809/.rap.t05z.awp130bgrbf12.grib2.tmp.b6b86684-d6ad-470a-9365-e7881b39adac
+2026-08-10T02:22:22.991Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf12.grib2
+2026-08-10T02:22:22.991Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf13.grib2
+2026-08-10T02:22:22.993Z FORCING  INFO    Attempt 1: Downloading https://noaa-rap-pds.s3.amazonaws.com/rap.20260809/rap.t05z.awp130bgrbf13.grib2 -> /ngen-app/data/raw_input/RAP/rap.20260809/.rap.t05z.awp130bgrbf13.grib2.tmp.8c061cba-e5f6-4373-99f0-968b94fb2630
+2026-08-10T02:22:23.632Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf13.grib2
+2026-08-10T02:22:23.632Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf14.grib2
+2026-08-10T02:22:23.634Z FORCING  INFO    Attempt 1: Downloading https://noaa-rap-pds.s3.amazonaws.com/rap.20260809/rap.t05z.awp130bgrbf14.grib2 -> /ngen-app/data/raw_input/RAP/rap.20260809/.rap.t05z.awp130bgrbf14.grib2.tmp.11dc8188-7c58-4647-b901-19bbc891d0bc
+2026-08-10T02:22:24.463Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf14.grib2
+2026-08-10T02:22:24.463Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf15.grib2
+2026-08-10T02:22:24.465Z FORCING  INFO    Attempt 1: Downloading https://noaa-rap-pds.s3.amazonaws.com/rap.20260809/rap.t05z.awp130bgrbf15.grib2 -> /ngen-app/data/raw_input/RAP/rap.20260809/.rap.t05z.awp130bgrbf15.grib2.tmp.a41ded3a-4f49-48ba-97c4-ba0f74efe213
+2026-08-10T02:22:25.744Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf15.grib2
+2026-08-10T02:22:25.744Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf16.grib2
+2026-08-10T02:22:25.745Z FORCING  INFO    Attempt 1: Downloading https://noaa-rap-pds.s3.amazonaws.com/rap.20260809/rap.t05z.awp130bgrbf16.grib2 -> /ngen-app/data/raw_input/RAP/rap.20260809/.rap.t05z.awp130bgrbf16.grib2.tmp.f8beb742-24fd-4fa8-b3b1-b0d96ee92aec
+2026-08-10T02:22:26.372Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf16.grib2
+2026-08-10T02:22:26.373Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf17.grib2
+2026-08-10T02:22:26.374Z FORCING  INFO    Attempt 1: Downloading https://noaa-rap-pds.s3.amazonaws.com/rap.20260809/rap.t05z.awp130bgrbf17.grib2 -> /ngen-app/data/raw_input/RAP/rap.20260809/.rap.t05z.awp130bgrbf17.grib2.tmp.42a296d8-a16d-4259-9a0c-a5073d0cf00c
+2026-08-10T02:22:27.287Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf17.grib2
+2026-08-10T02:22:27.288Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf18.grib2
+2026-08-10T02:22:27.290Z FORCING  INFO    Attempt 1: Downloading https://noaa-rap-pds.s3.amazonaws.com/rap.20260809/rap.t05z.awp130bgrbf18.grib2 -> /ngen-app/data/raw_input/RAP/rap.20260809/.rap.t05z.awp130bgrbf18.grib2.tmp.2db6786c-a548-420b-a940-a1f7d49c1cba
+2026-08-10T02:22:27.953Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf18.grib2
+2026-08-10T02:22:27.953Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf19.grib2
+2026-08-10T02:22:27.955Z FORCING  INFO    Attempt 1: Downloading https://noaa-rap-pds.s3.amazonaws.com/rap.20260809/rap.t05z.awp130bgrbf19.grib2 -> /ngen-app/data/raw_input/RAP/rap.20260809/.rap.t05z.awp130bgrbf19.grib2.tmp.ddf51167-b65d-4fed-ab7f-68d663aef3a2
+2026-08-10T02:22:28.663Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf19.grib2
+2026-08-10T02:22:28.663Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf20.grib2
+2026-08-10T02:22:28.666Z FORCING  INFO    Attempt 1: Downloading https://noaa-rap-pds.s3.amazonaws.com/rap.20260809/rap.t05z.awp130bgrbf20.grib2 -> /ngen-app/data/raw_input/RAP/rap.20260809/.rap.t05z.awp130bgrbf20.grib2.tmp.d071f572-f1b6-40d3-b246-d04e32a33d4e
+2026-08-10T02:22:29.310Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf20.grib2
+2026-08-10T02:22:29.310Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf21.grib2
+2026-08-10T02:22:29.312Z FORCING  INFO    Attempt 1: Downloading https://noaa-rap-pds.s3.amazonaws.com/rap.20260809/rap.t05z.awp130bgrbf21.grib2 -> /ngen-app/data/raw_input/RAP/rap.20260809/.rap.t05z.awp130bgrbf21.grib2.tmp.6342e27e-3eec-420b-b0f3-3dbf17b78a47
+2026-08-10T02:22:29.884Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/RAP/rap.20260809/rap.t05z.awp130bgrbf21.grib2
+2026-08-10T02:22:29.887Z FORCING  WARNING ewts package installed but EWTS_USE_NGEN_BRIDGE not on. Falling back to default logging. [forecast_download_base.py.__init__(L104)]
+2026-08-10T02:22:29.891Z FORCING  INFO    ForecastDownloader: Download data. lookback: 1 lagback: 0
+2026-08-10T02:22:29.904Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf00.grib2
+2026-08-10T02:22:29.907Z FORCING  INFO    Attempt 1: Downloading https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20260809/conus/hrrr.t05z.wrfsfcf00.grib2 -> /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/.hrrr.t05z.wrfsfcf00.grib2.tmp.4a2157a5-68b3-4a78-83eb-850a2c8c99b1
+2026-08-10T02:22:31.766Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf00.grib2
+2026-08-10T02:22:31.767Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf01.grib2
+2026-08-10T02:22:31.770Z FORCING  INFO    Attempt 1: Downloading https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20260809/conus/hrrr.t05z.wrfsfcf01.grib2 -> /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/.hrrr.t05z.wrfsfcf01.grib2.tmp.04ee865d-5709-459c-895b-7df2a29649ca
+2026-08-10T02:22:33.645Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf01.grib2
+2026-08-10T02:22:33.645Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf02.grib2
+2026-08-10T02:22:33.647Z FORCING  INFO    Attempt 1: Downloading https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20260809/conus/hrrr.t05z.wrfsfcf02.grib2 -> /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/.hrrr.t05z.wrfsfcf02.grib2.tmp.fc8a1d31-5bc8-4012-a9ff-2061ef4f864c
+2026-08-10T02:22:35.434Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf02.grib2
+2026-08-10T02:22:35.434Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf03.grib2
+2026-08-10T02:22:35.436Z FORCING  INFO    Attempt 1: Downloading https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20260809/conus/hrrr.t05z.wrfsfcf03.grib2 -> /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/.hrrr.t05z.wrfsfcf03.grib2.tmp.f00e6847-e176-42f5-9cd7-440a428aaa2b
+2026-08-10T02:22:37.476Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf03.grib2
+2026-08-10T02:22:37.476Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf04.grib2
+2026-08-10T02:22:37.478Z FORCING  INFO    Attempt 1: Downloading https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20260809/conus/hrrr.t05z.wrfsfcf04.grib2 -> /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/.hrrr.t05z.wrfsfcf04.grib2.tmp.965942f8-1ee1-4dc1-a367-9e0c6e78ca06
+2026-08-10T02:22:39.298Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf04.grib2
+2026-08-10T02:22:39.298Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf05.grib2
+2026-08-10T02:22:39.300Z FORCING  INFO    Attempt 1: Downloading https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20260809/conus/hrrr.t05z.wrfsfcf05.grib2 -> /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/.hrrr.t05z.wrfsfcf05.grib2.tmp.f1e2c9ad-5d32-42d5-b2d0-5cbc1a5beccd
+2026-08-10T02:22:41.107Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf05.grib2
+2026-08-10T02:22:41.108Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf06.grib2
+2026-08-10T02:22:41.110Z FORCING  INFO    Attempt 1: Downloading https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20260809/conus/hrrr.t05z.wrfsfcf06.grib2 -> /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/.hrrr.t05z.wrfsfcf06.grib2.tmp.58584e32-009c-4f51-9f4d-d120d17bf93d
+2026-08-10T02:22:42.955Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf06.grib2
+2026-08-10T02:22:42.956Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf07.grib2
+2026-08-10T02:22:42.957Z FORCING  INFO    Attempt 1: Downloading https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20260809/conus/hrrr.t05z.wrfsfcf07.grib2 -> /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/.hrrr.t05z.wrfsfcf07.grib2.tmp.c169633e-337d-485e-bb9f-0c7906ff5174
+2026-08-10T02:22:45.473Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf07.grib2
+2026-08-10T02:22:45.473Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf08.grib2
+2026-08-10T02:22:45.475Z FORCING  INFO    Attempt 1: Downloading https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20260809/conus/hrrr.t05z.wrfsfcf08.grib2 -> /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/.hrrr.t05z.wrfsfcf08.grib2.tmp.0487d32b-553b-4695-a071-a77c4161f5d3
+2026-08-10T02:22:48.221Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf08.grib2
+2026-08-10T02:22:48.222Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf09.grib2
+2026-08-10T02:22:48.224Z FORCING  INFO    Attempt 1: Downloading https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20260809/conus/hrrr.t05z.wrfsfcf09.grib2 -> /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/.hrrr.t05z.wrfsfcf09.grib2.tmp.9a5b52f6-e29c-4dae-a76f-029fb1c53c5c
+2026-08-10T02:22:50.302Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf09.grib2
+2026-08-10T02:22:50.302Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf10.grib2
+2026-08-10T02:22:50.304Z FORCING  INFO    Attempt 1: Downloading https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20260809/conus/hrrr.t05z.wrfsfcf10.grib2 -> /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/.hrrr.t05z.wrfsfcf10.grib2.tmp.5592d4d1-9de7-4496-a5f9-9442465f9177
+2026-08-10T02:22:52.319Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf10.grib2
+2026-08-10T02:22:52.320Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf11.grib2
+2026-08-10T02:22:52.321Z FORCING  INFO    Attempt 1: Downloading https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20260809/conus/hrrr.t05z.wrfsfcf11.grib2 -> /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/.hrrr.t05z.wrfsfcf11.grib2.tmp.d2463234-52b9-4f62-b4c8-b5b061e55d58
+2026-08-10T02:22:54.359Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf11.grib2
+2026-08-10T02:22:54.359Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf12.grib2
+2026-08-10T02:22:54.361Z FORCING  INFO    Attempt 1: Downloading https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20260809/conus/hrrr.t05z.wrfsfcf12.grib2 -> /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/.hrrr.t05z.wrfsfcf12.grib2.tmp.e7a50c57-96af-49f6-bfe8-1509e9d0e9ab
+2026-08-10T02:22:56.812Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf12.grib2
+2026-08-10T02:22:56.812Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf13.grib2
+2026-08-10T02:22:56.814Z FORCING  INFO    Attempt 1: Downloading https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20260809/conus/hrrr.t05z.wrfsfcf13.grib2 -> /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/.hrrr.t05z.wrfsfcf13.grib2.tmp.e2eb83fa-3420-49a4-b2bc-6a3795823729
+2026-08-10T02:22:59.128Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf13.grib2
+2026-08-10T02:22:59.128Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf14.grib2
+2026-08-10T02:22:59.130Z FORCING  INFO    Attempt 1: Downloading https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20260809/conus/hrrr.t05z.wrfsfcf14.grib2 -> /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/.hrrr.t05z.wrfsfcf14.grib2.tmp.90564a28-0824-4697-8a62-a0f1c123a050
+2026-08-10T02:23:01.207Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf14.grib2
+2026-08-10T02:23:01.207Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf15.grib2
+2026-08-10T02:23:01.209Z FORCING  INFO    Attempt 1: Downloading https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20260809/conus/hrrr.t05z.wrfsfcf15.grib2 -> /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/.hrrr.t05z.wrfsfcf15.grib2.tmp.d583f50b-64cc-4bdd-a916-cef41c3b741b
+2026-08-10T02:23:03.956Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf15.grib2
+2026-08-10T02:23:03.957Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf16.grib2
+2026-08-10T02:23:03.959Z FORCING  INFO    Attempt 1: Downloading https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20260809/conus/hrrr.t05z.wrfsfcf16.grib2 -> /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/.hrrr.t05z.wrfsfcf16.grib2.tmp.2401890e-400b-4519-b83b-fabc8b2513e6
+2026-08-10T02:23:06.116Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf16.grib2
+2026-08-10T02:23:06.116Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf17.grib2
+2026-08-10T02:23:06.117Z FORCING  INFO    Attempt 1: Downloading https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20260809/conus/hrrr.t05z.wrfsfcf17.grib2 -> /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/.hrrr.t05z.wrfsfcf17.grib2.tmp.87e154a3-4541-4ada-acfc-97637d526c0c
+2026-08-10T02:23:08.449Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf17.grib2
+2026-08-10T02:23:08.449Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf18.grib2
+2026-08-10T02:23:08.450Z FORCING  INFO    Attempt 1: Downloading https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20260809/conus/hrrr.t05z.wrfsfcf18.grib2 -> /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/.hrrr.t05z.wrfsfcf18.grib2.tmp.94837a08-41d5-44fb-87ab-9c9d627bdc9d
+2026-08-10T02:23:10.593Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/HRRR/hrrr.20260809/conus/hrrr.t05z.wrfsfcf18.grib2
+2026-08-10T02:23:15.223Z FORCING  INFO    BMI Forcing Engine initialized<MSG_DATA>{"status": "INITIALIZED", "prog": null, "msg": null, "modnm": "forcing"}</MSG_DATA>
+
+Now looping through 19 timesteps, updating the model, and extracting forcing data
+
+rank: 0
+grid_type: gridded
+
+---------------------------------------------------
+Iteration #0 of 19 for 2026-08-09 05:00:00
+
+==== MAX VALUES ====
+model time          | U2D_ELEMENT | V2D_ELEMENT | LWDOWN_ELEMENT | SWDOWN_ELEMENT | T2D_ELEMENT | Q2D_ELEMENT | PSFC_ELEMENT | RAINRATE_ELEMENT | LQFRAC_ELEMENT
+2026-08-09 06:00:00 | 14.6288     | 15.2626     | 487.154        | 0              | 317.622     | 0.0242402   | 102443       | 0.0238344        | 1             
+
+==== MIN VALUES ====
+model time          | U2D_ELEMENT | V2D_ELEMENT | LWDOWN_ELEMENT | SWDOWN_ELEMENT | T2D_ELEMENT | Q2D_ELEMENT | PSFC_ELEMENT | RAINRATE_ELEMENT | LQFRAC_ELEMENT
+2026-08-09 06:00:00 | -15.5438    | -19.2396    | 213.427        | 0              | 274.81      | 0.000445046 | 64254.7      | 0                | 0.41203       
+
+---------------------------------------------------
+Iteration #1 of 19 for 2026-08-09 06:00:00

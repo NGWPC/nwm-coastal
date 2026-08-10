@@ -1,0 +1,148 @@
+++ export ECF_NAME=/coastal_hourly/cycle/h03/ngen_forcing_ana
+++ ECF_NAME=/coastal_hourly/cycle/h03/ngen_forcing_ana
+++ export ECF_HOST=zhengtaocui-opertestbed-00023-mgmt
+++ ECF_HOST=zhengtaocui-opertestbed-00023-mgmt
+++ export ECF_PORT=39411
+++ ECF_PORT=39411
+++ export ECF_PASS=QGX8.tEZ
+++ ECF_PASS=QGX8.tEZ
+++ export ECF_TRYNO=1
+++ ECF_TRYNO=1
+++ export ECF_RID=1743631
+++ ECF_RID=1743631
+++ export PATH=/contrib/software/ecflow/5.6.0/bin:/contrib/software/ecflow/5.6.0/bin:/usr/lib64/openmpi/bin:/usr/lib64/openmpi/bin:/home/lauren.schambach/.local/bin:/home/lauren.schambach/bin:/usr/lib64/openmpi/bin:/usr/share/Modules/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin
+++ PATH=/contrib/software/ecflow/5.6.0/bin:/contrib/software/ecflow/5.6.0/bin:/usr/lib64/openmpi/bin:/usr/lib64/openmpi/bin:/home/lauren.schambach/.local/bin:/home/lauren.schambach/bin:/usr/lib64/openmpi/bin:/usr/share/Modules/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin
+++ ecflow_client --init=1743631
+++ _ERROR_HANDLED=0
+++ trap 'ERROR $?' ERR
+++ trap 'ERROR $?' EXIT
+++ YMD=20260809
+++ HH=03
+++ CYCLE=2026080903
+++ CYCLE_DT='2026-08-09 03:00:00'
+++ STAMP=202608090300
+++ FORCING_OUT_FILE=/contrib/LaurenSchambach/ngwpc/run_ngen/data/scratch/standard_ana_coastal/CONUS_202608090300.nc
+++ export CYCLE_DT
+++ bash -c '
+  set -euo pipefail
+  cd "/contrib/LaurenSchambach/ngwpc/nwm-rte"
+  source config.bashrc
+  source run.sh
+  docker_run python -um "ngen_rte.run_coastal" -dt "${CYCLE_DT}" -rname "coastal_ana" -fconfig standard_ana -gdomain CONUS -lb 240 -fih 240
+' /contrib/LaurenSchambach/ngwpc/nwm-rte/run.sh
+EWTS CALMGR logging is DISABLED
+2026-08-09 17:30:19,455 - matplotlib.font_manager - INFO - generated new fontManager
+RTE: initializing EWTS log at: /ngen-app/logs_rte/rte/rte_20260809_173020_539414.log
+EWTS RTE logging is DISABLED
+RTE: done initializing EWTS log at: /ngen-app/logs_rte/rte/rte_20260809_173020_539414.log
+EWTS FORCING logging is DISABLED
+/ngen-app/ngen-python/lib/python3.11/site-packages/esmpy/interface/loadESMF.py:94: VersionWarning: ESMF installation version 8.8.0, ESMPy version 8.8.0b0
+  warnings.warn("ESMF installation version {}, ESMPy version {}".format(
+Running coastal forcing engine:
+  fcst_run_name         : coastal_ana
+  forcing_configuration : standard_ana
+  global_domain         : CONUS
+  cycle_datetime        : 2026-08-09 03:00:00
+  start_time            : 2026-08-09 04:00:00
+  end_time              : 2026-08-09 07:00:00
+  ana_flag              : 1
+  RefcstBDateProc       : 202608090300
+  config                : /tmp/tmpu5j8c4vm.yml
+  geogrid               : /ngen-app/data/esmf_mesh/NWM/domain/geo_em_CONUS.nc
+  output                : /ngen-app/data/scratch/standard_ana_coastal/CONUS_202608090300.nc
+Initializing the BMI model
+Creating an instance of the BMI model object
+2026-08-09T17:30:21.774Z FORCING  WARNING ewts package installed but EWTS_USE_NGEN_BRIDGE not on. Falling back to default logging. [bmi_model.py.__init__(L161)]
+2026-08-09T17:30:21.774Z FORCING  INFO    ---------------------------
+2026-08-09T17:30:21.774Z FORCING  INFO    BMI Forcing Engine initializing with /tmp/tmpu5j8c4vm.yml<MSG_DATA>{"status": "INITIALIZING", "prog": null, "msg": null, "modnm": "forcing"}</MSG_DATA>
+2026-08-09T17:30:21.776Z FORCING  INFO    Reading config file: /tmp/tmpu5j8c4vm.yml
+2026-08-09T17:30:21.802Z FORCING  INFO    Begin date: 202608090300
+2026-08-09T17:30:21.864Z FORCING  WARNING ewts package installed but EWTS_USE_NGEN_BRIDGE not on. Falling back to default logging. [forecast_download_base.py.__init__(L104)]
+2026-08-09T17:30:21.868Z FORCING  INFO    ForecastDownloader: Download data. lookback: 5 lagback: 0
+2026-08-09T17:30:21.875Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP_ANA/rap.20260808/rap.t23z.awp130bgrbf01.grib2
+2026-08-09T17:30:21.877Z FORCING  INFO    Attempt 1: Downloading https://noaa-rap-pds.s3.amazonaws.com/rap.20260808/rap.t23z.awp130bgrbf01.grib2 -> /ngen-app/data/raw_input/RAP_ANA/rap.20260808/.rap.t23z.awp130bgrbf01.grib2.tmp.408141a2-8398-4c84-b90c-81e7b5220307
+2026-08-09T17:30:22.711Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/RAP_ANA/rap.20260808/rap.t23z.awp130bgrbf01.grib2
+2026-08-09T17:30:22.722Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP_ANA/rap.20260809/rap.t00z.awp130bgrbf01.grib2
+2026-08-09T17:30:22.725Z FORCING  INFO    Attempt 1: Downloading https://noaa-rap-pds.s3.amazonaws.com/rap.20260809/rap.t00z.awp130bgrbf01.grib2 -> /ngen-app/data/raw_input/RAP_ANA/rap.20260809/.rap.t00z.awp130bgrbf01.grib2.tmp.51c9453e-f489-41ad-acf4-06f9cf4e1830
+2026-08-09T17:30:23.647Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/RAP_ANA/rap.20260809/rap.t00z.awp130bgrbf01.grib2
+2026-08-09T17:30:23.651Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP_ANA/rap.20260809/rap.t01z.awp130bgrbf01.grib2
+2026-08-09T17:30:23.652Z FORCING  INFO    Attempt 1: Downloading https://noaa-rap-pds.s3.amazonaws.com/rap.20260809/rap.t01z.awp130bgrbf01.grib2 -> /ngen-app/data/raw_input/RAP_ANA/rap.20260809/.rap.t01z.awp130bgrbf01.grib2.tmp.9be3f0cc-8e7a-4464-bc49-7d1d8a1238a7
+2026-08-09T17:30:24.288Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/RAP_ANA/rap.20260809/rap.t01z.awp130bgrbf01.grib2
+2026-08-09T17:30:24.290Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP_ANA/rap.20260809/rap.t02z.awp130bgrbf01.grib2
+2026-08-09T17:30:24.292Z FORCING  INFO    Attempt 1: Downloading https://noaa-rap-pds.s3.amazonaws.com/rap.20260809/rap.t02z.awp130bgrbf01.grib2 -> /ngen-app/data/raw_input/RAP_ANA/rap.20260809/.rap.t02z.awp130bgrbf01.grib2.tmp.76435061-265f-4317-b56e-955a9f7bc088
+2026-08-09T17:30:25.203Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/RAP_ANA/rap.20260809/rap.t02z.awp130bgrbf01.grib2
+2026-08-09T17:30:25.205Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/RAP_ANA/rap.20260809/rap.t03z.awp130bgrbf01.grib2
+2026-08-09T17:30:25.207Z FORCING  INFO    Attempt 1: Downloading https://noaa-rap-pds.s3.amazonaws.com/rap.20260809/rap.t03z.awp130bgrbf01.grib2 -> /ngen-app/data/raw_input/RAP_ANA/rap.20260809/.rap.t03z.awp130bgrbf01.grib2.tmp.64122829-307f-411f-b451-982a8d41bbe5
+2026-08-09T17:30:25.994Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/RAP_ANA/rap.20260809/rap.t03z.awp130bgrbf01.grib2
+2026-08-09T17:30:25.996Z FORCING  WARNING ewts package installed but EWTS_USE_NGEN_BRIDGE not on. Falling back to default logging. [forecast_download_base.py.__init__(L104)]
+2026-08-09T17:30:25.998Z FORCING  INFO    ForecastDownloader: Download data. lookback: 5 lagback: 0
+2026-08-09T17:30:26.014Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR_ANA/hrrr.20260808/conus/hrrr.t23z.wrfsfcf01.grib2
+2026-08-09T17:30:26.017Z FORCING  INFO    Attempt 1: Downloading https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20260808/conus/hrrr.t23z.wrfsfcf01.grib2 -> /ngen-app/data/raw_input/HRRR_ANA/hrrr.20260808/conus/.hrrr.t23z.wrfsfcf01.grib2.tmp.00de63f0-2088-4a68-b280-b3ad5e5723e6
+2026-08-09T17:30:28.442Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/HRRR_ANA/hrrr.20260808/conus/hrrr.t23z.wrfsfcf01.grib2
+2026-08-09T17:30:28.458Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR_ANA/hrrr.20260809/conus/hrrr.t00z.wrfsfcf01.grib2
+2026-08-09T17:30:28.460Z FORCING  INFO    Attempt 1: Downloading https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20260809/conus/hrrr.t00z.wrfsfcf01.grib2 -> /ngen-app/data/raw_input/HRRR_ANA/hrrr.20260809/conus/.hrrr.t00z.wrfsfcf01.grib2.tmp.518e1ce9-38a3-4a50-83b4-5f3a7b9a465d
+2026-08-09T17:30:30.710Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/HRRR_ANA/hrrr.20260809/conus/hrrr.t00z.wrfsfcf01.grib2
+2026-08-09T17:30:30.714Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR_ANA/hrrr.20260809/conus/hrrr.t01z.wrfsfcf01.grib2
+2026-08-09T17:30:30.715Z FORCING  INFO    Attempt 1: Downloading https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20260809/conus/hrrr.t01z.wrfsfcf01.grib2 -> /ngen-app/data/raw_input/HRRR_ANA/hrrr.20260809/conus/.hrrr.t01z.wrfsfcf01.grib2.tmp.0713aba9-5c59-4e8a-a672-061934ae164d
+2026-08-09T17:30:32.597Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/HRRR_ANA/hrrr.20260809/conus/hrrr.t01z.wrfsfcf01.grib2
+2026-08-09T17:30:32.599Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR_ANA/hrrr.20260809/conus/hrrr.t02z.wrfsfcf01.grib2
+2026-08-09T17:30:32.600Z FORCING  INFO    Attempt 1: Downloading https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20260809/conus/hrrr.t02z.wrfsfcf01.grib2 -> /ngen-app/data/raw_input/HRRR_ANA/hrrr.20260809/conus/.hrrr.t02z.wrfsfcf01.grib2.tmp.33955ba3-50d2-43b7-9aae-750b8a6b44c9
+2026-08-09T17:30:34.495Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/HRRR_ANA/hrrr.20260809/conus/hrrr.t02z.wrfsfcf01.grib2
+2026-08-09T17:30:34.497Z FORCING  INFO    Looking for file /ngen-app/data/raw_input/HRRR_ANA/hrrr.20260809/conus/hrrr.t03z.wrfsfcf01.grib2
+2026-08-09T17:30:34.498Z FORCING  INFO    Attempt 1: Downloading https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20260809/conus/hrrr.t03z.wrfsfcf01.grib2 -> /ngen-app/data/raw_input/HRRR_ANA/hrrr.20260809/conus/.hrrr.t03z.wrfsfcf01.grib2.tmp.ccf77f54-9adb-45a4-ac70-022646737ee2
+2026-08-09T17:30:36.252Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/HRRR_ANA/hrrr.20260809/conus/hrrr.t03z.wrfsfcf01.grib2
+2026-08-09T17:30:36.255Z FORCING  WARNING ewts package installed but EWTS_USE_NGEN_BRIDGE not on. Falling back to default logging. [forecast_download_base.py.__init__(L104)]
+2026-08-09T17:30:36.256Z FORCING  INFO    FixedFileDownloader: Download data. lookback: 5 lagback: 0
+2026-08-09T17:30:36.275Z FORCING  INFO    Attempt 1: Downloading https://noaa-mrms-pds.s3.amazonaws.com/CONUS/RadarOnly_QPE_01H_00.00/20260809/MRMS_RadarOnly_QPE_01H_00.00_20260809-000000.grib2.gz -> /ngen-app/data/raw_input/MRMS_RO/CONUS/RadarOnly_QPE_01H_00.00/20260809/.MRMS_RadarOnly_QPE_01H_00.00_20260809-000000.grib2.gz.tmp.f2066b8c-3b53-4dc4-9074-8cffc30a6728
+2026-08-09T17:30:36.476Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/MRMS_RO/CONUS/RadarOnly_QPE_01H_00.00/20260809/MRMS_RadarOnly_QPE_01H_00.00_20260809-000000.grib2.gz
+2026-08-09T17:30:36.481Z FORCING  INFO    Attempt 1: Downloading https://noaa-mrms-pds.s3.amazonaws.com/CONUS/RadarOnly_QPE_01H_00.00/20260809/MRMS_RadarOnly_QPE_01H_00.00_20260809-010000.grib2.gz -> /ngen-app/data/raw_input/MRMS_RO/CONUS/RadarOnly_QPE_01H_00.00/20260809/.MRMS_RadarOnly_QPE_01H_00.00_20260809-010000.grib2.gz.tmp.ada94712-106c-49cf-bf37-9c9f6b3e30e4
+2026-08-09T17:30:36.647Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/MRMS_RO/CONUS/RadarOnly_QPE_01H_00.00/20260809/MRMS_RadarOnly_QPE_01H_00.00_20260809-010000.grib2.gz
+2026-08-09T17:30:36.650Z FORCING  INFO    Attempt 1: Downloading https://noaa-mrms-pds.s3.amazonaws.com/CONUS/RadarOnly_QPE_01H_00.00/20260809/MRMS_RadarOnly_QPE_01H_00.00_20260809-020000.grib2.gz -> /ngen-app/data/raw_input/MRMS_RO/CONUS/RadarOnly_QPE_01H_00.00/20260809/.MRMS_RadarOnly_QPE_01H_00.00_20260809-020000.grib2.gz.tmp.d969e4bc-c493-468f-9fda-110befc05ad8
+2026-08-09T17:30:36.808Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/MRMS_RO/CONUS/RadarOnly_QPE_01H_00.00/20260809/MRMS_RadarOnly_QPE_01H_00.00_20260809-020000.grib2.gz
+2026-08-09T17:30:36.811Z FORCING  INFO    Attempt 1: Downloading https://noaa-mrms-pds.s3.amazonaws.com/CONUS/RadarOnly_QPE_01H_00.00/20260809/MRMS_RadarOnly_QPE_01H_00.00_20260809-030000.grib2.gz -> /ngen-app/data/raw_input/MRMS_RO/CONUS/RadarOnly_QPE_01H_00.00/20260809/.MRMS_RadarOnly_QPE_01H_00.00_20260809-030000.grib2.gz.tmp.e13fb6ad-31bc-4b8f-a2b7-e05019a42f3b
+2026-08-09T17:30:36.931Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/MRMS_RO/CONUS/RadarOnly_QPE_01H_00.00/20260809/MRMS_RadarOnly_QPE_01H_00.00_20260809-030000.grib2.gz
+2026-08-09T17:30:36.934Z FORCING  INFO    Attempt 1: Downloading https://noaa-mrms-pds.s3.amazonaws.com/CONUS/RadarOnly_QPE_01H_00.00/20260809/MRMS_RadarOnly_QPE_01H_00.00_20260809-040000.grib2.gz -> /ngen-app/data/raw_input/MRMS_RO/CONUS/RadarOnly_QPE_01H_00.00/20260809/.MRMS_RadarOnly_QPE_01H_00.00_20260809-040000.grib2.gz.tmp.dea9033a-a38a-47e1-8e81-f0cd4b4f95cc
+2026-08-09T17:30:37.042Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/MRMS_RO/CONUS/RadarOnly_QPE_01H_00.00/20260809/MRMS_RadarOnly_QPE_01H_00.00_20260809-040000.grib2.gz
+2026-08-09T17:30:37.044Z FORCING  WARNING ewts package installed but EWTS_USE_NGEN_BRIDGE not on. Falling back to default logging. [forecast_download_base.py.__init__(L104)]
+2026-08-09T17:30:37.046Z FORCING  INFO    FixedFileDownloader: Download data. lookback: 5 lagback: 0
+2026-08-09T17:30:37.060Z FORCING  INFO    Attempt 1: Downloading https://noaa-mrms-pds.s3.amazonaws.com/CONUS/MultiSensor_QPE_01H_Pass1_00.00/20260809/MRMS_MultiSensor_QPE_01H_Pass1_00.00_20260809-000000.grib2.gz -> /ngen-app/data/raw_input/MRMS_MS/MultiSensor_QPE_01H_Pass1_00.00/20260809/.MRMS_MultiSensor_QPE_01H_Pass1_00.00_20260809-000000.grib2.gz.tmp.c396fb22-3c69-4a5f-90f8-56b858b8075e
+2026-08-09T17:30:37.158Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/MRMS_MS/MultiSensor_QPE_01H_Pass1_00.00/20260809/MRMS_MultiSensor_QPE_01H_Pass1_00.00_20260809-000000.grib2.gz
+2026-08-09T17:30:37.172Z FORCING  INFO    Attempt 1: Downloading https://noaa-mrms-pds.s3.amazonaws.com/CONUS/MultiSensor_QPE_01H_Pass2_00.00/20260809/MRMS_MultiSensor_QPE_01H_Pass2_00.00_20260809-000000.grib2.gz -> /ngen-app/data/raw_input/MRMS_MS/MultiSensor_QPE_01H_Pass2_00.00/20260809/.MRMS_MultiSensor_QPE_01H_Pass2_00.00_20260809-000000.grib2.gz.tmp.5bc36c3d-4724-466f-b3ad-7c9a596c08e4
+2026-08-09T17:30:37.291Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/MRMS_MS/MultiSensor_QPE_01H_Pass2_00.00/20260809/MRMS_MultiSensor_QPE_01H_Pass2_00.00_20260809-000000.grib2.gz
+2026-08-09T17:30:37.296Z FORCING  INFO    Attempt 1: Downloading https://noaa-mrms-pds.s3.amazonaws.com/CONUS/MultiSensor_QPE_01H_Pass1_00.00/20260809/MRMS_MultiSensor_QPE_01H_Pass1_00.00_20260809-010000.grib2.gz -> /ngen-app/data/raw_input/MRMS_MS/MultiSensor_QPE_01H_Pass1_00.00/20260809/.MRMS_MultiSensor_QPE_01H_Pass1_00.00_20260809-010000.grib2.gz.tmp.d058f6b0-e1bc-4794-aed6-bd01c2b690f6
+2026-08-09T17:30:37.405Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/MRMS_MS/MultiSensor_QPE_01H_Pass1_00.00/20260809/MRMS_MultiSensor_QPE_01H_Pass1_00.00_20260809-010000.grib2.gz
+2026-08-09T17:30:37.410Z FORCING  INFO    Attempt 1: Downloading https://noaa-mrms-pds.s3.amazonaws.com/CONUS/MultiSensor_QPE_01H_Pass2_00.00/20260809/MRMS_MultiSensor_QPE_01H_Pass2_00.00_20260809-010000.grib2.gz -> /ngen-app/data/raw_input/MRMS_MS/MultiSensor_QPE_01H_Pass2_00.00/20260809/.MRMS_MultiSensor_QPE_01H_Pass2_00.00_20260809-010000.grib2.gz.tmp.3047d0c6-efe0-4240-82cc-3e3862c0bc56
+2026-08-09T17:30:37.521Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/MRMS_MS/MultiSensor_QPE_01H_Pass2_00.00/20260809/MRMS_MultiSensor_QPE_01H_Pass2_00.00_20260809-010000.grib2.gz
+2026-08-09T17:30:37.524Z FORCING  INFO    Attempt 1: Downloading https://noaa-mrms-pds.s3.amazonaws.com/CONUS/MultiSensor_QPE_01H_Pass1_00.00/20260809/MRMS_MultiSensor_QPE_01H_Pass1_00.00_20260809-020000.grib2.gz -> /ngen-app/data/raw_input/MRMS_MS/MultiSensor_QPE_01H_Pass1_00.00/20260809/.MRMS_MultiSensor_QPE_01H_Pass1_00.00_20260809-020000.grib2.gz.tmp.42ad5515-578f-43e2-b985-3e8457dbf82e
+2026-08-09T17:30:37.637Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/MRMS_MS/MultiSensor_QPE_01H_Pass1_00.00/20260809/MRMS_MultiSensor_QPE_01H_Pass1_00.00_20260809-020000.grib2.gz
+2026-08-09T17:30:37.640Z FORCING  INFO    Attempt 1: Downloading https://noaa-mrms-pds.s3.amazonaws.com/CONUS/MultiSensor_QPE_01H_Pass2_00.00/20260809/MRMS_MultiSensor_QPE_01H_Pass2_00.00_20260809-020000.grib2.gz -> /ngen-app/data/raw_input/MRMS_MS/MultiSensor_QPE_01H_Pass2_00.00/20260809/.MRMS_MultiSensor_QPE_01H_Pass2_00.00_20260809-020000.grib2.gz.tmp.31fecb47-77e3-41b1-8388-3603bd46bc8c
+2026-08-09T17:30:37.725Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/MRMS_MS/MultiSensor_QPE_01H_Pass2_00.00/20260809/MRMS_MultiSensor_QPE_01H_Pass2_00.00_20260809-020000.grib2.gz
+2026-08-09T17:30:37.729Z FORCING  INFO    Attempt 1: Downloading https://noaa-mrms-pds.s3.amazonaws.com/CONUS/MultiSensor_QPE_01H_Pass1_00.00/20260809/MRMS_MultiSensor_QPE_01H_Pass1_00.00_20260809-030000.grib2.gz -> /ngen-app/data/raw_input/MRMS_MS/MultiSensor_QPE_01H_Pass1_00.00/20260809/.MRMS_MultiSensor_QPE_01H_Pass1_00.00_20260809-030000.grib2.gz.tmp.4b3c8a6a-e48e-469a-8a1d-eed0e85f8ebc
+2026-08-09T17:30:37.814Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/MRMS_MS/MultiSensor_QPE_01H_Pass1_00.00/20260809/MRMS_MultiSensor_QPE_01H_Pass1_00.00_20260809-030000.grib2.gz
+2026-08-09T17:30:37.817Z FORCING  INFO    Attempt 1: Downloading https://noaa-mrms-pds.s3.amazonaws.com/CONUS/MultiSensor_QPE_01H_Pass2_00.00/20260809/MRMS_MultiSensor_QPE_01H_Pass2_00.00_20260809-030000.grib2.gz -> /ngen-app/data/raw_input/MRMS_MS/MultiSensor_QPE_01H_Pass2_00.00/20260809/.MRMS_MultiSensor_QPE_01H_Pass2_00.00_20260809-030000.grib2.gz.tmp.9e637adf-7f7a-4da3-bb54-7f48f48a0ff3
+2026-08-09T17:30:37.932Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/MRMS_MS/MultiSensor_QPE_01H_Pass2_00.00/20260809/MRMS_MultiSensor_QPE_01H_Pass2_00.00_20260809-030000.grib2.gz
+2026-08-09T17:30:37.936Z FORCING  INFO    Attempt 1: Downloading https://noaa-mrms-pds.s3.amazonaws.com/CONUS/MultiSensor_QPE_01H_Pass1_00.00/20260809/MRMS_MultiSensor_QPE_01H_Pass1_00.00_20260809-040000.grib2.gz -> /ngen-app/data/raw_input/MRMS_MS/MultiSensor_QPE_01H_Pass1_00.00/20260809/.MRMS_MultiSensor_QPE_01H_Pass1_00.00_20260809-040000.grib2.gz.tmp.1a7a7b68-ca86-4787-b30b-f11aa977b338
+2026-08-09T17:30:38.027Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/MRMS_MS/MultiSensor_QPE_01H_Pass1_00.00/20260809/MRMS_MultiSensor_QPE_01H_Pass1_00.00_20260809-040000.grib2.gz
+2026-08-09T17:30:38.030Z FORCING  INFO    Attempt 1: Downloading https://noaa-mrms-pds.s3.amazonaws.com/CONUS/MultiSensor_QPE_01H_Pass2_00.00/20260809/MRMS_MultiSensor_QPE_01H_Pass2_00.00_20260809-040000.grib2.gz -> /ngen-app/data/raw_input/MRMS_MS/MultiSensor_QPE_01H_Pass2_00.00/20260809/.MRMS_MultiSensor_QPE_01H_Pass2_00.00_20260809-040000.grib2.gz.tmp.b96f5318-29d3-4170-a332-22671144a6cb
+2026-08-09T17:30:38.121Z FORCING  INFO    Download complete: /ngen-app/data/raw_input/MRMS_MS/MultiSensor_QPE_01H_Pass2_00.00/20260809/MRMS_MultiSensor_QPE_01H_Pass2_00.00_20260809-040000.grib2.gz
+2026-08-09T17:30:40.791Z FORCING  INFO    BMI Forcing Engine initialized<MSG_DATA>{"status": "INITIALIZED", "prog": null, "msg": null, "modnm": "forcing"}</MSG_DATA>
+
+Now looping through 4 timesteps, updating the model, and extracting forcing data
+
+rank: 0
+grid_type: gridded
+
+---------------------------------------------------
+Iteration #0 of 4 for 2026-08-09 04:00:00
+
+real	5m28.555s
+user	0m0.018s
+sys	0m0.029s
++++ ERROR 137
++++ local rc=137
++++ set +e
++++ '[' 0 -eq 1 ']'
++++ _ERROR_HANDLED=1
++++ trap - ERR EXIT
++++ ecflow_client '--abort=task failed (rc=137)'
++++ exit 137

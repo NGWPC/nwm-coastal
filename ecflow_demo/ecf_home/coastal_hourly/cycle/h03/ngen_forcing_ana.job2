@@ -1,0 +1,88 @@
+set -e -u -x   # abort on error/unset var, print commands as executed
+
+# Variables ecFlow substitutes at job-generation time (ecflow 5.6.0)
+export ECF_NAME=/coastal_hourly/cycle/h03/ngen_forcing_ana
+export ECF_HOST=zhengtaocui-opertestbed-00023-mgmt
+export ECF_PORT=39411
+export ECF_PASS=IQFZGMS/
+export ECF_TRYNO=2
+export ECF_RID=$$              # no batch scheduler wrapping this job -> use the shell PID
+
+export PATH="/contrib/software/ecflow/5.6.0/bin:${PATH}"
+
+# Tell ecFlow this task has started
+ecflow_client --init="${ECF_RID}"
+
+# Error handler: report --abort to ecFlow instead of leaving the task
+# stuck 'active' forever. Guarded against double-firing (ERR then EXIT).
+_ERROR_HANDLED=0
+ERROR() {
+  local rc=$1
+  set +e
+  if [ "${_ERROR_HANDLED}" -eq 1 ]; then
+    exit "${rc}"
+  fi
+  _ERROR_HANDLED=1
+  trap - ERR EXIT
+  ecflow_client --abort="task failed (rc=${rc})" || true
+  exit "${rc}"
+}
+trap 'ERROR $?' ERR
+trap 'ERROR $?' EXIT
+
+YMD=20260809
+HH=03
+CYCLE=${YMD}${HH}                       # YYYYMMDDHH
+CYCLE_DT="${YMD:0:4}-${YMD:4:2}-${YMD:6:2} ${HH}:00:00"
+STAMP=${CYCLE}00                        # YYYYMMDDHHMM (matches output filename convention)
+
+# MET forcing for the coastal AnA window (T-3 -> T0), consumed by
+# gen_configs_ana.ecf/schism_ana.ecf/sfincs_ana.ecf. This is a SEPARATE pull
+# from ngen_forcing_sr.ecf's forward-forecast forcing -- no collision risk:
+# run_coastal.py's output_dir already includes forcing_configuration in
+# its path (FORCING_ROOT_DIR/scratch/<forcing_configuration>_coastal/), so
+# short_range and standard_ana land in different directories even for the
+# same -dt/cycle (confirmed by reading run_coastal.py directly).
+#
+# standard_ana's own template (LookBack=180) only reaches back to T-2, not
+# the T-3 coastal models actually need -- confirmed live (real ncdump of a
+# CONUS_*.nc output: Time = [T-2,T-1,T0], not [T-3,T-2,T-1,T0]). Unlike
+# troute (which reaches T-3 itself via TWO tasks, troute_ana_a + troute_ana_b,
+# see troute_ana_a.ecf), there's only one ngen_forcing_ana task, so it can't
+# split the same way -- instead, run_coastal.py now accepts -lb/-fih as
+# AnA-only CLI overrides (added specifically for this) that directly widen
+# this SINGLE run's own window to T-3, rather than combining this cycle's
+# output with the previous cycle's own leading sample. -lb 240 (4h) moves
+# the window's real start back to T-3 (b_date_proc = cycle - (240-60)min =
+# cycle-3h); -fih 240 makes the engine actually iterate/write all 4 hourly
+# samples (T-3,T-2,T-1,T0) instead of just 3 -- LookBack and
+# ForecastInputHorizons are independent knobs (window start vs. sample
+# count), see run_coastal.py's build_config()/main() comments for why both
+# are needed together.
+FORCING_OUT_FILE="/contrib/LaurenSchambach/ngwpc/run_ngen/data/scratch/standard_ana_coastal/CONUS_${STAMP}.nc"
+
+export CYCLE_DT
+
+# ---- LAUNCH (placeholder for future Slurm submission) --------------------
+# Today: direct execution on this shared node. Mirrors ngen_forcing_sr.ecf's
+# LAUNCH block, adding -lb/-fih to widen the AnA window to T-3 (see above;
+# ngen_forcing_sr.ecf doesn't use these -- AnA-only, run_coastal.py errors
+# if passed against a non-AnA config).
+bash -c '
+  set -euo pipefail
+  cd "/contrib/LaurenSchambach/ngwpc/nwm-rte"
+  source config.bashrc
+  source run.sh
+  docker_run python -um "ngen_rte.run_coastal" -dt "${CYCLE_DT}" -rname "coastal_ana" -fconfig standard_ana -gdomain CONUS -lb 240 -fih 240
+' "/contrib/LaurenSchambach/ngwpc/nwm-rte/run.sh"
+# ---- END LAUNCH ------------------------------------------------------------
+
+if [ ! -f "${FORCING_OUT_FILE}" ]; then
+  echo "ERROR: expected AnA forcing output missing: ${FORCING_OUT_FILE}" >&2
+  exit 1
+fi
+echo "AnA forcing OK: ${FORCING_OUT_FILE}"
+
+ecflow_client --complete   # tell ecFlow the task finished successfully
+trap 0                     # clear all traps so ERROR() doesn't also fire on exit
+exit 0

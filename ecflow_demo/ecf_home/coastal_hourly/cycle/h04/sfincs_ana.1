@@ -1,0 +1,190 @@
+++ export ECF_NAME=/coastal_hourly/cycle/h04/sfincs_ana
+++ ECF_NAME=/coastal_hourly/cycle/h04/sfincs_ana
+++ export ECF_HOST=zhengtaocui-opertestbed-00023-mgmt
+++ ECF_HOST=zhengtaocui-opertestbed-00023-mgmt
+++ export ECF_PORT=39411
+++ ECF_PORT=39411
+++ export ECF_PASS=sSkS7n4K
+++ ECF_PASS=sSkS7n4K
+++ export ECF_TRYNO=1
+++ ECF_TRYNO=1
+++ export ECF_RID=1995823
+++ ECF_RID=1995823
+++ export PATH=/contrib/software/ecflow/5.6.0/bin:/contrib/software/ecflow/5.6.0/bin:/usr/lib64/openmpi/bin:/usr/lib64/openmpi/bin:/home/lauren.schambach/.local/bin:/home/lauren.schambach/bin:/usr/lib64/openmpi/bin:/usr/share/Modules/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin
+++ PATH=/contrib/software/ecflow/5.6.0/bin:/contrib/software/ecflow/5.6.0/bin:/usr/lib64/openmpi/bin:/usr/lib64/openmpi/bin:/home/lauren.schambach/.local/bin:/home/lauren.schambach/bin:/usr/lib64/openmpi/bin:/usr/share/Modules/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin
+++ ecflow_client --init=1995823
+++ _ERROR_HANDLED=0
+++ trap 'ERROR $?' ERR
+++ trap 'ERROR $?' EXIT
+++ YMD=20260809
+++ HH=04
+++ CYCLE=2026080904
+++ CYCLE_DT='2026-08-09 04:00:00'
++++ date -u -d '-1 hour 2026-08-09 04:00:00' +%Y%m%d%H
+++ PREV_CYCLE=2026080903
+++ TROUTE_PREV_STATE_SAVE=/contrib/LaurenSchambach/ngwpc/run_ngen/regionalization/region_ana_a_2026080903/03S/state_save/troute
+++ '[' '!' -f /contrib/LaurenSchambach/ngwpc/run_ngen/regionalization/region_ana_a_2026080903/03S/state_save/troute ']'
+++ SKIP_COASTAL=0
+++ '[' 0 -eq 0 ']'
+++ CONFIG_FILE=/contrib/LaurenSchambach/ngwpc/run_coastal/sfincs_sims/cycles/ana_2026080904/run.yaml
+++ '[' -f /contrib/LaurenSchambach/ngwpc/run_coastal/sfincs_sims/cycles/ana_2026080904/run.yaml ']'
+++ /contrib/LaurenSchambach/ngwpc/nwm-coastal/nwm-coastal-cli run /contrib/LaurenSchambach/ngwpc/run_coastal/sfincs_sims/cycles/ana_2026080904/run.yaml
+========================================                                        
+Coastal Calibration Workflow                                                    
+Start Time: 2026-08-09 23:48:41                                                 
+========================================                                        
+----------------------------------------                                        
+Cleaned generated files from                                                    
+/contrib/LaurenSchambach/ngwpc/run_coastal/sfincs_sims/cycles/ana_2026080904/run
+Stage: download                                                                 
+Start Time: 2026-08-09 23:48:41                                                 
+  Download input data (NWM, STOFS)                                              
+  meteo/ngen_forecast: 0/0 [OK]                                                 
+  hydro/nwm: 0/0 [OK]                                                           
+  coastal/stofs: 1/1 [OK]                                                       
+  Total: 1/1 (failed: 0)                                                        
+  Download complete. Raw files stored in                                        
+/contrib/LaurenSchambach/ngwpc/run_coastal/stofs_download                       
+  [✓] COMPLETED (0s)                                                            
+----------------------------------------                                        
+Stage: sfincs_symlinks                                                          
+Start Time: 2026-08-09 23:48:41                                                 
+  Create .nc symlinks for NWM data                                              
+  [✓] COMPLETED (0s)                                                            
+----------------------------------------                                        
+Stage: sfincs_data_catalog                                                      
+Start Time: 2026-08-09 23:48:41                                                 
+  Generate HydroMT data catalog for SFINCS                                      
+  Data catalog written to                                                       
+/contrib/LaurenSchambach/ngwpc/run_coastal/sfincs_sims/cycles/ana_2026080904/run
+/data_catalog.yml                                                               
+  [✓] COMPLETED (0s)                                                            
+----------------------------------------                                        
+Stage: sfincs_init                                                              
+Start Time: 2026-08-09 23:48:42                                                 
+  Initialize SFINCS model (pre-built)                                           
+  Copied pre-built model from                                                   
+/contrib/LaurenSchambach/ngwpc/run_coastal/sfincs_models/tampabay to            
+/contrib/LaurenSchambach/ngwpc/run_coastal/sfincs_sims/cycles/ana_2026080904/run
+/sfincs_model                                                                   
+  SFINCS model initialized (grid_type=quadtree) at                              
+/contrib/LaurenSchambach/ngwpc/run_coastal/sfincs_sims/cycles/ana_2026080904/run
+/sfincs_model                                                                   
+  [✓] COMPLETED (13s)                                                           
+----------------------------------------                                        
+Stage: sfincs_timing                                                            
+Start Time: 2026-08-09 23:48:55                                                 
+  Set SFINCS timing                                                             
+  Spinup: 3600 s                                                                
+  Timing set: 2026-08-09 01:00:00 to 2026-08-09 04:00:00                        
+  [✓] COMPLETED (0s)                                                            
+----------------------------------------                                        
+Stage: sfincs_forcing                                                           
+Start Time: 2026-08-09 23:48:55                                                 
+  Add water level forcing                                                       
+  Extracted 446 boundary point(s) from quadtree mask in sfincs.nc               
+  Loaded stofs_waterlevel: time=4, node=103902                                  
+  Interpolated stofs_waterlevel to 446 boundary points (4 time steps)           
+  Wrote boundary forcing to sfincs_netbndbzsbzifile.nc                          
+  Water level forcing added from stofs_waterlevel                               
+  [✓] COMPLETED (15s)                                                           
+----------------------------------------                                        
+Stage: sfincs_discharge                                                         
+Start Time: 2026-08-09 23:49:11                                                 
+  Add discharge sources                                                         
+  Using ngen discharge points: sfincs_ngen.src                                  
+  Added 24 discharge source point(s) from                                       
+/contrib/LaurenSchambach/ngwpc/run_coastal/sfincs_models/tampabay/sfincs_ngen.sr
+c                                                                               
+  Assigned discharge timeseries to 24 point(s) (24 unique feature_id(s))        
+  [✓] COMPLETED (0s)                                                            
+----------------------------------------                                        
+Stage: sfincs_precip                                                            
+Start Time: 2026-08-09 23:49:12                                                 
+  Add precipitation forcing                                                     
+  Precipitation forcing added from ngen_forecast_meteo (res=512 m)              
+  [✓] COMPLETED (2s)                                                            
+----------------------------------------                                        
+Stage: sfincs_wind                                                              
+Start Time: 2026-08-09 23:49:14                                                 
+  Add wind forcing                                                              
+  Wind forcing added from ngen_forecast_meteo (res=512 m)                       
+  [✓] COMPLETED (1s)                                                            
+----------------------------------------                                        
+Stage: sfincs_pressure                                                          
+Start Time: 2026-08-09 23:49:16                                                 
+  Add atmospheric pressure forcing                                              
+  Atmospheric pressure forcing added from ngen_forecast_meteo (baro=1, res=512  
+m)                                                                              
+  [✓] COMPLETED (1s)                                                            
+----------------------------------------                                        
+Stage: sfincs_write                                                             
+Start Time: 2026-08-09 23:49:17                                                 
+  Write SFINCS model                                                            
+  Applied 1 sfincs.inp override(s): {'dtrstout': 3600}                          
+  SFINCS model written to                                                       
+/contrib/LaurenSchambach/ngwpc/run_coastal/sfincs_sims/cycles/ana_2026080904/run
+/sfincs_model                                                                   
+  [✓] COMPLETED (4s)                                                            
+----------------------------------------                                        
+Stage: sfincs_run                                                               
+Start Time: 2026-08-09 23:49:22                                                 
+  Run SFINCS model                                                              
+  Running SFINCS via native executable:                                         
+/contrib/LaurenSchambach/ngwpc/nwm-coastal/.pixi/envs/dev/bin/sfincs            
+  SFINCS run completed                                                          
+  [✓] COMPLETED (49s)                                                           
+----------------------------------------                                        
+Stage: sfincs_floodmap                                                          
+Start Time: 2026-08-09 23:50:11                                                 
+  Downscale flood depth map                                                     
+  floodmap_dem not configured, skipping flood map stage                         
+  [✓] COMPLETED (0s)                                                            
+----------------------------------------                                        
+Stage: sfincs_plot                                                              
+Start Time: 2026-08-09 23:50:11                                                 
+  Plot simulated vs observed water levels                                       
+  Loading cached station metadata from cache/coops_stations_metadata.json       
+  Fetching datum information for 5 station(s)                                   
+  Fetching data from 5 station(s)                                               
+  Matched 5 observation point(s) to NOAA station(s): 8726384, 8726520, 8726607, 
+8726674, 8726724                                                                
+  Loading cached station metadata from cache/coops_stations_metadata.json       
+  Requesting water_level data for 5 station(s) from 20260809 01:00 to 20260809  
+04:00                                                                           
+  Fetching data from 5 station(s)                                               
+  Successfully retrieved data for 5 station(s)                                  
+  Loading cached station metadata from cache/coops_stations_metadata.json       
+  Fetching datum information for 5 station(s)                                   
+  Fetching data from 5 station(s)                                               
+  Saved 2 comparison figure(s) to                                               
+/contrib/LaurenSchambach/ngwpc/run_coastal/sfincs_sims/cycles/ana_2026080904/run
+/sfincs_model/figs                                                              
+  Including 5 NOAA gauge(s) from obs_station_map.json                           
+  Wrote obs_water_level.parquet with 5 station(s) and 4 timestep(s)             
+  [✓] COMPLETED (15s)                                                           
+----------------------------------------                                        
+========================================                                        
+Workflow COMPLETED | Total Duration: 0:01:46                                    
+========================================                                        
+                                                                                
+Timing Summary:                                                                 
+----------------------------------------                                        
+  [✓] download: 0s                                                              
+  [✓] sfincs_symlinks: 0s                                                       
+  [✓] sfincs_data_catalog: 0s                                                   
+  [✓] sfincs_init: 13s                                                          
+  [✓] sfincs_timing: 0s                                                         
+  [✓] sfincs_forcing: 15s                                                       
+  [✓] sfincs_discharge: 0s                                                      
+  [✓] sfincs_precip: 2s                                                         
+  [✓] sfincs_wind: 1s                                                           
+  [✓] sfincs_pressure: 1s                                                       
+  [✓] sfincs_write: 4s                                                          
+  [✓] sfincs_run: 49s                                                           
+  [✓] sfincs_floodmap: 0s                                                       
+  [✓] sfincs_plot: 15s                                                          
+Workflow completed successfully.                                                
+++ ecflow_client --complete
+++ trap 0
+++ exit 0

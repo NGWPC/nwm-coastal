@@ -1,0 +1,86 @@
+++ export ECF_NAME=/coastal_hourly/cycle/h04/troute_ana_b
+++ ECF_NAME=/coastal_hourly/cycle/h04/troute_ana_b
+++ export ECF_HOST=zhengtaocui-opertestbed-00023-mgmt
+++ ECF_HOST=zhengtaocui-opertestbed-00023-mgmt
+++ export ECF_PORT=39411
+++ ECF_PORT=39411
+++ export ECF_PASS=zoVN9CdT
+++ ECF_PASS=zoVN9CdT
+++ export ECF_TRYNO=1
+++ ECF_TRYNO=1
+++ export ECF_RID=1794970
+++ ECF_RID=1794970
+++ export PATH=/contrib/software/ecflow/5.6.0/bin:/contrib/software/ecflow/5.6.0/bin:/usr/lib64/openmpi/bin:/usr/lib64/openmpi/bin:/home/lauren.schambach/.local/bin:/home/lauren.schambach/bin:/usr/lib64/openmpi/bin:/usr/share/Modules/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin
+++ PATH=/contrib/software/ecflow/5.6.0/bin:/contrib/software/ecflow/5.6.0/bin:/usr/lib64/openmpi/bin:/usr/lib64/openmpi/bin:/home/lauren.schambach/.local/bin:/home/lauren.schambach/bin:/usr/lib64/openmpi/bin:/usr/share/Modules/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin
+++ ecflow_client --init=1794970
+++ _ERROR_HANDLED=0
+++ trap 'ERROR $?' ERR
+++ trap 'ERROR $?' EXIT
+++ YMD=20260809
+++ HH=04
+++ CYCLE=2026080904
+++ CYCLE_DT='2026-08-09 04:00:00'
+++ PREV_DT='-1 hour 2026-08-09 04:00:00'
++++ date -u -d '-1 hour 2026-08-09 04:00:00' +%Y%m%d%H
+++ PREV_CYCLE=2026080903
++++ date -u -d '-4 hours 2026-08-09 04:00:00' +%Y%m%d%H
+++ STAMP=202608090000
+++ RNAME=region_ana_b_2026080904
+++ TROUTE_OUT_FILE=/contrib/LaurenSchambach/ngwpc/run_ngen/regionalization/region_ana_b_2026080904/03S/Output/troute_output_202608090000.nc
+++ SAVE_STATE_DIR=/contrib/LaurenSchambach/ngwpc/run_ngen/regionalization/region_ana_b_2026080904/03S/state_save
+++ LOAD_STATE_DIR=/contrib/LaurenSchambach/ngwpc/run_ngen/regionalization/region_ana_a_2026080903/03S/state_save
+++ SAVE_STATE_DIR_CONTAINER=/ngwpc/run_ngen/regionalization/region_ana_b_2026080904/03S/state_save
+++ LOAD_STATE_DIR_CONTAINER=/ngwpc/run_ngen/regionalization/region_ana_a_2026080903/03S/state_save
+++ export CYCLE_DT
+++ export RNAME
+++ '[' -f /contrib/LaurenSchambach/ngwpc/run_ngen/regionalization/region_ana_a_2026080903/03S/state_save/troute ']'
+++ LOAD_STATE_ARGS='-lsf /ngwpc/run_ngen/regionalization/region_ana_a_2026080903/03S/state_save'
+++ echo 'Warm-starting troute AnA-B from /contrib/LaurenSchambach/ngwpc/run_ngen/regionalization/region_ana_a_2026080903/03S/state_save'
+Warm-starting troute AnA-B from /contrib/LaurenSchambach/ngwpc/run_ngen/regionalization/region_ana_a_2026080903/03S/state_save
+++ export LOAD_STATE_ARGS
+++ export SAVE_STATE_DIR_CONTAINER
+++ bash -c '
+  set -euo pipefail
+  cd "/contrib/LaurenSchambach/ngwpc/nwm-rte"
+  source config.bashrc
+  source run.sh
+  TEST_VPU="vpu_03S"
+  TEST_FORM_ASSIGN_VPU="${INSTALLED_REGIONALIZATION_RESULTS}/${TEST_VPU}/formulation_assignment.csv"
+  TEST_CAT_GRP_VPU="${INSTALLED_REGIONALIZATION_RESULTS}/${TEST_VPU}/catchment_groups.csv"
+  docker_run python -um "ngen_rte.run_regionalization_standalone" -n 12 -faf "${TEST_FORM_ASSIGN_VPU}" -cgf "${TEST_CAT_GRP_VPU}" -fconfig "standard_ana" -dt "${CYCLE_DT}" -lb 240 -rname "${RNAME}" -v "03S" -outfmt NetCDF -ss -ssd "${SAVE_STATE_DIR_CONTAINER}" ${LOAD_STATE_ARGS}
+' /contrib/LaurenSchambach/ngwpc/nwm-rte/run.sh
+EWTS CALMGR logging is DISABLED
+2026-08-09 18:54:34,835 - matplotlib.font_manager - INFO - generated new fontManager
+RTE: initializing EWTS log at: /ngen-app/logs_rte/rte/rte_20260809_185435_702959.log
+EWTS RTE logging is DISABLED
+RTE: done initializing EWTS log at: /ngen-app/logs_rte/rte/rte_20260809_185435_702959.log
+EWTS FCSTMGR logging is ENABLED
+EWTS FCSTMGR no module-specific or default EWTS log level env var found; defaulting to INFO
+EWTS FCSTMGR log level set to INFO
+EWTS FCSTMGR logging to /ngencerf/data/run-logs/fcst-mgr/fcst_mgr_20260809T185435.log
+2026-08-09 18:54:35,778 - root - INFO - Initialized RealizationBuilder with None
+2026-08-09 18:54:35,779 - root - INFO - Skipping load of config file since overrides will replace entire config (no amend)
+2026-08-09 18:54:35,779 - root - INFO - Will apply config overrides with self.config_overrides_mode__amend=False
+2026-08-09 18:54:35,779 - root - INFO - Applying config overrides
+2026-08-09 18:54:35,797 - root - INFO - Input directory created at: /ngwpc/run_ngen/regionalization/region_ana_b_2026080904/03S/Input/
+EWTS MSWMGR logging is ENABLED
+EWTS MSWMGR no module-specific or default EWTS log level env var found; defaulting to INFO
+EWTS MSWMGR log level set to INFO
+EWTS MSWMGR logging to /ngwpc/run_ngen/regionalization/region_ana_b_2026080904/03S/logs/msw_mgr_regionalization.log
+2026-08-09 18:54:36,042 - httpx - INFO - HTTP Request: GET http://edfs.test.nextgenwaterprediction.com/api/v1/hydrofabric/03S/gpkg?id_type=vpu_id&source=nhf&domain=CONUS "HTTP/1.1 200 OK"
+Saved geopackage file from Icefabric API to /ngwpc/run_ngen/regionalization/region_ana_b_2026080904/03S/Input/vpu_03S.gpkg
+EWTS FCSTMGR logging is ENABLED
+EWTS FCSTMGR no module-specific or default EWTS log level env var found; defaulting to INFO
+EWTS FCSTMGR log level set to INFO
+EWTS FCSTMGR logging to /ngwpc/run_ngen/regionalization/region_ana_b_2026080904/03S/fcst_mgr_03S.log
+
+real	13m4.269s
+user	0m0.025s
+sys	0m0.036s
+++ '[' '!' -f /contrib/LaurenSchambach/ngwpc/run_ngen/regionalization/region_ana_b_2026080904/03S/Output/troute_output_202608090000.nc ']'
+++ '[' '!' -f /contrib/LaurenSchambach/ngwpc/run_ngen/regionalization/region_ana_b_2026080904/03S/state_save/troute ']'
+++ echo 'troute AnA-B OK: /contrib/LaurenSchambach/ngwpc/run_ngen/regionalization/region_ana_b_2026080904/03S/Output/troute_output_202608090000.nc, /contrib/LaurenSchambach/ngwpc/run_ngen/regionalization/region_ana_b_2026080904/03S/state_save/troute'
+troute AnA-B OK: /contrib/LaurenSchambach/ngwpc/run_ngen/regionalization/region_ana_b_2026080904/03S/Output/troute_output_202608090000.nc, /contrib/LaurenSchambach/ngwpc/run_ngen/regionalization/region_ana_b_2026080904/03S/state_save/troute
+++ ecflow_client --complete
+++ trap 0
+++ exit 0

@@ -622,7 +622,7 @@ class TestUpdateParams:
         text = (work_dir / "param.nml").read_text()
         assert "nspool = 18" in text
         assert "ihfskip = 18" in text
-        assert "nhot_write = 324" in text  # template default preserved
+        assert "nhot_write = 18" in text  # hourly hotstart, independent of run length
 
     def test_single_output_file_extends_ihfskip(self, tmp_path):
         work_dir = tmp_path / "run"

@@ -678,9 +678,9 @@ class SCHISMRunStage(WorkflowStage):
 class PostSCHISMStage(WorkflowStage):
     """Post-process SCHISM outputs.
 
-    Checks for fatal errors and combines hotstart files when running
-    reanalysis or chained runs.  ``combine_hotstart7`` is expected on
-    ``$PATH`` (pixi installs it to ``$CONDA_PREFIX/bin``).
+    Checks for fatal errors and combines any hotstart files SCHISM wrote.
+    ``combine_hotstart7`` is expected on ``$PATH`` (pixi installs it to
+    ``$CONDA_PREFIX/bin``).
     """
 
     name = "schism_postprocess"
@@ -717,15 +717,14 @@ class PostSCHISMStage(WorkflowStage):
                 raise RuntimeError(f"SCHISM run failed: {error_content[-2000:]}")
             self._log("fatal.error contains only dry-node warnings (QUICKSEARCH); continuing")
 
-        # Combine hotstarts for reanalysis / chained runs
-        sim = self.config.simulation
-        is_reanalysis = sim.duration_hours < 0
-        if is_reanalysis:
-            self._update_substep("Combining hotstarts")
-            self._log("Running combine_hotstart7")
-            from coastal_calibration.schism.prep import combine_hotstart
+        # Combine any hotstarts SCHISM wrote (nhot_write now always targets
+        # hourly checkpoints, regardless of run type -- see make_param_nml).
+        # combine_hotstart() itself no-ops cleanly if none were written, so
+        # this always runs rather than gating on run type.
+        self._update_substep("Combining hotstarts")
+        from coastal_calibration.schism.prep import combine_hotstart
 
-            combine_hotstart(outputs_dir)
+        combine_hotstart(outputs_dir)
 
         self._log("SCHISM post-processing complete")
         return {

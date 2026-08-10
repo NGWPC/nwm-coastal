@@ -71,12 +71,13 @@ class DateRange:
             )
         # For operational sources (end=None means "present"), check that dates aren't in the future
         if self.end is None:
-            today = utc_now().replace(hour=0, minute=0, second=0, microsecond=0)
-            if start > today:
+            now = utc_now()
+            if start > now:
                 return (
                     f"{self.description} data is available from "
                     f"{self.start.strftime('%Y-%m-%d')} to present. "
-                    f"Requested start date {start.strftime('%Y-%m-%d')} is in the future."
+                    f"Requested start date {start.strftime('%Y-%m-%d %H:%M')} is in the future "
+                    f"(current UTC time: {now.strftime('%Y-%m-%d %H:%M')})."
                 )
         return None
 

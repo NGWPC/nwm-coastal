@@ -1,0 +1,45 @@
+++ export ECF_NAME=/coastal_hourly/cycle/h04/run_schism_download_ana
+++ ECF_NAME=/coastal_hourly/cycle/h04/run_schism_download_ana
+++ export ECF_HOST=zhengtaocui-opertestbed-00023-mgmt
+++ ECF_HOST=zhengtaocui-opertestbed-00023-mgmt
+++ export ECF_PORT=39411
+++ ECF_PORT=39411
+++ export ECF_PASS=aPKrxUMD
+++ ECF_PASS=aPKrxUMD
+++ export ECF_TRYNO=1
+++ ECF_TRYNO=1
+++ export ECF_RID=1826224
+++ ECF_RID=1826224
+++ export PATH=/contrib/software/ecflow/5.6.0/bin:/contrib/software/ecflow/5.6.0/bin:/usr/lib64/openmpi/bin:/usr/lib64/openmpi/bin:/home/lauren.schambach/.local/bin:/home/lauren.schambach/bin:/usr/lib64/openmpi/bin:/usr/share/Modules/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin
+++ PATH=/contrib/software/ecflow/5.6.0/bin:/contrib/software/ecflow/5.6.0/bin:/usr/lib64/openmpi/bin:/usr/lib64/openmpi/bin:/home/lauren.schambach/.local/bin:/home/lauren.schambach/bin:/usr/lib64/openmpi/bin:/usr/share/Modules/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin
+++ ecflow_client --init=1826224
+++ _ERROR_HANDLED=0
+++ trap 'ERROR $?' ERR
+++ trap 'ERROR $?' EXIT
+++ YMD=20260809
+++ HH=04
+++ CYCLE=2026080904
+++ CYCLE_DT='2026-08-09 04:00:00'
++++ date -u -d '-1 hour 2026-08-09 04:00:00' +%Y%m%d%H
+++ PREV_CYCLE=2026080903
+++ TROUTE_PREV_STATE_SAVE=/contrib/LaurenSchambach/ngwpc/run_ngen/regionalization/region_ana_a_2026080903/03S/state_save/troute
+++ '[' '!' -f /contrib/LaurenSchambach/ngwpc/run_ngen/regionalization/region_ana_a_2026080903/03S/state_save/troute ']'
+++ SKIP_COASTAL=0
+++ '[' 0 -eq 0 ']'
+++ CONFIG_FILE=/contrib/LaurenSchambach/ngwpc/run_coastal/schism_sims/cycles/ana_2026080904/run.yaml
+++ '[' -f /contrib/LaurenSchambach/ngwpc/run_coastal/schism_sims/cycles/ana_2026080904/run.yaml ']'
+++ /contrib/LaurenSchambach/ngwpc/nwm-coastal/nwm-coastal-cli run /contrib/LaurenSchambach/ngwpc/run_coastal/schism_sims/cycles/ana_2026080904/run.yaml --stop-after download
+  - STOFS (operational) data is available from 2020-12-30 to present. Requested 
+start date 2026-08-09 is in the future.                                         
+╭─ Error ──────────────────────────────────────────────────────────────────────╮
+│ Workflow failed with errors (see above).                                     │
+╰──────────────────────────────────────────────────────────────────────────────╯
+                                                                                
++++ ERROR 1
++++ local rc=1
++++ set +e
++++ '[' 0 -eq 1 ']'
++++ _ERROR_HANDLED=1
++++ trap - ERR EXIT
++++ ecflow_client '--abort=task failed (rc=1)'
++++ exit 1
