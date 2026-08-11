@@ -4,31 +4,26 @@ YMD=%YMD%
 HH=%HOUR%
 CYCLE=${YMD}${HH}                       # YYYYMMDDHH
 CYCLE_DT="${YMD:0:4}-${YMD:4:2}-${YMD:6:2} ${HH}:00:00"
-STAMP=${CYCLE}00                        # YYYYMMDDHHMM (matches output filename convention)
+STAMP=${CYCLE}00                        # YYYYMMDDHHMM
 
 # MET forcing for the coastal AnA window (T-3 -> T0), consumed by
-# gen_configs_ana.ecf/schism_ana.ecf/sfincs_ana.ecf. This is a SEPARATE pull
+# gen_configs_ana.ecf/schism_ana.ecf/sfincs_ana.ecf. This is a separate pull
 # from ngen_forcing_sr.ecf's forward-forecast forcing -- no collision risk:
-# run_coastal.py's output_dir already includes forcing_configuration in
-# its path (FORCING_ROOT_DIR/scratch/<forcing_configuration>_coastal/), so
+# run_coastal.py's output_dir includes forcing_configuration in its path
+# (FORCING_ROOT_DIR/scratch/<forcing_configuration>_coastal/), so
 # short_range and standard_ana land in different directories even for the
-# same -dt/cycle (confirmed by reading run_coastal.py directly).
+# same -dt/cycle.
 #
 # standard_ana's own template (LookBack=180) only reaches back to T-2, not
-# the T-3 coastal models actually need -- confirmed live (real ncdump of a
-# CONUS_*.nc output: Time = [T-2,T-1,T0], not [T-3,T-2,T-1,T0]). Unlike
-# troute (which reaches T-3 itself via TWO tasks, troute_ana_a + troute_ana_b,
-# see troute_ana_a.ecf), there's only one ngen_forcing_ana task, so it can't
-# split the same way -- instead, run_coastal.py now accepts -lb/-fih as
-# AnA-only CLI overrides (added specifically for this) that directly widen
-# this SINGLE run's own window to T-3, rather than combining this cycle's
-# output with the previous cycle's own leading sample. -lb 240 (4h) moves
+# the T-3 coastal models actually need. The run_coastal.py now accepts -lb/-fih
+# as AnA-only CLI overrides (added specifically for this) that directly widen
+# this single run's own window to T-3; -lb 240 (4h) moves
 # the window's real start back to T-3 (b_date_proc = cycle - (240-60)min =
 # cycle-3h); -fih 240 makes the engine actually iterate/write all 4 hourly
 # samples (T-3,T-2,T-1,T0) instead of just 3 -- LookBack and
 # ForecastInputHorizons are independent knobs (window start vs. sample
-# count), see run_coastal.py's build_config()/main() comments for why both
-# are needed together.
+# count)
+
 FORCING_OUT_FILE="%FORCING_OUT_DIR_ANA%/CONUS_${STAMP}.nc"
 
 export CYCLE_DT

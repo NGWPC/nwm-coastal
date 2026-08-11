@@ -7,29 +7,33 @@ CYCLE_DT="${YMD:0:4}-${YMD:4:2}-${YMD:6:2} ${HH}:00:00"
 STAMP=${CYCLE}00
 
 # VPU + cycle isolation, without isolating the whole run_ngen root: -rname
-# already controls the first path segment under regionalization/ (confirmed
-# via fcst-mgr's own log: "-rname region_sr -v 03S" -> regionalization/region_sr/03S/),
+# already controls the first path segment under regionalization: "-rname 
+# region_sr -v 03S" -> regionalization/region_sr/03S/),
 # and -v already separates VPUs, so making -rname cycle-specific is enough
 # to keep every (vpu, cycle) combination in its own directory -- including
-# concurrent runs of other VPUs against this same shared run_ngen -- with
-# zero risk of collision. Deliberately NOT isolating data/raw_input (the
-# HRRR/RAP grib cache) or MNT__RUN_NGEN__HOST wholesale: that cache is
+# concurrent runs of other VPUs against this same shared run_ngen.
+#
+# Deliberately NOT isolating data/raw_input (the
+# HRRR/RAP grib cache) or MNT__RUN_NGEN__HOST: that cache can be is
 # shared across VPUs/cycles on purpose, so we don't redundantly re-download
 # the same raw data every cycle.
 #
 # %VPU% (suite var) is the single source of truth for which VPU this suite
 # targets -- change it there and everything below (the -v flag, the output
 # path, and TEST_VPU) follows automatically.
-RNAME="region_sr_${CYCLE}"
-TROUTE_OUT_FILE="%TROUTE_REGIONALIZATION_ROOT%/${RNAME}/%VPU%/troute_output_${STAMP}.nc"
 
-# Warm start from THIS cycle's own troute_ana_b save (T0 state) -- this
-# task now triggers on troute_ana_b == complete (see suite_def), so the
-# save should already exist by the time this runs. See troute_ana_b.ecf
-# for why AnA-B, not AnA-A, is SR's warm-start source: AnA-B is the run
-# that reaches T0 (SR's own start time), AnA-A only reaches T-2.
+RNAME="region_sr_${CYCLE}"
+
+# netCDF outputs land in an Output/ subdirectory -- same convention as the
+# AnA tasks (troute_ana_a.ecf/troute_ana_b.ecf)
+
+TROUTE_OUT_FILE="%TROUTE_REGIONALIZATION_ROOT%/${RNAME}/%VPU%/Output/troute_output_${STAMP}.nc"
+
+# Warm start from THIS cycle's own troute_ana_b save (T0 state)
+
 # HOST path for the existence check; CONTAINER path for -lsf itself (see
 # troute_ana_a.ecf -- passing the HOST path here silently no-ops the load).
+
 LOAD_STATE_DIR="%TROUTE_REGIONALIZATION_ROOT%/region_ana_b_${CYCLE}/%VPU%/state_save"
 LOAD_STATE_DIR_CONTAINER="%TROUTE_REGIONALIZATION_ROOT_CONTAINER%/region_ana_b_${CYCLE}/%VPU%/state_save"
 if [ -f "${LOAD_STATE_DIR}/troute" ]; then
@@ -47,8 +51,7 @@ export LOAD_STATE_ARGS
 # ---- LAUNCH (placeholder for future Slurm submission) --------------------
 # Today: direct execution on this shared node.
 #
-# This owns the full docker_run invocation itself rather than depending on
-# our own run_region_03S_standalone.sh wrapper -- only run.sh and
+# This owns the full docker_run invocation itself - only run.sh and
 # config.bashrc (stable, shared infra providing the docker_run function and
 # env vars like INSTALLED_REGIONALIZATION_RESULTS) are sourced from
 # nwm-rte. See ngen_forcing_sr.ecf for why $0 is pinned via bash -c's second

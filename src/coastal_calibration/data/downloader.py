@@ -822,6 +822,37 @@ def _download_stofs_time_subset(
         tmp_path.replace(out_path)
 
 
+def _stofs_local_file_covers(path: Path, needed_start: datetime, needed_end: datetime) -> bool:
+    """Check whether an existing local STOFS subset file already covers ``[needed_start, needed_end]``.
+
+    ``get_stofs_path()`` names files only by their 6-hourly STOFS *cycle*,
+    not by the fetch window used to build them -- so e.g. an AnA cycle's
+    narrow subset (a few hours) and an SR cycle's much wider one (18h+)
+    can resolve to the identical on-disk path when they share a cycle.
+    Trusting mere file existence let a later, wider-window caller silently
+    inherit an earlier, narrower slice with no data past its own short
+    window -- confirmed live as the cause of an SR SCHISM/SFINCS run
+    losing all real boundary forcing after its first hour. Any read
+    failure (missing/corrupt file) is treated as "doesn't cover" so the
+    caller re-fetches rather than trusting a bad cache entry.
+    """
+    import netCDF4
+    from cftime import num2date
+
+    try:
+        with netCDF4.Dataset(path, mode="r") as ds:
+            time_var = ds.variables["time"]
+            units = time_var.units.split("!")[0].strip()
+            calendar = getattr(time_var, "calendar", "standard")
+            times = time_var[:]
+            if len(times) == 0:
+                return False
+            decoded = num2date(times, units=units, calendar=calendar)
+            return decoded[0] <= needed_start and decoded[-1] >= needed_end
+    except (OSError, KeyError, IndexError, ValueError):
+        return False
+
+
 def _build_glofs_urls(
     start: datetime,
     end: datetime,
@@ -1156,8 +1187,22 @@ def download_data(
         # schism/boundary.py and sfincs/data_catalog.py need no changes --
         # only *where the data is sourced from* is resolution-aware, not
         # where it lands on disk.
+        #
+        # Because that path only encodes the STOFS *cycle* (6-hourly
+        # bucket), two callers targeting the same cycle but different
+        # window lengths -- e.g. an AnA run's few-hour subset and an SR
+        # run's 18h+ one -- can resolve to the same file. A bare
+        # exists()/size check let the narrower one "win" and get silently
+        # reused by the wider caller (confirmed live: SR lost all real
+        # boundary forcing past its first hour this way). Verify the
+        # on-disk file's actual time coverage before trusting it.
         stofs_out_path = get_stofs_path(start, out_dir)
-        if stofs_out_path.exists() and stofs_out_path.stat().st_size > 0:
+        needed_end = end + timedelta(hours=1)
+        if (
+            stofs_out_path.exists()
+            and stofs_out_path.stat().st_size > 0
+            and _stofs_local_file_covers(stofs_out_path, start, needed_end)
+        ):
             coastal_result = DownloadResult(
                 source="coastal/stofs",
                 total_files=1,
@@ -1171,9 +1216,7 @@ def download_data(
             try:
                 cycle = resolve_stofs_cycle(start)
                 logger.info("STOFS: using cycle %s for start %s", cycle, start)
-                _download_stofs_time_subset(
-                    cycle, start, end + timedelta(hours=1), stofs_out_path
-                )
+                _download_stofs_time_subset(cycle, start, needed_end, stofs_out_path)
                 coastal_result.successful = 1
             except Exception as e:  # noqa: BLE001 -- surfaced via DownloadResult, not raised here
                 coastal_result.failed = 1

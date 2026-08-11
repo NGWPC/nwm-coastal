@@ -4,7 +4,7 @@ YMD=%YMD%
 HH=%HOUR%
 CYCLE=${YMD}${HH}                       # YYYYMMDDHH
 CYCLE_DT="${YMD:0:4}-${YMD:4:2}-${YMD:6:2} ${HH}:00:00"
-STAMP=${CYCLE}00                        # YYYYMMDDHHMM (matches output filename convention)
+STAMP=${CYCLE}00                        # YYYYMMDDHHMM
 
 FORCING_OUT_FILE="%FORCING_OUT_DIR%/CONUS_${STAMP}.nc"
 
@@ -12,21 +12,6 @@ export CYCLE_DT
 
 # ---- LAUNCH (placeholder for future Slurm submission) --------------------
 # Today: direct execution on this shared node.
-#
-# This owns the full docker_run invocation itself rather than depending on
-# nwm-rte's run_coastal.sh -- that script is a shared, hand-curated menu of
-# example commands where a human toggles which line is "active" by
-# commenting/uncommenting, so its active line can (and has) changed out
-# from under us for reasons unrelated to this pipeline. Only run.sh and
-# config.bashrc (stable, shared infra providing the docker_run function and
-# env vars) are sourced from nwm-rte.
-#
-# config.bashrc derives REPOS_COMMON_ROOT__HOST from dirname(dirname($0))
-# unconditionally (not a ${VAR:-default} fallback), so it must see $0 as if
-# run_coastal.sh were invoked directly from the nwm-rte directory. bash -c's
-# argument after the script string becomes $0 inside that invocation, so
-# passing nwm-rte/run.sh here reproduces that exactly.
-#
 # Future migration, e.g.: wrap the whole bash -c invocation below in
 # `sbatch --wait --job-name="coastal_forcing_${CYCLE}" --wrap="..."`.
 bash -c '

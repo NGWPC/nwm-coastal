@@ -5,58 +5,55 @@ HH=%HOUR%
 CYCLE=${YMD}${HH}
 CYCLE_DT="${YMD:0:4}-${YMD:4:2}-${YMD:6:2} ${HH}:00:00"
 
-# troute AnA-B: the 3-hour throwaway reprocessing (T-3 -> T0 relative to
-# this cycle's own time). Never chained forward to a future cycle (that's
-# troute_ana_a's job) -- this run exists purely to produce a T0 state for
-# THIS cycle's SR troute run (troute_sr.ecf) and coastal AnA
-# (coastal_ana_schism.ecf/coastal_ana_sfincs.ecf) to warm-start from. Loads
-# from the SAME prior-cycle troute_ana_a save that troute_ana_a.ecf itself
-# loads from (both branch off the same T-3 starting point) -- NOT from this
-# hour's own troute_ana_a, which is a separate, independent 1h run. See
-# troute_ana_a.ecf for the full rationale (two runs because troute can only
-# checkpoint at wherever a run stops, not mid-run).
-# IMPORTANT: relative adjustment must come BEFORE the timestamp -- see
-# troute_ana_a.ecf for why "${CYCLE_DT} -1 hour" silently parses wrong in
-# GNU date (confirmed live).
+# troute AnA-B: the 3-hour (T-3 -> T0 relative to this cycle's own time). 
+# Never chained forward to a future AnA cycle (that's troute_ana_a's job)
+# - this run exists to produce a T0 state for THIS cycle's SR troute run 
+# (troute_sr.ecf) and coastal AnA cycles to use for forcing.
+# Loads from the SAME prior-cycle troute_ana_a save that troute_ana_a.ecf 
+# loads from (both branch off the same T-3 starting point) 
+# 
+# note: the -1 relative adjustment must come BEFORE the timestamp as
+# "${CYCLE_DT} -1 hour" silently parses wrong in GNU date.
+
 PREV_DT="-1 hour ${CYCLE_DT}"
 PREV_CYCLE=$(date -u -d "${PREV_DT}" +"%%Y%%m%%d%%H")
+
 # troute names its output file after the run's actual start_time, not the
-# cycle time -- confirmed live from the realization config's own "time"
-# block. This run's fcst_start is T-3 (CYCLE_DT-3h): -dt is CYCLE_DT (T0)
+# cycle time. This run's fcst_start is T-3 (CYCLE_DT-3h): -dt is CYCLE_DT (T0)
 # and -lb 240 pulls it back to T-3 -- mswm's create_fcst_times() (ana_flag==1
-# branch, unmodified upstream, do not edit) computes
-# forcing_lookback = int(LookBack/60) - 1, so -lb 240 resolves to a 3h
-# lookback (int(240/60)-1 == 3), not -lb 180 (int(180/60)-1 == 2, only a 2h
-# lookback -- T-2, one hour short of what this run's loaded hotstart
-# actually represents, T-3). See troute_ana_a.ecf for the identical -lb
-# arithmetic and rationale. But troute's own restart/output timestamp is a
+# branch) computes forcing_lookback = int(LookBack/60) - 1, so -lb 240 resolves 
+# to a 3h lookback (int(240/60)-1 == 3). But troute's own restart/output timestamp is a
 # further 1h before fcst_start by design (mswm ginputfunc.py: "troute must
 # start 1h before [ngen] so that states can be transferred between runs",
-# for realtime/non-hindcast forcing) -- confirmed live against the actual
-# output filename (predicted T-3 == 11:00, real file was stamped 10:00).
-# So the real stamp is T-4, not T-3.
+# for realtime/non-hindcast forcing) so the real stamp is T-4, not T-3.
+
 STAMP=$(date -u -d "-4 hours ${CYCLE_DT}" +"%%Y%%m%%d%%H")00
 
 RNAME="region_ana_b_${CYCLE}"
+
 # netCDF outputs (troute_output_*.nc etc.) land in an Output/ subdirectory
-# for AnA runs -- confirmed live across all 3 AnA test runs. state_save/
-# stays directly under VPU/ (unaffected, confirmed separately).
+# for AnA runs
+
 TROUTE_OUT_FILE="%TROUTE_REGIONALIZATION_ROOT%/${RNAME}/%VPU%/Output/troute_output_${STAMP}.nc"
+
 # HOST-side paths -- for the [ -f ... ] existence checks (outside docker).
+
 SAVE_STATE_DIR="%TROUTE_REGIONALIZATION_ROOT%/${RNAME}/%VPU%/state_save"
 LOAD_STATE_DIR="%TROUTE_REGIONALIZATION_ROOT%/region_ana_a_${PREV_CYCLE}/%VPU%/state_save"
+
 # CONTAINER-side paths -- for the -ssd/-lsf flags, read INSIDE the
 # container. See troute_ana_a.ecf for why these must differ from the HOST
-# paths above (confirmed live: passing the HOST path silently no-ops the
-# save).
+# paths above.
+
 SAVE_STATE_DIR_CONTAINER="%TROUTE_REGIONALIZATION_ROOT_CONTAINER%/${RNAME}/%VPU%/state_save"
 LOAD_STATE_DIR_CONTAINER="%TROUTE_REGIONALIZATION_ROOT_CONTAINER%/region_ana_a_${PREV_CYCLE}/%VPU%/state_save"
 
 export CYCLE_DT
 export RNAME
 
-# Bootstrap handling: see troute_ana_a.ecf -- same rationale, same source
-# state (both A and B load from the same prior-cycle troute_ana_a save).
+# Bootstrap handling: see troute_ana_a.ecf - same source state
+# (both A and B load from the same prior-cycle troute_ana_a save).
+
 if [ -f "${LOAD_STATE_DIR}/troute" ]; then
   LOAD_STATE_ARGS="-lsf ${LOAD_STATE_DIR_CONTAINER}"
   echo "Warm-starting troute AnA-B from ${LOAD_STATE_DIR}"
@@ -68,17 +65,7 @@ export LOAD_STATE_ARGS
 export SAVE_STATE_DIR_CONTAINER
 
 # ---- LAUNCH (placeholder for future Slurm submission) --------------------
-# Today: direct execution on this shared node. -dt is this cycle's own
-# CYCLE_DT (T0). -lb 240: gives a 3h lookback after mswm's own -1 (see
-# STAMP comment above) -- this run's output lands at CYCLE_DT-3h (T-3),
-# matching the T-3->T0 design (confirmed live: dt X, lb N minutes ->
-# output stamped X-minus-(N/60-1)-hours). Also matches exactly what this
-# run's loaded hotstart represents: PREV_CYCLE's own troute_ana_a save is
-# valid at PREV_CYCLE's own T-2, which equals THIS cycle's own T-3 --
-# -lb 180 (2h lookback) previously left a 1h gap between what the loaded
-# state represented (T-3) and what this run's own fcst_start declared
-# (T-2), which -lb 240 now closes. Same caveats as troute_ana_a.ecf:
-# -lsf/-ss/-ssd mechanics confirmed real end to end.
+# Today: direct execution on this shared node. 
 bash -c '
   set -euo pipefail
   cd "%NWM_RTE_DIR%"

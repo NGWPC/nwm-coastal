@@ -6,14 +6,6 @@ CYCLE=${YMD}${HH}
 CYCLE_DT="${YMD:0:4}-${YMD:4:2}-${YMD:6:2} ${HH}:00:00"
 PREV_CYCLE=$(date -u -d "-1 hour ${CYCLE_DT}" +"%%Y%%m%%d%%H")
 
-# Bootstrap skip: mirrors gen_configs_ana.ecf's own check exactly -- see
-# that file for the full rationale on why this must be troute_ana_a's own
-# PREV_CYCLE state (not a coastal-model hotstart/rst check, which stays
-# empty for two cycles and would make every cycle skip forever). If
-# gen_configs_ana skipped (no run.yaml written), this task should skip
-# too, not error. Re-checking here (not just inferring from CONFIG_FILE's
-# absence) means a genuine missing-config bug on a non-bootstrap cycle
-# still fails loudly below.
 TROUTE_PREV_STATE_SAVE="%TROUTE_REGIONALIZATION_ROOT%/region_ana_a_${PREV_CYCLE}/%VPU%/state_save/troute"
 if [ ! -f "${TROUTE_PREV_STATE_SAVE}" ]; then
   echo "No prior troute_ana_a state at ${TROUTE_PREV_STATE_SAVE} (bootstrap cycle) -- skipping download for ${CYCLE}"
@@ -23,8 +15,7 @@ else
 fi
 
 # A second %include <tail.h> here (one per skip branch, one at the true
-# end) breaks ecflow's own job-generation preprocessing -- confirmed live:
-# "Mismatched ecfmicro(%) count(1) at: %include <tail.h>". Wrap the real
+# end) breaks ecflow's own job-generation preprocessing. Wrap the real
 # work in a shell conditional instead, so there is only ever ONE
 # %include <tail.h>, at the true end of the file.
 if [ "${SKIP_COASTAL}" -eq 0 ]; then
@@ -32,10 +23,8 @@ if [ "${SKIP_COASTAL}" -eq 0 ]; then
 CONFIG_FILE="%SCHISM_CYCLES_DIR%/ana_${CYCLE}/run.yaml"
 [ -f "${CONFIG_FILE}" ] || { echo "ERROR: missing config: ${CONFIG_FILE}" >&2; exit 1; }
 
-# AnA counterpart of run_schism_download_sr.ecf -- same STOFS boundary data,
-# same race (SCHISM and SFINCS share raw_download_dir), same fix (download
-# once, up front, serialized). schism_ana and sfincs_ana both trigger on
-# this task's completion. See run_schism_download_sr.ecf for why this and
+# schism_ana and sfincs_ana both trigger on
+# this task's completion. See run_stofs_download_sr.ecf for why this and
 # the SR download never race each other despite sharing raw_download_dir.
 #
 # ---- LAUNCH (placeholder for future Slurm submission) --------------------

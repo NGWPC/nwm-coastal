@@ -4,31 +4,34 @@ YMD=%YMD%
 HH=%HOUR%
 CYCLE=${YMD}${HH}
 CYCLE_DT="${YMD:0:4}-${YMD:4:2}-${YMD:6:2} ${HH}:00:00"
-# IMPORTANT: relative adjustment must come BEFORE the timestamp -- see
-# troute_ana_a.ecf for why "${CYCLE_DT} -1 hour" silently parses wrong in
-# GNU date (confirmed live: evaluates to +2h, not -1h).
+
+# note: relative adjustment must come BEFORE the timestamp
+
 PREV_CYCLE=$(date -u -d "-1 hour ${CYCLE_DT}" +"%%Y%%m%%d%%H")
-# T-3 relative to THIS cycle == T-2 relative to PREV_CYCLE -- the exact real
-# time PREV_CYCLE's own schism_ana/sfincs_ana wrote their 1h-mark checkpoint
-# at. See troute_ana_a.ecf for the same PREV_CYCLE derivation rationale
-# (date arithmetic, not string slicing, so day/month/year rollover is free).
+
+# T-3 relative to THIS cycle == T-2 relative to PREV_CYCLE -- the time
+# PREV_CYCLE's schism_ana/sfincs_ana wrote their 1h-mark checkpoint
+# at. (date arithmetic, not string slicing, so day/month/year rollover works)
+
 T_MINUS_3_STAMP=$(date -u -d "-3 hours ${CYCLE_DT}" +"%%Y%%m%%d.%%H0000")
+
 # ngen_forcing_ana's output is named after the raw cycle time (run_coastal.py
-# passes -dt straight through as RefcstBDateProc, unshifted -- see the
-# run_coastal.py AnA windowing fix).
+# passes -dt straight through as RefcstBDateProc, unshifted.
+
 STAMP=${CYCLE}00
+
 # troute_ana_b's output, by contrast, is named after its actual restart
 # timestamp, which is a further 1h before its own fcst_start (T-4, not
-# T-3) -- see troute_ana_b.ecf for the mswm rationale and live
-# confirmation. NOT the same value as T_MINUS_3_STAMP above (that one is
-# for SCHISM/SFINCS's own self-chained checkpoint naming, unrelated to
-# troute's mswm-specific shift).
+# T-3) -- see troute_ana_b.ecf for the mswm rationale NOT the same value 
+# as T_MINUS_3_STAMP above (that one is for SCHISM/SFINCS's own self-chained 
+# checkpoint naming, unrelated to troute's mswm-specific shift).
+
 TROUTE_STAMP=$(date -u -d "-4 hours ${CYCLE_DT}" +"%%Y%%m%%d%%H")00
 
 FORCING_FILE="%FORCING_OUT_DIR_ANA%/CONUS_${STAMP}.nc"
-# troute's netCDF outputs land in an Output/ subdirectory for AnA runs --
-# confirmed live across all 3 AnA test runs (see troute_ana_a.ecf/
-# troute_ana_b.ecf).
+
+# troute's netCDF outputs land in an Output/ subdirectory for AnA runs
+
 TROUTE_FILE="%TROUTE_REGIONALIZATION_ROOT%/region_ana_b_${CYCLE}/%VPU%/Output/troute_output_${TROUTE_STAMP}.nc"
 
 for f in "${FORCING_FILE}" "${TROUTE_FILE}"; do
@@ -59,8 +62,11 @@ if [ -d "${PREV_SCHISM_ANA_OUTPUTS_DIR}" ]; then
 fi
 
 # SFINCS: sfincs.<YYYYMMDD.HHMMSS>.rst, name computed directly (see
-# T_MINUS_3_STAMP above) -- no globbing needed.
-PREV_SFINCS_ANA_RUN_DIR="%SFINCS_CYCLES_DIR%/ana_${PREV_CYCLE}/run"
+# T_MINUS_3_STAMP above).
+# SFINCS actually writes its .rst files into a "sfincs_model/" subdirectory
+# of the run dir, not directly under it
+
+PREV_SFINCS_ANA_RUN_DIR="%SFINCS_CYCLES_DIR%/ana_${PREV_CYCLE}/run/sfincs_model"
 SFINCS_RST_FILE="${PREV_SFINCS_ANA_RUN_DIR}/sfincs.${T_MINUS_3_STAMP}.rst"
 
 # Bootstrap skip: the true first cycle in the suite's history has no
@@ -88,6 +94,7 @@ SFINCS_RST_FILE="${PREV_SFINCS_ANA_RUN_DIR}/sfincs.${T_MINUS_3_STAMP}.rst"
 # whether coastal models have ever run -- making this check self-limiting
 # to exactly the one true bootstrap cycle, same LOAD_STATE_DIR path
 # troute_ana_a.ecf itself already checks.
+
 TROUTE_PREV_STATE_SAVE="%TROUTE_REGIONALIZATION_ROOT%/region_ana_a_${PREV_CYCLE}/%VPU%/state_save/troute"
 if [ ! -f "${TROUTE_PREV_STATE_SAVE}" ]; then
   echo "No prior troute_ana_a state at ${TROUTE_PREV_STATE_SAVE} (bootstrap cycle) -- skipping coastal-model chain for ${CYCLE}"
@@ -97,15 +104,16 @@ else
 fi
 
 # A second %include <tail.h> here (one per skip branch, one at the true
-# end) breaks ecflow's own job-generation preprocessing -- confirmed live:
+# end) breaks ecflow's own job-generation preprocessing:
 # "Mismatched ecfmicro(%) count(1) at: %include <tail.h>" -- ecflow's %
 # micro-substitution scanner doesn't tolerate %include appearing twice in
 # one script. Wrap the real work in a shell conditional instead, so there
 # is only ever ONE %include <tail.h>, at the true end of the file.
+
 if [ "${SKIP_COASTAL}" -eq 0 ]; then
 
 # ---- LAUNCH (placeholder for future Slurm submission) --------------------
-# Today: direct execution (sub-second; unlikely to ever need Slurm).
+# Today: direct execution (this takes about a second; unlikely to ever need Slurm).
 %NWM_COASTAL_PY% %GEN_SCRIPT% \
   --model schism \
   --run-type ana \

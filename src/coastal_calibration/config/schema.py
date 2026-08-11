@@ -205,6 +205,21 @@ class PathConfig:
     # ``simulation.meteo_source == "ngen_forecast"``; only needed when the
     # model is configured with a discharge crosswalk. Ignored otherwise.
     troute_file: Path | None = None
+    # Optional second t-route output, used only when troute_file's own
+    # window doesn't reach back to simulation.start_date (e.g. an SR
+    # forecast warm-started from an AnA cycle, where troute's SR run
+    # starts 1h after T0 by mswm design) -- just the T0 row gets pulled
+    # from here instead. Ignored when troute_file already covers T0.
+    t0_troute_file: Path | None = None
+    # Optional second precip_source.nc (SCHISM only), used only when this
+    # run's own precip_source.nc has no valid T0 sample (e.g. an SR
+    # forecast, where the underlying gridded forcing's T0 sample doesn't
+    # exist by BMI design -- same class of gap as t0_troute_file above,
+    # confirmed live to otherwise leave source.nc's T0 row as a raw netCDF
+    # fill sentinel that destabilizes the model within its first
+    # timestep). Typically points at that hour's own AnA schism_ana run's
+    # precip_source.nc. Ignored when precip_source.nc already covers T0.
+    t0_precip_source_file: Path | None = None
     # Legacy create-workflow fields — not used by the run workflow.
     parm_dir: Path | None = None
     nwm_dir: Path | None = None
@@ -431,6 +446,17 @@ class SchismModelConfig(ModelConfig):
         Path to a ``nwmReaches.csv`` file mapping NWM reach feature IDs
         to SCHISM source/sink elements.  When ``None`` (default), the
         discharge stage is skipped and no river forcing is generated.
+    include_wind : bool
+        When False, skips both wind/pressure regridding stages
+        (``schism_forcing``'s lat-lon regrid and ``schism_sflux``)
+        entirely rather than generating and then discarding them --
+        mirrors SFINCS's ``include_wind``/``include_pressure`` toggles.
+        SCHISM has no ``param.nml``-level equivalent of SFINCS's
+        per-forcing booleans (river/precip forcing is controlled
+        separately, via ``discharge_file`` above -- when both are unset,
+        ``schism_forcing`` is skipped outright rather than just its
+        lat-lon portion, since nothing downstream needs its output
+        either way). Defaults to ``True`` (matches all prior behavior).
     create_water_level_animation : bool
         When True, the ``schism_plot`` stage loads the 2-D elevation
         field from ``outputs/out2d_*.nc`` and renders an MP4 animation
@@ -482,6 +508,7 @@ class SchismModelConfig(ModelConfig):
     schism_exe: Path | None = None
     include_noaa_gages: bool = False
     discharge_file: Path | None = None
+    include_wind: bool = True
     create_water_level_animation: bool = False
     animation_fps: int = 10
     animation_time_stride: int = 1
@@ -659,8 +686,12 @@ class SchismModelConfig(ModelConfig):
                 if not (self.prebuilt_dir / fname).exists()
             )
 
-        if self.discharge_file and not self.discharge_file.exists():
-            errors.append(f"model_config.discharge_file not found: {self.discharge_file}")
+        # No existence check on discharge_file itself: resolved_discharge_file()
+        # already documents (and PreForcingStage/NWMForcingStage/UpdateParamsStage
+        # already rely on) "explicitly set but missing -> treat as disabled,
+        # gracefully resolve to None" as a legitimate, intentional way to turn
+        # off river forcing (e.g. --run-type spinup's sentinel path). Erroring
+        # here would make that mechanism unusable.
 
         if self.geogrid_file is None:
             errors.append(
@@ -668,6 +699,25 @@ class SchismModelConfig(ModelConfig):
             )
         elif not self.geogrid_file.exists():
             errors.append(f"model_config.geogrid_file not found: {self.geogrid_file}")
+
+        # forecast_meteo_file (CoastalCalibConfig.validate() above only
+        # checks "if given, must exist") is actually required here whenever
+        # discharge (which needs the precip regridding schism_forcing also
+        # produces) or wind forcing is enabled -- a boundary-only spin-up
+        # run (both disabled) needs neither, see PreForcingStage.
+        needs_meteo = (
+            self.resolved_discharge_file(config.simulation.meteo_source) is not None
+            or self.include_wind
+        )
+        if (
+            needs_meteo
+            and config.simulation.meteo_source == "ngen_forecast"
+            and config.paths.forecast_meteo_file is None
+        ):
+            errors.append(
+                "paths.forecast_meteo_file is required when simulation.meteo_source is "
+                "'ngen_forecast' and discharge_file or include_wind is set"
+            )
 
         return errors
 
@@ -794,11 +844,18 @@ class SfincsModelConfig(ModelConfig):
 
         Defaults to ``0.0``.
     vdatum_mesh_to_msl_m : float
-        Vertical offset in meters *added* to the simulated water level
-        before comparison with NOAA CO-OPS observations (which are in
-        MSL).  The model output inherits the mesh vertical datum, so
-        this converts it to MSL (e.g. ``0.171`` for a NAVD88 mesh on
-        the Texas Gulf coast).
+        Fallback vertical offset in meters *added* to the simulated
+        water level before comparison with NOAA CO-OPS observations
+        (which are in MSL).  The model output inherits the mesh
+        vertical datum, so this converts it to MSL (e.g. ``0.171`` for
+        a NAVD88 mesh on the Texas Gulf coast).
+
+        ``SfincsPlotStage`` prefers a live, per-station NAVD88 value
+        from CO-OPS's own Datums API when available (more precise than
+        one domain-wide constant) and only falls back to this value for
+        stations without a published NAVD88 datum — see
+        ``SfincsPlotStage._per_station_mesh_to_msl_offsets``. Still set
+        this from VDatum so the fallback is correct too.
 
         Defaults to ``0.0``.
     sfincs_exe : Path, optional
@@ -1633,19 +1690,18 @@ class CoastalCalibConfig:
             errors.append("simulation.duration_hours must be positive")
 
         # ngen forecast forcing is read from a pre-generated file on disk
-        # rather than downloaded, so the path must be set and present.
+        # rather than downloaded. Whether it's actually *required* depends
+        # on which forcing types the model config has enabled (e.g. a
+        # boundary-only spin-up run needs neither) -- that's model-specific,
+        # so each model's own validate() below enforces the "must be set"
+        # half of this; here we only check "if given, it must exist",
+        # exactly like troute_file (optional -- only needed when discharge
+        # is wired).
         if self.simulation.meteo_source == "ngen_forecast":
             fcst = self.paths.forecast_meteo_file
-            if fcst is None:
-                errors.append(
-                    "paths.forecast_meteo_file is required when "
-                    "simulation.meteo_source is 'ngen_forecast'"
-                )
-            elif not fcst.exists():
+            if fcst is not None and not fcst.exists():
                 errors.append(f"Forecast meteo file not found: {fcst}")
 
-            # troute_file is optional (only needed when discharge is wired),
-            # but if given it must exist.
             troute = self.paths.troute_file
             if troute is not None and not troute.exists():
                 errors.append(f"t-route file not found: {troute}")

@@ -48,11 +48,25 @@ def _apply_namelist_overrides(text: str, overrides: dict[str, Any]) -> str:
     """Replace ``key = ...`` lines in a Fortran namelist with new values.
 
     Keys not already present in *text* are appended just before the
-    closing ``/`` of the most recent namelist block — which is good
-    enough for SCHISM's ``param.nml`` (single ``&PARAM`` block plus an
-    optional ``&SCHOUT``). Raises ``KeyError`` if no namelist block is
-    found at all.
+    closing ``/`` of the ``&OPT`` block (SCHISM's general physics/
+    numerics namelist -- home to the vast majority of ad-hoc override
+    keys, e.g. ``nramp``/``nrampbc`` alongside their already-present
+    siblings ``dramp``/``drampbc``). SCHISM's real ``param.nml`` has
+    three blocks (``&CORE``, ``&OPT``, ``&SCHOUT``); inserting into
+    whichever block happens to close last (the old behavior) landed
+    physics keys inside ``&SCHOUT`` -- an output-control namelist that
+    doesn't recognize them -- corrupting it enough to break parsing of
+    unrelated array members like ``iof_hydro`` at SCHISM startup. Falls
+    back to the last block in the file if no ``&OPT`` block is found
+    (e.g. a differently-structured namelist file). Raises ``KeyError``
+    if no namelist block is found at all.
     """
+    # The closing line's whitespace must be horizontal-only ([ \t], not
+    # \s): \s also matches \n, so a greedy \s*$ silently swallows the
+    # blank lines *between* this block's "/" and the next block's "&NAME",
+    # moving the match's end() past where "/" actually is.
+    opt_close_re = re.compile(r"(?mi)^&OPT[ \t]*$.*?(^[ \t]*/[ \t]*$)", flags=re.DOTALL)
+
     out = text
     for key, value in overrides.items():
         rendered = _format_namelist_value(value)
@@ -62,7 +76,8 @@ def _apply_namelist_overrides(text: str, overrides: dict[str, Any]) -> str:
             out,
         )
         if n == 0:
-            insert_at = out.rfind("/")
+            opt_match = opt_close_re.search(out)
+            insert_at = opt_match.start(1) if opt_match else out.rfind("/")
             if insert_at < 0:
                 raise KeyError(f"No namelist closing '/' found in param.nml; cannot insert {key}")
             out = out[:insert_at] + f"  {key} = {rendered}\n" + out[insert_at:]
@@ -269,6 +284,7 @@ def make_discharge(  # noqa: PLR0912
     start_date: datetime | None = None,
     end_date: datetime | None = None,
     troute_file: Path | None = None,
+    t0_troute_file: Path | None = None,
     reaches_filename: str = "nwmReaches.csv",
 ) -> None:
     """Create discharge files from routed-streamflow output.
@@ -283,6 +299,14 @@ def make_discharge(  # noqa: PLR0912
     streamflow is read from local CHRTOUT netCDF files.  For
     ``ngen_forecast`` it is read from the t-route output netCDF
     (*troute_file*, requires *start_date* and *end_date*).
+
+    *t0_troute_file* is optional and only relevant for ``ngen_forecast``:
+    some callers' primary *troute_file* doesn't reach back to *start_date*
+    by design (e.g. an SR forecast warm-started from an AnA cycle, where
+    troute's own SR run starts 1h after T0). When given and *troute_file*'s
+    own data doesn't cover *start_date*, just the T0 row is pulled from
+    this second source instead of leaving that row at zero. Every other
+    caller simply omits it and behavior is unchanged.
     """
     from coastal_calibration.data.streamflow import read_streamflow
 
@@ -328,6 +352,30 @@ def make_discharge(  # noqa: PLR0912
             meteo_source="ngen_forecast",
             troute_file=troute_file,
         )
+        if t0_troute_file is not None and start_date not in df.index:
+            import pandas as pd
+
+            df_t0 = read_streamflow(
+                all_fids,
+                start_date,
+                start_date,
+                meteo_source="ngen_forecast",
+                troute_file=t0_troute_file,
+            )
+            if not df_t0.empty:
+                # df and df_t0 come from two different troute regionalization
+                # runs (region_sr vs region_ana_b) and can each cover a
+                # different reach subset -- concat unions their columns, so
+                # any fid present in one but absent from the other becomes
+                # NaN at that row. Confirmed live: this NaN then overwrote
+                # the zero-initialized vsource/vsink array below at the T0
+                # row for every one of this run's 269 source elements
+                # (region_ana_b's reach set didn't overlap this run's at
+                # all), producing a raw netCDF fill-value-scale discharge
+                # that blew up SCHISM within its first timestep. Zero-fill
+                # to match the "unmatched slots stay at zero" convention
+                # documented below, instead of leaking NaN into the model.
+                df = pd.concat([df_t0, df]).sort_index().fillna(0.0)
     else:
         # Gather local CHRTOUT files for nwm_ana
         chrtout_files: list[Path] = []
@@ -449,6 +497,7 @@ def merge_source_sink(  # noqa: PLR0915
     work_dir: Path,
     element_areas: NDArray[np.floating[Any]],
     prebuilt_dir: Path | None = None,
+    t0_precip_source_file: Path | None = None,
 ) -> None:
     """Merge river discharge into precipitation source and write ``source.nc``.
 
@@ -463,6 +512,24 @@ def merge_source_sink(  # noqa: PLR0915
     prebuilt_dir : Path | None
         If given, the reference ``source.nc`` is symlinked from this
         directory into *work_dir* first.
+    t0_precip_source_file : Path | None
+        Optional path to a second ``precip_source.nc`` (typically that
+        hour's own AnA ``schism_ana`` run) to pull a valid T0 sample
+        from when this run's own ``precip_source.nc`` has none.
+        Some callers' precip regridding doesn't reach back to T0 (e.g.
+        an SR forecast, where the underlying gridded forcing's own T0
+        sample doesn't exist by BMI design -- confirmed live: its
+        ``vsource`` array is masked in full across the whole domain at
+        row 0, `time_vsource[0]` too). ``np.ma`` addition propagates
+        that mask through the source/sink merge below regardless of
+        real discharge, and the masked cells are then serialized to
+        the raw netCDF fill sentinel (~1e37) -- confirmed live as the
+        cause of an SR SCHISM run destabilizing within its first
+        timestep. When given and row 0 is masked, that row is replaced
+        with the T0 sample (its own last row -- both files share the
+        same mesh-element ordering/shape) from this second source
+        instead of writing it out corrupted. Every other caller simply
+        omits it and behavior is unchanged.
     """
     # Optionally stage source.nc from prebuilt model directory
     if prebuilt_dir is not None:
@@ -507,6 +574,16 @@ def merge_source_sink(  # noqa: PLR0915
     # Read precipitation source
     with netCDF4.Dataset(str(work_dir / "precip_source.nc"), "r") as precip:
         so2 = precip.variables["vsource"][:]
+
+    if (
+        t0_precip_source_file is not None
+        and np.ma.is_masked(so2)
+        and np.ma.getmaskarray(so2)[0].any()
+    ):
+        with netCDF4.Dataset(str(t0_precip_source_file), "r") as t0precip:
+            t0_row = np.ma.filled(t0precip.variables["vsource"][-1, :], 0.0)
+        so2[0, :] = t0_row
+        so2.mask[0, :] = False
 
     # Truncate discharge arrays to match precipitation time dimension
     ntime = so2.shape[0]
@@ -916,6 +993,7 @@ def update_params(  # noqa: PLR0912, PLR0915
     single_output_file: bool = False,
     run_param_overrides: dict[str, Any] | None = None,
     discharge_enabled: bool = True,
+    wind_enabled: bool = True,
 ) -> Path:
     """Create ``param.nml`` and symlink static mesh files.
 
@@ -1020,6 +1098,14 @@ def update_params(  # noqa: PLR0912, PLR0915
     # file. Set to 0 in that case so SCHISM runs without river forcing.
     if_source_val = -1 if discharge_enabled else 0
     text = re.sub(r"(?m)^(\s*)if_source\s*=.*$", rf"\g<1>if_source = {if_source_val}", text)
+
+    # nws = 2 reads sflux atmospheric files, produced by the schism_sflux
+    # stage. When wind is disabled (include_wind=False) that stage skips
+    # and no sflux files are ever written -- leaving nws = 2 would make
+    # SCHISM abort at init looking for them. nws = 0 means no atmospheric
+    # forcing is applied at all (confirmed in the template's own comment).
+    if not wind_enabled:
+        text = re.sub(r"(?m)^(\s*)nws\s*=.*$", r"\g<1>nws = 0", text)
 
     # rnday is fractional day
     rnday = rnhours / 24.0

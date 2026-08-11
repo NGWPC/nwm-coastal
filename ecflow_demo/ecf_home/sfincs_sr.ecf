@@ -4,20 +4,22 @@ YMD=%YMD%
 HH=%HOUR%
 CYCLE=${YMD}${HH}
 
-CONFIG_FILE="%SFINCS_CYCLES_DIR%/${CYCLE}/run.yaml"
+CONFIG_FILE="%SFINCS_CYCLES_DIR%/sr_${CYCLE}/run.yaml"
 [ -f "${CONFIG_FILE}" ] || { echo "ERROR: missing config: ${CONFIG_FILE}" >&2; exit 1; }
 
 # Warm-started from this cycle's own sfincs_ana T0 checkpoint --
 # gen_configs_sr.ecf already located it and set rstfile in this run.yaml's
-# model_config.run_param_overrides, so nothing extra to do here.
+# model_config.run_param_overrides.
 #
 # ---- LAUNCH (placeholder for future Slurm submission) --------------------
 # Today: direct execution on this shared node.
 # Future migration, e.g.:
 #   sbatch --wait --job-name="sfincs_${CYCLE}" \
-#     --output="%SFINCS_CYCLES_DIR%/${CYCLE}/slurm.out" \
+#     --output="%SFINCS_CYCLES_DIR%/sr_${CYCLE}/slurm.out" \
 #     --wrap="%NWM_COASTAL_CLI% run ${CONFIG_FILE}"
+
 %NWM_COASTAL_CLI% run "${CONFIG_FILE}"
+
 # ---- END LAUNCH ------------------------------------------------------------
 
 %include <tail.h>

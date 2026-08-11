@@ -237,11 +237,15 @@ class CoastalForcingRegridder:
         input_file: Path,
         vsource_ds: netCDF4.Dataset | None,
         time_index: int = 0,
-    ):
+    ) -> int | None:
         """Regrid RAINRATE to SCHISM mesh elements and write to vsource.
 
         *time_index* selects the timestep to read; canonical LDASIN files
         have a single step (index 0) while forecast files hold several.
+
+        Returns the ``time_vsource`` row index actually written, or
+        ``None`` when nothing was written (non-root rank, or the slab's
+        elapsed offset falls outside the output window).
         """
         with netCDF4.Dataset(input_file) as input_ds:
             # Populate source field
@@ -298,6 +302,7 @@ class CoastalForcingRegridder:
                 raise ValueError(msg)
 
             # Write on root rank
+            written_idx = None
             if self.root and vsource_ds is not None:
                 step_time = self._read_start_time(input_ds, time_index)
                 output_ts = int(step_time - self.schism_first_timestep)  # pyright: ignore[reportOperatorIssue]
@@ -307,6 +312,7 @@ class CoastalForcingRegridder:
                     vsource_ds["time_vsource"][output_idx] = output_ts
                     vsource_ds["vsource"][output_idx, :] = all_elements
                     vsource_ds.sync()
+                    written_idx = output_idx
                 else:
                     logger.warning(
                         "    _regrid_to_schism: slab at %s (elapsed %ds) falls outside "
@@ -318,6 +324,7 @@ class CoastalForcingRegridder:
 
             in_field.destroy()
             out_field.destroy()
+            return written_idx
 
     def _init_latlon_nc(
         self, output_ds: netCDF4.Dataset, nlats: int, nlons: int, input_ds: netCDF4.Dataset
@@ -559,13 +566,45 @@ class CoastalForcingRegridder:
             ntimes = (n_hours + 1) if n_hours is not None else len(slabs)
             self._init_vsource_nc(schism_vsource, ntimes)
 
+        written_indices: set[int] = set()
         try:
             # Process slabs
             for file, time_index in slabs:
                 if not skip_latlon and (file, time_index) in sub_slabs:
                     self._regrid_to_latlon(file, apply_slp=apply_slp, time_index=time_index)
                 if idx == 0:
-                    self._regrid_to_schism(file, schism_vsource, time_index)
+                    written_idx = self._regrid_to_schism(file, schism_vsource, time_index)
+                    if written_idx is not None:
+                        written_indices.add(written_idx)
+
+            # RAINRATE is a period-mean, right-labeled at the END of its
+            # averaging interval (cell_methods="time: mean") -- a forecast
+            # window that starts fresh at start_date has no sample labeled
+            # AT start_date (there's no "prior hour" yet to average over),
+            # so row 0 above is never written by the loop even though it's
+            # in-range. Confirmed live: this left row 0 at its netCDF fill
+            # value (~1e37, masked on read), which downstream merge
+            # arithmetic then wrote straight into SCHISM's discharge input,
+            # blowing up the model within its first timestep. The first
+            # available slab (labeled start_date+1h, valid for
+            # [start_date, start_date+1h)) is the correct rate to hold for
+            # this opening hour -- same convention SFINCS's own precip
+            # stage handles by shifting its time axis back one step. This
+            # only fires when row 0 is genuinely still empty (e.g. AnA's
+            # own anchor is already pre-shifted upstream via LookBack, so
+            # its row 0 is written directly by the loop above and this is
+            # a no-op there).
+            if idx == 0 and self.root and schism_vsource is not None and 0 not in written_indices:
+                next_idx = min((i for i in written_indices if i > 0), default=None)
+                if next_idx is not None:
+                    logger.info(
+                        "    _regrid_to_schism: row 0 has no directly-labeled slab "
+                        "(right-labeled RAINRATE convention) -- backfilling from row %d",
+                        next_idx,
+                    )
+                    schism_vsource["time_vsource"][0] = 0
+                    schism_vsource["vsource"][0, :] = schism_vsource["vsource"][next_idx, :]
+                    schism_vsource.sync()
         finally:
             if schism_vsource is not None:
                 schism_vsource.sync()

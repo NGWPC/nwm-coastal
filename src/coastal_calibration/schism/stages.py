@@ -472,6 +472,7 @@ class SchismDischargeStage(WorkflowStage):
             start_date=sim.start_date,
             end_date=end_date,
             troute_file=self.config.paths.troute_file,
+            t0_troute_file=self.config.paths.t0_troute_file,
             reaches_filename=reaches_name,
         )
 
@@ -489,6 +490,7 @@ class SchismDischargeStage(WorkflowStage):
             work_dir=work_dir,
             element_areas=project.element_areas,
             prebuilt_dir=prebuilt_dir,
+            t0_precip_source_file=self.config.paths.t0_precip_source_file,
         )
 
         # Verify source.nc was produced
@@ -545,7 +547,12 @@ class PreSCHISMStage(WorkflowStage):
 
         # 2. Verify critical files exist
         required_files = ["param.nml", "hgrid.gr3"]
-        if self.model.discharge_file is not None:
+        # resolved_discharge_file(), not the raw discharge_file field --
+        # an explicitly-set-but-missing path (e.g. --run-type spinup's
+        # sentinel) already resolves to None and skips source.nc generation
+        # upstream (schism_discharge/schism_forcing); checking the raw
+        # field here would demand a file nothing was ever asked to produce.
+        if self.model.resolved_discharge_file(self.config.simulation.meteo_source) is not None:
             required_files.append("source.nc")
         missing = [f for f in required_files if not (work_dir / f).exists()]
         if missing:
