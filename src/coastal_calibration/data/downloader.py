@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -343,6 +344,76 @@ _GLOFS_MODEL_DIRS = {
 }
 
 
+#: Zarr store per Retrospective domain whose ``crs`` variable carries the
+#: authoritative GeoTransform for that domain's 1 km LDASIN grid.
+_LDASOUT_ZARR = "s3://noaa-nwm-retrospective-3-0-pds/{domain}/zarr/ldasout.zarr"
+
+
+def write_nwm_grid_sidecar(out_dir: Path, domain: str) -> Path | None:
+    """Record the NWM Retrospective grid for *domain* next to its forcing.
+
+    The PRVI and Alaska Retrospective LDASIN files carry no georeferencing
+    at all: no grid-mapping variable, no coordinate variables, no WRF
+    global attributes.  NOAA's own ``ldasout.zarr`` for the same domain is
+    on the same 1 km grid and does carry a ``crs`` variable, so read its
+    ``GeoTransform`` (metadata only, a few kB) and write it as a small
+    JSON sidecar that
+    :func:`coastal_calibration.data.nwm_forcing.normalize_wrf_forcing`
+    picks up when rebuilding x/y coordinates.
+
+    Writing one sidecar per domain lets several domains share a download
+    directory; the reader selects by grid shape.
+
+    Parameters
+    ----------
+    out_dir : pathlib.Path
+        Directory holding the Retrospective forcing files.
+    domain : str
+        Coastal domain (``conus``, ``hawaii``, ``prvi``, ...).
+
+    Returns
+    -------
+    pathlib.Path or None
+        Path to the sidecar, or *None* if the grid could not be read.
+        Failure is non-fatal: the domains that need it also have a
+        built-in fallback.
+    """
+    import json
+
+    sidecar = out_dir / f"grid_{domain}.json"
+    if sidecar.is_file():
+        return sidecar
+
+    url = _LDASOUT_ZARR.format(domain=_DOMAIN_MAP_RETRO.get(domain, "CONUS"))
+    # Written via a unique temporary file and renamed, matching
+    # ``_execute_download``: a concurrent run or a crash mid-write must never
+    # leave a half-parsed sidecar where the preprocessor will read it.
+    tmp = sidecar.with_suffix(f".{os.getpid()}.tmp")
+    try:
+        import fsspec
+        import xarray as xr
+
+        with xr.open_zarr(fsspec.get_mapper(url, anon=True), consolidated=True) as ds:
+            record = {
+                "domain": domain,
+                "geotransform": str(ds["crs"].attrs["GeoTransform"]).strip(),
+                "shape": [int(ds.sizes["x"]), int(ds.sizes["y"])],
+                "source": url,
+            }
+        out_dir.mkdir(parents=True, exist_ok=True)
+        tmp.write_text(json.dumps(record, indent=2) + "\n")
+        tmp.replace(sidecar)
+    except Exception as exc:
+        # Deliberately broad: s3fs/botocore raise their own hierarchies, and an
+        # offline node must still get its (already cached) forcing.
+        logger.warning("Could not record the NWM %s grid from %s: %s", domain, url, exc)
+        tmp.unlink(missing_ok=True)
+        return None
+
+    logger.info("Recorded the NWM %s forcing grid: %s", domain, sidecar)
+    return sidecar
+
+
 def _build_nwm_retro_forcing_urls(
     start: datetime,
     end: datetime,
@@ -355,7 +426,7 @@ def _build_nwm_retro_forcing_urls(
 
     urls: list[str] = []
     paths: list[Path] = []
-    out_dir = output_dir / PathConfig.METEO_SUBDIR / "nwm_retro"
+    out_dir = output_dir / PathConfig.meteo_subdir("nwm_retro", domain)
 
     for h in _hour_range(start, end):
         dt = start + timedelta(hours=h)
@@ -391,7 +462,7 @@ def _build_nwm_ana_forcing_urls(
 
     urls: list[str] = []
     paths: list[Path] = []
-    out_dir = output_dir / PathConfig.METEO_SUBDIR / "nwm_ana"
+    out_dir = output_dir / PathConfig.meteo_subdir("nwm_ana", domain)
 
     for h in _hour_range(start, end):
         dt = start + timedelta(hours=h)
@@ -422,7 +493,7 @@ def _build_nwm_ana_streamflow_urls(
 
     urls: list[str] = []
     paths: list[Path] = []
-    out_dir = output_dir / PathConfig.HYDRO_SUBDIR / "nwm" / name
+    out_dir = output_dir / PathConfig.streamflow_subdir(domain)
 
     for h in _hour_range(start, end):
         dt = start + timedelta(hours=h)
@@ -470,6 +541,12 @@ def _build_nwm_ana_streamflow_urls(
     return urls, paths
 
 
+# STOFS naming convention changed on 2023-01-08. The older ``estofs``
+# product also stores mesh connectivity in a separate companion file.
+STOFS_NAME_CHANGE_DATE = datetime(2023, 1, 8)
+STOFS_BASE_URL = "https://noaa-gestofs-pds.s3.amazonaws.com"
+
+
 def get_stofs_path(start: datetime, output_dir: Path) -> Path:
     """Get the expected local path for a STOFS file.
 
@@ -485,8 +562,7 @@ def get_stofs_path(start: datetime, output_dir: Path) -> Path:
     Path
         Expected path to the STOFS file.
     """
-    name_change_date = datetime(2023, 1, 8)
-    product = "estofs" if start < name_change_date else "stofs_2d_glo"
+    product = "estofs" if start < STOFS_NAME_CHANGE_DATE else "stofs_2d_glo"
     date_str = start.strftime("%Y%m%d")
     cycle_hour = (start.hour // 6) * 6
     hour_str = f"{cycle_hour:02d}"
@@ -504,19 +580,38 @@ def _build_stofs_urls(
     output_dir: Path,
 ) -> tuple[list[str], list[Path]]:
     """Build URLs for STOFS water level files."""
-    base_url = "https://noaa-gestofs-pds.s3.amazonaws.com"
-    # STOFS naming convention changed on 2023-01-08
-    name_change_date = datetime(2023, 1, 8)
-
-    product = "estofs" if start < name_change_date else "stofs_2d_glo"
+    product = "estofs" if start < STOFS_NAME_CHANGE_DATE else "stofs_2d_glo"
     date_str = start.strftime("%Y%m%d")
     cycle_hour = (start.hour // 6) * 6
     hour_str = f"{cycle_hour:02d}"
 
-    url = f"{base_url}/{product}.{date_str}/{product}.t{hour_str}z.fields.cwl.nc"
+    url = f"{STOFS_BASE_URL}/{product}.{date_str}/{product}.t{hour_str}z.fields.cwl.nc"
     filepath = get_stofs_path(start, output_dir)
 
     return [url], [filepath]
+
+
+def _build_stofs_mesh_urls(
+    start: datetime,
+    output_dir: Path,
+) -> tuple[list[str], list[Path]]:
+    """Build URLs for the companion file holding STOFS mesh connectivity.
+
+    The pre-2023 ``estofs`` product stores only ``time``/``x``/``y``/
+    ``zeta`` in its ``fields.cwl.nc`` file; the ``element`` connectivity
+    needed for BILINEAR regridding lives in the companion ``maxele``
+    file, which describes the same ADCIRC mesh with identical node
+    ordering.  Newer ``stofs_2d_glo`` files carry ``element`` directly,
+    so nothing extra is needed and this returns empty lists.
+    """
+    if start >= STOFS_NAME_CHANGE_DATE:
+        return [], []
+
+    date_str = start.strftime("%Y%m%d")
+    hour_str = f"{(start.hour // 6) * 6:02d}"
+    url = f"{STOFS_BASE_URL}/estofs.{date_str}/estofs.t{hour_str}z.fields.cwl.maxele.nc"
+    main = get_stofs_path(start, output_dir)
+    return [url], [main.with_name(f"{main.stem}.maxele{main.suffix}")]
 
 
 def _build_glofs_urls(
@@ -762,6 +857,9 @@ def download_data(
 
     if meteo_source == "nwm_retro":
         urls, paths = _build_nwm_retro_forcing_urls(start, end, out_dir, domain)
+        # PRVI and Alaska Retrospective forcing ships with no georeferencing,
+        # so record the domain's grid alongside it while we are online.
+        write_nwm_grid_sidecar(out_dir / PathConfig.meteo_subdir("nwm_retro", domain), domain)
     else:
         urls, paths = _build_nwm_ana_forcing_urls(start, end, out_dir, domain)
     meteo_result = _execute_download(urls, paths, f"meteo/{meteo_source}", timeout, raise_on_error)
@@ -809,6 +907,13 @@ def download_data(
         stofs_timeout = max(timeout, 3600)
         coastal_result = _execute_download(
             urls, paths, "coastal/stofs", stofs_timeout, raise_on_error
+        )
+        # Best effort: regrid_estofs synthesizes a triangulation when this
+        # companion mesh file is absent, so a failure is not fatal. The
+        # lists are empty for the newer product, where this is a no-op.
+        mesh_urls, mesh_paths = _build_stofs_mesh_urls(start, out_dir)
+        _execute_download(
+            mesh_urls, mesh_paths, "coastal/stofs-mesh", stofs_timeout, raise_on_error=False
         )
     else:
         urls, paths = _build_glofs_urls(start, end, out_dir, glofs_model)

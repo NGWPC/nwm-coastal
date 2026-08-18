@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -16,13 +18,16 @@ from coastal_calibration.data.downloader import (
     _build_nwm_ana_forcing_urls,
     _build_nwm_ana_streamflow_urls,
     _build_nwm_retro_forcing_urls,
+    _build_stofs_mesh_urls,
     _build_stofs_urls,
     _execute_download,
     _hour_range,
     get_date_range,
     get_default_sources,
     get_overlapping_range,
+    get_stofs_path,
     validate_date_ranges,
+    write_nwm_grid_sidecar,
 )
 
 
@@ -255,12 +260,14 @@ class TestBuildUrls:
         assert "noaa-nwm-retrospective-3-0-pds" in urls[0]
         assert "CONUS" in urls[0]
         assert "LDASIN_DOMAIN1" in urls[0]
+        assert paths[0].parent == tmp_path / "meteo" / "nwm_retro" / "conus"
 
     def test_retro_forcing_urls_hawaii(self, tmp_path):
         start = datetime(2010, 1, 1, 0)
         end = datetime(2010, 1, 1, 1)
-        urls, _paths = _build_nwm_retro_forcing_urls(start, end, tmp_path, "hawaii")
+        urls, paths = _build_nwm_retro_forcing_urls(start, end, tmp_path, "hawaii")
         assert "Hawaii" in urls[0]
+        assert paths[0].parent == tmp_path / "meteo" / "nwm_retro" / "hawaii"
 
     def test_ana_forcing_urls(self, tmp_path):
         start = datetime(2023, 1, 1, 0)
@@ -279,6 +286,7 @@ class TestBuildUrls:
         urls, paths = _build_nwm_ana_forcing_urls(start, end, tmp_path, "hawaii")
         assert "hawaii" in urls[0]
         assert paths[0].name == "2023010100.LDASIN_DOMAIN1"
+        assert paths[0].parent == tmp_path / "meteo" / "nwm_ana" / "hawaii"
 
     def test_ana_streamflow_urls_conus(self, tmp_path):
         start = datetime(2023, 1, 1, 0)
@@ -483,3 +491,116 @@ class TestValidateDateRanges:
             "conus",
         )
         assert len(errors) == 0
+
+
+class TestBuildStofsMeshUrls:
+    """The pre-2023 estofs product needs its connectivity fetched separately."""
+
+    def test_old_product_fetches_maxele_companion(self):
+        urls, paths = _build_stofs_mesh_urls(datetime(2022, 9, 28), Path("/tmp/dl"))
+        assert len(urls) == 1
+        assert urls[0].endswith("estofs.20220928/estofs.t00z.fields.cwl.maxele.nc")
+        # Lands beside the main fields file so regrid_estofs finds it by name.
+        assert paths[0].name == "estofs.t00z.fields.cwl.maxele.nc"
+        assert paths[0].parent == get_stofs_path(datetime(2022, 9, 28), Path("/tmp/dl")).parent
+
+    def test_new_product_needs_nothing_extra(self):
+        # stofs_2d_glo carries ``element`` inline.
+        urls, paths = _build_stofs_mesh_urls(datetime(2024, 1, 9), Path("/tmp/dl"))
+        assert urls == []
+        assert paths == []
+
+    def test_boundary_date_is_new_product(self):
+        assert _build_stofs_mesh_urls(datetime(2023, 1, 8), Path("/tmp/dl")) == ([], [])
+        assert _build_stofs_mesh_urls(datetime(2023, 1, 7), Path("/tmp/dl"))[0]
+
+
+class TestWriteNwmGridSidecar:
+    """PRVI and Alaska Retrospective forcing ships with no georeferencing."""
+
+    def test_existing_sidecar_is_not_refetched(self, tmp_path: Path):
+        sidecar = tmp_path / "grid_prvi.json"
+        sidecar.write_text('{"domain": "prvi"}')
+
+        # A network read here would blow up the offline test run.
+        assert write_nwm_grid_sidecar(tmp_path, "prvi") == sidecar
+        assert sidecar.read_text() == '{"domain": "prvi"}'
+
+    def test_records_grid_from_the_store(self, tmp_path: Path, monkeypatch):
+        """The sidecar carries the domain's grid verbatim from ldasout.zarr."""
+        import xarray as xr
+
+        store = xr.Dataset(
+            data_vars={"crs": ((), 0, {"GeoTransform": " -149999.716023 1000.0 0 5 0 -1000.0 "})},
+            coords={"x": np.arange(300.0), "y": np.arange(110.0)},
+        )
+        monkeypatch.setattr("fsspec.get_mapper", lambda *_a, **_k: {})
+        monkeypatch.setattr(xr, "open_zarr", lambda *_a, **_k: store)
+
+        sidecar = write_nwm_grid_sidecar(tmp_path / "meteo", "prvi")
+
+        assert sidecar == tmp_path / "meteo" / "grid_prvi.json"
+        record = json.loads(sidecar.read_text())
+        assert record["domain"] == "prvi"
+        assert record["geotransform"] == "-149999.716023 1000.0 0 5 0 -1000.0"
+        assert record["shape"] == [300, 110]
+        assert record["source"].endswith("PR/zarr/ldasout.zarr")
+
+    def test_unreadable_store_is_non_fatal(self, tmp_path: Path, monkeypatch):
+        """The domains that need a sidecar also have a built-in fallback."""
+
+        def _boom(*_args: object, **_kwargs: object) -> None:
+            raise OSError("no network")
+
+        monkeypatch.setattr("fsspec.get_mapper", _boom)
+
+        assert write_nwm_grid_sidecar(tmp_path, "prvi") is None
+        # No sidecar and no .tmp debris left for the next run to trip over.
+        assert not list(tmp_path.glob("grid_*"))
+
+    def test_write_failure_leaves_no_partial_sidecar(self, tmp_path: Path, monkeypatch):
+        """The canonical path is only ever created by an atomic rename."""
+        import xarray as xr
+
+        store = xr.Dataset(
+            data_vars={"crs": ((), 0, {"GeoTransform": "0 1 0 0 0 -1"})},
+            coords={"x": np.arange(3.0), "y": np.arange(2.0)},
+        )
+        monkeypatch.setattr("fsspec.get_mapper", lambda *_a, **_k: {})
+        monkeypatch.setattr(xr, "open_zarr", lambda *_a, **_k: store)
+        monkeypatch.setattr(
+            Path, "replace", lambda *_a, **_k: (_ for _ in ()).throw(OSError("disk full"))
+        )
+
+        assert write_nwm_grid_sidecar(tmp_path, "prvi") is None
+        assert not (tmp_path / "grid_prvi.json").exists()
+
+
+class TestForcingCacheIsolation:
+    """Every NWM domain names its hourly forcing identically."""
+
+    @pytest.mark.parametrize(
+        "builder", [_build_nwm_retro_forcing_urls, _build_nwm_ana_forcing_urls]
+    )
+    def test_domains_do_not_share_a_cached_file(self, tmp_path: Path, builder):
+        """Regression: a cached Hawaii file must not be served for a PRVI run.
+
+        ``_execute_download`` treats any existing non-empty file at the target
+        path as a cache hit, so two domains landing on one path silently feed
+        the wrong forcing into a run.
+        """
+        start, end = datetime(2023, 1, 1, 0), datetime(2023, 1, 1, 2)
+        hawaii_urls, hawaii_paths = builder(start, end, tmp_path, "hawaii")
+        prvi_urls, prvi_paths = builder(start, end, tmp_path, "prvi")
+
+        assert hawaii_urls != prvi_urls
+        assert {p.name for p in hawaii_paths} == {p.name for p in prvi_paths}
+        assert not set(hawaii_paths) & set(prvi_paths)
+
+    def test_conus_domains_share_one_copy(self, tmp_path: Path):
+        """Atlgulf and pacific pull byte-identical CONUS forcing."""
+        start, end = datetime(2021, 6, 11, 0), datetime(2021, 6, 11, 1)
+        _, atlgulf = _build_nwm_retro_forcing_urls(start, end, tmp_path, "atlgulf")
+        _, pacific = _build_nwm_retro_forcing_urls(start, end, tmp_path, "pacific")
+
+        assert atlgulf == pacific

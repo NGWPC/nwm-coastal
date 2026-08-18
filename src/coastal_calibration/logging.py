@@ -313,7 +313,7 @@ def silence_third_party_loggers(*, file_level: int = logging.DEBUG) -> None:
 
 
 @contextmanager
-def suppress_hydromt_output() -> Generator[None, None, None]:
+def suppress_hydromt_output() -> Generator[None]:
     """Silence all hydromt / hydromt-sfincs console noise.
 
     Applies two layers:
@@ -592,7 +592,7 @@ class WorkflowMonitor:
         self.logger.debug(message)
 
     @contextmanager
-    def stage_context(self, name: str, message: str = "") -> Generator[StageProgress, None, None]:
+    def stage_context(self, name: str, message: str = "") -> Generator[StageProgress]:
         """Context manager for stage execution with automatic status updates."""
         # Re-silence third-party loggers in case libraries (e.g. hydromt)
         # re-added console handlers during import or initialization.

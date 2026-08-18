@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import esmpy as ESMF
@@ -49,6 +50,7 @@ from .esmf_utils import (
     Regridder,
     build_locstream,
     build_unstructured_mesh,
+    delaunay_elements,
     gather_reduce,
 )
 
@@ -159,6 +161,63 @@ def _regrid_timeseries(
     return output
 
 
+def _resolve_source_elements(
+    f_in: netCDF4.Dataset,
+    nc_in: str,
+    src_lon: NDArray[np.floating[Any]],
+    src_lat: NDArray[np.floating[Any]],
+    dst_bbox: tuple[float, float, float, float],
+    bbox_buffer_deg: float,
+) -> tuple[NDArray[np.integer[Any]], int]:
+    """Return ``(elements, start_index)`` for the ESTOFS source mesh.
+
+    The ``stofs_2d_glo`` product (2023-01-08 onward) stores ``element``
+    in the ``fields.cwl.nc`` file itself.  The older ``estofs`` product
+    ships only ``time``/``x``/``y``/``zeta``, so the connectivity is
+    recovered from the companion ``*.maxele.nc`` file, which carries the
+    same ADCIRC mesh with identical node ordering.  When that file is
+    missing the connectivity is synthesized with a Delaunay
+    triangulation of the regional nodes, which keeps BILINEAR
+    interpolation available at some cost in fidelity near land.
+    """
+    if "element" in f_in.variables:
+        var = f_in["element"]
+        return np.asarray(var[:]), int(getattr(var, "start_index", 1))
+
+    src = Path(nc_in)
+    maxele = src.with_name(f"{src.stem}.maxele{src.suffix}")
+    if maxele.is_file():
+        with netCDF4.Dataset(maxele) as f_mesh:
+            n_mesh_nodes = len(f_mesh.dimensions["node"]) if "node" in f_mesh.dimensions else -1
+            if "element" in f_mesh.variables and n_mesh_nodes == len(src_lon):
+                var = f_mesh["element"]
+                if local_pet == 0:
+                    logger.info("Read element connectivity from %s", maxele.name)
+                return np.asarray(var[:]), int(getattr(var, "start_index", 1))
+            if local_pet == 0:
+                logger.warning(
+                    "%s has no usable element connectivity (nodes %d, expected %d)",
+                    maxele.name,
+                    n_mesh_nodes,
+                    len(src_lon),
+                )
+
+    if local_pet == 0:
+        logger.warning(
+            "%s has no element connectivity and no usable companion "
+            "%s; synthesizing a Delaunay triangulation of the regional nodes",
+            src.name,
+            maxele.name,
+        )
+    elements = delaunay_elements(
+        src_lon,
+        src_lat,
+        bbox=dst_bbox,
+        bbox_buffer_deg=bbox_buffer_deg,
+    )
+    return elements, 0
+
+
 def regrid_estofs(
     nc_in: str,
     nc_grid: str,
@@ -213,8 +272,12 @@ def regrid_estofs(
 
         src_lon = f_in["x"][:]
         src_lat = f_in["y"][:]
-        src_elements = f_in["element"][:]
-        src_start_index = int(getattr(f_in["element"], "start_index", 1))
+        # The same buffer must be used for both calls so that a synthesized
+        # triangulation covers every node the mesh builder keeps.
+        bbox_buffer_deg = 2.0
+        src_elements, src_start_index = _resolve_source_elements(
+            f_in, nc_in, src_lon, src_lat, dst_bbox, bbox_buffer_deg
+        )
 
         # Build the source as an ESMF.Mesh (with element connectivity)
         # so we can do BILINEAR / barycentric interpolation.  The mesh
@@ -225,7 +288,7 @@ def regrid_estofs(
             src_elements,
             start_index=src_start_index,
             bbox=dst_bbox,
-            bbox_buffer_deg=2.0,
+            bbox_buffer_deg=bbox_buffer_deg,
         )
         n_src_kept = len(src_keep_idx)
         if local_pet == 0:

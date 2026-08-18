@@ -128,6 +128,102 @@ def build_grid(
     return grid, GridBounds(y_lo, y_hi, x_lo, x_hi)
 
 
+def bbox_node_indices(
+    lon: NDArray[np.floating[Any]],
+    lat: NDArray[np.floating[Any]],
+    bbox: tuple[float, float, float, float] | None,
+    *,
+    bbox_buffer_deg: float = 1.0,
+) -> NDArray[np.integer[Any]]:
+    """Return indices of nodes inside *bbox* expanded by *bbox_buffer_deg*.
+
+    Parameters
+    ----------
+    lon, lat
+        Node coordinates, 1D arrays of length ``n_nodes``.
+    bbox
+        ``(lon_min, lat_min, lon_max, lat_max)``, or ``None`` to keep all
+        nodes.  ``lon_min > lon_max`` means the box wraps the antimeridian.
+    bbox_buffer_deg
+        Margin added on each side.
+
+    Returns
+    -------
+    numpy.ndarray
+        1D array of retained node indices.
+    """
+    if bbox is None:
+        return np.arange(len(lon), dtype=np.int64)
+
+    lon_min, lat_min, lon_max, lat_max = bbox
+    lat_in = (lat >= lat_min - bbox_buffer_deg) & (lat <= lat_max + bbox_buffer_deg)
+    if lon_min <= lon_max:
+        lon_in = (lon >= lon_min - bbox_buffer_deg) & (lon <= lon_max + bbox_buffer_deg)
+    else:
+        # bbox wraps the antimeridian (e.g. Aleutians): union of the
+        # two longitude segments either side of +/-180.
+        lon_in = (lon >= lon_min - bbox_buffer_deg) | (lon <= lon_max + bbox_buffer_deg)
+    return np.where(lon_in & lat_in)[0]
+
+
+def delaunay_elements(
+    lon: NDArray[np.floating[Any]],
+    lat: NDArray[np.floating[Any]],
+    *,
+    bbox: tuple[float, float, float, float] | None = None,
+    bbox_buffer_deg: float = 1.0,
+    max_edge_factor: float | None = 10.0,
+) -> NDArray[np.integer[Any]]:
+    """Synthesize triangle connectivity for a node cloud via Delaunay.
+
+    Fallback for unstructured sources that ship node coordinates without
+    element connectivity (pre-2023 ESTOFS ``fields.cwl.nc``).  Only the
+    nodes inside *bbox* are triangulated, which keeps this tractable on
+    multi-million-node global meshes.
+
+    Parameters
+    ----------
+    lon, lat
+        Global node coordinates, 1D arrays of length ``n_nodes``.
+    bbox, bbox_buffer_deg
+        Region to triangulate; see :func:`bbox_node_indices`.  Pass the
+        same values used for :func:`build_unstructured_mesh` so the
+        synthesized elements cover every node that mesh will keep.
+    max_edge_factor
+        Drop triangles whose longest edge exceeds this multiple of the
+        median triangle edge.  Delaunay fills concavities (land, islands,
+        the convex hull) with elements that would otherwise interpolate
+        across them.  ``None`` disables the filter.
+
+    Returns
+    -------
+    numpy.ndarray
+        0-based triangles, shape ``(n_elem, 3)``, indexed into the full
+        ``lon``/``lat`` arrays.
+    """
+    from scipy.spatial import Delaunay
+
+    keep_idx = bbox_node_indices(lon, lat, bbox, bbox_buffer_deg=bbox_buffer_deg)
+    sub_lon = np.asarray(lon, dtype=float)[keep_idx]
+    sub_lat = np.asarray(lat, dtype=float)[keep_idx]
+    if len(keep_idx) < 3:
+        raise ValueError(f"Need at least 3 nodes to triangulate; got {len(keep_idx)}")
+
+    # Unwrap longitudes so an antimeridian-spanning cloud triangulates in
+    # a continuous plane instead of splitting into two distant clusters.
+    if float(sub_lon.max() - sub_lon.min()) > 180.0:
+        sub_lon = np.where(sub_lon < 0.0, sub_lon + 360.0, sub_lon)
+
+    simplices = np.asarray(Delaunay(np.column_stack([sub_lon, sub_lat])).simplices)
+
+    if max_edge_factor is not None and len(simplices):
+        corners = np.stack([sub_lon[simplices], sub_lat[simplices]], axis=-1)
+        longest = np.linalg.norm(corners - np.roll(corners, -1, axis=1), axis=-1).max(axis=1)
+        simplices = simplices[longest <= max_edge_factor * float(np.median(longest))]
+
+    return keep_idx[simplices].astype(np.int64)
+
+
 def build_unstructured_mesh(
     lon: NDArray[np.floating[Any]],
     lat: NDArray[np.floating[Any]],
@@ -196,18 +292,7 @@ def build_unstructured_mesh(
         raise ValueError(f"start_index must be 0 or 1, got {start_index}")
 
     # Optional bbox filter to keep the mesh small
-    if bbox is not None:
-        lon_min, lat_min, lon_max, lat_max = bbox
-        lat_in = (lat >= lat_min - bbox_buffer_deg) & (lat <= lat_max + bbox_buffer_deg)
-        if lon_min <= lon_max:
-            lon_in = (lon >= lon_min - bbox_buffer_deg) & (lon <= lon_max + bbox_buffer_deg)
-        else:
-            # bbox wraps the antimeridian (e.g. Aleutians): union of the
-            # two longitude segments either side of +/-180.
-            lon_in = (lon >= lon_min - bbox_buffer_deg) | (lon <= lon_max + bbox_buffer_deg)
-        keep_idx = np.where(lon_in & lat_in)[0]
-    else:
-        keep_idx = np.arange(n_global, dtype=np.int64)
+    keep_idx = bbox_node_indices(lon, lat, bbox, bbox_buffer_deg=bbox_buffer_deg)
 
     # Filter elements: keep only triangles whose vertices are all in keep_idx
     keep_set = np.zeros(n_global, dtype=bool)
@@ -500,7 +585,8 @@ def gatherv_1d(
 
     result = np.zeros(int(all_counts.sum())) if comm.Get_rank() == root else None  # pyright: ignore[reportOptionalMemberAccess]
 
-    comm.Gatherv(sendbuf=local_data, recvbuf=(result, all_counts), root=root)
+    # (buffer, counts) is valid mpi4py Gatherv recvbuf syntax that its stubs miss.
+    comm.Gatherv(sendbuf=local_data, recvbuf=(result, all_counts), root=root)  # pyright: ignore[reportArgumentType]
     return result
 
 

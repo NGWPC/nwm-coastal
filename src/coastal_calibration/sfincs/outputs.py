@@ -7,7 +7,7 @@ canonical layout returned by :func:`load_sfincs_water_level` lets the shared
 renderer in :mod:`coastal_calibration.plotting.spatial` dispatch via the
 ``mesh_type`` attribute and apply wet-cell masking against ``h``.
 
-Two layouts are supported:
+Two layouts are returned:
 
 - ``mesh_type="regular"`` — fields indexed by ``(time, y, x)`` with 1-D
   ``x`` / ``y`` coord vectors. This matches a non-rotated regular SFINCS grid.
@@ -16,10 +16,10 @@ Two layouts are supported:
   ``node_y(node)``, ``face_nodes(face, 4)``). This matches the UGRID-style
   ``sfincs_map.nc`` that SFINCS emits for quadtree grids.
 
-The ``(n, m)`` structured layout used by SFINCS for *structured-output-of-
-quadtree-model* files is not yet handled here — a clear
-:class:`NotImplementedError` is raised pointing at the existing regridder in
-:mod:`coastal_calibration.sfincs._hydromt_compat`.
+Three input layouts map onto those two. The SFINCS executable writes map
+output on a structured ``(n, m)`` grid even for quadtree models; those files
+are re-indexed onto their faces using the topology in the model grid file
+(``sfincs.nc``) and returned as ``mesh_type="ugrid-quadtree"``.
 """
 
 from __future__ import annotations
@@ -38,6 +38,12 @@ __all__ = ["load_sfincs_water_level"]
 
 #: Default map-output filename written by SFINCS.
 _MAP_FILENAME = "sfincs_map.nc"
+
+#: Quadtree model grid file, which supplies the mesh topology missing from
+#: structured ``(n, m)`` map output. Models written by hydromt-sfincs always
+#: name it this; a model whose ``qtrfile`` in ``sfincs.inp`` points elsewhere
+#: fails with a clear "does not exist" error rather than reading a wrong file.
+_GRID_FILENAME = "sfincs.nc"
 
 
 def _resolve_map_file(run_dir: Path) -> Path:
@@ -113,8 +119,8 @@ def _detect_layout(ds: xr.Dataset) -> str:
     """Identify the SFINCS output layout.
 
     Returns one of ``"regular"``, ``"ugrid-quadtree"``, or ``"structured-nm"``.
-    The latter is the raw ``(n, m)`` format that requires the HydroMT compat
-    regridder and is not yet handled here.
+    The latter is the raw ``(n, m)`` format that SFINCS writes for quadtree
+    models; :func:`_build_structured_nm` re-indexes it onto the mesh faces.
     """
     dims = set(ds.dims)
     if "n" in dims and "m" in dims:
@@ -153,6 +159,48 @@ def _normalize_face_nodes_1based(
     return arr
 
 
+def _require_zs_zb(ds: xr.Dataset) -> None:
+    """Raise ``KeyError`` unless both ``zs`` and ``zb`` are present."""
+    if "zs" not in ds.variables:
+        msg = "Required variable 'zs' not found in sfincs_map.nc"
+        raise KeyError(msg)
+    if "zb" not in ds.variables:
+        msg = "Required static variable 'zb' not found in sfincs_map.nc"
+        raise KeyError(msg)
+
+
+def _pack_quadtree(
+    zs: NDArray[np.float64],
+    zb: NDArray[np.float64],
+    msk: NDArray[np.int8] | None,
+    node_x: NDArray[np.float64],
+    node_y: NDArray[np.float64],
+    face_nodes: NDArray[np.int64],
+    times: NDArray[Any],
+) -> xr.Dataset:
+    """Assemble face-valued arrays into the canonical quadtree dataset."""
+    data_vars: dict[str, tuple[tuple[str, ...], NDArray[Any]]] = {
+        "zs": (("time", "face"), zs),
+        "h": (("time", "face"), zs - zb[np.newaxis, :]),
+        "zb": (("face",), zb),
+        "node_x": (("node",), node_x),
+        "node_y": (("node",), node_y),
+        "face_nodes": (("face", "face_node"), face_nodes),
+    }
+    if msk is not None:
+        data_vars["msk"] = (("face",), msk)
+
+    return xr.Dataset(
+        data_vars=data_vars,
+        coords={
+            "time": times,
+            "node": np.arange(node_x.size, dtype=np.int64),
+            "face": np.arange(face_nodes.shape[0], dtype=np.int64),
+        },
+        attrs={"mesh_type": "ugrid-quadtree"},
+    )
+
+
 def _build_quadtree(ds: xr.Dataset) -> xr.Dataset:
     """Build a canonical ``mesh_type="ugrid-quadtree"`` dataset.
 
@@ -160,12 +208,7 @@ def _build_quadtree(ds: xr.Dataset) -> xr.Dataset:
     (when present) the static cell mask ``msk(face)``; derives water depth
     ``h = zs - zb``.
     """
-    if "zs" not in ds.variables:
-        msg = "Required variable 'zs' not found in sfincs_map.nc"
-        raise KeyError(msg)
-    if "zb" not in ds.variables:
-        msg = "Required static variable 'zb' not found in sfincs_map.nc"
-        raise KeyError(msg)
+    _require_zs_zb(ds)
 
     zs_da = ds["zs"]
     face_dim_candidates = [
@@ -177,34 +220,114 @@ def _build_quadtree(ds: xr.Dataset) -> xr.Dataset:
     face_dim = face_dim_candidates[0]
     zs_da = zs_da.transpose("time", face_dim)
 
-    zs = np.asarray(zs_da.to_numpy(), dtype=np.float64)
-    zb = np.asarray(ds["zb"].to_numpy(), dtype=np.float64)
-    h = zs - zb[np.newaxis, :]
+    return _pack_quadtree(
+        zs=np.asarray(zs_da.to_numpy(), dtype=np.float64),
+        zb=np.asarray(ds["zb"].to_numpy(), dtype=np.float64),
+        msk=(np.asarray(ds["msk"].to_numpy(), dtype=np.int8) if "msk" in ds.variables else None),
+        node_x=np.asarray(ds["mesh2d_node_x"].to_numpy(), dtype=np.float64),
+        node_y=np.asarray(ds["mesh2d_node_y"].to_numpy(), dtype=np.float64),
+        face_nodes=_normalize_face_nodes_1based(ds["mesh2d_face_nodes"].to_numpy()),
+        times=np.asarray(zs_da["time"].to_numpy()),
+    )
 
-    node_x = np.asarray(ds["mesh2d_node_x"].to_numpy(), dtype=np.float64)
-    node_y = np.asarray(ds["mesh2d_node_y"].to_numpy(), dtype=np.float64)
-    face_nodes = _normalize_face_nodes_1based(ds["mesh2d_face_nodes"].to_numpy())
-    times = np.asarray(zs_da["time"].to_numpy())
 
-    data_vars: dict[str, tuple[tuple[str, ...], NDArray[Any]]] = {
-        "zs": (("time", "face"), zs),
-        "h": (("time", "face"), h),
-        "zb": (("face",), zb),
-        "node_x": (("node",), node_x),
-        "node_y": (("node",), node_y),
-        "face_nodes": (("face", "face_node"), face_nodes),
-    }
-    if "msk" in ds.variables:
-        data_vars["msk"] = (("face",), np.asarray(ds["msk"].to_numpy(), dtype=np.int8))
+def _build_structured_nm(ds: xr.Dataset, grid_file: Path) -> xr.Dataset:
+    """Re-index a structured ``(n, m)`` quadtree map onto its UGRID faces.
 
-    return xr.Dataset(
-        data_vars=data_vars,
-        coords={
-            "time": times,
-            "node": np.arange(node_x.size, dtype=np.int64),
-            "face": np.arange(face_nodes.shape[0], dtype=np.int64),
-        },
-        attrs={"mesh_type": "ugrid-quadtree"},
+    The SFINCS executable writes map output on a regular ``(n, m)`` grid
+    even for quadtree models, so ``sfincs_map.nc`` carries no mesh
+    topology.  The model grid file holds the missing pieces: per-face ``n``
+    / ``m`` row and column indices (1-based) plus the node coordinates and
+    face-node table.
+
+    Gathering the ``(n, m)`` fields through those indices yields exactly the
+    face ordering of :func:`_build_quadtree`, so the result carries the same
+    ``mesh_type="ugrid-quadtree"`` layout and needs no renderer changes.
+
+    Index bounds and array cardinalities are validated, which catches a
+    corrupt or foreign grid file.  A *different* grid file of the same
+    dimensions cannot be detected, because SFINCS writes no run identifier
+    into either file.
+    """
+    _require_zs_zb(ds)
+
+    if not grid_file.is_file():
+        msg = (
+            f"Structured (n, m) quadtree output needs the model grid file to supply "
+            f"mesh topology, but {grid_file} does not exist."
+        )
+        raise FileNotFoundError(msg)
+
+    zs_da = ds["zs"]
+    required_dims = {"time", "n", "m"}
+    dims_str = {str(d) for d in zs_da.dims}
+    missing = required_dims - dims_str
+    if missing:
+        msg = (
+            f"Expected zs to have dims {required_dims}; got {tuple(zs_da.dims)} (missing {missing})"
+        )
+        raise ValueError(msg)
+    zs_da = zs_da.transpose("time", "n", "m")
+
+    with xr.open_dataset(grid_file) as grid:
+        for name in ("n", "m", "mesh2d_node_x", "mesh2d_node_y", "mesh2d_face_nodes"):
+            if name not in grid.variables:
+                msg = f"Required variable '{name}' not found in {grid_file.name}"
+                raise KeyError(msg)
+        raw_n = np.asarray(grid["n"].to_numpy())
+        raw_m = np.asarray(grid["m"].to_numpy())
+        node_x = np.asarray(grid["mesh2d_node_x"].to_numpy(), dtype=np.float64)
+        node_y = np.asarray(grid["mesh2d_node_y"].to_numpy(), dtype=np.float64)
+        face_nodes = _normalize_face_nodes_1based(grid["mesh2d_face_nodes"].to_numpy())
+
+    n_faces = face_nodes.shape[0]
+    if raw_n.shape != (n_faces,) or raw_m.shape != (n_faces,) or n_faces == 0:
+        msg = (
+            f"{grid_file.name} has {raw_n.shape} row and {raw_m.shape} column indices for "
+            f"{n_faces} faces; all three must be one-dimensional and the same non-zero length."
+        )
+        raise ValueError(msg)
+    if node_x.shape != node_y.shape:
+        msg = (
+            f"{grid_file.name} has {node_x.size} node x-coordinates but {node_y.size} "
+            "y-coordinates."
+        )
+        raise ValueError(msg)
+
+    # Casting a float index array would silently truncate (1.9 -> 1), so
+    # reject anything that is not already integer-valued.
+    if not (np.all(raw_n == np.floor(raw_n)) and np.all(raw_m == np.floor(raw_m))):
+        msg = f"{grid_file.name} has non-integer row or column indices."
+        raise ValueError(msg)
+
+    # SFINCS stores n/m 1-based; convert to 0-based row/column indices.
+    n_idx = raw_n.astype(np.int64) - 1
+    m_idx = raw_m.astype(np.int64) - 1
+
+    # A grid file from a different run would index out of bounds, or worse,
+    # wrap negatively and silently gather the wrong cells.
+    n_max = ds.sizes["n"]
+    m_max = ds.sizes["m"]
+    if n_idx.min() < 0 or n_idx.max() >= n_max or m_idx.min() < 0 or m_idx.max() >= m_max:
+        msg = (
+            f"{grid_file.name} indexes rows {n_idx.min() + 1}-{n_idx.max() + 1} and columns "
+            f"{m_idx.min() + 1}-{m_idx.max() + 1}, outside the {n_max}x{m_max} grid in "
+            f"{_MAP_FILENAME}. The grid file does not match this run."
+        )
+        raise ValueError(msg)
+
+    return _pack_quadtree(
+        zs=np.asarray(zs_da.to_numpy(), dtype=np.float64)[:, n_idx, m_idx],
+        zb=np.asarray(ds["zb"].transpose("n", "m").to_numpy(), dtype=np.float64)[n_idx, m_idx],
+        msk=(
+            np.asarray(ds["msk"].transpose("n", "m").to_numpy(), dtype=np.int8)[n_idx, m_idx]
+            if "msk" in ds.variables
+            else None
+        ),
+        node_x=node_x,
+        node_y=node_y,
+        face_nodes=face_nodes,
+        times=np.asarray(zs_da["time"].to_numpy()),
     )
 
 
@@ -316,13 +439,15 @@ def load_sfincs_water_level(
     NotADirectoryError
         If *run_dir* is neither a directory nor a ``sfincs_map.nc`` file.
     FileNotFoundError
-        If the map output file cannot be located.
+        If the map output file cannot be located, or if a structured
+        ``(n, m)`` map has no ``sfincs.nc`` alongside it to supply the
+        mesh topology.
     KeyError
-        If a required variable (``zs`` or ``zb``) is missing.
-    NotImplementedError
-        If the file uses the structured ``(n, m)`` quadtree layout.
+        If a required variable (``zs`` or ``zb``) is missing, or if
+        ``sfincs.nc`` lacks the ``n`` / ``m`` / mesh geometry variables.
     ValueError
-        If ``zs`` does not have the expected dims for the detected layout.
+        If ``zs`` does not have the expected dims for the detected layout,
+        or if ``sfincs.nc`` indexes cells outside the map grid.
 
     Notes
     -----
@@ -339,13 +464,8 @@ def load_sfincs_water_level(
     with xr.open_dataset(map_file) as ds:
         layout = _detect_layout(ds)
         if layout == "structured-nm":
-            raise NotImplementedError(
-                "Structured (n, m) quadtree SFINCS outputs are not yet supported by "
-                "load_sfincs_water_level. See "
-                "coastal_calibration.sfincs._hydromt_compat.patch_quadtree_output_read "
-                "for the regridding logic to plumb in."
-            )
-        if layout == "ugrid-quadtree":
+            out = _build_structured_nm(ds, map_file.parent / _GRID_FILENAME)
+        elif layout == "ugrid-quadtree":
             out = _build_quadtree(ds)
         elif layout == "regular":
             out = _build_regular(ds)

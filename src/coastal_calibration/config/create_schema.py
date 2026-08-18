@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -92,6 +93,29 @@ class ElevationDataset:
     #: ``"hi"``, ``"prvi"``, ``"pacific"``, ``"ak"``).
     #: Only used when ``source`` is ``"nws_30m"``.
     coastal_domain: str | None = None
+
+    #: Vertical offset in meters *added* to this dataset's elevations before
+    #: it is merged with the others.  Elevation sources do not share a
+    #: vertical datum -- NCEI CRM volumes 9 (Puerto Rico) and 10 (Hawaii) are
+    #: MSL while volumes 1-5 and 7-8 are EGM2008, the CUDEM 1/9 arc-second
+    #: tiles behind ``noaa_3m`` are NAVD88, and GEBCO is nominally MSL.  A
+    #: merge of two sources on different datums leaves a step wherever the
+    #: finer source's footprint ends, silently, since neither the merge nor
+    #: the mask knows the datums differ.  Set this to bring a dataset onto
+    #: the same datum as the others; the merge applies it before the ``zmin``
+    #: filter, so ``zmin`` refers to the shifted elevations.
+    #:
+    #: Example: a CUDEM (NAVD88) primary filled by GEBCO (MSL) on the Texas
+    #: coast, where MSL sits about 0.24 m above NAVD88, needs ``offset:
+    #: -0.24`` on the GEBCO entry to put both on NAVD88.
+    #:
+    #: A single number is a *local* approximation.  Datum separations vary in
+    #: space -- MSL against NAVD88 changes by 0.25 m across the four gauges
+    #: around Matagorda Bay alone -- so a scalar removes the step near where
+    #: it was measured and leaves a residual elsewhere.  Record where the
+    #: value came from, and for a domain wide enough that one number will not
+    #: do, pre-transform the raster instead.
+    offset: float = 0.0
 
 
 @dataclass
@@ -298,9 +322,44 @@ class SfincsCreateConfig:
             self.download_dir = Path(self.download_dir).expanduser().resolve()
 
     @property
+    def aoi_key(self) -> str:
+        """Short identifier for this cache, e.g. ``aoi_3f9c1a2b``.
+
+        Every fetcher clips to the AOI's buffered WGS 84 bounding box, so
+        those bounds determine the raster's extent. Rasters are named after
+        their dataset (``noaa_crm.tif``) and reused whenever the file is
+        already there, so the key also has to cover the other inputs that
+        change a raster's *content* under an unchanged name: which source
+        is fetched, which NOAA dataset, and which NWS domain. Without that,
+        flipping ``noaa_dataset`` from one survey to another would silently
+        reuse the first one.
+        """
+        import hashlib
+
+        import geopandas as gpd
+
+        bounds = gpd.read_file(self.aoi).to_crs(4326).total_bounds
+        parts = [
+            ",".join(f"{v:.6f}" for v in bounds),
+            *(
+                f"{ds.name}|{ds.source}|{ds.noaa_dataset}|{ds.coastal_domain}"
+                for ds in self.elevation.datasets
+            ),
+            f"lulc|{self.subgrid.lulc_dataset}|{self.subgrid.lulc_source}",
+        ]
+        digest = hashlib.sha256("\n".join(parts).encode()).hexdigest()
+        return f"aoi_{digest[:8]}"
+
+    @property
     def effective_download_dir(self) -> Path:
-        """Effective download directory (fallback to output_dir/downloads)."""
-        return self.download_dir or self.output_dir / "downloads"
+        """Per-AOI download directory for fetched rasters.
+
+        Rasters are named after their dataset (``noaa_crm.tif``), so two
+        AOIs sharing one download directory would silently reuse the first
+        one's clipped extent.  The :attr:`aoi_key` subdirectory keeps them
+        apart while still letting reruns of the same AOI hit the cache.
+        """
+        return (self.download_dir or self.output_dir / "downloads") / self.aoi_key
 
     # ------------------------------------------------------------------
     # Stage ordering
@@ -509,6 +568,18 @@ class SfincsCreateConfig:
         if not self.elevation.datasets:
             errors.append("elevation.datasets must contain at least one entry")
         for ds in self.elevation.datasets:
+            # NaN would silently void the dataset (hydromt adds the offset,
+            # turning every cell of that source invalid, and the coarser fill
+            # takes over its whole footprint); inf would poison the bed. A
+            # bool is an int in Python and never a real elevation shift.
+            if isinstance(ds.offset, bool) or not isinstance(ds.offset, (int, float)):
+                errors.append(
+                    f"elevation.datasets[{ds.name}].offset must be a number, got {ds.offset!r}"
+                )
+            elif not math.isfinite(ds.offset):
+                errors.append(
+                    f"elevation.datasets[{ds.name}].offset must be finite, got {ds.offset!r}"
+                )
             if ds.source is not None and ds.source not in self._VALID_ELEV_SOURCES:
                 errors.append(
                     f"elevation.datasets[{ds.name}].source must be one of "
@@ -613,6 +684,7 @@ class SfincsCreateConfig:
                         **({"source": d.source} if d.source else {}),
                         **({"noaa_dataset": d.noaa_dataset} if d.noaa_dataset else {}),
                         **({"coastal_domain": d.coastal_domain} if d.coastal_domain else {}),
+                        **({"offset": d.offset} if d.offset else {}),
                     }
                     for d in self.elevation.datasets
                 ],

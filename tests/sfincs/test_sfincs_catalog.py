@@ -184,10 +184,12 @@ class TestGenerateDataCatalog:
 
     def test_generate_all(self, catalog_config, tmp_path):
         catalog = generate_data_catalog(catalog_config)
-        assert len(catalog.entries) == 3  # meteo, streamflow, coastal
+        # nwm_retro streamflow comes from the S3 Zarr store, not from disk,
+        # so it gets no catalog entry.
+        assert len(catalog.entries) == 2  # meteo, coastal
         names = [e.name for e in catalog.entries]
         assert "nwm_retro_meteo" in names
-        assert "nwm_retro_streamflow" in names
+        assert "nwm_retro_streamflow" not in names
         assert "stofs_waterlevel" in names
 
     def test_generate_meteo_only(self, catalog_config):
@@ -215,6 +217,37 @@ class TestGenerateDataCatalog:
         )
         assert len(catalog.entries) == 1
         assert "glofs" in catalog.entries[0].name
+
+    def test_glofs_uri_is_scoped_by_placeholder(self, catalog_config):
+        """Regression: the URI used to sweep up every cached run of a lake.
+
+        hydromt expands ``{year}``/``{month}`` over the requested window, so
+        one entry covers a run of any length. Emitting one entry per month
+        instead left the extras suffixed ``_1``, ``_2``, ... which no
+        consumer ever asks for.
+        """
+        catalog_config.simulation.duration_hours = 24 * 40  # crosses into July
+        catalog = generate_data_catalog(
+            catalog_config,
+            coastal_source="glofs",
+            glofs_model="leofs",
+            include_meteo=False,
+            include_streamflow=False,
+        )
+
+        assert len(catalog.entries) == 1
+        assert catalog.entries[0].name == "glofs_leofs_waterlevel"
+        assert catalog.entries[0].uri == ("coastal/glofs/leofs.*.{year}{month:02d}*.fields.*.nc")
+
+    def test_multi_month_run_yields_one_meteo_entry(self, catalog_config):
+        """A cross-month window must not split into entries nobody loads."""
+        catalog_config.simulation.duration_hours = 24 * 40
+        catalog = generate_data_catalog(
+            catalog_config, include_streamflow=False, include_coastal=False
+        )
+
+        assert [e.name for e in catalog.entries] == ["nwm_retro_meteo"]
+        assert "{year}{month:02d}" in catalog.entries[0].uri
 
     def test_generate_tpxo_source(self, catalog_config):
         """TPXO forcing is handled directly by SfincsForcingStage, not via the catalog."""
@@ -268,54 +301,68 @@ class TestGenerateDataCatalog:
 
 class TestCreateNcSymlinks:
     def test_creates_meteo_symlinks(self, tmp_path):
-        meteo_dir = tmp_path / "meteo" / "nwm_retro"
+        meteo_dir = tmp_path / "meteo" / "nwm_retro" / "prvi"
         meteo_dir.mkdir(parents=True)
         (meteo_dir / "2021061100.LDASIN_DOMAIN1").write_text("data")
         (meteo_dir / "2021061101.LDASIN_DOMAIN1").write_text("data")
 
-        created, existing = create_nc_symlinks(tmp_path, include_streamflow=False)
+        created, existing = create_nc_symlinks(
+            tmp_path, coastal_domain="prvi", include_streamflow=False
+        )
         assert len(created["meteo"]) == 2
         for link in created["meteo"]:
             assert link.name.endswith(".LDASIN_DOMAIN1.nc")
             assert link.is_symlink()
         assert existing["meteo"] == 0
 
-    def test_creates_streamflow_symlinks_retro(self, tmp_path):
-        stream_dir = tmp_path / "streamflow" / "nwm_retro"
+    def test_creates_streamflow_symlinks_ana_conus(self, tmp_path):
+        stream_dir = tmp_path / "hydro" / "nwm" / "conus"
         stream_dir.mkdir(parents=True)
         (stream_dir / "202106110000.CHRTOUT_DOMAIN1").write_text("data")
 
-        created, _existing = create_nc_symlinks(tmp_path, include_meteo=False)
+        created, _existing = create_nc_symlinks(
+            tmp_path, meteo_source="nwm_ana", coastal_domain="atlgulf", include_meteo=False
+        )
         assert len(created["streamflow"]) == 1
         assert created["streamflow"][0].name.endswith(".CHRTOUT_DOMAIN1.nc")
 
+    def test_retro_has_no_streamflow_on_disk(self, tmp_path):
+        """nwm_retro streamflow is read from the S3 Zarr store."""
+        created, _existing = create_nc_symlinks(
+            tmp_path, meteo_source="nwm_retro", coastal_domain="prvi", include_meteo=False
+        )
+        assert created["streamflow"] == []
+
     def test_creates_streamflow_symlinks_ana(self, tmp_path):
-        stream_dir = tmp_path / "hydro" / "nwm"
+        stream_dir = tmp_path / "hydro" / "nwm" / "prvi"
         stream_dir.mkdir(parents=True)
         (stream_dir / "202306010000.CHRTOUT_DOMAIN1").write_text("data")
 
         created, _existing = create_nc_symlinks(
             tmp_path,
             meteo_source="nwm_ana",
+            coastal_domain="prvi",
             include_meteo=False,
         )
         assert len(created["streamflow"]) == 1
 
     def test_skip_existing_symlinks(self, tmp_path):
-        meteo_dir = tmp_path / "meteo" / "nwm_retro"
+        meteo_dir = tmp_path / "meteo" / "nwm_retro" / "prvi"
         meteo_dir.mkdir(parents=True)
         original = meteo_dir / "2021061100.LDASIN_DOMAIN1"
         original.write_text("data")
         link = meteo_dir / "2021061100.LDASIN_DOMAIN1.nc"
         link.symlink_to(original.name)
 
-        created, existing = create_nc_symlinks(tmp_path, include_streamflow=False)
+        created, existing = create_nc_symlinks(
+            tmp_path, coastal_domain="prvi", include_streamflow=False
+        )
         assert len(created["meteo"]) == 0
         assert existing["meteo"] == 1  # Reports the pre-existing symlink
 
     def test_creates_meteo_symlinks_for_nwm_ana(self, tmp_path):
         """nwm_ana downloads use LDASIN naming — .nc symlinks are needed."""
-        meteo_dir = tmp_path / "meteo" / "nwm_ana"
+        meteo_dir = tmp_path / "meteo" / "nwm_ana" / "prvi"
         meteo_dir.mkdir(parents=True)
         (meteo_dir / "2021042100.LDASIN_DOMAIN1").write_text("data")
         (meteo_dir / "2021042101.LDASIN_DOMAIN1").write_text("data")
@@ -323,6 +370,7 @@ class TestCreateNcSymlinks:
         created, _existing = create_nc_symlinks(
             tmp_path,
             meteo_source="nwm_ana",
+            coastal_domain="prvi",
             include_streamflow=False,
         )
         assert len(created["meteo"]) == 2
@@ -331,7 +379,7 @@ class TestCreateNcSymlinks:
             assert link.is_symlink()
 
     def test_nonexistent_dir(self, tmp_path):
-        created, existing = create_nc_symlinks(tmp_path)
+        created, existing = create_nc_symlinks(tmp_path, coastal_domain="prvi")
         assert created["meteo"] == []
         assert created["streamflow"] == []
         assert existing["meteo"] == 0
@@ -340,42 +388,44 @@ class TestCreateNcSymlinks:
 
 class TestRemoveNcSymlinks:
     def test_removes_meteo_symlinks(self, tmp_path):
-        meteo_dir = tmp_path / "meteo" / "nwm_retro"
+        meteo_dir = tmp_path / "meteo" / "nwm_retro" / "prvi"
         meteo_dir.mkdir(parents=True)
         original = meteo_dir / "2021061100.LDASIN_DOMAIN1"
         original.write_text("data")
         link = meteo_dir / "2021061100.LDASIN_DOMAIN1.nc"
         link.symlink_to(original.name)
 
-        result = remove_nc_symlinks(tmp_path, include_streamflow=False)
+        result = remove_nc_symlinks(tmp_path, coastal_domain="prvi", include_streamflow=False)
         assert result["meteo"] == 1
         assert not link.exists()
         assert original.exists()
 
     def test_removes_streamflow_symlinks(self, tmp_path):
-        stream_dir = tmp_path / "streamflow" / "nwm_retro"
+        stream_dir = tmp_path / "hydro" / "nwm" / "prvi"
         stream_dir.mkdir(parents=True)
         original = stream_dir / "202106110000.CHRTOUT_DOMAIN1"
         original.write_text("data")
         link = stream_dir / "202106110000.CHRTOUT_DOMAIN1.nc"
         link.symlink_to(original.name)
 
-        result = remove_nc_symlinks(tmp_path, include_meteo=False)
+        result = remove_nc_symlinks(
+            tmp_path, meteo_source="nwm_ana", coastal_domain="prvi", include_meteo=False
+        )
         assert result["streamflow"] == 1
 
     def test_nonexistent_dir(self, tmp_path):
-        result = remove_nc_symlinks(tmp_path)
+        result = remove_nc_symlinks(tmp_path, coastal_domain="prvi")
         assert result["meteo"] == 0
         assert result["streamflow"] == 0
 
     def test_does_not_remove_real_files(self, tmp_path):
-        meteo_dir = tmp_path / "meteo" / "nwm_retro"
+        meteo_dir = tmp_path / "meteo" / "nwm_retro" / "prvi"
         meteo_dir.mkdir(parents=True)
         # Create a real file with .nc extension (not a symlink)
         real_file = meteo_dir / "2021061100.LDASIN_DOMAIN1.nc"
         real_file.write_text("real data")
 
-        result = remove_nc_symlinks(tmp_path, include_streamflow=False)
+        result = remove_nc_symlinks(tmp_path, coastal_domain="prvi", include_streamflow=False)
         assert result["meteo"] == 0
         assert real_file.exists()
 

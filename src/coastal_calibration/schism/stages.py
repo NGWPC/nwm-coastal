@@ -448,7 +448,7 @@ class SchismDischargeStage(WorkflowStage):
                 start_date=sim.start_date,
                 duration_hours=int(sim.duration_hours),
                 coastal_domain=sim.coastal_domain,
-                streamflow_dir=paths.streamflow_dir(sim.meteo_source, sim.coastal_domain),
+                streamflow_dir=paths.streamflow_dir(sim.coastal_domain),
             )
 
         # 3. Generate discharge files from NWM CHRT output
