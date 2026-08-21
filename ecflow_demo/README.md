@@ -31,12 +31,14 @@ export RUN_COASTAL_ROOT=/contrib/<you>/ngwpc/run_coastal
 
 `server/ecf_env.sh` requires `NWM_COASTAL_ROOT` (everything else it needs
 -- `ECF_HOME`, the ecflow binary `PATH` -- derives from it or from its own
-optional overrides, see below). `server/load_and_begin.sh` additionally
-requires `NWM_RTE_ROOT`/`RUN_NGEN_ROOT`/`RUN_COASTAL_ROOT`.
-`bin/hotstart_coastal_models.sh` requires `NWM_COASTAL_ROOT`/
-`RUN_COASTAL_ROOT` only (it never touches troute or ngen forcing --
-STOFS boundary data only). Each script fails fast with a clear error if a
-variable it needs is unset.
+optional overrides, see below). `server/load_and_begin.sh` and
+`server/seed_ring.sh` additionally require `NWM_RTE_ROOT`/`RUN_NGEN_ROOT`/
+`RUN_COASTAL_ROOT`. `bin/hotstart_coastal_models.sh` requires all four
+(its coastal spin-up only needs `NWM_COASTAL_ROOT`/`RUN_COASTAL_ROOT`, but
+its t-route bootstrap step needs `NWM_RTE_ROOT`/`RUN_NGEN_ROOT` too, so all
+four are checked up front regardless of which `--coastal-only`/
+`--troute-only` flag you use). Each script fails fast with a clear error
+if a variable it needs is unset.
 
 Optional overrides:
 
@@ -72,3 +74,71 @@ by the generated `.ecf` task scripts (via `%NWM_COASTAL_PY%`/
 `%NWM_COASTAL_CLI%`/`%GEN_SCRIPT%`, all resolved from the same env vars)
 and can also be run standalone -- see `hotstart_coastal_models.sh`'s own
 header comment for its bootstrap/spin-up role.
+
+## Cold start / initialization procedure
+
+### When you need this
+
+The suite self-chains hour-to-hour: every hour's `troute_ana_a`/
+`schism_ana`/`sfincs_ana` triggers off the *same task in the previous
+hour* (a true 24h ring -- h00's predecessor is `../h23`). On a fresh
+`--begin`, there is no natural entry point *for any hour* -- every hour's
+trigger is waiting on a predecessor that has never run. You need this
+procedure the first time you ever begin the suite, or any time after an
+outage long enough that no real prior-hour AnA state exists to self-chain
+from.
+
+### Procedure
+
+1. Set the four env vars above.
+2. Pick `TARGET_CYCLE` (`YYYYMMDDHH`, UTC) -- the first hour the live
+   suite will run for real. Its predecessor hour (`TARGET_CYCLE` - 1h) is
+   where all bootstrap state below lands.
+3. Produce warm-start state for the predecessor hour:
+   ```bash
+   bin/hotstart_coastal_models.sh <TARGET_CYCLE>
+   ```
+   This is the slow step (an 18h SCHISM/SFINCS spin-up by default, plus a
+   short t-route bootstrap run). Use `--dry-run` first to sanity-check env
+   vars/paths without running anything, and shorten `SPINUP_HOURS`/
+   `RAMP_HOURS` (positional args 2/3) for a quick smoke test. Use
+   `--coastal-only`/`--troute-only` to re-run just one half if only that
+   half needs redoing.
+4. Start the ecflow server if it isn't already running:
+   ```bash
+   server/start_server.sh
+   server/load_and_begin.sh
+   ```
+5. Seed the ring:
+   ```bash
+   server/seed_ring.sh <TARGET_CYCLE>
+   ```
+   This verifies the state from step 3 is really on disk, then
+   force-completes exactly the three cross-hour-referenced nodes
+   (`troute_ana_a`, `schism_ana`, `sfincs_ana`) under
+   `/coastal_hourly/cycle/h<PREV_HH>/`. Use `--dry-run` first -- it's
+   entirely read-only and safe to run repeatedly against a live server.
+6. Confirm: `ecflow_client --get_state=/coastal_hourly/cycle/h<TARGET_HH>`
+   should progress past its `time HH:00` gate on its own from here.
+
+### Scope note
+
+The predecessor hour's *other* tasks (`troute_ana_b`, `gen_configs_ana`,
+`run_stofs_download_ana`, `gen_configs_sr`, `run_stofs_download_sr`,
+`schism_sr`, `sfincs_sr`) are intentionally left untouched by
+`seed_ring.sh` -- they aren't referenced by any trigger `TARGET_CYCLE`
+depends on. Depending on wall-clock timing they may sit queued
+indefinitely (harmless) or run for real against real data once the ring
+starts moving (also harmless, just possibly redundant with the manual
+bootstrap). This is expected, not a bug.
+
+### Troubleshooting
+
+`seed_ring.sh` fails loudly and tells you which precondition wasn't met:
+- **server not reachable** -- run `server/start_server.sh` +
+  `server/load_and_begin.sh` first.
+- **target node not found** -- the suite isn't loaded/begun yet, or
+  `TARGET_CYCLE`'s hour doesn't match what you expect.
+- **missing troute/SCHISM/SFINCS state file** -- re-run
+  `bin/hotstart_coastal_models.sh <TARGET_CYCLE>` (or just the missing
+  half, via `--troute-only`/`--coastal-only`).

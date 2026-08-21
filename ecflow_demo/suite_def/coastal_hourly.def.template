@@ -25,6 +25,17 @@ suite coastal_hourly
 
   # ---- Pipeline paths (single source of truth for all tasks) ----
   edit NWM_RTE_DIR           '${NWM_RTE_ROOT}'
+  # nwm-rte's config.bashrc now defaults EWTS_ENABLED to YES, but several
+  # of its sub-modules (FCSTMGR, MSWMGR) write their own log files straight
+  # into RUN_NGEN_ROOT's regionalization dir even at the default INFO
+  # level -- confirmed live, and since that mount is NFS-backed, this is
+  # the same class of problem PMIX_MCA_gds=hash was removed for elsewhere
+  # (nwm-rte/run.sh): lots of small file writes to an NFS mount, real
+  # slowdown during troute runs. Override back to NO here, for this
+  # pipeline only -- see ngen_forcing_ana.ecf/ngen_forcing_sr.ecf/
+  # troute_ana_a.ecf/troute_ana_b.ecf/troute_sr.ecf, the only tasks that
+  # source config.bashrc.
+  edit EWTS_ENABLED          'NO'
   # Single source of truth for which VPU this suite targets -- used for the
   # -v flag on all troute_*.ecf scripts, TEST_VPU, and the troute output
   # path (see troute_sr.ecf/troute_ana_a.ecf/troute_ana_b.ecf/gen_configs_sr.ecf/gen_configs_ana.ecf).
@@ -77,10 +88,17 @@ suite coastal_hourly
     # attribute is incremented when all the child nodes are complete" --
     # once the last hNN family of the day completes, YMD increments and
     # h00..h23 auto-requeue for the new date.
-    # NOTE: bump the start bound to today's date before the first
-    # `--load`+`--begin`; ecflow's checkpoint preserves state across
-    # server restarts after that, so this literal is only read once.
-    repeat date YMD 20260805 20991231 1
+    # ${TODAY_YMD} is substituted by load_and_begin.sh at every load,
+    # computed fresh from the real current UTC date -- NOT a fixed literal.
+    # This matters because a `--load force` (which load_and_begin.sh always
+    # does, so it's safely re-runnable -- see its own comments) replaces the
+    # whole suite, resetting this repeat to whatever start bound is baked
+    # into the def at that moment. A stale hardcoded date here silently
+    # desyncs every .ecf script's own YMD/CYCLE_DT (used for real data
+    # lookups) from the suite's calendar (which correctly tracks real time
+    # regardless) -- every date-dependent task then looks for data from
+    # whatever day was last hardcoded here instead of today.
+    repeat date YMD ${TODAY_YMD} 20991231 1
 
     family h00
       edit HOUR '00'

@@ -93,7 +93,7 @@ def parse_args() -> argparse.Namespace:
         default="ana",
         help=(
             "sr: model start_date = --start-date (T0) directly."
-            "ana (default): model start_date = --start-date - 3h (the AnA 
+            "ana (default): model start_date = --start-date - 3h (the AnA "
             "window's true start.)"
             "For sfincs, ana also sets dtrstout=3600 in run_param_overrides so "
             "SFINCS writes hourly restarts during the run -- "

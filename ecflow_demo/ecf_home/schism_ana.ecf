@@ -4,16 +4,8 @@ YMD=%YMD%
 HH=%HOUR%
 CYCLE=${YMD}${HH}
 CYCLE_DT="${YMD:0:4}-${YMD:4:2}-${YMD:6:2} ${HH}:00:00"
-PREV_CYCLE=$(date -u -d "-1 hour ${CYCLE_DT}" +"%%Y%%m%%d%%H")
-
-# Bootstrap skip: 
-TROUTE_PREV_STATE_SAVE="%TROUTE_REGIONALIZATION_ROOT%/region_ana_a_${PREV_CYCLE}/%VPU%/state_save/troute"
-if [ ! -f "${TROUTE_PREV_STATE_SAVE}" ]; then
-  echo "No prior troute_ana_a state at ${TROUTE_PREV_STATE_SAVE} (bootstrap cycle) -- skipping schism_ana for ${CYCLE}"
-  SKIP_COASTAL=1
-else
-  SKIP_COASTAL=0
-fi
+# Bootstrap skip -- see bootstrap_check.h for full rationale.
+%include <bootstrap_check.h>
 
 # A second %include <tail.h> here (one per skip branch, one at the true
 # end) breaks ecflow's own job-generation preprocessing. Wrap the real

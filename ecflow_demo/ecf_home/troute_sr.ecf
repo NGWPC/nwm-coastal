@@ -68,6 +68,15 @@ export LOAD_STATE_ARGS
 bash -c '
   set -euo pipefail
   cd "%NWM_RTE_DIR%"
+  export EWTS_ENABLED="%EWTS_ENABLED%"
+  # TEMPORARY: pinned to a locally built image with the Aug 5 fix
+  # (commit 2bb8004, "when type is gridded, does not delete the esmf
+  # mesh") -- ngen_rte_ghcr:latest and ngen_rte_build_from_local:latest
+  # were both confirmed missing that fix as of 2026-08-20. Revert to
+  # the config.bashrc default (remove this line) once a corrected
+  # image is promoted back to ngen_rte_ghcr:latest. No apostrophes in
+  # this comment -- it lives inside a single-quoted bash -c block.
+  export TARGET_IMAGE_NAME="ngen_rte_lauren_20260820"
   source config.bashrc
   source run.sh
   TEST_VPU="vpu_%VPU%"
