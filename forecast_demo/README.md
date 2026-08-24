@@ -108,14 +108,25 @@ The t-route regionalization step (`run_regionalization_standalone`, called
 from `troute_sr.ecf`/`troute_ana_a.ecf`/`troute_ana_b.ecf` and
 `bin/hotstart_coastal_models.sh`'s troute bootstrap) normally fetches the
 VPU's hydrofabric geopackage from the Icefabric API
-(`edfs.test.nextgenwaterprediction.com`) at runtime. As of this writing that
-hostname does not resolve from this network (`Name or service not known`) --
-unrelated to WSL/Docker networking, it fails the same way from the host
-directly, so it looks like the API requires VPN access this environment
-doesn't have. If/when that access is sorted out, this step becomes
-unnecessary and can be skipped.
+(`edfs.test.nextgenwaterprediction.com`) at runtime. Whether that hostname
+resolves depends entirely on the network the command runs from, so check it
+on **each** environment you use rather than assuming one implies the other:
 
-Until then, stage the geopackage locally and pass it explicitly:
+```bash
+getent hosts edfs.test.nextgenwaterprediction.com
+```
+
+- **Resolves:** the API call succeeds on its own -- skip this section, no
+  `--hydrofab_file` override needed.
+- **Does not resolve** (`Name or service not known`): apply the workaround
+  below. This has been observed both locally (no VPN access from this
+  machine) and may also apply on a cluster if its compute/login nodes sit
+  behind a firewall without a route to that host -- test independently on
+  each, since cluster network egress rules are commonly different from a
+  local machine's.
+
+Until API access is confirmed working, stage the geopackage locally and pass
+it explicitly:
 
 1. Get the VPU's hydrofabric geopackage. It's already tracked in
    `nwm-region-mgr`, at
@@ -189,11 +200,22 @@ WRAPPER
 chmod +x nwm-coastal-py
 ```
 
-This is a one-time step per checkout. Skip the "make it available to all
-users" system-`PATH` step from `cluster-install.md` -- that part is only
-needed when multiple login/compute nodes share one install; it doesn't
-apply here since `NWM_COASTAL_ROOT` already resolves these two paths
-directly.
+This is a one-time step per checkout, on either a local machine or a
+cluster's shared filesystem.
+
+- **Local, single machine:** stop here. `NWM_COASTAL_ROOT` already resolves
+  both wrapper paths directly, so no further step is needed.
+- **Cluster, multi-node:** additionally do `cluster-install.md`'s "Make it
+  available to all users" step (an `/etc/profile.d/` drop-in adding the
+  install directory to `PATH`). This demo's own scripts don't need it --
+  they always invoke `${NWM_COASTAL_ROOT}/nwm-coastal-py`/`nwm-coastal-cli`
+  by full path -- but Slurm-dispatched compute-node jobs launched *outside*
+  this demo's own scripts (e.g. a user running `nwm-coastal-cli` directly
+  in an `sbatch` script) won't have `NWM_COASTAL_ROOT` set unless that
+  env var is also exported cluster-wide, so the `PATH` drop-in is the more
+  robust way to make the wrappers reachable across nodes. See
+  `cluster-install.md`'s own warning about node-local symlinks not working
+  for compute nodes launched by Slurm.
 
 ## The suite definition is generated, not hand-edited
 
