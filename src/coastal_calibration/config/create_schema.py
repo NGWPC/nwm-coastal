@@ -227,8 +227,20 @@ class RiverDischargeConfig:
     #: this threshold are dropped with a warning.
     max_snap_distance_m: float = 2000.0
 
+    #: Which discharge data source these points will be run against:
+    #: ``"nwm"`` (NWM COMIDs, looked up in CHRTOUT files) or ``"ngen"``
+    #: (NextGen hydrofabric flowpath ids, routed by t-route). Determines
+    #: the output filename (``sfincs_nwm.src`` / ``sfincs_ngen.src``) so
+    #: both can coexist and the run stage's
+    #: ``resolved_discharge_locations_file`` can select the right one
+    #: automatically based on the run's ``meteo_source``.
+    source: str = "nwm"
+
     def __post_init__(self) -> None:
         self.flowlines = Path(self.flowlines).expanduser().resolve()
+        if self.source not in ("nwm", "ngen"):
+            msg = f"river_discharge.source must be 'nwm' or 'ngen', got {self.source!r}"
+            raise ValueError(msg)
 
 
 @dataclass
@@ -720,6 +732,7 @@ class SfincsCreateConfig:
                     "flowlines": str(self.river_discharge.flowlines),
                     "nwm_id_column": self.river_discharge.nwm_id_column,
                     "max_snap_distance_m": self.river_discharge.max_snap_distance_m,
+                    "source": self.river_discharge.source,
                 }
                 if self.river_discharge is not None
                 else None

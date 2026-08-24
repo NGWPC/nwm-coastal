@@ -109,14 +109,14 @@ RAMP_HOURS="${RAMP_HOURS:-$((SPINUP_HOURS / 2))}"
 # ../README.md for what each should point to.
 for _var in NWM_COASTAL_ROOT RUN_COASTAL_ROOT NWM_RTE_ROOT RUN_NGEN_ROOT; do
   if [ -z "${!_var:-}" ]; then
-    echo "ERROR: ${_var} is not set -- see ecflow_demo/README.md" >&2
+    echo "ERROR: ${_var} is not set -- see forecast_demo/README.md" >&2
     exit 1
   fi
 done
 
 NWM_COASTAL_PY="${NWM_COASTAL_ROOT}/nwm-coastal-py"
 NWM_COASTAL_CLI="${NWM_COASTAL_ROOT}/nwm-coastal-cli"
-GEN_SCRIPT="${NWM_COASTAL_ROOT}/ecflow_demo/bin/gen_cycle_config.py"
+GEN_SCRIPT="${NWM_COASTAL_ROOT}/forecast_demo/bin/gen_cycle_config.py"
 SCHISM_BASE_YAML="${RUN_COASTAL_ROOT}/schism_sims/run.yaml"
 SFINCS_BASE_YAML="${RUN_COASTAL_ROOT}/sfincs_sims/run.yaml"
 SCHISM_CYCLES_DIR="${RUN_COASTAL_ROOT}/schism_sims/cycles"
@@ -172,19 +172,13 @@ if [ "${RUN_TROUTE}" -eq 1 ]; then
     set -euo pipefail
     cd "'"${NWM_RTE_DIR}"'"
     export EWTS_ENABLED="'"${EWTS_ENABLED}"'"
-    # TEMPORARY: pin to Laurens locally-built image, which has the Aug 5
-    # fix (commit 2bb8004, "when type is gridded, does not delete the esmf
-    # mesh") -- ngen_rte_ghcr:latest and ngen_rte_build_from_local:latest
-    # were both confirmed missing that fix as of 2026-08-20. Revert to the
-    # config.bashrc default (remove this line) once a corrected image is
-    # promoted back to ngen_rte_ghcr:latest.
-    export TARGET_IMAGE_NAME="ngen_rte_lauren_20260820"
+    export TARGET_IMAGE_NAME="${TARGET_IMAGE_NAME:-ngen_rte_ghcr}"
     source config.bashrc
     source run.sh
     TEST_VPU="vpu_'"${VPU}"'"
     TEST_FORM_ASSIGN_VPU="${INSTALLED_REGIONALIZATION_RESULTS}/${TEST_VPU}/formulation_assignment.csv"
     TEST_CAT_GRP_VPU="${INSTALLED_REGIONALIZATION_RESULTS}/${TEST_VPU}/catchment_groups.csv"
-    docker_run python -um "ngen_rte.run_regionalization_standalone" -n 12 -faf "${TEST_FORM_ASSIGN_VPU}" -cgf "${TEST_CAT_GRP_VPU}" -fconfig "standard_ana" -dt "'"${TROUTE_END_DT}"'" -lb 120 -rname "'"${RNAME_A}"'" -v "'"${VPU}"'" -outfmt NetCDF -ss -ssd "'"${SAVE_STATE_DIR_A_CONTAINER}"'"
+    docker_run python -um "ngen_rte.run_regionalization_standalone" -n 12 -faf "${TEST_FORM_ASSIGN_VPU}" -cgf "${TEST_CAT_GRP_VPU}" -fconfig "standard_ana" -dt "'"${TROUTE_END_DT}"'" -lb 120 -rname "'"${RNAME_A}"'" -v "'"${VPU}"'" --hydrofab_file "/ngwpc/run_ngen/data/hydrofabric/vpu_'"${VPU}"'.gpkg" -outfmt NetCDF -ss -ssd "'"${SAVE_STATE_DIR_A_CONTAINER}"'"
   ' "${NWM_RTE_DIR}/run.sh"
 
   if [ "${DRY_RUN}" -eq 0 ]; then
@@ -306,4 +300,4 @@ fi
 echo "=== hotstart_coastal_models complete for ${TARGET_CYCLE} ==="
 [ "${RUN_TROUTE}" -eq 1 ] && echo "  troute:                  region_ana_a_${PREV_CYCLE} ready"
 [ "${RUN_COASTAL}" -eq 1 ] && echo "  coastal (SCHISM/SFINCS): ana_${PREV_CYCLE} ready"
-echo "Next: ecflow_demo/server/seed_ring.sh ${TARGET_CYCLE}   (once the ecflow server is up and the suite is loaded+begun)"
+echo "Next: forecast_demo/server/seed_ring.sh ${TARGET_CYCLE}   (once the ecflow server is up and the suite is loaded+begun)"

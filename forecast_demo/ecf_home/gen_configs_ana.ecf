@@ -28,7 +28,7 @@ STAMP=${CYCLE}00
 
 TROUTE_STAMP=$(date -u -d "-4 hours ${CYCLE_DT}" +"%%Y%%m%%d%%H")00
 
-FORCING_FILE="%FORCING_OUT_DIR_ANA%/CONUS_${STAMP}.nc"
+FORCING_FILE="%FORCING_OUT_DIR_ANA%/vpu03s_${STAMP}.nc"
 
 # troute's netCDF outputs land in an Output/ subdirectory for AnA runs
 

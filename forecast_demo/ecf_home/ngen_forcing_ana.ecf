@@ -24,7 +24,7 @@ STAMP=${CYCLE}00                        # YYYYMMDDHHMM
 # ForecastInputHorizons are independent knobs (window start vs. sample
 # count)
 
-FORCING_OUT_FILE="%FORCING_OUT_DIR_ANA%/CONUS_${STAMP}.nc"
+FORCING_OUT_FILE="%FORCING_OUT_DIR_ANA%/vpu03s_${STAMP}.nc"
 
 export CYCLE_DT
 
@@ -37,17 +37,10 @@ bash -c '
   set -euo pipefail
   cd "%NWM_RTE_DIR%"
   export EWTS_ENABLED="%EWTS_ENABLED%"
-  # TEMPORARY: pinned to a locally built image with the Aug 5 fix
-  # (commit 2bb8004, "when type is gridded, does not delete the esmf
-  # mesh") -- ngen_rte_ghcr:latest and ngen_rte_build_from_local:latest
-  # were both confirmed missing that fix as of 2026-08-20. Revert to
-  # the config.bashrc default (remove this line) once a corrected
-  # image is promoted back to ngen_rte_ghcr:latest. No apostrophes in
-  # this comment -- it lives inside a single-quoted bash -c block.
-  export TARGET_IMAGE_NAME="ngen_rte_lauren_20260820"
+  export TARGET_IMAGE_NAME="${TARGET_IMAGE_NAME:-ngen_rte_ghcr}"
   source config.bashrc
   source run.sh
-  docker_run python -um "ngen_rte.run_coastal" -dt "${CYCLE_DT}" -rname "coastal_ana" -fconfig standard_ana -gdomain CONUS -lb 240 -fih 240
+  docker_run python -um "ngen_rte.run_coastal" -dt "${CYCLE_DT}" -rname "coastal_ana" -fconfig standard_ana -gdomain vpu03s -lb 240 -fih 240
 ' "%NWM_RTE_DIR%/run.sh"
 # ---- END LAUNCH ------------------------------------------------------------
 

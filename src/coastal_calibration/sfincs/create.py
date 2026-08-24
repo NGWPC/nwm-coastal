@@ -1143,7 +1143,7 @@ class CreateDischargeStage(_CreateStageBase):
         # reads this file, adds the points, and assigns real discharge
         # timeseries from the NWM CHRTOUT data catalog.
         self._update_substep("Writing discharge source locations")
-        src_path = cfg.output_dir / "sfincs_nwm.src"
+        src_path = cfg.output_dir / f"sfincs_{nd.source}.src"
         with src_path.open("w") as f:
             for x, y, name in snapped:
                 f.write(f'{x:.2f} {y:.2f} "{name}"\n')

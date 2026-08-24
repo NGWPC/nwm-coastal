@@ -36,7 +36,7 @@ DRY_RUN=0
 
 for _var in NWM_RTE_ROOT RUN_NGEN_ROOT RUN_COASTAL_ROOT; do
   if [ -z "${!_var:-}" ]; then
-    echo "ERROR: ${_var} is not set -- see ecflow_demo/README.md" >&2
+    echo "ERROR: ${_var} is not set -- see forecast_demo/README.md" >&2
     exit 1
   fi
 done

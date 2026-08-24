@@ -566,12 +566,14 @@ river_discharge:
   flowlines: ./selected_flowpaths.geojson
   nwm_id_column: feature_id
   max_snap_distance_m: 2000
+  source: nwm                        # or "ngen"
 ```
 
 | Parameter             | Type  | Default  | Description                                                                    |
 | --------------------- | ----- | -------- | ------------------------------------------------------------------------------ |
 | `flowlines`           | path  | required | GeoJSON file with flowpath linestrings (e.g. exported from QGIS)               |
 | `nwm_id_column`       | str   | required | Column whose values correspond to NWM `feature_id` in CHRTOUT                  |
+| `source`              | str   | `nwm`    | Discharge data source these points are for: `nwm` or `ngen`. Sets the output filename (`sfincs_nwm.src` / `sfincs_ngen.src`) so the run stage can pick the right one automatically based on `meteo_source` |
 | `max_snap_distance_m` | float | `2000`   | Max distance (m) to snap a point to an active cell; farther points are dropped |
 
 ## Validation

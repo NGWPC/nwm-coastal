@@ -18,13 +18,13 @@
 suite coastal_hourly
 
   # ---- ecFlow bookkeeping ----
-  edit ECF_HOME    '${NWM_COASTAL_ROOT}/ecflow_demo/ecf_home'
-  edit ECF_FILES   '${NWM_COASTAL_ROOT}/ecflow_demo/ecf_home'
-  edit ECF_INCLUDE '${NWM_COASTAL_ROOT}/ecflow_demo/ecf_home'
+  edit ECF_HOME    '/home/laurscham/ngwpc/nwm-coastal/ecflow_demo/ecf_home'
+  edit ECF_FILES   '/home/laurscham/ngwpc/nwm-coastal/ecflow_demo/ecf_home'
+  edit ECF_INCLUDE '/home/laurscham/ngwpc/nwm-coastal/ecflow_demo/ecf_home'
   edit ECF_TRIES   '1'
 
   # ---- Pipeline paths (single source of truth for all tasks) ----
-  edit NWM_RTE_DIR           '${NWM_RTE_ROOT}'
+  edit NWM_RTE_DIR           '/home/laurscham/ngwpc/nwm-rte'
   # nwm-rte's config.bashrc now defaults EWTS_ENABLED to YES, but several
   # of its sub-modules (FCSTMGR, MSWMGR) write their own log files straight
   # into RUN_NGEN_ROOT's regionalization dir even at the default INFO
@@ -46,18 +46,18 @@ suite coastal_hourly
   # without also swapping those base configs would mismatch the coastal
   # domain from the hydrology domain.
   edit VPU                   '03S'
-  edit FORCING_OUT_DIR       '${RUN_NGEN_ROOT}/data/scratch/short_range_coastal'
+  edit FORCING_OUT_DIR       '/home/laurscham/ngwpc/run_ngen/data/scratch/short_range_coastal'
   # ngen_forcing_ana.ecf's output dir -- run_coastal.py's own output path
   # convention already segregates by forcing_configuration
   # (FORCING_ROOT_DIR/scratch/<forcing_configuration>_coastal/), confirmed
   # by reading run_coastal.py directly, so this is a real, distinct path,
   # not a guess.
-  edit FORCING_OUT_DIR_ANA   '${RUN_NGEN_ROOT}/data/scratch/standard_ana_coastal'
+  edit FORCING_OUT_DIR_ANA   '/home/laurscham/ngwpc/run_ngen/data/scratch/standard_ana_coastal'
   # Shared regionalization root (data/raw_input etc. stay shared too, on
   # purpose -- see ngen_troute.ecf). Cycle+VPU isolation comes from -rname
   # being cycle-specific, not from a separate root: this resolves to
   # TROUTE_REGIONALIZATION_ROOT/region_sr_<cycle>/<VPU>/troute_output_*.nc.
-  edit TROUTE_REGIONALIZATION_ROOT '${RUN_NGEN_ROOT}/regionalization'
+  edit TROUTE_REGIONALIZATION_ROOT '/home/laurscham/ngwpc/run_ngen/regionalization'
   # Container-side view of the same directory as TROUTE_REGIONALIZATION_ROOT
   # above (nwm-rte's docker_run mounts MNT__RUN_NGEN__HOST at
   # MNT__RUN_NGEN__CONTAINER=/ngwpc/run_ngen -- confirmed live). Required
@@ -71,24 +71,24 @@ suite coastal_hourly
   # .ecf scripts' own existence checks ([ -f ... ]) run outside docker, on
   # the host, where only that path resolves.
   edit TROUTE_REGIONALIZATION_ROOT_CONTAINER '/ngwpc/run_ngen/regionalization'
-  edit NWM_COASTAL_CLI       '${NWM_COASTAL_ROOT}/nwm-coastal-cli'
-  edit NWM_COASTAL_PY        '${NWM_COASTAL_ROOT}/nwm-coastal-py'
-  edit GEN_SCRIPT            '${NWM_COASTAL_ROOT}/ecflow_demo/bin/gen_cycle_config.py'
-  edit SCHISM_BASE_YAML       '${RUN_COASTAL_ROOT}/schism_sims/run.yaml'
-  edit SFINCS_BASE_YAML       '${RUN_COASTAL_ROOT}/sfincs_sims/run.yaml'
+  edit NWM_COASTAL_CLI       '/home/laurscham/ngwpc/nwm-coastal/nwm-coastal-cli'
+  edit NWM_COASTAL_PY        '/home/laurscham/ngwpc/nwm-coastal/nwm-coastal-py'
+  edit GEN_SCRIPT            '/home/laurscham/ngwpc/nwm-coastal/ecflow_demo/bin/gen_cycle_config.py'
+  edit SCHISM_BASE_YAML       '/home/laurscham/ngwpc/run_coastal/schism_sims/run.yaml'
+  edit SFINCS_BASE_YAML       '/home/laurscham/ngwpc/run_coastal/sfincs_sims/run.yaml'
   # Everything ecflow generates (per-cycle configs + work dirs) lives under
   # run_coastal/, nested next to the base templates and the S3-staged
   # prebuilt models -- nothing generated ever lands inside the nwm-coastal
   # repo checkout itself.
-  edit SCHISM_CYCLES_DIR      '${RUN_COASTAL_ROOT}/schism_sims/cycles'
-  edit SFINCS_CYCLES_DIR      '${RUN_COASTAL_ROOT}/sfincs_sims/cycles'
+  edit SCHISM_CYCLES_DIR      '/home/laurscham/ngwpc/run_coastal/schism_sims/cycles'
+  edit SFINCS_CYCLES_DIR      '/home/laurscham/ngwpc/run_coastal/sfincs_sims/cycles'
 
   family cycle
     # Day-rollover odometer. Per `ecflow_client --help force`: "A repeat
     # attribute is incremented when all the child nodes are complete" --
     # once the last hNN family of the day completes, YMD increments and
     # h00..h23 auto-requeue for the new date.
-    # ${TODAY_YMD} is substituted by load_and_begin.sh at every load,
+    # 20260821 is substituted by load_and_begin.sh at every load,
     # computed fresh from the real current UTC date -- NOT a fixed literal.
     # This matters because a `--load force` (which load_and_begin.sh always
     # does, so it's safely re-runnable -- see its own comments) replaces the
@@ -98,7 +98,7 @@ suite coastal_hourly
     # lookups) from the suite's calendar (which correctly tracks real time
     # regardless) -- every date-dependent task then looks for data from
     # whatever day was last hardcoded here instead of today.
-    repeat date YMD ${TODAY_YMD} 20991231 1
+    repeat date YMD 20260821 20991231 1
 
     family h00
       edit HOUR '00'

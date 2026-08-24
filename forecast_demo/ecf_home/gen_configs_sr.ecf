@@ -6,7 +6,7 @@ CYCLE=${YMD}${HH}
 CYCLE_DT="${YMD:0:4}-${YMD:4:2}-${YMD:6:2} ${HH}:00:00"
 STAMP=${CYCLE}00
 
-FORCING_FILE="%FORCING_OUT_DIR%/CONUS_${STAMP}.nc"
+FORCING_FILE="%FORCING_OUT_DIR%/vpu03s_${STAMP}.nc"
 
 # netCDF outputs land in an Output/ subdirectory -- same convention as the
 # AnA tasks
