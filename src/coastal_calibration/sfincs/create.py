@@ -758,8 +758,11 @@ class CreateMaskStage(_CreateStageBase):
         self._update_substep("Creating active mask")
         self._log(f"zmin={cfg.mask.zmin}")
 
+        # Adding config options hydromt accepts for active cells
         self.sfincs.quadtree_mask.create_active(
             zmin=cfg.mask.zmin,
+            include_polygon=cfg.mask.include_polygon,
+            exclude_polygon=cfg.mask.exclude_polygon,
         )
 
         if cfg.mask.keep_largest_only:
@@ -792,6 +795,18 @@ class CreateBoundaryStage(_CreateStageBase):
             zmax=cfg.mask.boundary_zmax,
             reset_bounds=cfg.mask.reset_bounds,
         )
+
+        # Adding config options hydromt accepts for boundary points
+        self.sfincs.water_level.create_boundary_points_from_mask(
+            min_dist=cfg.mask.min_dist,
+            bnd_dist=cfg.mask.bnd_dist,
+        )
+        gdf_bnd = self.sfincs.water_level.gdf
+        if len(gdf_bnd):
+            bnd_path = cfg.output_dir / "sfincs.bnd"
+            lines = [f"    {row.geometry.x:.1f}   {row.geometry.y:.1f}" for _, row in gdf_bnd.iterrows()]
+            bnd_path.write_text("\n".join(lines) + "\n")
+            self._log(f"Wrote {len(gdf_bnd)} boundary point(s) to {bnd_path.name} (bnd_dist={cfg.mask.bnd_dist})")
 
         self._log("Boundary cells created successfully")
         return {"status": "completed"}
