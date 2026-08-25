@@ -3,8 +3,7 @@
 Tools and infrastructure for running the hourly coastal forecast cycle
 (nwm-rte forcing + t-route regionalization + SCHISM/SFINCS coastal runs).
 This README is the complete, ordered runbook for everything a new user needs
-to do to get from a fresh checkout to a running forecast -- not just example
-documentation.
+to do to get from a fresh checkout to a running forecast.
 
 ## Two ways to run this
 
