@@ -2694,6 +2694,36 @@ run/simulation config above.</p>
 <td>true</td>
 <td>Reset existing boundary conditions</td>
 </tr>
+<tr>
+<td><code>keep_largest_only</code></td>
+<td>bool</td>
+<td>false</td>
+<td>Drop active cells outside the largest connected region</td>
+</tr>
+<tr>
+<td><code>include_polygon</code></td>
+<td>path</td>
+<td>null</td>
+<td>Polygon to include in the active model domain</td>
+</tr>
+<tr>
+<td><code>exclude_polygon</code></td>
+<td>path</td>
+<td>null</td>
+<td>Polygon to exclude from the active model domain</td>
+</tr>
+<tr>
+<td><code>bnd_dist</code></td>
+<td>float</td>
+<td>5000.0</td>
+<td>Spacing (m) between waterlevel boundary points</td>
+</tr>
+<tr>
+<td><code>min_dist</code></td>
+<td>float</td>
+<td>null</td>
+<td>Minimum distance (m) between quadtree boundary points</td>
+</tr>
 </tbody>
 </table>
 <h4 id="subgrid-settings-subgrid">Subgrid Settings (<code>subgrid</code>)<a class="headerlink" href="#subgrid-settings-subgrid" title="Permanent link">#</a></h4>
@@ -2765,6 +2795,7 @@ hydrofabric flowpaths with the AOI boundary.</p>
 </span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="w">  </span><span class="nt">flowlines</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./selected_flowpaths.geojson</span>
 </span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="w">  </span><span class="nt">nwm_id_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">feature_id</span>
 </span><span id="__span-21-4"><a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="w">  </span><span class="nt">max_snap_distance_m</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2000</span>
+</span><span id="__span-21-5"><a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a><span class="w">  </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nwm</span><span class="w">                        </span><span class="c1"># or &quot;ngen&quot;</span>
 </span></code></pre></div>
 <table>
 <thead>
@@ -2787,6 +2818,12 @@ hydrofabric flowpaths with the AOI boundary.</p>
 <td>str</td>
 <td>required</td>
 <td>Column whose values correspond to NWM <code>feature_id</code> in CHRTOUT</td>
+</tr>
+<tr>
+<td><code>source</code></td>
+<td>str</td>
+<td><code>nwm</code></td>
+<td>Discharge data source these points are for: <code>nwm</code> or <code>ngen</code>. Sets the output filename (<code>sfincs_nwm.src</code> / <code>sfincs_ngen.src</code>) so the run stage can pick the right one automatically based on <code>meteo_source</code></td>
 </tr>
 <tr>
 <td><code>max_snap_distance_m</code></td>
