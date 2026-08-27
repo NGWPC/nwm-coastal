@@ -26,7 +26,10 @@ class PreForcingStage(WorkflowStage):
 
     def run(self) -> dict[str, Any]:
         """Stage LDASIN forcing files and create output directories."""
-        from coastal_calibration.schism.prep import stage_ldasin_files
+        from coastal_calibration.schism.prep import (
+            stage_forecast_forcing,
+            stage_ldasin_files,
+        )
 
         self._update_substep("Building environment")
         self.build_environment()
@@ -35,18 +38,41 @@ class PreForcingStage(WorkflowStage):
         work_dir = self.config.paths.work_dir
         work_dir.mkdir(parents=True, exist_ok=True)
 
-        self._update_substep("Staging LDASIN files")
-        self._log("Creating forcing symlinks and output directories")
-
         sim = self.config.simulation
-        nwm_forcing_dir = self.config.paths.meteo_dir(sim.meteo_source, sim.coastal_domain)
 
-        _forcing_input_dir, coastal_forcing_output = stage_ldasin_files(
-            work_dir=work_dir,
-            start_date=sim.start_date,
-            duration_hours=sim.duration_hours,
-            nwm_forcing_dir=nwm_forcing_dir,
-        )
+        if sim.meteo_source == "ngen_forecast":
+            forecast_file = self.config.paths.forecast_meteo_file
+            if forecast_file is None:
+                # Nothing to stage. Safe regardless of what's actually
+                # needed downstream: schism_forcing/schism_sflux already
+                # skip on their own when discharge/include_wind are both
+                # off (the only case gen_cycle_config.py currently omits
+                # this path for -- see --run-type spinup), and if some
+                # other caller genuinely needs forcing data but forgot to
+                # set this path, whichever stage actually reads it will
+                # fail there with a clear error instead.
+                self._log(
+                    "paths.forecast_meteo_file is unset; nothing to stage "
+                    "(expected when discharge and wind forcing are both disabled)"
+                )
+                return {"forcing_output_dir": None, "status": "skipped"}
+            self._update_substep("Staging forecast forcing")
+            self._log("Staging pre-generated ngen forecast forcing")
+            _forcing_input_dir, coastal_forcing_output = stage_forecast_forcing(
+                work_dir=work_dir,
+                start_date=sim.start_date,
+                forecast_file=forecast_file,
+            )
+        else:
+            self._update_substep("Staging LDASIN files")
+            self._log("Creating forcing symlinks and output directories")
+            nwm_forcing_dir = self.config.paths.meteo_dir(sim.meteo_source, sim.coastal_domain)
+            _forcing_input_dir, coastal_forcing_output = stage_ldasin_files(
+                work_dir=work_dir,
+                start_date=sim.start_date,
+                duration_hours=sim.duration_hours,
+                nwm_forcing_dir=nwm_forcing_dir,
+            )
 
         self._log(f"Pre-forcing complete. Output dir: {coastal_forcing_output}")
         return {
@@ -132,11 +158,25 @@ class NWMForcingStage(WorkflowStage):
         """Execute NWM forcing generation with MPI."""
         import subprocess
 
+        # This stage's entire cost is regridding precipitation onto the
+        # SCHISM mesh (precip_source.nc) -- CLI main() always passes
+        # skip_latlon=True, so wind/pressure regridding never happens here
+        # regardless (see schism_sflux/PostForcingStage for that, gated
+        # separately on include_wind below). precip_source.nc is only ever
+        # consumed by merge_source_sink() in the schism_discharge stage, so
+        # there's nothing to skip *for* when discharge itself is disabled.
+        sim = self.config.simulation
+        if self.model.resolved_discharge_file(sim.meteo_source) is None:
+            self._log(
+                "No discharge crosswalk configured; skipping precip regridding "
+                "(schism_forcing) entirely -- nothing downstream would read it"
+            )
+            return {"status": "skipped"}
+
         self._update_substep("Building environment")
         env = self._build_run_env()
 
         self._update_substep("Setting up forcing parameters")
-        sim = self.config.simulation
         start_pdy = sim.start_pdy
         start_cyc = sim.start_cyc
         length_hrs = int(sim.duration_hours)
@@ -199,6 +239,10 @@ class PostForcingStage(WorkflowStage):
     def run(self) -> dict[str, Any]:
         """Generate sflux files from LDASIN forcing data."""
         from coastal_calibration.schism.prep import make_sflux
+
+        if not self.model.include_wind:
+            self._log("include_wind is False; skipping sflux generation entirely")
+            return {"status": "skipped"}
 
         self._update_substep("Building environment")
         self.build_environment()

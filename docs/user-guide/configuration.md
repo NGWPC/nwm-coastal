@@ -534,11 +534,16 @@ Each dataset entry:
 
 #### Mask Settings (`mask`)
 
-| Parameter       | Type  | Default | Description                          |
-| --------------- | ----- | ------- | ------------------------------------ |
-| `zmin`          | float | -5.0    | Minimum elevation for active cells   |
-| `boundary_zmax` | float | -5.0    | Maximum elevation for boundary cells |
-| `reset_bounds`  | bool  | true    | Reset existing boundary conditions   |
+| Parameter          | Type  | Default | Description                                          |
+| ------------------ | ----- | ------- | ----------------------------------------------------- |
+| `zmin`             | float | -5.0    | Minimum elevation for active cells                    |
+| `boundary_zmax`    | float | -5.0    | Maximum elevation for boundary cells                   |
+| `reset_bounds`     | bool  | true    | Reset existing boundary conditions                     |
+| `keep_largest_only`| bool  | false   | Drop active cells outside the largest connected region |
+| `include_polygon`  | path  | null    | Polygon to include in the active model domain          |
+| `exclude_polygon`  | path  | null    | Polygon to exclude from the active model domain        |
+| `bnd_dist`         | float | 5000.0  | Spacing (m) between waterlevel boundary points         |
+| `min_dist`         | float | null    | Minimum distance (m) between quadtree boundary points  |
 
 #### Subgrid Settings (`subgrid`)
 
@@ -566,12 +571,14 @@ river_discharge:
   flowlines: ./selected_flowpaths.geojson
   nwm_id_column: feature_id
   max_snap_distance_m: 2000
+  source: nwm                        # or "ngen"
 ```
 
 | Parameter             | Type  | Default  | Description                                                                    |
 | --------------------- | ----- | -------- | ------------------------------------------------------------------------------ |
 | `flowlines`           | path  | required | GeoJSON file with flowpath linestrings (e.g. exported from QGIS)               |
 | `nwm_id_column`       | str   | required | Column whose values correspond to NWM `feature_id` in CHRTOUT                  |
+| `source`              | str   | `nwm`    | Discharge data source these points are for: `nwm` or `ngen`. Sets the output filename (`sfincs_nwm.src` / `sfincs_ngen.src`) so the run stage can pick the right one automatically based on `meteo_source` |
 | `max_snap_distance_m` | float | `2000`   | Max distance (m) to snap a point to an active cell; farther points are dropped |
 
 ## Validation

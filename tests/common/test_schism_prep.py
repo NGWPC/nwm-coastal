@@ -22,6 +22,7 @@ from coastal_calibration.schism.prep import (
     partition_mesh,
     run_combine_sink_source,
     stage_chrtout_files,
+    stage_forecast_forcing,
     stage_ldasin_files,
     update_params,
     validate_param_nml,
@@ -139,8 +140,9 @@ class TestStageChrtoutFiles:
 class TestWriteThFile:
     def test_writes_correct_format(self, tmp_path):
         data = np.array([[1.0, 2.0], [3.0, 4.0]])
+        times = np.array([0.0, 3600.0])
         path = tmp_path / "test.th"
-        _write_th_file(path, data, tstep=3600.0)
+        _write_th_file(path, data, times)
         lines = path.read_text().splitlines()
         assert len(lines) == 2
         # First line: time=0, then values
@@ -151,6 +153,16 @@ class TestWriteThFile:
         # Second line: time=3600
         parts = lines[1].split("\t")
         assert parts[0] == "3600.0"
+
+    def test_writes_times_as_given(self, tmp_path):
+        """The caller (make_discharge) owns t=0 padding; this just writes
+        whatever elapsed-time array it's handed, verbatim."""
+        data = np.array([[1.0], [2.0], [3.0]])
+        times = np.array([0.0, 3600.0, 7200.0])
+        path = tmp_path / "test.th"
+        _write_th_file(path, data, times)
+        lines = path.read_text().splitlines()
+        assert [line.split("\t")[0] for line in lines] == ["0.0", "3600.0", "7200.0"]
 
 
 # ---------------------------------------------------------------------------
@@ -379,6 +391,39 @@ class TestStageLdasinFiles:
         assert len(list(subdir.iterdir())) == 0
 
 
+class TestStageForecastForcing:
+    def test_symlinks_single_multitimestep_file(self, tmp_path):
+        """A single forecast file is symlinked with a LDASIN_DOMAIN1 name."""
+        forecast_file = tmp_path / "Hawaii_202509150000.nc"
+        forecast_file.write_text("dummy")
+        dt = datetime(2025, 9, 15, tzinfo=UTC)
+
+        forcing_input, coastal_output = stage_forecast_forcing(
+            work_dir=tmp_path,
+            start_date=dt,
+            forecast_file=forecast_file,
+        )
+
+        assert coastal_output.exists()
+        subdir = forcing_input / "2025091500"
+        assert subdir.exists()
+        links = list(subdir.iterdir())
+        # Exactly one symlink, discoverable by the *LDASIN_DOMAIN1 globs.
+        assert len(links) == 1
+        link = links[0]
+        assert link.name == "Hawaii_202509150000.LDASIN_DOMAIN1"
+        assert link.is_symlink()
+        assert link.resolve() == forecast_file.resolve()
+
+    def test_raises_when_forecast_file_missing(self, tmp_path):
+        with pytest.raises(FileNotFoundError, match="Forecast meteo file not found"):
+            stage_forecast_forcing(
+                work_dir=tmp_path,
+                start_date=datetime(2025, 9, 15, tzinfo=UTC),
+                forecast_file=tmp_path / "does_not_exist.nc",
+            )
+
+
 # ---------------------------------------------------------------------------
 # update_params
 # ---------------------------------------------------------------------------
@@ -577,7 +622,7 @@ class TestUpdateParams:
         text = (work_dir / "param.nml").read_text()
         assert "nspool = 18" in text
         assert "ihfskip = 18" in text
-        assert "nhot_write = 324" in text  # template default preserved
+        assert "nhot_write = 18" in text  # hourly hotstart, independent of run length
 
     def test_single_output_file_extends_ihfskip(self, tmp_path):
         work_dir = tmp_path / "run"

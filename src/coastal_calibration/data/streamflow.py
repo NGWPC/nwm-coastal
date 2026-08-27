@@ -1,12 +1,19 @@
-"""Shared NWM streamflow reader for SFINCS and SCHISM workflows.
+"""Shared streamflow reader for SFINCS and SCHISM workflows.
 
 Provides a single ``read_streamflow`` function that extracts discharge
-timeseries from NWM CHRTOUT data for a set of ``feature_id`` values.
+timeseries for a set of ``feature_id`` values from one of three sources:
 
-For **nwm_retro** data the function reads directly from the consolidated
-Zarr store on S3 — no file download required.  For **nwm_ana** (operational)
-data it reads from local CHRTOUT netCDF files using fast direct
-``netCDF4.Dataset`` access.
+* **nwm_retro** — the consolidated NWM Retrospective Zarr store on S3
+  (no local files required).
+* **nwm_ana** — local NWM CHRTOUT netCDF files, via fast direct
+  ``netCDF4.Dataset`` access.
+* **ngen_forecast** — a t-route output netCDF (``troute_output_*.nc``)
+  produced by the ngen forecast, keyed by NextGen hydrofabric
+  ``feature_id``.
+
+All three return the same ``DataFrame`` shape (``DatetimeIndex`` ×
+``feature_id`` columns, m³/s) so downstream discharge stages are agnostic
+to the source.
 """
 
 from __future__ import annotations
@@ -178,14 +185,75 @@ def _read_from_chrtout(
     return df
 
 
+def _read_from_troute(
+    troute_file: Path,
+    feature_ids: list[int],
+    start: datetime,
+    end: datetime,
+) -> pd.DataFrame:
+    """Read discharge from a t-route output netCDF (``troute_output_*.nc``).
+
+    The file is written by the ngen forecast's routing step with layout:
+
+    * ``feature_id(feature_id)`` — int64 NextGen hydrofabric reach IDs,
+    * ``time(time)`` — ``seconds since <file_reference_time>``,
+    * ``flow(feature_id, time)`` — discharge in m³/s.
+
+    Note the ``(feature_id, time)`` axis order is **transposed** relative
+    to NWM CHRTOUT (``(time, feature_id)``); it is transposed here so the
+    returned frame is time-indexed like the other readers.  Selection is
+    by exact ``feature_id`` match — the coastal discharge crosswalk is
+    expected to use the same NextGen hydrofabric IDs (no translation).
+    """
+    import netCDF4
+
+    with netCDF4.Dataset(str(troute_file), "r") as ds:
+        all_fids = np.asarray(ds.variables["feature_id"][:])
+        tvar = ds.variables["time"]
+        # ``np.atleast_1d`` guards the single-timestep case so the result is
+        # always an iterable array of cftime/datetime values.
+        raw_times = np.atleast_1d(
+            netCDF4.num2date(
+                tvar[:], units=tvar.units, calendar=getattr(tvar, "calendar", "standard")
+            )
+        )
+        # flow is (feature_id, time); read fully then subset by row.
+        flow = np.ma.filled(ds.variables["flow"][:], 0.0).astype(np.float64)
+
+    times = pd.DatetimeIndex([pd.Timestamp(str(t)) for t in raw_times], name="time")
+
+    # Dedupe requested ids and map to their row in the file (skip missing).
+    fid_to_row = {int(f): i for i, f in enumerate(all_fids)}
+    keep = [f for f in sorted(set(feature_ids)) if f in fid_to_row]
+    if not keep:
+        logger.warning("None of the requested feature_ids found in t-route output")
+        return pd.DataFrame()
+
+    rows = [fid_to_row[f] for f in keep]
+    data = flow[rows, :].T  # (time, keep) — transpose to time-major
+
+    df = pd.DataFrame(data, index=times, columns=keep)
+    # Inclusive window filter (t-route time axis is monotonic hourly).
+    df = df.loc[(df.index >= start) & (df.index <= end)]
+    df = df.fillna(0.0)
+
+    if df.index.duplicated().any():
+        df = df[~df.index.duplicated(keep="first")]
+    if not df.index.is_monotonic_increasing:
+        df = df.sort_index()
+
+    return df
+
+
 def read_streamflow(
     feature_ids: Sequence[int],
     start: datetime,
     end: datetime,
     *,
-    meteo_source: Literal["nwm_retro", "nwm_ana"] = "nwm_retro",
+    meteo_source: Literal["nwm_retro", "nwm_ana", "ngen_forecast"] = "nwm_retro",
     domain: str = "conus",
     chrtout_files: Sequence[Path] | None = None,
+    troute_file: Path | None = None,
 ) -> pd.DataFrame:
     """Read NWM streamflow for *feature_ids* over *[start, end]*.
 
@@ -204,12 +272,16 @@ def read_streamflow(
     meteo_source
         ``"nwm_retro"`` reads from the S3 Zarr store (no local files
         needed).  ``"nwm_ana"`` requires *chrtout_files*.
+        ``"ngen_forecast"`` requires *troute_file*.
     domain
         Coastal domain key (``"conus"``, ``"atlgulf"``, ``"pacific"``,
         ``"hawaii"``, ``"prvi"``).  Only used for the Zarr path.
     chrtout_files
         Sorted list of local CHRTOUT netCDF paths.  Required when
         *meteo_source* is ``"nwm_ana"``.
+    troute_file
+        Path to a t-route output netCDF (``troute_output_*.nc``).
+        Required when *meteo_source* is ``"ngen_forecast"``.
     """
     from coastal_calibration.utils import to_naive_utc
 
@@ -221,6 +293,11 @@ def read_streamflow(
 
     if meteo_source == "nwm_retro":
         return _read_from_zarr(feature_ids, start, end, domain=domain)
+
+    if meteo_source == "ngen_forecast":
+        if troute_file is None:
+            raise ValueError("troute_file is required when meteo_source is 'ngen_forecast'")
+        return _read_from_troute(troute_file, list(feature_ids), start, end)
 
     if chrtout_files is None:
         raise ValueError("chrtout_files is required when meteo_source is 'nwm_ana'")

@@ -1,0 +1,34 @@
+%include <head.h>
+
+YMD=%YMD%
+HH=%HOUR%
+CYCLE=${YMD}${HH}
+
+CONFIG_FILE="%SCHISM_CYCLES_DIR%/sr_${CYCLE}/run.yaml"
+[ -f "${CONFIG_FILE}" ] || { echo "ERROR: missing config: ${CONFIG_FILE}" >&2; exit 1; }
+
+# SCHISM and SFINCS share the same raw_download_dir (see run.yaml's
+# download.raw_download_dir) for STOFS/NWM inputs. Running both models'
+# full pipelines concurrently races two processes downloading the same
+# STOFS file to the same .tmp path with no locking.
+#
+# Fix: download once, up front, as its own serialized task. schism_sr
+# (--start-from schism_forcing_prep) and sfincs_sr both trigger on this
+# task's completion, and both find the fully-downloaded, uncorrupted data
+# already in place -- their own download stages just skip
+# (final-path-exists check in coastal_calibration.data.downloader).
+#
+# This SR download and its AnA counterpart (run_stofs_download_ana.ecf)
+# share the same raw_download_dir (both configs load the same base_yaml),
+# but the trigger graph keeps them sequential, not concurrent: this task
+# only fires once gen_configs_sr completes, which itself depends on
+# schism_ana/sfincs_ana (and thus run_stofs_download_ana) already being
+# done for this hour. Same race as above, avoided by construction rather
+# than by a second serialization mechanism.
+#
+# ---- LAUNCH (placeholder for future Slurm submission) --------------------
+# Today: direct execution on this shared node.
+%NWM_COASTAL_CLI% run "${CONFIG_FILE}" --stop-after download
+# ---- END LAUNCH ------------------------------------------------------------
+
+%include <tail.h>

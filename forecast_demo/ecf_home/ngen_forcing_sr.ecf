@@ -1,0 +1,34 @@
+%include <head.h>
+
+YMD=%YMD%
+HH=%HOUR%
+CYCLE=${YMD}${HH}                       # YYYYMMDDHH
+CYCLE_DT="${YMD:0:4}-${YMD:4:2}-${YMD:6:2} ${HH}:00:00"
+STAMP=${CYCLE}00                        # YYYYMMDDHHMM
+
+FORCING_OUT_FILE="%FORCING_OUT_DIR%/vpu03s_${STAMP}.nc"
+
+export CYCLE_DT
+
+# ---- LAUNCH (placeholder for future Slurm submission) --------------------
+# Today: direct execution on this shared node.
+# Future migration, e.g.: wrap the whole bash -c invocation below in
+# `sbatch --wait --job-name="coastal_forcing_${CYCLE}" --wrap="..."`.
+bash -c '
+  set -euo pipefail
+  cd "%NWM_RTE_DIR%"
+  export EWTS_ENABLED="%EWTS_ENABLED%"
+  export TARGET_IMAGE_NAME="${TARGET_IMAGE_NAME:-ngen_rte_ghcr}"
+  source config.bashrc
+  source run.sh
+  docker_run python -um "ngen_rte.run_coastal" -dt "${CYCLE_DT}" -rname "coastal_short_range" -fconfig short_range -gdomain vpu03s
+' "%NWM_RTE_DIR%/run.sh"
+# ---- END LAUNCH ------------------------------------------------------------
+
+if [ ! -f "${FORCING_OUT_FILE}" ]; then
+  echo "ERROR: expected forcing output missing: ${FORCING_OUT_FILE}" >&2
+  exit 1
+fi
+echo "forcing OK: ${FORCING_OUT_FILE}"
+
+%include <tail.h>

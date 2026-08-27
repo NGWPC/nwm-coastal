@@ -1,0 +1,53 @@
+%include <head.h>
+
+YMD=%YMD%
+HH=%HOUR%
+CYCLE=${YMD}${HH}                       # YYYYMMDDHH
+CYCLE_DT="${YMD:0:4}-${YMD:4:2}-${YMD:6:2} ${HH}:00:00"
+STAMP=${CYCLE}00                        # YYYYMMDDHHMM
+
+# MET forcing for the coastal AnA window (T-3 -> T0), consumed by
+# gen_configs_ana.ecf/schism_ana.ecf/sfincs_ana.ecf. This is a separate pull
+# from ngen_forcing_sr.ecf's forward-forecast forcing -- no collision risk:
+# run_coastal.py's output_dir includes forcing_configuration in its path
+# (FORCING_ROOT_DIR/scratch/<forcing_configuration>_coastal/), so
+# short_range and standard_ana land in different directories even for the
+# same -dt/cycle.
+#
+# standard_ana's own template (LookBack=180) only reaches back to T-2, not
+# the T-3 coastal models actually need. The run_coastal.py now accepts -lb/-fih
+# as AnA-only CLI overrides (added specifically for this) that directly widen
+# this single run's own window to T-3; -lb 240 (4h) moves
+# the window's real start back to T-3 (b_date_proc = cycle - (240-60)min =
+# cycle-3h); -fih 240 makes the engine actually iterate/write all 4 hourly
+# samples (T-3,T-2,T-1,T0) instead of just 3 -- LookBack and
+# ForecastInputHorizons are independent knobs (window start vs. sample
+# count)
+
+FORCING_OUT_FILE="%FORCING_OUT_DIR_ANA%/vpu03s_${STAMP}.nc"
+
+export CYCLE_DT
+
+# ---- LAUNCH (placeholder for future Slurm submission) --------------------
+# Today: direct execution on this shared node. Mirrors ngen_forcing_sr.ecf's
+# LAUNCH block, adding -lb/-fih to widen the AnA window to T-3 (see above;
+# ngen_forcing_sr.ecf doesn't use these -- AnA-only, run_coastal.py errors
+# if passed against a non-AnA config).
+bash -c '
+  set -euo pipefail
+  cd "%NWM_RTE_DIR%"
+  export EWTS_ENABLED="%EWTS_ENABLED%"
+  export TARGET_IMAGE_NAME="${TARGET_IMAGE_NAME:-ngen_rte_ghcr}"
+  source config.bashrc
+  source run.sh
+  docker_run python -um "ngen_rte.run_coastal" -dt "${CYCLE_DT}" -rname "coastal_ana" -fconfig standard_ana -gdomain vpu03s -lb 240 -fih 240
+' "%NWM_RTE_DIR%/run.sh"
+# ---- END LAUNCH ------------------------------------------------------------
+
+if [ ! -f "${FORCING_OUT_FILE}" ]; then
+  echo "ERROR: expected AnA forcing output missing: ${FORCING_OUT_FILE}" >&2
+  exit 1
+fi
+echo "AnA forcing OK: ${FORCING_OUT_FILE}"
+
+%include <tail.h>

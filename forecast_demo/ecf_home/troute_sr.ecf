@@ -1,0 +1,88 @@
+%include <head.h>
+
+YMD=%YMD%
+HH=%HOUR%
+CYCLE=${YMD}${HH}
+CYCLE_DT="${YMD:0:4}-${YMD:4:2}-${YMD:6:2} ${HH}:00:00"
+STAMP=${CYCLE}00
+
+# VPU + cycle isolation, without isolating the whole run_ngen root: -rname
+# already controls the first path segment under regionalization: "-rname 
+# region_sr -v 03S" -> regionalization/region_sr/03S/),
+# and -v already separates VPUs, so making -rname cycle-specific is enough
+# to keep every (vpu, cycle) combination in its own directory -- including
+# concurrent runs of other VPUs against this same shared run_ngen.
+#
+# Deliberately NOT isolating data/raw_input (the
+# HRRR/RAP grib cache) or MNT__RUN_NGEN__HOST: that cache can be is
+# shared across VPUs/cycles on purpose, so we don't redundantly re-download
+# the same raw data every cycle.
+#
+# %VPU% (suite var) is the single source of truth for which VPU this suite
+# targets -- change it there and everything below (the -v flag, the output
+# path, and TEST_VPU) follows automatically.
+
+RNAME="region_sr_${CYCLE}"
+
+# netCDF outputs land in an Output/ subdirectory -- same convention as the
+# AnA tasks (troute_ana_a.ecf/troute_ana_b.ecf)
+
+TROUTE_OUT_FILE="%TROUTE_REGIONALIZATION_ROOT%/${RNAME}/%VPU%/Output/troute_output_${STAMP}.nc"
+
+# Warm start from THIS cycle's own troute_ana_b save (T0 state)
+
+# HOST path for the existence check; CONTAINER path for -lsf itself (see
+# troute_ana_a.ecf -- passing the HOST path here silently no-ops the load).
+
+LOAD_STATE_DIR="%TROUTE_REGIONALIZATION_ROOT%/region_ana_b_${CYCLE}/%VPU%/state_save"
+LOAD_STATE_DIR_CONTAINER="%TROUTE_REGIONALIZATION_ROOT_CONTAINER%/region_ana_b_${CYCLE}/%VPU%/state_save"
+if [ -f "${LOAD_STATE_DIR}/troute" ]; then
+  LOAD_STATE_ARGS="-lsf ${LOAD_STATE_DIR_CONTAINER}"
+  echo "Warm-starting SR troute from ${LOAD_STATE_DIR}"
+else
+  LOAD_STATE_ARGS=""
+  echo "No troute_ana_b state at ${LOAD_STATE_DIR} -- cold-starting (expected only at bootstrap; the trigger on troute_ana_b == complete should otherwise guarantee this exists)"
+fi
+
+export CYCLE_DT
+export RNAME
+export LOAD_STATE_ARGS
+
+# ---- LAUNCH (placeholder for future Slurm submission) --------------------
+# Today: direct execution on this shared node.
+#
+# This owns the full docker_run invocation itself - only run.sh and
+# config.bashrc (stable, shared infra providing the docker_run function and
+# env vars like INSTALLED_REGIONALIZATION_RESULTS) are sourced from
+# nwm-rte. See ngen_forcing_sr.ecf for why $0 is pinned via bash -c's second
+# argument (config.bashrc derives REPOS_COMMON_ROOT__HOST from
+# dirname(dirname($0)) unconditionally).
+#
+# TEST_VPU is reassigned (not pre-exported) because config.bashrc sets it
+# with a plain `TEST_VPU="vpu_03S"` -- an unconditional assignment, not a
+# ${TEST_VPU:-default} fallback -- so it would clobber any pre-exported
+# override. Same reasoning as REPOS_COMMON_ROOT__HOST elsewhere in this repo.
+#
+# Future migration, e.g.: wrap the whole bash -c invocation below in
+# `sbatch --wait --job-name="coastal_regionalize_${CYCLE}" --wrap="..."`.
+bash -c '
+  set -euo pipefail
+  cd "%NWM_RTE_DIR%"
+  export EWTS_ENABLED="%EWTS_ENABLED%"
+  export TARGET_IMAGE_NAME="${TARGET_IMAGE_NAME:-ngen_rte_ghcr}"
+  source config.bashrc
+  source run.sh
+  TEST_VPU="vpu_%VPU%"
+  TEST_FORM_ASSIGN_VPU="${INSTALLED_REGIONALIZATION_RESULTS}/${TEST_VPU}/formulation_assignment.csv"
+  TEST_CAT_GRP_VPU="${INSTALLED_REGIONALIZATION_RESULTS}/${TEST_VPU}/catchment_groups.csv"
+  docker_run python -um "ngen_rte.run_regionalization_standalone" -n 12 -faf "${TEST_FORM_ASSIGN_VPU}" -cgf "${TEST_CAT_GRP_VPU}" -fconfig "short_range" -dt "${CYCLE_DT}" -rname "${RNAME}" -v "%VPU%" --hydrofab_file "/ngwpc/run_ngen/data/hydrofabric/vpu_%VPU%.gpkg" -outfmt NetCDF ${LOAD_STATE_ARGS}
+' "%NWM_RTE_DIR%/run.sh"
+# ---- END LAUNCH ------------------------------------------------------------
+
+if [ ! -f "${TROUTE_OUT_FILE}" ]; then
+  echo "ERROR: expected t-route output missing: ${TROUTE_OUT_FILE}" >&2
+  exit 1
+fi
+echo "regionalize OK: ${TROUTE_OUT_FILE}"
+
+%include <tail.h>

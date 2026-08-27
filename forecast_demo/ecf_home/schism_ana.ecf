@@ -1,0 +1,40 @@
+%include <head.h>
+
+YMD=%YMD%
+HH=%HOUR%
+CYCLE=${YMD}${HH}
+CYCLE_DT="${YMD:0:4}-${YMD:4:2}-${YMD:6:2} ${HH}:00:00"
+# Bootstrap skip -- see bootstrap_check.h for full rationale.
+%include <bootstrap_check.h>
+
+# A second %include <tail.h> here (one per skip branch, one at the true
+# end) breaks ecflow's own job-generation preprocessing. Wrap the real
+# work in a shell conditional instead, so there is only ever ONE
+# %include <tail.h>, at the true end of the file.
+if [ "${SKIP_COASTAL}" -eq 0 ]; then
+
+CONFIG_FILE="%SCHISM_CYCLES_DIR%/ana_${CYCLE}/run.yaml"
+[ -f "${CONFIG_FILE}" ] || { echo "ERROR: missing config: ${CONFIG_FILE}" >&2; exit 1; }
+
+# SCHISM AnA: 3h T-3->T0, using troute_ana_b's discharge output via
+# gen_configs_ana.ecf's config (start_date=T-3, duration_hours=3,
+# warm-started from PREV_CYCLE's own T-2 checkpoint if present - true
+# bootstrap cold-starts gracefully, see gen_cycle_config.py). SCHISM CAN checkpoint
+# mid-run -- nhot_write is always hourly (schism/prep.py's make_param_nml)
+# regardless of run length, so this ONE 3h run writes hotstarts at both the
+# 1h mark (T-2, self-chains to next cycle's schism_ana via
+# gen_configs_ana.ecf) and the 3h/final mark (T0, feeds schism_sr.ecf's
+# warm start this same hour via gen_configs_sr.ecf). See combine_hotstart()
+# in schism/prep.py.
+#
+# Resumes after run_stofs_download_ana.ecf's --stop-after download, same
+# pattern as schism_sr.ecf.
+#
+# ---- LAUNCH (placeholder for future Slurm submission) --------------------
+# Today: direct execution on this shared node.
+%NWM_COASTAL_CLI% run "${CONFIG_FILE}" --start-from schism_forcing_prep
+# ---- END LAUNCH ------------------------------------------------------------
+
+fi
+
+%include <tail.h>

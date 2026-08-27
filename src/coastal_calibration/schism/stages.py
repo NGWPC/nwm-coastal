@@ -404,14 +404,20 @@ class SchismDischargeStage(WorkflowStage):
 
     def run(self) -> dict[str, Any]:
         """Stage streamflow data and produce ``source.nc``."""
-        discharge_file = self.model.resolved_discharge_file
+        sim = self.config.simulation
+        # ngen_forecast runs use ngenReaches.csv (NextGen hydrofabric IDs);
+        # nwm_retro/nwm_ana use nwmReaches.csv (NWM COMIDs).
+        is_forecast = sim.meteo_source == "ngen_forecast"
+        reaches_name = "ngenReaches.csv" if is_forecast else "nwmReaches.csv"
+
+        discharge_file = self.model.resolved_discharge_file(sim.meteo_source)
         if discharge_file is None:
             # Reachable only via the auto-discovery path (unset
-            # discharge_file + no nwmReaches.csv in prebuilt_dir).
+            # discharge_file + no reaches file in prebuilt_dir).
             # Explicit-but-missing is caught earlier by validate().
             self._log(
-                "No discharge file (set discharge_file or place "
-                "nwmReaches.csv in prebuilt_dir to enable); skipping"
+                f"No discharge crosswalk (set discharge_file or place "
+                f"{reaches_name} in prebuilt_dir to enable); skipping"
             )
             return {"status": "skipped"}
 
@@ -424,20 +430,22 @@ class SchismDischargeStage(WorkflowStage):
         )
 
         work_dir = self.config.paths.work_dir
-        sim = self.config.simulation
         paths = self.config.paths
         prebuilt_dir = self.model.coastal_parm
 
-        # 1. Copy discharge file into work_dir as nwmReaches.csv
-        self._update_substep("Staging discharge file")
-        self._log(f"Copying discharge file: {discharge_file}")
-        shutil.copy2(discharge_file, work_dir / "nwmReaches.csv")
+        # 1. Copy the discharge crosswalk into work_dir under its real name
+        # (ngenReaches.csv for ngen_forecast, nwmReaches.csv otherwise) so the
+        # staged file makes the active source obvious.
+        self._update_substep("Staging discharge crosswalk")
+        self._log(f"Using {reaches_name} discharge crosswalk: {discharge_file}")
+        shutil.copy2(discharge_file, work_dir / reaches_name)
 
         # 2. Stage CHRTOUT files
         end_date = sim.start_date + timedelta(hours=int(sim.duration_hours))
 
-        if sim.meteo_source == "nwm_retro":
-            # nwm_retro reads directly from S3 Zarr — no local files needed
+        if sim.meteo_source in ("nwm_retro", "ngen_forecast"):
+            # nwm_retro reads from S3 Zarr; ngen_forecast reads the t-route
+            # netCDF — neither needs local CHRTOUT files staged.
             nwm_output_dir = work_dir  # not used but needed for signature
             nwm_ana_dir = None
         else:
@@ -463,6 +471,9 @@ class SchismDischargeStage(WorkflowStage):
             domain=sim.coastal_domain,
             start_date=sim.start_date,
             end_date=end_date,
+            troute_file=self.config.paths.troute_file,
+            t0_troute_file=self.config.paths.t0_troute_file,
+            reaches_filename=reaches_name,
         )
 
         # 4. Combine sink/source (Fortran binary)
@@ -479,6 +490,7 @@ class SchismDischargeStage(WorkflowStage):
             work_dir=work_dir,
             element_areas=project.element_areas,
             prebuilt_dir=prebuilt_dir,
+            t0_precip_source_file=self.config.paths.t0_precip_source_file,
         )
 
         # Verify source.nc was produced
@@ -535,7 +547,12 @@ class PreSCHISMStage(WorkflowStage):
 
         # 2. Verify critical files exist
         required_files = ["param.nml", "hgrid.gr3"]
-        if self.model.discharge_file is not None:
+        # resolved_discharge_file(), not the raw discharge_file field --
+        # an explicitly-set-but-missing path (e.g. --run-type spinup's
+        # sentinel) already resolves to None and skips source.nc generation
+        # upstream (schism_discharge/schism_forcing); checking the raw
+        # field here would demand a file nothing was ever asked to produce.
+        if self.model.resolved_discharge_file(self.config.simulation.meteo_source) is not None:
             required_files.append("source.nc")
         missing = [f for f in required_files if not (work_dir / f).exists()]
         if missing:
@@ -668,9 +685,9 @@ class SCHISMRunStage(WorkflowStage):
 class PostSCHISMStage(WorkflowStage):
     """Post-process SCHISM outputs.
 
-    Checks for fatal errors and combines hotstart files when running
-    reanalysis or chained runs.  ``combine_hotstart7`` is expected on
-    ``$PATH`` (pixi installs it to ``$CONDA_PREFIX/bin``).
+    Checks for fatal errors and combines any hotstart files SCHISM wrote.
+    ``combine_hotstart7`` is expected on ``$PATH`` (pixi installs it to
+    ``$CONDA_PREFIX/bin``).
     """
 
     name = "schism_postprocess"
@@ -707,15 +724,14 @@ class PostSCHISMStage(WorkflowStage):
                 raise RuntimeError(f"SCHISM run failed: {error_content[-2000:]}")
             self._log("fatal.error contains only dry-node warnings (QUICKSEARCH); continuing")
 
-        # Combine hotstarts for reanalysis / chained runs
-        sim = self.config.simulation
-        is_reanalysis = sim.duration_hours < 0
-        if is_reanalysis:
-            self._update_substep("Combining hotstarts")
-            self._log("Running combine_hotstart7")
-            from coastal_calibration.schism.prep import combine_hotstart
+        # Combine any hotstarts SCHISM wrote (nhot_write now always targets
+        # hourly checkpoints, regardless of run type -- see make_param_nml).
+        # combine_hotstart() itself no-ops cleanly if none were written, so
+        # this always runs rather than gating on run type.
+        self._update_substep("Combining hotstarts")
+        from coastal_calibration.schism.prep import combine_hotstart
 
-            combine_hotstart(outputs_dir)
+        combine_hotstart(outputs_dir)
 
         self._log("SCHISM post-processing complete")
         return {

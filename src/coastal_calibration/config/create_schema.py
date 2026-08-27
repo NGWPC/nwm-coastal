@@ -156,6 +156,23 @@ class MaskConfig:
     #: preserve historical behavior; turn this on for new models.
     keep_largest_only: bool = False
 
+    # Adding config options hydromt accepts for active cells
+    #: Polygon(s) to include/exclude from the active model domain,
+    #: passed through to hydromt-sfincs's ``create_active()``.
+    include_polygon: Path | None = None
+    exclude_polygon: Path | None = None
+
+    # Adding config options hydromt accepts for boundary points
+    #: Passed through to hydromt-sfincs's ``create_boundary_points_from_mask()``.
+    bnd_dist: float = 5000.0
+    min_dist: float | None = None
+
+    def __post_init__(self) -> None:
+        if self.include_polygon is not None:
+            self.include_polygon = Path(self.include_polygon).expanduser().resolve()
+        if self.exclude_polygon is not None:
+            self.exclude_polygon = Path(self.exclude_polygon).expanduser().resolve()
+
 
 @dataclass
 class SubgridConfig:
@@ -227,8 +244,20 @@ class RiverDischargeConfig:
     #: this threshold are dropped with a warning.
     max_snap_distance_m: float = 2000.0
 
+    #: Which discharge data source these points will be run against:
+    #: ``"nwm"`` (NWM COMIDs, looked up in CHRTOUT files) or ``"ngen"``
+    #: (NextGen hydrofabric flowpath ids, routed by t-route). Determines
+    #: the output filename (``sfincs_nwm.src`` / ``sfincs_ngen.src``) so
+    #: both can coexist and the run stage's
+    #: ``resolved_discharge_locations_file`` can select the right one
+    #: automatically based on the run's ``meteo_source``.
+    source: str = "nwm"
+
     def __post_init__(self) -> None:
         self.flowlines = Path(self.flowlines).expanduser().resolve()
+        if self.source not in ("nwm", "ngen"):
+            msg = f"river_discharge.source must be 'nwm' or 'ngen', got {self.source!r}"
+            raise ValueError(msg)
 
 
 @dataclass
@@ -497,6 +526,12 @@ class SfincsCreateConfig:
             if val and not Path(val).is_absolute():
                 data[key] = str(yaml_dir / val)
 
+        mask_data = data.get("mask") or {}
+        for key in ("include_polygon", "exclude_polygon"):
+            val = mask_data.get(key)
+            if val and not Path(val).is_absolute():
+                mask_data[key] = str(yaml_dir / val)
+
         reclass = (data.get("subgrid") or {}).get("reclass_table")
         if reclass and not Path(reclass).is_absolute():
             data["subgrid"]["reclass_table"] = str(yaml_dir / reclass)
@@ -695,6 +730,14 @@ class SfincsCreateConfig:
                 "boundary_zmax": self.mask.boundary_zmax,
                 "reset_bounds": self.mask.reset_bounds,
                 "keep_largest_only": self.mask.keep_largest_only,
+                "include_polygon": (
+                    str(self.mask.include_polygon) if self.mask.include_polygon else None
+                ),
+                "exclude_polygon": (
+                    str(self.mask.exclude_polygon) if self.mask.exclude_polygon else None
+                ),
+                "bnd_dist": self.mask.bnd_dist,
+                "min_dist": self.mask.min_dist,
             },
             "subgrid": {
                 "nr_subgrid_pixels": self.subgrid.nr_subgrid_pixels,
@@ -720,6 +763,7 @@ class SfincsCreateConfig:
                     "flowlines": str(self.river_discharge.flowlines),
                     "nwm_id_column": self.river_discharge.nwm_id_column,
                     "max_snap_distance_m": self.river_discharge.max_snap_distance_m,
+                    "source": self.river_discharge.source,
                 }
                 if self.river_discharge is not None
                 else None

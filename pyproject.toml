@@ -37,6 +37,8 @@ dependencies = [
   "dotenv",
   "fsspec",
   "geopandas>=1",
+  "h5netcdf",
+  "h5py",
   "icechunk>=1.0.2",
   "netcdf4",
   "numpy>=2,<2.5",

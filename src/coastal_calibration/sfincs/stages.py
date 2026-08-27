@@ -510,6 +510,9 @@ class SfincsInitStage(_SfincsStageBase):
         "sfincs_netamp.nc",
         "sfincs_netampr.nc",
         "sfincs_netsrcdisfile.nc",
+        # ID-space-suffixed discharge files (ngen_forecast vs nwm runs)
+        "sfincs_netsrcdisfile_nwm.nc",
+        "sfincs_netsrcdisfile_ngen.nc",
         # SFINCS output files (not strictly forcing but can interfere)
         "sfincs_map.nc",
         "sfincs_his.nc",
@@ -1395,6 +1398,49 @@ class SfincsDischargeStage(_SfincsStageBase):
                 meteo_source="nwm_retro",
                 domain=sim.coastal_domain,
             )
+        elif sim.meteo_source == "ngen_forecast":
+            troute_file = self.config.paths.troute_file
+            if troute_file is None:
+                self._log(
+                    "meteo_source is 'ngen_forecast' but paths.troute_file is unset; "
+                    "discharge points will use default (zero) values"
+                )
+                return
+            df_fid = read_streamflow(
+                needed_fids,
+                start_dt,
+                end_dt,
+                meteo_source="ngen_forecast",
+                troute_file=troute_file,
+            )
+            t0_troute_file = self.config.paths.t0_troute_file
+            if t0_troute_file is not None and start_dt not in df_fid.index:
+                # troute_file's own window doesn't reach back to start_dt
+                # (e.g. an SR forecast warm-started from an AnA cycle,
+                # where troute's SR run starts 1h after T0 by mswm design)
+                # -- pull just the T0 row from a second source that does
+                # have it (that cycle's own troute_ana_b) instead of
+                # leaving that timestep at default zero. Mirrors
+                # schism/prep.py's make_discharge() handling of the same
+                # gap.
+                df_fid_t0 = read_streamflow(
+                    needed_fids,
+                    start_dt,
+                    start_dt,
+                    meteo_source="ngen_forecast",
+                    troute_file=t0_troute_file,
+                )
+                if not df_fid_t0.empty:
+                    # df_fid and df_fid_t0 come from two different troute
+                    # regionalization runs and can each cover a different
+                    # reach subset -- concat unions their columns, so any
+                    # fid present in one but absent from the other becomes
+                    # NaN at that row instead of the intended default zero.
+                    # Confirmed live on the SCHISM side (see
+                    # schism/prep.py's make_discharge()): this NaN survived
+                    # through to the model's discharge input and blew up
+                    # the simulation within its first timestep.
+                    df_fid = pd.concat([df_fid_t0, df_fid]).sort_index().fillna(0.0)
         else:
             streamflow_dir = self.config.paths.streamflow_dir(sim.coastal_domain)
             files = _filter_chrtout_files(
@@ -1462,9 +1508,21 @@ class SfincsDischargeStage(_SfincsStageBase):
         """Add discharge source points from a ``.src`` or GeoJSON file."""
         model = _get_model(self.config)
 
-        if self.sfincs.discharge_locations_file is None:
+        # Resolve the discharge-points file for this run's source: for
+        # ngen_forecast prefer the ``_ngen`` file (NextGen hydrofabric IDs),
+        # otherwise ``_nwm`` (NWM COMIDs).  This picks the right file when the
+        # user drops both alongside each other.
+        meteo_source = self.config.simulation.meteo_source
+        token = self.sfincs._discharge_token(meteo_source)
+        src_path = self.sfincs.resolved_discharge_locations_file(meteo_source)
+        if src_path is None:
             self._log("No discharge configuration, skipping")
             return {"status": "skipped"}
+        self._log(f"Using {token} discharge points: {src_path.name}")
+
+        # Carry the ID-space token onto the written SFINCS discharge file so
+        # the model directory makes the active source obvious.
+        _set_forcing_filename(model.discharge_points, f"sfincs_netsrcdisfile_{token}.nc")
 
         self._update_substep("Adding discharge source points")
 
@@ -1481,7 +1539,6 @@ class SfincsDischargeStage(_SfincsStageBase):
             except (AttributeError, ValueError) as exc:
                 logger.debug("No existing discharge points to clear: %s", exc)
 
-        src_path = self.sfincs.discharge_locations_file
         suffix = src_path.suffix.lower()
 
         if suffix == ".src":
@@ -1916,7 +1973,12 @@ class SfincsPlotStage(_SfincsStageBase):
     Observations are fetched in MLLW (universally supported by all
     CO-OPS stations) and then converted to MSL using per-station datum
     offsets from the CO-OPS metadata API, matching the STOFS boundary
-    condition vertical reference used by SFINCS.
+    condition vertical reference used by SFINCS. Simulated values
+    (referenced to the mesh's own vertical datum, e.g. NAVD88) are
+    converted to MSL the same way -- per station, from each station's
+    own live NAVD88 datum value where CO-OPS publishes one, falling
+    back to the flat ``vdatum_mesh_to_msl_m`` config value otherwise
+    (see :meth:`_per_station_mesh_to_msl_offsets`).
 
     The stage is a no-op when:
 
@@ -1943,6 +2005,56 @@ class SfincsPlotStage(_SfincsStageBase):
             if "station" in str(dim_name).lower():
                 return str(dim_name)
         raise ValueError("Cannot determine station dimension in point_h")
+
+    def _per_station_mesh_to_msl_offsets(self, station_ids: list[str]) -> NDArray[Any]:
+        """Per-station mesh(NAVD88) -> MSL offsets, live from CO-OPS.
+
+        For each station, queries its own surveyed NAVD88 datum value
+        (CO-OPS publishes this directly for many stations, in the
+        per-station datum table under the name ``"NAVD88"`` -- distinct
+        from the ``"NAVD"`` datum *query parameter* used elsewhere for
+        fetching time-series data) and computes the local
+        NAVD88 -> MSL offset from it, station by station. This is more
+        precise than a single domain-wide constant (SCHISM's own
+        equivalent, ``_per_station_datum_offsets`` in schism/stages.py,
+        only gets this precision by spatially interpolating a
+        separately-generated VDatum grid file). Falls back to the flat
+        ``vdatum_mesh_to_msl_m`` config value for any station without a
+        published NAVD88 datum.
+        """
+        from coastal_calibration.data.coops_api import COOPSAPIClient
+
+        fallback = self.sfincs.vdatum_mesh_to_msl_m
+        offsets = np.full(len(station_ids), fallback)
+
+        client = COOPSAPIClient()
+        datums = client.get_datums(station_ids)
+        datum_map = {d.station_id: d for d in datums}
+
+        for i, sid in enumerate(station_ids):
+            d = datum_map.get(sid)
+            if d is None:
+                self._log(f"Station {sid}: datum lookup failed; using fallback offset", "debug")
+                continue
+            msl = d.get_datum_value("MSL")
+            navd = d.get_datum_value("NAVD88")
+            if msl is None or navd is None:
+                self._log(
+                    f"Station {sid}: no NAVD88 datum published; using fallback offset "
+                    f"{fallback:+.4f} m",
+                    "debug",
+                )
+                continue
+            # Same offset convention as the MLLW->MSL conversion just below:
+            # both msl/navd are heights above the station's own arbitrary
+            # zero, so their difference is NAVD88's height above MSL there.
+            offset = msl - navd
+            if d.units == "feet":
+                offset *= 0.3048
+            offsets[i] = -offset
+            self._log(f"Station {sid}: NAVD88->MSL offset = {-offset:+.4f} m", "debug")
+
+        return offsets
 
     def _fetch_observations_msl(
         self,
@@ -2201,13 +2313,11 @@ class SfincsPlotStage(_SfincsStageBase):
             [point_zs.isel({station_dim: idx}).values for idx in noaa_indices]
         )
 
-        # Apply mesh vdatum → MSL correction.  Model output inherits
-        # the mesh vertical datum; this offset converts to MSL for
-        # comparison with NOAA CO-OPS observations.
-        datum_offset = self.sfincs.vdatum_mesh_to_msl_m
-        if datum_offset != 0.0:
-            sim_elevation = sim_elevation + datum_offset
-            self._log(f"Applied mesh→MSL vdatum offset: {datum_offset:+.4f} m")
+        # Apply mesh vdatum → MSL correction, per station (live NAVD88 from
+        # CO-OPS where available, falling back to vdatum_mesh_to_msl_m
+        # otherwise -- see _per_station_mesh_to_msl_offsets).
+        station_offsets = self._per_station_mesh_to_msl_offsets(noaa_station_ids)
+        sim_elevation = sim_elevation + station_offsets[np.newaxis, :]
 
         # Fetch observed water levels (MLLW → MSL)
         self._update_substep("Fetching NOAA CO-OPS observations")
@@ -2434,7 +2544,11 @@ class SfincsDataCatalogStage(WorkflowStage):
     def run(self) -> dict[str, Any]:
         """Generate a HydroMT data catalog YAML for downloaded data."""
         download_dir = self.config.paths.download_dir
-        if not download_dir.exists():
+        # ngen forecast meteo is an external, absolute-path file referenced
+        # directly by the catalog, so the catalog is still worth generating
+        # even when download_dir is absent (e.g. download disabled).
+        is_forecast = self.config.simulation.meteo_source == "ngen_forecast"
+        if not download_dir.exists() and not is_forecast:
             self._log(f"Download dir {download_dir} does not exist; skipping catalog generation")
             return {"catalog_path": None, "entries": [], "status": "skipped"}
 
@@ -2442,10 +2556,21 @@ class SfincsDataCatalogStage(WorkflowStage):
 
         catalog_path = self.config.paths.work_dir / "data_catalog.yml"
 
+        # generate_data_catalog()'s own include_meteo defaults to True and
+        # unconditionally requires paths.forecast_meteo_file to be set
+        # whenever meteo_source is "ngen_forecast" -- correct when any of
+        # the three toggles below actually need it, but not when a caller
+        # (e.g. hotstart_coastal_models.sh's boundary-only spin-up) has all
+        # three off and never set forecast_meteo_file at all.
+        sfincs_cfg = _sfincs_cfg(self.config)
+        include_meteo = (
+            sfincs_cfg.include_precip or sfincs_cfg.include_wind or sfincs_cfg.include_pressure
+        )
         catalog = generate_data_catalog(
             self.config,
             output_path=catalog_path,
             catalog_name=f"sfincs_{self.config.simulation.coastal_domain}",
+            include_meteo=include_meteo,
         )
 
         self._log(f"Data catalog written to {catalog_path}")
@@ -2463,7 +2588,10 @@ class SfincsDataCatalogStage(WorkflowStage):
         created by the download stage, so this check is skipped.
         """
         errors = super().validate()
-        if not self.config.download.enabled:
+        # ngen forecast meteo does not live under download_dir, so a missing
+        # download_dir is not fatal for that source.
+        is_forecast = self.config.simulation.meteo_source == "ngen_forecast"
+        if not self.config.download.enabled and not is_forecast:
             download_dir = self.config.paths.download_dir
             if not download_dir.exists():
                 errors.append(f"Download directory does not exist: {download_dir}")

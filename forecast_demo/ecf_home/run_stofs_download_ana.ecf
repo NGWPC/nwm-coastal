@@ -1,0 +1,30 @@
+%include <head.h>
+
+YMD=%YMD%
+HH=%HOUR%
+CYCLE=${YMD}${HH}
+CYCLE_DT="${YMD:0:4}-${YMD:4:2}-${YMD:6:2} ${HH}:00:00"
+# Bootstrap skip -- see bootstrap_check.h for full rationale.
+%include <bootstrap_check.h>
+
+# A second %include <tail.h> here (one per skip branch, one at the true
+# end) breaks ecflow's own job-generation preprocessing. Wrap the real
+# work in a shell conditional instead, so there is only ever ONE
+# %include <tail.h>, at the true end of the file.
+if [ "${SKIP_COASTAL}" -eq 0 ]; then
+
+CONFIG_FILE="%SCHISM_CYCLES_DIR%/ana_${CYCLE}/run.yaml"
+[ -f "${CONFIG_FILE}" ] || { echo "ERROR: missing config: ${CONFIG_FILE}" >&2; exit 1; }
+
+# schism_ana and sfincs_ana both trigger on
+# this task's completion. See run_stofs_download_sr.ecf for why this and
+# the SR download never race each other despite sharing raw_download_dir.
+#
+# ---- LAUNCH (placeholder for future Slurm submission) --------------------
+# Today: direct execution on this shared node.
+%NWM_COASTAL_CLI% run "${CONFIG_FILE}" --stop-after download
+# ---- END LAUNCH ------------------------------------------------------------
+
+fi
+
+%include <tail.h>

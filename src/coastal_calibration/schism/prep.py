@@ -48,11 +48,25 @@ def _apply_namelist_overrides(text: str, overrides: dict[str, Any]) -> str:
     """Replace ``key = ...`` lines in a Fortran namelist with new values.
 
     Keys not already present in *text* are appended just before the
-    closing ``/`` of the most recent namelist block — which is good
-    enough for SCHISM's ``param.nml`` (single ``&PARAM`` block plus an
-    optional ``&SCHOUT``). Raises ``KeyError`` if no namelist block is
-    found at all.
+    closing ``/`` of the ``&OPT`` block (SCHISM's general physics/
+    numerics namelist -- home to the vast majority of ad-hoc override
+    keys, e.g. ``nramp``/``nrampbc`` alongside their already-present
+    siblings ``dramp``/``drampbc``). SCHISM's real ``param.nml`` has
+    three blocks (``&CORE``, ``&OPT``, ``&SCHOUT``); inserting into
+    whichever block happens to close last (the old behavior) landed
+    physics keys inside ``&SCHOUT`` -- an output-control namelist that
+    doesn't recognize them -- corrupting it enough to break parsing of
+    unrelated array members like ``iof_hydro`` at SCHISM startup. Falls
+    back to the last block in the file if no ``&OPT`` block is found
+    (e.g. a differently-structured namelist file). Raises ``KeyError``
+    if no namelist block is found at all.
     """
+    # The closing line's whitespace must be horizontal-only ([ \t], not
+    # \s): \s also matches \n, so a greedy \s*$ silently swallows the
+    # blank lines *between* this block's "/" and the next block's "&NAME",
+    # moving the match's end() past where "/" actually is.
+    opt_close_re = re.compile(r"(?mi)^&OPT[ \t]*$.*?(^[ \t]*/[ \t]*$)", flags=re.DOTALL)
+
     out = text
     for key, value in overrides.items():
         rendered = _format_namelist_value(value)
@@ -62,7 +76,8 @@ def _apply_namelist_overrides(text: str, overrides: dict[str, Any]) -> str:
             out,
         )
         if n == 0:
-            insert_at = out.rfind("/")
+            opt_match = opt_close_re.search(out)
+            insert_at = opt_match.start(1) if opt_match else out.rfind("/")
             if insert_at < 0:
                 raise KeyError(f"No namelist closing '/' found in param.nml; cannot insert {key}")
             out = out[:insert_at] + f"  {key} = {rendered}\n" + out[insert_at:]
@@ -239,15 +254,18 @@ def _parse_reach_rows(rows: list[str], count: int, kind: str) -> tuple[list[int]
     return [int(p[0]) for p in parts], [int(p[1]) for p in parts]
 
 
-def _write_th_file(path: Path, data: NDArray[np.floating[Any]], tstep: float) -> None:
-    """Write a SCHISM time-history (.th) file."""
-    t = 0.0
+def _write_th_file(path: Path, data: NDArray[np.floating[Any]], times: NDArray[np.floating[Any]]) -> None:
+    """Write a SCHISM time-history (.th) file.
+
+    *times* are elapsed seconds since the simulation start, one per row of
+    *data*, and must already include a t=0 row -- SCHISM requires the first
+    row of a .th file to be at t=0 (see the t=0 padding in ``make_discharge``).
+    """
     with path.open("w") as f:
         for i in range(data.shape[0]):
-            parts = [str(t)]
+            parts = [str(times[i])]
             parts.extend(str(data[i, j]) for j in range(data.shape[1]))
             f.write("\t".join(parts) + "\n")
-            t += tstep
 
 
 # ---------------------------------------------------------------------------
@@ -265,8 +283,11 @@ def make_discharge(  # noqa: PLR0912
     domain: str = "conus",
     start_date: datetime | None = None,
     end_date: datetime | None = None,
+    troute_file: Path | None = None,
+    t0_troute_file: Path | None = None,
+    reaches_filename: str = "nwmReaches.csv",
 ) -> None:
-    """Create discharge files from NWM CHRT output.
+    """Create discharge files from routed-streamflow output.
 
     Writes ``vsource.th``, ``vsink.th``, and ``source_sink.in`` into
     *work_dir*.  The sink block of ``nwmReaches.csv`` is optional, since a
@@ -275,11 +296,21 @@ def make_discharge(  # noqa: PLR0912
 
     For ``nwm_retro`` the streamflow is read directly from the S3 Zarr
     store (requires *start_date* and *end_date*).  For ``nwm_ana`` the
-    streamflow is read from local CHRTOUT netCDF files.
+    streamflow is read from local CHRTOUT netCDF files.  For
+    ``ngen_forecast`` it is read from the t-route output netCDF
+    (*troute_file*, requires *start_date* and *end_date*).
+
+    *t0_troute_file* is optional and only relevant for ``ngen_forecast``:
+    some callers' primary *troute_file* doesn't reach back to *start_date*
+    by design (e.g. an SR forecast warm-started from an AnA cycle, where
+    troute's own SR run starts 1h after T0). When given and *troute_file*'s
+    own data doesn't cover *start_date*, just the T0 row is pulled from
+    this second source instead of leaving that row at zero. Every other
+    caller simply omits it and behavior is unchanged.
     """
     from coastal_calibration.data.streamflow import read_streamflow
 
-    reaches_path = work_dir / "nwmReaches.csv"
+    reaches_path = work_dir / reaches_filename
     # Blank separator lines are dropped, which makes the trailing sink
     # block optional: a mesh subset can contain sources and no sinks, and
     # such a file may end right after the source block instead of writing
@@ -309,6 +340,42 @@ def make_discharge(  # noqa: PLR0912
             meteo_source="nwm_retro",
             domain=domain,
         )
+    elif meteo_source == "ngen_forecast":
+        if start_date is None or end_date is None:
+            raise ValueError("start_date and end_date are required for ngen_forecast")
+        if troute_file is None:
+            raise ValueError("troute_file is required for ngen_forecast discharge")
+        df = read_streamflow(
+            all_fids,
+            start_date,
+            end_date,
+            meteo_source="ngen_forecast",
+            troute_file=troute_file,
+        )
+        if t0_troute_file is not None and start_date not in df.index:
+            import pandas as pd
+
+            df_t0 = read_streamflow(
+                all_fids,
+                start_date,
+                start_date,
+                meteo_source="ngen_forecast",
+                troute_file=t0_troute_file,
+            )
+            if not df_t0.empty:
+                # df and df_t0 come from two different troute regionalization
+                # runs (region_sr vs region_ana_b) and can each cover a
+                # different reach subset -- concat unions their columns, so
+                # any fid present in one but absent from the other becomes
+                # NaN at that row. Confirmed live: this NaN then overwrote
+                # the zero-initialized vsource/vsink array below at the T0
+                # row for every one of this run's 269 source elements
+                # (region_ana_b's reach set didn't overlap this run's at
+                # all), producing a raw netCDF fill-value-scale discharge
+                # that blew up SCHISM within its first timestep. Zero-fill
+                # to match the "unmatched slots stay at zero" convention
+                # documented below, instead of leaking NaN into the model.
+                df = pd.concat([df_t0, df]).sort_index().fillna(0.0)
     else:
         # Gather local CHRTOUT files for nwm_ana
         chrtout_files: list[Path] = []
@@ -339,23 +406,46 @@ def make_discharge(  # noqa: PLR0912
         if freq < timedelta(hours=1):  # pyright: ignore[reportOperatorIssue]
             df = df.resample("h").mean()
 
-    # Build vsource / vsink arrays from the DataFrame
-    n_rows = len(df)
-    vsource = np.zeros((n_rows, len(soids)))
-    vsink = np.zeros((n_rows, len(siids)))
+    # SCHISM reads vsource/vsink from source.nc purely positionally -- row i
+    # is always taken to mean "elapsed i*3600s from start_date" (see
+    # schism_init.F90's "nc" branch and schism_step.F90's STEP: vsource
+    # read: both index by time/th_dt3(1), never by the stored time_vsource
+    # values). merge_source_sink() later adds discharge into precip
+    # row-for-row by array position too, not by matching time labels. So
+    # writing df's rows in arrival order (the old behavior) only happened
+    # to be correct when df's first row landed exactly on start_date with
+    # no gaps -- any mismatch between troute's real window and start_date
+    # would silently misalign every row downstream. Scatter into a
+    # gapless hourly grid spanning [start_date, end_date] by each row's
+    # real elapsed time instead, so row i is genuinely i*3600s regardless
+    # of what troute actually returned. Unmatched slots stay at zero --
+    # deliberately not backfilled (e.g. hot-started runs load their t=0
+    # state from the restart file and don't need forcing to describe it).
+    n_hours = round((end_date - start_date).total_seconds() / 3600)
+    elapsed = np.arange(n_hours + 1, dtype=float) * 3600.0
+    vsource = np.zeros((n_hours + 1, len(soids)))
+    vsink = np.zeros((n_hours + 1, len(siids)))
+
+    row_idx = np.round((df.index - start_date).total_seconds().to_numpy() / 3600).astype(int)
+    in_range = (row_idx >= 0) & (row_idx <= n_hours)
+    if not in_range.all():
+        logger.warning(
+            "    make_discharge: dropping %d row(s) outside [start_date, end_date]",
+            int((~in_range).sum()),
+        )
+    row_idx = row_idx[in_range]
+    df = df.iloc[in_range]
 
     for i, sid in enumerate(soids):
         if sid in df.columns:
-            vsource[:, i] = df[sid].to_numpy()
+            vsource[row_idx, i] = df[sid].to_numpy()
 
     for i, sid in enumerate(siids):
         if sid in df.columns:
-            vsink[:, i] = -1.0 * df[sid].to_numpy()
+            vsink[row_idx, i] = -1.0 * df[sid].to_numpy()
 
-    tstep = 3600.0
-
-    _write_th_file(work_dir / "vsource.th", vsource, tstep)
-    _write_th_file(work_dir / "vsink.th", vsink, tstep)
+    _write_th_file(work_dir / "vsource.th", vsource, elapsed)
+    _write_th_file(work_dir / "vsink.th", vsink, elapsed)
 
     # source_sink.in
     with (work_dir / "source_sink.in").open("w") as f:
@@ -407,6 +497,7 @@ def merge_source_sink(  # noqa: PLR0915
     work_dir: Path,
     element_areas: NDArray[np.floating[Any]],
     prebuilt_dir: Path | None = None,
+    t0_precip_source_file: Path | None = None,
 ) -> None:
     """Merge river discharge into precipitation source and write ``source.nc``.
 
@@ -421,6 +512,24 @@ def merge_source_sink(  # noqa: PLR0915
     prebuilt_dir : Path | None
         If given, the reference ``source.nc`` is symlinked from this
         directory into *work_dir* first.
+    t0_precip_source_file : Path | None
+        Optional path to a second ``precip_source.nc`` (typically that
+        hour's own AnA ``schism_ana`` run) to pull a valid T0 sample
+        from when this run's own ``precip_source.nc`` has none.
+        Some callers' precip regridding doesn't reach back to T0 (e.g.
+        an SR forecast, where the underlying gridded forcing's own T0
+        sample doesn't exist by BMI design -- confirmed live: its
+        ``vsource`` array is masked in full across the whole domain at
+        row 0, `time_vsource[0]` too). ``np.ma`` addition propagates
+        that mask through the source/sink merge below regardless of
+        real discharge, and the masked cells are then serialized to
+        the raw netCDF fill sentinel (~1e37) -- confirmed live as the
+        cause of an SR SCHISM run destabilizing within its first
+        timestep. When given and row 0 is masked, that row is replaced
+        with the T0 sample (its own last row -- both files share the
+        same mesh-element ordering/shape) from this second source
+        instead of writing it out corrupted. Every other caller simply
+        omits it and behavior is unchanged.
     """
     # Optionally stage source.nc from prebuilt model directory
     if prebuilt_dir is not None:
@@ -465,6 +574,16 @@ def merge_source_sink(  # noqa: PLR0915
     # Read precipitation source
     with netCDF4.Dataset(str(work_dir / "precip_source.nc"), "r") as precip:
         so2 = precip.variables["vsource"][:]
+
+    if (
+        t0_precip_source_file is not None
+        and np.ma.is_masked(so2)
+        and np.ma.getmaskarray(so2)[0].any()
+    ):
+        with netCDF4.Dataset(str(t0_precip_source_file), "r") as t0precip:
+            t0_row = np.ma.filled(t0precip.variables["vsource"][-1, :], 0.0)
+        so2[0, :] = t0_row
+        so2.mask[0, :] = False
 
     # Truncate discharge arrays to match precipitation time dimension
     ntime = so2.shape[0]
@@ -671,6 +790,44 @@ def stage_ldasin_files(
     return nwm_forcing_output, coastal_forcing_output
 
 
+def stage_forecast_forcing(
+    *,
+    work_dir: Path,
+    start_date: datetime,
+    forecast_file: Path,
+) -> tuple[Path, Path]:
+    """Stage a pre-generated ngen forecast forcing file for regridding.
+
+    Unlike :func:`stage_ldasin_files`, which symlinks one file per hour,
+    the ngen forecast forcing engine emits a single multi-timestep file on
+    the WRF-Hydro geogrid.  A single symlink is placed in
+    ``forcing_input/<YYYYMMDDHH>/`` with a ``*.LDASIN_DOMAIN1`` name so the
+    (slab-aware) regridder and sflux generator discover it via their
+    existing globs and iterate its timesteps in place — no copy needed.
+
+    Returns ``(forcing_input_dir, coastal_forcing_output_dir)``.
+    """
+    pdy = start_date.strftime("%Y%m%d")
+    cyc = start_date.strftime("%H")
+    forcing_begin = f"{pdy}{cyc}"
+
+    nwm_forcing_output = work_dir / "forcing_input"
+    forcing_subdir = nwm_forcing_output / forcing_begin[:10]
+    forcing_subdir.mkdir(parents=True, exist_ok=True)
+
+    coastal_forcing_output = work_dir / "coastal_forcing_output"
+    coastal_forcing_output.mkdir(parents=True, exist_ok=True)
+
+    if not forecast_file.exists():
+        raise FileNotFoundError(f"Forecast meteo file not found: {forecast_file}")
+
+    dst = forcing_subdir / f"{forecast_file.stem}.LDASIN_DOMAIN1"
+    _symlink(forecast_file, dst)
+
+    logger.info("    Staged forecast forcing %s -> %s", forecast_file, dst)
+    return nwm_forcing_output, coastal_forcing_output
+
+
 # ---------------------------------------------------------------------------
 # 8. Generate sflux from LDASIN  (was post_nwm_forcing_coastal → makeAtmo.py)
 # ---------------------------------------------------------------------------
@@ -836,6 +993,7 @@ def update_params(  # noqa: PLR0912, PLR0915
     single_output_file: bool = False,
     run_param_overrides: dict[str, Any] | None = None,
     discharge_enabled: bool = True,
+    wind_enabled: bool = True,
 ) -> Path:
     """Create ``param.nml`` and symlink static mesh files.
 
@@ -913,12 +1071,15 @@ def update_params(  # noqa: PLR0912, PLR0915
     ihfskip = int(overrides_remaining.pop("ihfskip", ihfskip_default))
 
     # SCHISM requires ``nhot_write`` to be a multiple of ihfskip when
-    # nhot=1. We aim for "hotstart roughly every 18 simulation hours"
-    # at the canonical dt=200 (nhot_target = 324 timesteps) but rescale
-    # for other timesteps so the wall-clock cadence stays similar, then
-    # round up to the next multiple of ihfskip so the constraint holds.
-    # The user can still override ``nhot_write`` directly.
-    nhot_target = max(1, round(18 * 3600 / timestep_seconds))
+    # nhot=1. We aim for "hotstart every simulated hour" (nhot_target =
+    # 18 timesteps at the canonical dt=200) so a hotstart lands at every
+    # hour boundary regardless of the run's total length -- this is what
+    # AnA cycling needs (a checkpoint at the 1h mark and another at the
+    # run's end), and it degrades gracefully for longer forecast runs
+    # (just more, unused, intermediate hotstarts). Round up to the next
+    # multiple of ihfskip so the divisibility constraint holds. The user
+    # can still override ``nhot_write`` directly.
+    nhot_target = max(1, round(1 * 3600 / timestep_seconds))
     nhot_write_default = max(1, -(-nhot_target // ihfskip)) * ihfskip
     nhot_write = int(overrides_remaining.pop("nhot_write", nhot_write_default))
 
@@ -937,6 +1098,14 @@ def update_params(  # noqa: PLR0912, PLR0915
     # file. Set to 0 in that case so SCHISM runs without river forcing.
     if_source_val = -1 if discharge_enabled else 0
     text = re.sub(r"(?m)^(\s*)if_source\s*=.*$", rf"\g<1>if_source = {if_source_val}", text)
+
+    # nws = 2 reads sflux atmospheric files, produced by the schism_sflux
+    # stage. When wind is disabled (include_wind=False) that stage skips
+    # and no sflux files are ever written -- leaving nws = 2 would make
+    # SCHISM abort at init looking for them. nws = 0 means no atmospheric
+    # forcing is applied at all (confirmed in the template's own comment).
+    if not wind_enabled:
+        text = re.sub(r"(?m)^(\s*)nws\s*=.*$", r"\g<1>nws = 0", text)
 
     # rnday is fractional day
     rnday = rnhours / 24.0
@@ -1269,17 +1438,45 @@ def make_stofs_boundary(
 # ---------------------------------------------------------------------------
 
 
-def combine_hotstart(outputs_dir: Path) -> None:
-    """Run ``combine_hotstart7`` in the outputs directory."""
-    result = subprocess.run(
-        ["combine_hotstart7"],
-        cwd=outputs_dir,
-        capture_output=True,
-        text=True,
-        check=False,
+def combine_hotstart(outputs_dir: Path) -> list[Path]:
+    """Run ``combine_hotstart7`` for every hotstart iteration in *outputs_dir*.
+
+    SCHISM writes one set of per-rank ``hotstart_<rank>_<iteration>.nc``
+    files at each ``nhot_write`` interval (see ``make_param_nml``).
+    ``combine_hotstart7`` requires an explicit ``-i <iteration>`` to know
+    which set to merge -- it does not auto-detect it -- and produces
+    ``hotstart_it=<iteration>.nc``. This finds every iteration actually
+    present (via rank 0's files) and combines each one in turn.
+
+    Returns the combined file paths, in iteration order.
+    """
+    iterations = sorted(
+        int(m.group(1))
+        for f in outputs_dir.glob("hotstart_000000_*.nc")
+        if (m := re.match(r"hotstart_000000_(\d+)\.nc$", f.name))
     )
-    if result.returncode != 0:
-        raise RuntimeError(
-            f"combine_hotstart7 failed (exit {result.returncode}): {result.stderr[-2000:]}"
+    if not iterations:
+        logger.info("    No hotstart_000000_*.nc files found in %s; nothing to combine", outputs_dir)
+        return []
+
+    combined_paths = []
+    for iteration in iterations:
+        result = subprocess.run(
+            ["combine_hotstart7", "-i", str(iteration)],
+            cwd=outputs_dir,
+            capture_output=True,
+            text=True,
+            check=False,
         )
-    logger.info("    combine_hotstart7 completed")
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"combine_hotstart7 -i {iteration} failed (exit {result.returncode}): "
+                f"{result.stderr[-2000:]}"
+            )
+        combined_path = outputs_dir / f"hotstart_it={iteration}.nc"
+        if not combined_path.exists():
+            raise RuntimeError(f"combine_hotstart7 -i {iteration} did not produce {combined_path}")
+        combined_paths.append(combined_path)
+        logger.info("    combine_hotstart7 -i %d completed -> %s", iteration, combined_path.name)
+
+    return combined_paths

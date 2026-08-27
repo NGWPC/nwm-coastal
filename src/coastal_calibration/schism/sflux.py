@@ -161,11 +161,25 @@ def make_atmo_sflux(  # noqa: PLR0915
         j0, j1 = 0, lats.shape[0]
         i0, i1 = 0, lons.shape[1]
 
-    files = sorted(str(p) for p in forcing_input_dir.glob("*LDASIN_DOMAIN1"))
+    files = sorted(forcing_input_dir.glob("*LDASIN_DOMAIN1"))
     if not files:
         msg = f"No LDASIN_DOMAIN1 files found in {forcing_input_dir}"
         raise FileNotFoundError(msg)
-    logger.info("    Creating sflux from %d LDASIN files in %s", len(files), forcing_input_dir)
+    # Each file may hold a single timestep (canonical LDASIN) or several
+    # (ngen forecast forcing engine).  Count timesteps per file from the
+    # leading axis so the output is sized to the true number of slabs
+    # rather than the file count.
+    file_ntimes = []
+    for f in files:
+        with netCDF4.Dataset(f) as data:
+            file_ntimes.append(data.variables["T2D"].shape[0])
+    n_times = sum(file_ntimes)
+    logger.info(
+        "    Creating sflux from %d LDASIN file(s) (%d timestep(s)) in %s",
+        len(files),
+        n_times,
+        forcing_input_dir,
+    )
 
     sflux_dir = work_dir / "sflux"
     sflux_dir.mkdir(parents=True, exist_ok=True)
@@ -183,7 +197,7 @@ def make_atmo_sflux(  # noqa: PLR0915
     field_dims = ("time", "ny_grid", "nx_grid")
 
     with netCDF4.Dataset(out_path, "w", format="NETCDF4") as ncout:
-        ncout.createDimension("time", len(files) + 1)
+        ncout.createDimension("time", n_times + 1)
         ncout.createDimension("ny_grid", lats.shape[0])
         ncout.createDimension("nx_grid", lons.shape[1])
 
@@ -199,7 +213,7 @@ def make_atmo_sflux(  # noqa: PLR0915
                 "base_date": base_date,
             },
         )
-        time = np.arange(0, (1 / 24) * (len(files) + 1), 1 / 24)
+        time = np.arange(0, (1 / 24) * (n_times + 1), 1 / 24)
         time += start_dt.hour / 24.0
         time[0] = _round_down(time[0], 7)
         write_var(nctime, time)
@@ -286,18 +300,21 @@ def make_atmo_sflux(  # noqa: PLR0915
             },
         )
 
-        for i, file in enumerate(files):
+        out_i = 0
+        for file, nt in zip(files, file_ntimes, strict=True):
             with netCDF4.Dataset(file) as data:
-                t2d = np.asarray(data.variables["T2D"][0])[j0:j1, i0:i1]
-                q2d = np.asarray(data.variables["Q2D"][0])[j0:j1, i0:i1]
-                psfc = np.asarray(data.variables["PSFC"][0])[j0:j1, i0:i1]
-                u2d = np.asarray(data.variables["U2D"][0])[j0:j1, i0:i1]
-                v2d = np.asarray(data.variables["V2D"][0])[j0:j1, i0:i1]
-                write_var(nct, t2d, index=i)
-                write_var(ncq, q2d, index=i)
-                write_var(ncu, u2d, index=i)
-                write_var(ncv, v2d, index=i)
-                write_var(ncp, _pressure_to_msl(t2d, q2d, height, psfc), index=i)
+                for t in range(nt):
+                    t2d = np.asarray(data.variables["T2D"][t])[j0:j1, i0:i1]
+                    q2d = np.asarray(data.variables["Q2D"][t])[j0:j1, i0:i1]
+                    psfc = np.asarray(data.variables["PSFC"][t])[j0:j1, i0:i1]
+                    u2d = np.asarray(data.variables["U2D"][t])[j0:j1, i0:i1]
+                    v2d = np.asarray(data.variables["V2D"][t])[j0:j1, i0:i1]
+                    write_var(nct, t2d, index=out_i)
+                    write_var(ncq, q2d, index=out_i)
+                    write_var(ncu, u2d, index=out_i)
+                    write_var(ncv, v2d, index=out_i)
+                    write_var(ncp, _pressure_to_msl(t2d, q2d, height, psfc), index=out_i)
+                    out_i += 1
 
         # Duplicate last timestep so SCHISM always has a trailing value
         write_var(ncu, np.asarray(ncu[-2]), index=-1)

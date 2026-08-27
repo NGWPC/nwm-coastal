@@ -171,6 +171,14 @@ class TestPathConfig:
         cfg = PathConfig(work_dir=tmp_work_dir, tidal_atlas_dir=tmp_path / "TPXO10_atlas")
         assert cfg.tidal_atlas_dir == (tmp_path / "TPXO10_atlas").resolve()
 
+    def test_troute_file_default_none(self, tmp_work_dir):
+        cfg = PathConfig(work_dir=tmp_work_dir)
+        assert cfg.troute_file is None
+
+    def test_troute_file_explicit_resolved(self, tmp_work_dir, tmp_path):
+        cfg = PathConfig(work_dir=tmp_work_dir, troute_file=tmp_path / "troute_output_x.nc")
+        assert cfg.troute_file == (tmp_path / "troute_output_x.nc").resolve()
+
     def test_meteo_dir(self, tmp_work_dir, tmp_download_dir):
         cfg = PathConfig(work_dir=tmp_work_dir, raw_download_dir=tmp_download_dir)
         assert (
@@ -297,7 +305,7 @@ class TestSchismModelConfig:
         discharge = tmp_path / "my_reaches.csv"
         discharge.touch()
         cfg = SchismModelConfig(discharge_file=discharge)
-        assert cfg.resolved_discharge_file == discharge.resolve()
+        assert cfg.resolved_discharge_file() == discharge.resolve()
 
     def test_resolved_discharge_explicit_missing(self, tmp_path):
         prebuilt = tmp_path / "prebuilt"
@@ -308,7 +316,7 @@ class TestSchismModelConfig:
             prebuilt_dir=prebuilt,
             discharge_file=tmp_path / "does_not_exist.csv",
         )
-        assert cfg.resolved_discharge_file is None
+        assert cfg.resolved_discharge_file() is None
 
     def test_resolved_discharge_autodiscover(self, tmp_path):
         prebuilt = tmp_path / "prebuilt"
@@ -316,17 +324,44 @@ class TestSchismModelConfig:
         reaches = prebuilt / "nwmReaches.csv"
         reaches.touch()
         cfg = SchismModelConfig(prebuilt_dir=prebuilt)
-        assert cfg.resolved_discharge_file == reaches.resolve()
+        assert cfg.resolved_discharge_file() == reaches.resolve()
 
     def test_resolved_discharge_neither_found(self, tmp_path):
         prebuilt = tmp_path / "prebuilt"
         prebuilt.mkdir()
         cfg = SchismModelConfig(prebuilt_dir=prebuilt)
-        assert cfg.resolved_discharge_file is None
+        assert cfg.resolved_discharge_file() is None
 
     def test_resolved_discharge_no_prebuilt(self):
         cfg = SchismModelConfig()
-        assert cfg.resolved_discharge_file is None
+        assert cfg.resolved_discharge_file() is None
+
+    def test_resolved_discharge_ngen_autodiscover(self, tmp_path):
+        """ngen_forecast auto-discovers ngenReaches.csv, not nwmReaches.csv."""
+        prebuilt = tmp_path / "prebuilt"
+        prebuilt.mkdir()
+        (prebuilt / "nwmReaches.csv").touch()
+        ngen = prebuilt / "ngenReaches.csv"
+        ngen.touch()
+        cfg = SchismModelConfig(prebuilt_dir=prebuilt)
+        assert cfg.resolved_discharge_file("ngen_forecast") == ngen.resolve()
+        # the nwm sources still resolve to nwmReaches.csv
+        assert cfg.resolved_discharge_file("nwm_ana").name == "nwmReaches.csv"
+
+    def test_resolved_discharge_ngen_missing(self, tmp_path):
+        """ngen_forecast with only nwmReaches.csv present resolves to None."""
+        prebuilt = tmp_path / "prebuilt"
+        prebuilt.mkdir()
+        (prebuilt / "nwmReaches.csv").touch()  # nwm present, ngen absent
+        cfg = SchismModelConfig(prebuilt_dir=prebuilt)
+        assert cfg.resolved_discharge_file("ngen_forecast") is None
+
+    def test_resolved_discharge_explicit_applies_to_ngen(self, tmp_path):
+        """An explicit discharge_file overrides for ngen_forecast too."""
+        discharge = tmp_path / "custom_ngen.csv"
+        discharge.touch()
+        cfg = SchismModelConfig(discharge_file=discharge)
+        assert cfg.resolved_discharge_file("ngen_forecast") == discharge.resolve()
 
     def test_nscribes_autodetect_from_param_nml(self, tmp_path):
         prebuilt = tmp_path / "prebuilt"
@@ -404,6 +439,74 @@ class TestSfincsModelConfig:
     def test_model_name(self, tmp_path):
         cfg = SfincsModelConfig(prebuilt_dir=tmp_path)
         assert cfg.model_name == "sfincs"
+
+    def test_discharge_locations_none(self, tmp_path):
+        cfg = SfincsModelConfig(prebuilt_dir=tmp_path)
+        assert cfg.resolved_discharge_locations_file("nwm_ana") is None
+        assert cfg.resolved_discharge_locations_file("ngen_forecast") is None
+
+    def test_discharge_locations_matching_token_used_asis(self, tmp_path):
+        nwm = tmp_path / "discharge_points_nwm.geojson"
+        nwm.touch()
+        cfg = SfincsModelConfig(prebuilt_dir=tmp_path, discharge_locations_file=nwm)
+        assert cfg.resolved_discharge_locations_file("nwm_ana") == nwm.resolve()
+
+    def test_discharge_locations_swaps_to_ngen_sibling(self, tmp_path):
+        # config points at the _nwm file, but an ngen run prefers the _ngen sibling
+        nwm = tmp_path / "discharge_points_nwm.geojson"
+        ngen = tmp_path / "discharge_points_ngen.geojson"
+        nwm.touch()
+        ngen.touch()
+        cfg = SfincsModelConfig(prebuilt_dir=tmp_path, discharge_locations_file=nwm)
+        assert cfg.resolved_discharge_locations_file("ngen_forecast") == ngen.resolve()
+        assert cfg.resolved_discharge_locations_file("nwm_ana") == nwm.resolve()
+
+    def test_discharge_locations_no_sibling_falls_back(self, tmp_path):
+        # only the _nwm file exists; ngen run has no sibling -> falls back (validate flags it)
+        nwm = tmp_path / "discharge_points_nwm.geojson"
+        nwm.touch()
+        cfg = SfincsModelConfig(prebuilt_dir=tmp_path, discharge_locations_file=nwm)
+        assert cfg.resolved_discharge_locations_file("ngen_forecast") == nwm.resolve()
+
+    def test_discharge_locations_appends_token_when_unsuffixed(self, tmp_path):
+        base = tmp_path / "discharge_points.geojson"
+        ngen = tmp_path / "discharge_points_ngen.geojson"
+        base.touch()
+        ngen.touch()
+        cfg = SfincsModelConfig(prebuilt_dir=tmp_path, discharge_locations_file=base)
+        assert cfg.resolved_discharge_locations_file("ngen_forecast") == ngen.resolve()
+
+    def test_validate_flags_token_mismatch(self, tmp_path):
+        # _nwm file with an ngen_forecast run and no _ngen sibling -> validation error
+        from coastal_calibration.config.schema import (
+            BoundaryConfig,
+            CoastalCalibConfig,
+            DownloadConfig,
+            PathConfig,
+            SimulationConfig,
+        )
+
+        (tmp_path / "sfincs.inp").touch()
+        nwm = tmp_path / "discharge_points_nwm.geojson"
+        nwm.touch()
+        fcst = tmp_path / "Hawaii_x.nc"
+        fcst.touch()
+        cfg = CoastalCalibConfig(
+            simulation=SimulationConfig(
+                start_date=datetime(2025, 9, 15),
+                duration_hours=2,
+                coastal_domain="hawaii",
+                meteo_source="ngen_forecast",
+            ),
+            boundary=BoundaryConfig(source="stofs"),
+            paths=PathConfig(work_dir=tmp_path / "work", forecast_meteo_file=fcst),
+            model_config=SfincsModelConfig(
+                prebuilt_dir=tmp_path, discharge_locations_file=nwm
+            ),
+            download=DownloadConfig(enabled=False),
+        )
+        errors = cfg.model_config.validate(cfg)
+        assert any("_nwm" in e and "ngen_forecast" in e for e in errors)
 
     def test_stage_order(self, tmp_path):
         cfg = SfincsModelConfig(prebuilt_dir=tmp_path)

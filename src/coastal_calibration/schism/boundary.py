@@ -57,7 +57,8 @@ class UpdateParamsStage(WorkflowStage):
             output_freq_hours=self.model.output_freq_hours,
             single_output_file=self.model.single_output_file,
             run_param_overrides=self.model.run_param_overrides,
-            discharge_enabled=self.model.resolved_discharge_file is not None,
+            discharge_enabled=self.model.resolved_discharge_file(sim.meteo_source) is not None,
+            wind_enabled=self.model.include_wind,
         )
 
         self._log(f"Parameter file created: {param_file}")

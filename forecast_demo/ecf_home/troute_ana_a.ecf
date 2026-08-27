@@ -1,0 +1,104 @@
+%include <head.h>
+
+YMD=%YMD%
+HH=%HOUR%
+CYCLE=${YMD}${HH}
+CYCLE_DT="${YMD:0:4}-${YMD:4:2}-${YMD:6:2} ${HH}:00:00"
+
+# troute AnA-A: the 1-hour rolling self-chain (T-3 -> T-2 relative to this
+# cycle's own time). This is the ONLY state that ever gets fed forward to
+# a future cycle -- AnA-B (troute_ana_b.ecf) and SR (troute_sr.ecf) both
+# branch off it but never feed anything back.
+#
+# troute can only save state at wherever a run stops, not mid-run, hence
+# two separate 1h/3h invocations from the same starting state instead of
+# one longer run with an internal checkpoint (unlike SCHISM/SFINCS, which
+# can checkpoint mid-run - see coastal_ana_schism.ecf/coastal_ana_sfincs.ecf).
+#
+# PREV_CYCLE is this cycle's own start point (=T-3).
+#
+# The relative adjustment must come BEFORE the timestamp in the
+# string passed to `date -d`. "${CYCLE_DT} -1 hour" silently parses wrong
+# the "-1 hour ${CYCLE_DT}" adjustment first evaluates correctly.
+
+PREV_DT="-1 hour ${CYCLE_DT}"
+PREV_CYCLE=$(date -u -d "${PREV_DT}" +"%%Y%%m%%d%%H")
+END_DT=$(date -u -d "-2 hours ${CYCLE_DT}" +"%%Y-%%m-%%d %%H:%%M:%%S")
+
+# troute names its output file after the run's actual start_time, not the
+# cycle time.
+#
+# This run's fcst_start is T-3 (CYCLE_DT-3h): -dt is END_DT (T-2, already
+# CYCLE_DT-2h) and -lb 120 pulls it back one more hour to T-3, but troute's
+# own restart/output timestamp is a further 1h before fcst_start by design
+# in mswm.
+
+STAMP=$(date -u -d "-4 hours ${CYCLE_DT}" +"%%Y%%m%%d%%H")00
+
+RNAME="region_ana_a_${CYCLE}"
+
+# netCDF outputs (troute_output_*.nc etc.) land in an Output/ subdirectory
+
+TROUTE_OUT_FILE="%TROUTE_REGIONALIZATION_ROOT%/${RNAME}/%VPU%/Output/troute_output_${STAMP}.nc"
+
+# HOST-side paths -- for the [ -f ... ] existence checks below, which run
+# in this .ecf script's own shell, outside docker.
+
+SAVE_STATE_DIR="%TROUTE_REGIONALIZATION_ROOT%/${RNAME}/%VPU%/state_save"
+LOAD_STATE_DIR="%TROUTE_REGIONALIZATION_ROOT%/region_ana_a_${PREV_CYCLE}/%VPU%/state_save"
+
+# CONTAINER-side paths -- for the -ssd/-lsf flags below, which are read by
+# run_regionalization_standalone.py INSIDE the container. Passing it the
+# HOST path instead silently no-ops the save/load because
+# TROUTE_REGIONALIZATION_ROOT's HOST prefix doesn't exist in the
+# container's filesystem (only TROUTE_REGIONALIZATION_ROOT_CONTAINER's
+# does, per nwm-rte's docker_run mount).
+
+SAVE_STATE_DIR_CONTAINER="%TROUTE_REGIONALIZATION_ROOT_CONTAINER%/${RNAME}/%VPU%/state_save"
+LOAD_STATE_DIR_CONTAINER="%TROUTE_REGIONALIZATION_ROOT_CONTAINER%/region_ana_a_${PREV_CYCLE}/%VPU%/state_save"
+
+export CYCLE_DT
+export END_DT
+export RNAME
+
+# Bootstrap handling: only the first cycle in the suite's history has
+# no prior troute_ana_a save to load -- see gen_cycle_config.py's
+# --hot-start-file/--sfincs-rst-file for the same pattern applied to the
+# coastal models. Anywhere else, a missing LOAD_STATE_DIR would mean the
+# ecflow trigger graph would let this run before the prior cycle's troute_ana_a
+# actually finished, which the trigger above is supposed to prevent.
+# Existence check against the HOST path; -lsf arg built from the
+# CONTAINER path (see note above).
+
+if [ -f "${LOAD_STATE_DIR}/troute" ]; then
+  LOAD_STATE_ARGS="-lsf ${LOAD_STATE_DIR_CONTAINER}"
+  echo "Warm-starting troute AnA-A from ${LOAD_STATE_DIR}"
+else
+  LOAD_STATE_ARGS=""
+  echo "No prior troute_ana_a state at ${LOAD_STATE_DIR} -- cold-starting (expected only at bootstrap)"
+fi
+export LOAD_STATE_ARGS
+export SAVE_STATE_DIR_CONTAINER
+
+# ---- LAUNCH (placeholder for future Slurm submission) --------------------
+bash -c '
+  set -euo pipefail
+  cd "%NWM_RTE_DIR%"
+  export EWTS_ENABLED="%EWTS_ENABLED%"
+  export TARGET_IMAGE_NAME="${TARGET_IMAGE_NAME:-ngen_rte_ghcr}"
+  source config.bashrc
+  source run.sh
+  TEST_VPU="vpu_%VPU%"
+  TEST_FORM_ASSIGN_VPU="${INSTALLED_REGIONALIZATION_RESULTS}/${TEST_VPU}/formulation_assignment.csv"
+  TEST_CAT_GRP_VPU="${INSTALLED_REGIONALIZATION_RESULTS}/${TEST_VPU}/catchment_groups.csv"
+  docker_run python -um "ngen_rte.run_regionalization_standalone" -n 12 -faf "${TEST_FORM_ASSIGN_VPU}" -cgf "${TEST_CAT_GRP_VPU}" -fconfig "standard_ana" -dt "${END_DT}" -lb 120 -rname "${RNAME}" -v "%VPU%" --hydrofab_file "/ngwpc/run_ngen/data/hydrofabric/vpu_%VPU%.gpkg" -outfmt NetCDF -ss -ssd "${SAVE_STATE_DIR_CONTAINER}" ${LOAD_STATE_ARGS}
+' "%NWM_RTE_DIR%/run.sh"
+# ---- END LAUNCH ------------------------------------------------------------
+
+if [ ! -f "${SAVE_STATE_DIR}/troute" ]; then
+  echo "ERROR: expected troute_ana_a state save missing: ${SAVE_STATE_DIR}/troute" >&2
+  exit 1
+fi
+echo "troute AnA-A OK: ${SAVE_STATE_DIR}/troute"
+
+%include <tail.h>

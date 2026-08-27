@@ -563,6 +563,8 @@ class TestCreateStages:
         assert result["status"] == "completed"
         mock_sfincs_model.quadtree_mask.create_active.assert_called_once_with(
             zmin=-5.0,
+            include_polygon=None,
+            exclude_polygon=None,
         )
         _clear_model(minimal_create_config)
 

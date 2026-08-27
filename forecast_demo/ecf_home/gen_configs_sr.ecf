@@ -1,0 +1,106 @@
+%include <head.h>
+
+YMD=%YMD%
+HH=%HOUR%
+CYCLE=${YMD}${HH}
+CYCLE_DT="${YMD:0:4}-${YMD:4:2}-${YMD:6:2} ${HH}:00:00"
+STAMP=${CYCLE}00
+
+FORCING_FILE="%FORCING_OUT_DIR%/vpu03s_${STAMP}.nc"
+
+# netCDF outputs land in an Output/ subdirectory -- same convention as the
+# AnA tasks
+
+TROUTE_FILE="%TROUTE_REGIONALIZATION_ROOT%/region_sr_${CYCLE}/%VPU%/Output/troute_output_${STAMP}.nc"
+
+# troute_sr's own run starts 1h after T0 by mswm design (confirmed live:
+# real data starts at CYCLE_DT+1h, not CYCLE_DT) -- SCHISM/SFINCS SR now
+# start genuinely at T0 (see gen_cycle_config.py's --run-type sr), so T0's
+# discharge row has to come from somewhere else. This same hour's own
+# troute_ana_b run already reprocessed the same window and genuinely
+# reaches T0 -- same STAMP convention as troute_ana_b.ecf (-4h, the mswm
+# output-naming shift, not the data's actual span).
+
+T0_TROUTE_STAMP=$(date -u -d "-4 hours ${CYCLE_DT}" +"%%Y%%m%%d%%H")00
+T0_TROUTE_FILE="%TROUTE_REGIONALIZATION_ROOT%/region_ana_b_${CYCLE}/%VPU%/Output/troute_output_${T0_TROUTE_STAMP}.nc"
+
+# sr_ prefix mirrors the AnA side's ana_${CYCLE} convention, distinguishing
+# an SR cycle's own directory from its same-hour AnA counterpart.
+
+SCHISM_CYCLE_DIR="%SCHISM_CYCLES_DIR%/sr_${CYCLE}"
+SFINCS_CYCLE_DIR="%SFINCS_CYCLES_DIR%/sr_${CYCLE}"
+
+# SR's own gridded meteo forcing has no real T0 sample by the same BMI
+# design gap as troute above.
+# This cycle's schism_ana run already reached T0 with real values;
+# pull just that row instead
+
+T0_PRECIP_SOURCE_FILE="%SCHISM_CYCLES_DIR%/ana_${CYCLE}/run/precip_source.nc"
+
+for f in "${FORCING_FILE}" "${TROUTE_FILE}" "${T0_TROUTE_FILE}" "${T0_PRECIP_SOURCE_FILE}"; do
+  [ -f "$f" ] || { echo "ERROR: upstream file missing: $f" >&2; exit 1; }
+done
+
+# SR warm start: this cycle's own schism_ana/sfincs_ana just finished (this
+# task's trigger requires both == complete) and reached T0 -- the same real
+# time SR starts from. Locate their T0 checkpoints.
+#
+# SCHISM: hotstart_it=<iteration>.nc, iteration is a timestep count (depends
+# on dt/nhot_write, not derivable without parsing param.nml), but
+# combine_hotstart() writes hourly, so the LARGEST iteration present is
+# always the final/T0 checkpoint -- discover it by numeric sort.
+
+SCHISM_ANA_OUTPUTS_DIR="%SCHISM_CYCLES_DIR%/ana_${CYCLE}/run/outputs"
+SCHISM_HOT_START_FILE=""
+if [ -d "${SCHISM_ANA_OUTPUTS_DIR}" ]; then
+  SCHISM_HOT_START_FILE=$(
+    for f in "${SCHISM_ANA_OUTPUTS_DIR}"/hotstart_it=*.nc; do
+      [ -e "$f" ] || continue
+      n=$(echo "$f" | sed -E 's/.*hotstart_it=([0-9]+)\.nc$/\1/')
+      echo "${n} ${f}"
+    done | sort -n | tail -1 | awk '{print $2}'
+  )
+fi
+
+# SFINCS: sfincs.<YYYYMMDD.HHMMSS>.rst -- the timestamp is tref (==
+# schism_ana/sfincs_ana's own start_date, T-3) + elapsed seconds, so the T0
+# restart's name is exactly computable: it's this cycle's own CYCLE_DT.
+# SFINCS writes its .rst files into a "sfincs_model/" subdirectory
+# of the run dir.
+
+SFINCS_ANA_RUN_DIR="%SFINCS_CYCLES_DIR%/ana_${CYCLE}/run/sfincs_model"
+SFINCS_RST_FILE="${SFINCS_ANA_RUN_DIR}/sfincs.${YMD}.${HH}0000.rst"
+
+# ---- LAUNCH (placeholder for future Slurm submission) --------------------
+# Today: direct execution (takes less than a second; unlikely to ever need Slurm).
+%NWM_COASTAL_PY% %GEN_SCRIPT% \
+  --model schism \
+  --run-type sr \
+  --base-yaml "%SCHISM_BASE_YAML%" \
+  --cycle "${CYCLE}" \
+  --start-date "${CYCLE_DT}" \
+  --forecast-meteo-file "${FORCING_FILE}" \
+  --troute-file "${TROUTE_FILE}" \
+  --t0-troute-file "${T0_TROUTE_FILE}" \
+  --t0-precip-source-file "${T0_PRECIP_SOURCE_FILE}" \
+  --cycle-dir "${SCHISM_CYCLE_DIR}" \
+  ${SCHISM_HOT_START_FILE:+--hot-start-file "${SCHISM_HOT_START_FILE}"}
+
+%NWM_COASTAL_PY% %GEN_SCRIPT% \
+  --model sfincs \
+  --run-type sr \
+  --base-yaml "%SFINCS_BASE_YAML%" \
+  --cycle "${CYCLE}" \
+  --start-date "${CYCLE_DT}" \
+  --forecast-meteo-file "${FORCING_FILE}" \
+  --troute-file "${TROUTE_FILE}" \
+  --t0-troute-file "${T0_TROUTE_FILE}" \
+  --cycle-dir "${SFINCS_CYCLE_DIR}" \
+  --sfincs-rst-file "${SFINCS_RST_FILE}"
+# ---- END LAUNCH ------------------------------------------------------------
+
+for f in "${SCHISM_CYCLE_DIR}/run.yaml" "${SFINCS_CYCLE_DIR}/run.yaml"; do
+  [ -s "$f" ] || { echo "ERROR: generated config missing/empty: $f" >&2; exit 1; }
+done
+
+%include <tail.h>

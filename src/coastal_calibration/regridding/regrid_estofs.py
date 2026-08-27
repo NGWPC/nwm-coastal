@@ -56,26 +56,40 @@ from .esmf_utils import (
 
 local_pet = ESMF.local_pet()
 
-FORECAST_START = 5
 TIME_STEP = 3600
 MISSING = -9999.0
 
 
+def _round_to_hour(t: datetime) -> datetime:
+    """Round a decoded ESTOFS timestamp up to the nearest hour.
+
+    ESTOFS timestamps aren't always exactly on the hour; matching against
+    the requested cycle time (which always is) requires normalizing first.
+    """
+    truncated = datetime(t.year, t.month, t.day, t.hour)
+    if t.minute != 0 or t.second != 0:
+        truncated += timedelta(hours=1)
+    return truncated
+
+
 def _determine_time_range(
     f_in: netCDF4.Dataset,
-    forecast_start: int,
     cycle_date: str,
     cycle_time: str,
     length_hrs: int,
 ) -> tuple[int, int, NDArray[Any], dict[str, Any]]:
     """Determine the time slice to extract from the ESTOFS input.
 
+    Locates the requested cycle start by searching the file's ``time``
+    values for a match, rather than assuming a fixed index offset into a
+    full ~186-step cycle file. This works the same whether *f_in* is a
+    complete cycle file or one pre-trimmed to just the window a
+    simulation needs (e.g. by a time-subsetted download).
+
     Parameters
     ----------
     f_in
         Open netCDF4 Dataset handle for the ESTOFS file.
-    forecast_start
-        Index of the first forecast timestep.
     cycle_date
         Cycle date as ``YYYYMMDD``.
     cycle_time
@@ -95,18 +109,21 @@ def _determine_time_range(
         Attributes of the time variable (for output metadata).
     """
     etime_var = f_in["time"]
-    estart = num2date(etime_var[forecast_start], units=etime_var.units)
-
-    # Round up non-hourly ESTOFS start times
-    if estart.minute != 0:
-        estart = datetime(estart.year, estart.month, estart.day, estart.hour)
-        estart += timedelta(hours=1)
-
-    total_hours = length_hrs + 1
     fdate = datetime.strptime(cycle_date + cycle_time, "%Y%m%d%H%M")
 
-    dt_h = int((fdate - estart).total_seconds() / 3600)
-    start = forecast_start + dt_h
+    all_times = num2date(etime_var[:], units=etime_var.units)
+    rounded_times = [_round_to_hour(t) for t in all_times]
+    try:
+        start = rounded_times.index(fdate)
+    except ValueError as e:
+        msg = (
+            f"Requested cycle start {fdate:%Y-%m-%d %H:%M} not found in ESTOFS "
+            f"input (file covers {rounded_times[0]:%Y-%m-%d %H:%M} to "
+            f"{rounded_times[-1]:%Y-%m-%d %H:%M})"
+        )
+        raise ValueError(msg) from e
+
+    total_hours = length_hrs + 1
 
     logger.debug("ESTOFS time range: start=%d, total_hours=%d", start, total_hours)
     times = f_in["time"][start : start + total_hours]
@@ -267,7 +284,7 @@ def regrid_estofs(
 
     with netCDF4.Dataset(nc_in) as f_in:
         start, nt, times, time_atts = _determine_time_range(
-            f_in, FORECAST_START, cycle_date, cycle_time, length_hrs
+            f_in, cycle_date, cycle_time, length_hrs
         )
 
         src_lon = f_in["x"][:]

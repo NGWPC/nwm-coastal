@@ -209,3 +209,22 @@ nwm-coastal-cli
 # Per-domain runtime artifacts under docs/examples/ are gitignored by
 # docs/examples/.gitignore (cache/, run/, model symlinks, etc.) so the
 # committed inputs at the top of each domain dir stay tracked.
+
+### forecast_demo ###
+# Generated from suite_def/coastal_hourly.def.template (envsubst, run by
+# server/load_and_begin.sh) -- installation-specific paths get baked in,
+# so this is never the tracked source of truth. See forecast_demo/README.md.
+forecast_demo/suite_def/coastal_hourly.def
+
+# Per-cycle job/output/try artifacts ecflow generates on every run
+# (schism_sr.job4, troute_ana_a.1, etc.) -- pure runtime state, unique to
+# whoever ran the suite and when, never something to track.
+forecast_demo/ecf_home/coastal_hourly/
+
+# ecflow_server checkpoint binaries, named after the host they ran on.
+forecast_demo/ecf_home/*.ecf.check
+forecast_demo/ecf_home/*.ecf.check.b
+forecast_demo/ecf_home/*.ecf.log
+
+# ecflow_server stdout/stderr log, from server/start_server.sh's nohup.
+forecast_demo/ecf_home/*.nohup.out

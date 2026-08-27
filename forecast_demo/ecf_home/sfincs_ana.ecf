@@ -1,0 +1,36 @@
+%include <head.h>
+
+YMD=%YMD%
+HH=%HOUR%
+CYCLE=${YMD}${HH}
+CYCLE_DT="${YMD:0:4}-${YMD:4:2}-${YMD:6:2} ${HH}:00:00"
+# Bootstrap skip -- see bootstrap_check.h for full rationale.
+%include <bootstrap_check.h>
+
+# A second %include <tail.h> here (one per skip branch, one at the true
+# end) breaks ecflow's own job-generation preprocessing. Wrap the real
+# work in a shell conditional instead, so there is only ever ONE
+# %include <tail.h>, at the true end of the file.
+if [ "${SKIP_COASTAL}" -eq 0 ]; then
+
+CONFIG_FILE="%SFINCS_CYCLES_DIR%/ana_${CYCLE}/run.yaml"
+[ -f "${CONFIG_FILE}" ] || { echo "ERROR: missing config: ${CONFIG_FILE}" >&2; exit 1; }
+
+# SFINCS AnA: 3h T-3->T0, via gen_configs_ana.ecf's config (start_date=T-3,
+# duration_hours=3, dtrstout=3600 so restarts actually get written,
+# warm-started from PREV_CYCLE's own T-2 checkpoint if present - true
+# bootstrap cold-starts gracefully).SFINCS can also checkpoint mid-run 
+# so this  3h run writes restarts at both the 1h mark (T-2, self-chains to 
+# next cycle's sfincs_ana via gen_configs_ana.ecf) and the 3h/final mark 
+# (T0, feeds sfincs_sr.ecf's warm start this same hour via gen_configs_sr.ecf).
+#
+# ---- LAUNCH (placeholder for future Slurm submission) --------------------
+# Today: direct execution on this shared node.
+
+%NWM_COASTAL_CLI% run "${CONFIG_FILE}"
+
+# ---- END LAUNCH ------------------------------------------------------------
+
+fi
+
+%include <tail.h>

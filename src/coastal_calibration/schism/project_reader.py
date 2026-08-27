@@ -325,6 +325,7 @@ class NWMSCHISMProject:
         self.elem_area_file = self.project_dir / SCHISMFiles.ELEM_AREA
         self.elev_ic_file = self.project_dir / SCHISMFiles.ELEV_IC
         self.nwm_reaches_file = self.project_dir / SCHISMFiles.NWM_REACHES
+        self.ngen_reaches_file = self.project_dir / SCHISMFiles.NGEN_REACHES
         self.bctides_file = self.project_dir / SCHISMFiles.BCTIDES
         self.elev_corr_file = self.project_dir / SCHISMFiles.ELEV_CORRECTION
 
@@ -340,6 +341,7 @@ class NWMSCHISMProject:
             "element_areas.txt": self.elem_area_file,
             "elev.ic": self.elev_ic_file,
             "nwmReaches.csv": self.nwm_reaches_file,
+            "ngenReaches.csv": self.ngen_reaches_file,
         }
         if validate:
             self._validate_required_files()
