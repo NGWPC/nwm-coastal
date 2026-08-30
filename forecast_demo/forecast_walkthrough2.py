@@ -134,12 +134,12 @@ subprocess.run(
 # ---------------------------------------------------------------------------
 # 4. hotstart_coastal_models.sh -- spin up SCHISM/SFINCS, bootstrap troute AnA-A
 #
-# Produces state for PREV_CYCLE. 18h spinup / 9h ramp are the real defaults;
-# shortened here for a faster test run. Use full defaults for a real run.
+# Produces state for PREV_CYCLE. hotstart_coastal_models.sh's own default
+# is 18h spinup / 9h ramp; this demo uses 24h/6h instead.
 # ---------------------------------------------------------------------------
 
-SPINUP_HOURS = 4
-RAMP_HOURS = 2
+SPINUP_HOURS = 24
+RAMP_HOURS = 6
 
 subprocess.run(
     [
@@ -172,8 +172,10 @@ spinup_station_ids = sorted(set(spinup_schism_series.columns) & set(spinup_sfinc
 if not spinup_station_ids:
     print("Spinup check: no shared stations, skipping")
 else:
-    spinup_start = datetime.strptime(PREV_CYCLE, "%Y%m%d%H") - timedelta(hours=SPINUP_HOURS)
-    spinup_end = datetime.strptime(PREV_CYCLE, "%Y%m%d%H")
+    # hotstart_coastal_models.sh anchors the spin-up's start-date at
+    # TARGET_CYCLE-3h, not PREV_CYCLE -- see SPINUP_END_DT in that script.
+    spinup_end = datetime.strptime(TARGET_CYCLE, "%Y%m%d%H") - timedelta(hours=3)
+    spinup_start = spinup_end - timedelta(hours=SPINUP_HOURS)
     spinup_obs_ds = query_coops_byids(
         spinup_station_ids,
         spinup_start.strftime("%Y%m%d %H:%M"),
