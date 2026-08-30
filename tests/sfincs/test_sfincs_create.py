@@ -88,6 +88,7 @@ def minimal_config_dict(aoi_file: Path, output_dir: Path) -> dict[str, Any]:
     return {
         "aoi": str(aoi_file),
         "output_dir": str(output_dir),
+        "mask": {"zmin": -5.0},
     }
 
 
