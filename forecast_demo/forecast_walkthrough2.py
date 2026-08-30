@@ -138,18 +138,31 @@ if not hydrofab_file_host.exists():
     )
     shutil.copy(nwm_region_mgr_gpkg, hydrofab_file_host)
 
-# Skip the ESMF mesh extract if geo_em_vpu03s.nc already exists under
-# $RUN_NGEN_ROOT/data/esmf_mesh/NWM/domain/.
-subprocess.run(
-    [
+# Skip the ESMF mesh extract if both output files already exist under
+# $RUN_NGEN_ROOT/data/esmf_mesh/NWM/domain/. If only one exists, pass
+# --overwrite so extract_esmf_domain.py doesn't error on the partial state --
+# it errors on an existing output instead of skipping, without that flag.
+esmf_domain_dir = RUN_NGEN_ROOT / "data" / "esmf_mesh" / "NWM" / "domain"
+esmf_domain_outputs = [
+    esmf_domain_dir / "geo_em_vpu03s.nc",
+    esmf_domain_dir / "GEOGRID_LDASOUT_Spatial_Metadata_vpu03s.nc",
+]
+if all(p.exists() for p in esmf_domain_outputs):
+    print("VPU ESMF mesh already exists, skipping extract_esmf_domain.py")
+else:
+    esmf_extract_args = [
         str(NWM_COASTAL_ROOT / "nwm-coastal-py"),
         str(NWM_COASTAL_ROOT / "forecast_demo" / "bin" / "extract_esmf_domain.py"),
         "--source-domain", "CONUS",
         "--extract-geojson", str(RUN_NGEN_ROOT / "data" / "esmf_mesh" / "esmf_domain_extract" / "esmf_conus_03s_extract.geojson"),
         "--output-name", "vpu03s",
-    ],
-    check=True,
-)
+    ]
+    if any(p.exists() for p in esmf_domain_outputs):
+        esmf_extract_args.append("--overwrite")
+    subprocess.run(
+        esmf_extract_args,
+        check=True,
+    )
 
 # ---------------------------------------------------------------------------
 # 4. hotstart_coastal_models.sh -- spin up SCHISM/SFINCS, bootstrap troute AnA-A
