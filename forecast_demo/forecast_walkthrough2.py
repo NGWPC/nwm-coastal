@@ -58,10 +58,17 @@ HYDROFAB_FILE_CONTAINER = f"/ngwpc/run_ngen/data/hydrofabric/vpu_{VPU}.gpkg"
 
 
 def run_nwm_rte(module: str, args: list[str]) -> subprocess.CompletedProcess:
-    """cd into nwm-rte, source config, call an ngen_rte module in the RTE container."""
+    """cd into nwm-rte, source config, call an ngen_rte module in the RTE container.
+
+    EWTS_ENABLED=NO matches every .ecf task in this pipeline -- config.bashrc
+    now defaults it to YES, but FCSTMGR/MSWMGR write log files straight into
+    RUN_NGEN_ROOT's regionalization dir (NFS-backed) even at INFO level,
+    which stalls troute runs. See suite_def/coastal_hourly.def.template.
+    """
     quoted_args = " ".join(f'"{a}"' for a in args)
     script = (
         f'cd "{NWM_RTE_ROOT}" && '
+        f'export EWTS_ENABLED="NO" && '
         f"source config.bashrc && source run.sh && "
         f'docker_run python -um "{module}" {quoted_args}'
     )

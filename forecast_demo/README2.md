@@ -70,8 +70,10 @@ What it downloads, and where (all under `$RUN_NGEN_ROOT` unless noted):
 - Pre-computed ESMF regrid weights → `data/esmf_mesh/regrid_weights/`
 - Regionalization inputs (same as `setup_data.sh -r`) — requires
   `nwm-region-mgr` to already be cloned
-- SCHISM/SFINCS model directories (`sfincs_models/`, `schism_models/`) →
-  `$RUN_COASTAL_ROOT`, created as a sibling of `nwm-rte`
+- SCHISM/SFINCS model directories (`sfincs_models/`, `schism_models/`) and
+  the base per-cycle run templates (`schism_sims/run.yaml`,
+  `sfincs_sims/run.yaml`) → `$RUN_COASTAL_ROOT`, created as a sibling of
+  `nwm-rte`
 - VPU03S extract polygon (`esmf_conus_03s_extract.geojson`) →
   `data/esmf_mesh/esmf_domain_extract/`
 
