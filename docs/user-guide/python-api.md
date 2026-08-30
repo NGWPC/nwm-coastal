@@ -311,14 +311,11 @@ fig, ax = plot_floodmap("run/sfincs_model/floodmap_hmax.tif")
 ### Station Comparison Plots
 
 ```python
-from coastal_calibration import plot_station_comparison, plotable_stations
+from coastal_calibration import plot_station_comparison
 
-# Filter stations that have both simulated and observed data
-pairs = plotable_stations(station_ids, sim_elevation, obs_ds)
-
-# Generate 2×2 comparison figures and save to disk
+# One or more labeled runs, each a (times, elevation[n_t, n_stations]) pair
 fig_paths = plot_station_comparison(
-    sim_times, sim_elevation, station_ids, obs_ds, "run/sfincs_model/figs"
+    {"SFINCS": (sim_times, sim_elevation)}, station_ids, "run/sfincs_model/figs", obs_ds=obs_ds
 )
 ```
 
