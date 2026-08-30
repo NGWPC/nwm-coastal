@@ -75,26 +75,19 @@ What it downloads, and where (all under `$RUN_NGEN_ROOT` unless noted):
 - VPU03S extract polygon (`esmf_conus_03s_extract.geojson`) →
   `data/esmf_mesh/esmf_domain_extract/`
 
-Two items are not yet handled by this script and currently require manual
-steps:
+One item is not yet handled by this script and currently requires a manual
+step:
 
 - The NHF dataset required for the SCHISM crosswalk (`nwmReaches.csv` →
   `ngenReaches.csv`) is not downloaded here. That crosswalk step is currently
   broken/skipped rather than functional.
-- The VPU hydrofabric geopackage is not copied here. It is required because
-  the Icefabric API t-route normally queries for this is not reliably
-  reachable from all networks. Check with:
 
-  ```bash
-  getent hosts edfs.test.nextgenwaterprediction.com
-  ```
-
-  If that returns nothing, copy the file manually:
-
-  ```bash
-  mkdir -p "${RUN_NGEN_ROOT}/data/hydrofabric"
-  cp nwm-region-mgr/data/inputs/region/hydrofabric/gpkg_vpu/vpu_03S.gpkg \
-      "${RUN_NGEN_ROOT}/data/hydrofabric/vpu_03S.gpkg"
-  ```
+The VPU hydrofabric geopackage copy is handled by `forecast_walkthrough2.py`
+(step 3) instead of here -- it copies
+`nwm-region-mgr/data/inputs/region/hydrofabric/gpkg_vpu/vpu_<VPU>.gpkg` to
+`$RUN_NGEN_ROOT/data/hydrofabric/vpu_<VPU>.gpkg` if it isn't already there.
+This is needed because the Icefabric API t-route would normally query for
+this isn't reliably reachable from all networks; `nwm-region-mgr` must
+already be cloned as a sibling of `nwm-coastal`.
 
 Setup is complete after this step. Proceed to `forecast_walkthrough2.py`.

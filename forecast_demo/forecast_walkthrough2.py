@@ -6,6 +6,7 @@ Run with: nwm-coastal-py forecast_walkthrough2.py
 """
 
 import os
+import shutil
 import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -113,13 +114,25 @@ def nwm_coastal_cli(args: list[str]) -> subprocess.CompletedProcess:
 # print(stats)
 
 # ---------------------------------------------------------------------------
-# 3. VPU ESMF mesh
+# 3. VPU hydrofabric geopackage + ESMF mesh
 #
-# One-time per mesh -- only needs re-running if you want a different
-# domain/VPU extract, or the source CONUS grid changed. Skip if
-# geo_em_vpu03s.nc already exists under $RUN_NGEN_ROOT/data/esmf_mesh/NWM/domain/.
+# One-time per VPU -- only needs re-running if you want a different
+# domain/VPU, or the source CONUS grid changed. The gpkg copy is needed
+# because the Icefabric API t-route would normally query for this isn't
+# reliably reachable from all networks; skipped if the file already exists.
 # ---------------------------------------------------------------------------
 
+hydrofab_file_host = RUN_NGEN_ROOT / "data" / "hydrofabric" / f"vpu_{VPU}.gpkg"
+if not hydrofab_file_host.exists():
+    hydrofab_file_host.parent.mkdir(parents=True, exist_ok=True)
+    nwm_region_mgr_gpkg = (
+        NWM_COASTAL_ROOT.parent / "nwm-region-mgr" / "data" / "inputs" / "region"
+        / "hydrofabric" / "gpkg_vpu" / f"vpu_{VPU}.gpkg"
+    )
+    shutil.copy(nwm_region_mgr_gpkg, hydrofab_file_host)
+
+# Skip the ESMF mesh extract if geo_em_vpu03s.nc already exists under
+# $RUN_NGEN_ROOT/data/esmf_mesh/NWM/domain/.
 subprocess.run(
     [
         str(NWM_COASTAL_ROOT / "nwm-coastal-py"),
