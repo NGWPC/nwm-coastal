@@ -1,19 +1,19 @@
-# forecast_demo
+# forecast_demo detailed README
 
 Tools and infrastructure for running the hourly coastal forecast cycle
 (nwm-rte forcing + t-route regionalization + SCHISM/SFINCS coastal runs).
-This README is the complete, ordered runbook for everything a new user needs
+This README describes install and setup process a new user needs
 to do to get from a fresh checkout to a running forecast.
 
 ## Two ways to run this
 
 - **`server/` + `ecf_home/` + `suite_def/`** -- ecflow-orchestrated. Self-chains
   hourly, runs unattended once started. See "Usage" and "Cold start /
-  initialization procedure" below.
+  initialization procedure" below. NOTE: Current testing on parallelworks
+  shows performance issues so may not be fully functional
 - **`forecast_walkthrough.py`** -- runs one spinup + one AnA hour + one SR
   cycle directly, step by step, with no ecflow involved at all. Good for
-  understanding exactly what each stage does and what it produces. See its
-  own header comment for details.
+  understanding exactly what each stage does and what it produces.
 
 Both share every prerequisite below (env vars, `nwm-rte` build, data
 staging, wrappers) and both call the same underlying tools

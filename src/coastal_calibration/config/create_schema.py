@@ -137,8 +137,8 @@ class ElevationConfig:
 class MaskConfig:
     """Active-cell mask and boundary configuration."""
 
-    #: Minimum elevation for active cells.
-    zmin: float = -5.0
+    #: Minimum elevation for active cells; zmin not required for create
+    zmin: float | None = None
 
     #: Maximum elevation for waterlevel boundary cells.
     boundary_zmax: float = -5.0
@@ -685,6 +685,10 @@ class SfincsCreateConfig:
             nd = self.river_discharge
             if not nd.flowlines.exists():
                 errors.append(f"river_discharge.flowlines not found: {nd.flowlines}")
+
+        # hydromt starts from an all-inactive mask; need zmin or include_polygon to populate it
+        if self.mask.zmin is None and self.mask.include_polygon is None:
+            errors.append("mask.zmin or mask.include_polygon must be set to define an active mask")
 
         return errors
 

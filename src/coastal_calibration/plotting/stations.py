@@ -20,6 +20,8 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from coastal_calibration.logging import logger
+
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
@@ -109,6 +111,7 @@ def plot_station_comparison(
     figs_dir: Path | str,
     *,
     obs_ds: Any | None = None,
+    stations_per_figure: int = _STATIONS_PER_FIGURE,
 ) -> list[Path]:
     """Create station comparison figures for one or more simulated runs.
 
@@ -127,6 +130,9 @@ def plot_station_comparison(
         Observed water levels with a ``water_level`` variable indexed by
         ``station`` and ``time``. When *None*, the plots are pure
         model-vs-model comparisons.
+    stations_per_figure : int, optional
+        Stations grouped into each figure (default 4, a 2x2 grid). Values
+        above 4 are clamped to 4, with a warning -- the grid layout caps at 2x2.
 
     Returns
     -------
@@ -147,6 +153,13 @@ def plot_station_comparison(
     if len(runs) == 0:
         msg = "plot_station_comparison: `runs` is empty."
         raise ValueError(msg)
+
+    if stations_per_figure > 4:
+        logger.warning(
+            "stations_per_figure=%d not supported (grid layout caps at 2x2); using 4",
+            stations_per_figure,
+        )
+        stations_per_figure = 4
 
     runs_dict = dict(runs)
     n_stations = len(station_ids)
@@ -185,12 +198,12 @@ def plot_station_comparison(
     run_markers = {label: _RUN_MARKERS[i % len(_RUN_MARKERS)] for i, label in enumerate(labels)}
 
     n_plotable = len(stations)
-    n_figures = math.ceil(n_plotable / _STATIONS_PER_FIGURE)
+    n_figures = math.ceil(n_plotable / stations_per_figure)
 
     saved: list[Path] = []
     for fig_idx in range(n_figures):
-        start = fig_idx * _STATIONS_PER_FIGURE
-        end = min(start + _STATIONS_PER_FIGURE, n_plotable)
+        start = fig_idx * stations_per_figure
+        end = min(start + stations_per_figure, n_plotable)
         batch = stations[start:end]
         batch_size = len(batch)
 

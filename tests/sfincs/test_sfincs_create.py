@@ -24,6 +24,7 @@ from coastal_calibration.config.create_schema import (
     ElevationConfig,
     ElevationDataset,
     GridConfig,
+    MaskConfig,
     RefinementLevel,
     RiverDischargeConfig,
     SfincsCreateConfig,
@@ -78,7 +79,7 @@ def output_dir(tmp_path: Path) -> Path:
 @pytest.fixture
 def minimal_create_config(aoi_file: Path, output_dir: Path) -> SfincsCreateConfig:
     """Return a ``SfincsCreateConfig`` with all defaults."""
-    return SfincsCreateConfig(aoi=aoi_file, output_dir=output_dir)
+    return SfincsCreateConfig(aoi=aoi_file, output_dir=output_dir, mask=MaskConfig(zmin=-5.0))
 
 
 @pytest.fixture
@@ -87,6 +88,7 @@ def minimal_config_dict(aoi_file: Path, output_dir: Path) -> dict[str, Any]:
     return {
         "aoi": str(aoi_file),
         "output_dir": str(output_dir),
+        "mask": {"zmin": -5.0},
     }
 
 
@@ -242,6 +244,20 @@ class TestSfincsCreateConfig:
         cfg = SfincsCreateConfig(aoi=Path("/nonexistent/aoi.geojson"), output_dir=output_dir)
         errors = cfg.validate()
         assert any("AOI file not found" in e for e in errors)
+
+    def test_validate_no_active_mask_source(self, aoi_file: Path, output_dir: Path) -> None:
+        cfg = SfincsCreateConfig(aoi=aoi_file, output_dir=output_dir, mask=MaskConfig())
+        errors = cfg.validate()
+        assert any("mask.zmin or mask.include_polygon" in e for e in errors)
+
+    def test_validate_include_polygon_alone_is_ok(
+        self, aoi_file: Path, output_dir: Path
+    ) -> None:
+        cfg = SfincsCreateConfig(
+            aoi=aoi_file, output_dir=output_dir, mask=MaskConfig(include_polygon=aoi_file)
+        )
+        errors = cfg.validate()
+        assert not any("mask.zmin or mask.include_polygon" in e for e in errors)
 
     def test_validate_bad_resolution(self, aoi_file: Path, output_dir: Path) -> None:
         cfg = SfincsCreateConfig(
