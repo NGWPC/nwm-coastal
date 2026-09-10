@@ -352,17 +352,28 @@ if errors:
 
 Configure logging for the workflow:
 
+The runner writes a log file automatically, so most workflows need no setup.
+The console shows `INFO`; the file captures `DEBUG` unless
+`monitoring.log_level` says otherwise.
+
 ```python
-import logging
-from coastal_calibration.logging import configure_logger, logger
+from coastal_calibration import CoastalCalibConfig, CoastalCalibRunner
 
-# Set up logging
-configure_logger(log_level="DEBUG", log_file="workflow.log")
-
-# Now run your workflow
 config = CoastalCalibConfig.from_yaml("config.yaml")
+config.monitoring.log_level = "INFO"     # smaller log file
 runner = CoastalCalibRunner(config)
 result = runner.run()
+```
+
+To take direct control — a specific log path, or console output from library
+functions like `extract_mesh` that write no log file of their own — call
+`configure_logger` before the workflow. Note the parameters are `level` and
+`file`, spelled `log_level` and `log_file` in YAML:
+
+```python
+from coastal_calibration.logging import configure_logger
+
+configure_logger(level="DEBUG", file="workflow.log", file_level="DEBUG")
 ```
 
 ## Example: Batch Processing

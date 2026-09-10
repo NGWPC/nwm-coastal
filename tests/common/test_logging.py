@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+import coastal_calibration.logging as cc_logging
 from coastal_calibration.config.schema import MonitoringConfig
 from coastal_calibration.logging import (
     StageProgress,
@@ -17,6 +18,16 @@ from coastal_calibration.logging import (
     configure_logger,
     generate_log_path,
 )
+
+
+@pytest.fixture(autouse=True)
+def _reset_logging_state():
+    """Reset the module-global handler state that leaks between tests."""
+    console_level = cc_logging._console_handler.level
+    yield
+    configure_logger(file=None)
+    cc_logging._user_console_level = None
+    cc_logging._console_handler.setLevel(console_level)
 
 
 class TestStageStatus:
@@ -137,7 +148,63 @@ class TestConfigureLogger:
 
     def test_verbose_flag(self):
         configure_logger(verbose=True)
+        assert cc_logging._console_handler.level == logging.DEBUG
         configure_logger(verbose=False)
+        assert cc_logging._console_handler.level == logging.INFO
+
+    def test_console_default_is_info(self):
+        """Importing the package alone gives an INFO console, not WARNING.
+
+        This is the level library calls that never build a WorkflowMonitor
+        (e.g. ``extract_mesh``) log at.
+        """
+        assert cc_logging._console_handler.level == logging.INFO
+
+    def test_traceback_written_to_file(self, tmp_path):
+        log_file = tmp_path / "tb.log"
+        configure_logger(level="CRITICAL", file=str(log_file), file_mode="w")
+        mon = WorkflowMonitor(MonitoringConfig())
+        try:
+            raise RuntimeError("boom")
+        except RuntimeError:
+            mon.error("Workflow failed: boom", exc_info=True)
+
+        contents = log_file.read_text()
+        assert "Traceback (most recent call last)" in contents
+        assert 'raise RuntimeError("boom")' in contents
+
+
+class TestLevelRouting:
+    """Console is fixed at INFO; log_level sets the file level."""
+
+    @pytest.mark.parametrize("level", ["DEBUG", "INFO", "WARNING", "ERROR"])
+    def test_console_stays_info_regardless_of_config(self, level):
+        WorkflowMonitor(MonitoringConfig(log_level=level))
+        assert cc_logging._console_handler.level == logging.INFO
+
+    def test_explicit_call_beats_console_default(self):
+        configure_logger(level="ERROR")
+        WorkflowMonitor(MonitoringConfig())
+        assert cc_logging._console_handler.level == logging.ERROR
+
+    def test_log_level_sets_file_level(self, tmp_path):
+        cfg = MonitoringConfig(log_level="WARNING", log_file=tmp_path / "f.log")
+        WorkflowMonitor(cfg)
+        assert cc_logging._file_handler.level == logging.WARNING
+
+    def test_log_level_defaults_to_debug(self, tmp_path):
+        cfg = MonitoringConfig(log_file=tmp_path / "f.log")
+        WorkflowMonitor(cfg)
+        assert cc_logging._file_handler.level == logging.DEBUG
+
+    def test_file_honours_level_when_writing(self, tmp_path):
+        log_file = tmp_path / "f.log"
+        mon = WorkflowMonitor(MonitoringConfig(log_level="WARNING", log_file=log_file))
+        mon.logger.debug("hidden-debug")
+        mon.logger.warning("shown-warning")
+        contents = log_file.read_text()
+        assert "hidden-debug" not in contents
+        assert "shown-warning" in contents
 
 
 class TestWorkflowMonitor:
@@ -190,6 +257,13 @@ class TestWorkflowMonitor:
         mon.register_stages(["test"])
         mon.update_substep("test", "substep1")
         assert "substep1" in mon.stages["test"].substeps
+
+    def test_update_substep_disabled(self):
+        cfg = MonitoringConfig(enable_progress_tracking=False)
+        mon = WorkflowMonitor(cfg)
+        mon.register_stages(["test"])
+        mon.update_substep("test", "substep1")
+        assert mon.stages["test"].substeps == []
 
     def test_log_methods(self):
         cfg = MonitoringConfig()

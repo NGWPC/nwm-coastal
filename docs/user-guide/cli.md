@@ -105,6 +105,7 @@ coastal-calibration run <config> [OPTIONS]
 | `--start-from` | Stage to start from                      | First   |
 | `--stop-after` | Stage to stop after                      | Last    |
 | `--dry-run`    | Validate configuration without executing | False   |
+| `--log-level`  | Detail level for the log file            | `DEBUG` |
 
 **Available Stages (SCHISM):**
 
@@ -234,6 +235,7 @@ coastal-calibration create <config> [OPTIONS]
 | `--start-from` | Stage to start from                      | First   |
 | `--stop-after` | Stage to stop after                      | Last    |
 | `--dry-run`    | Validate configuration without executing | False   |
+| `--log-level`  | Detail level for the log file            | `DEBUG` |
 
 **Available Stages:**
 
@@ -398,21 +400,51 @@ SFINCS creation stages (create subcommand):
 
 ## Exit Codes
 
-| Code | Description                    |
-| ---- | ------------------------------ |
-| 0    | Success                        |
-| 1    | Configuration validation error |
-| 2    | Runtime error                  |
-| 3    | Runtime error (stage failure)  |
+| Code | Description                                             |
+| ---- | ------------------------------------------------------- |
+| 0    | Success                                                 |
+| 1    | Any failure (validation error, runtime error, or stage failure) |
+
+## Logging
+
+Two sinks, with different jobs:
+
+| Sink        | Level                       | Set by                          |
+| ----------- | --------------------------- | ------------------------------- |
+| Console     | Always `INFO`               | Nothing — it is fixed           |
+| Log file    | `DEBUG` by default          | `monitoring.log_level`          |
+
+The console is a readable progress stream, so it is not adjustable. The log
+file is the diagnostic record, and its detail level is the one knob you can
+turn. Lower it (`INFO`, `WARNING`) when full `DEBUG` output from HydroMT,
+xarray and botocore makes the file unwieldy — worth doing when `work_dir` is
+on an NFS mount, where the write volume costs real time.
+
+`run` and `create` accept `--log-level` to set it for a single run. The file
+level is resolved in this order, first match winning:
+
+1. `--log-level`
+1. `COASTAL_LOG_LEVEL`
+1. `monitoring.log_level` in the config file
+1. `DEBUG`
+
+```bash
+# Keep the log file small on a slow filesystem
+coastal-calibration run config.yaml --log-level INFO
+```
+
+Commands that write no log file (`prepare-topobathy`, `prepare-schism-mesh`,
+`update-dem-index`) have no `--log-level` option; they only print to the
+console.
 
 ## Environment Variables
 
 The CLI respects these environment variables:
 
-| Variable            | Description                    |
-| ------------------- | ------------------------------ |
-| `COASTAL_LOG_LEVEL` | Override default log level     |
-| `SLURM_JOB_ID`      | Detected when running in SLURM |
+| Variable            | Description                                  |
+| ------------------- | -------------------------------------------- |
+| `COASTAL_LOG_LEVEL` | Log-file detail level (see Logging)          |
+| `SLURM_JOB_ID`      | Detected when running in SLURM               |
 
 ## Shell Completion
 

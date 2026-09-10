@@ -11,6 +11,8 @@ from typing import TYPE_CHECKING
 import rich_click as click
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from coastal_calibration.config.schema import CoastalDomain
 
 
@@ -57,6 +59,17 @@ def _raise_cli_error(message: str) -> None:
     raise CLIError(message)
 
 
+def _log_level_option(f: Callable) -> Callable:
+    """Attach ``--log-level``, which sets the level of the log *file*."""
+    return click.option(
+        "--log-level",
+        type=click.Choice(["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], case_sensitive=False),
+        default=None,
+        envvar="COASTAL_LOG_LEVEL",
+        help="Detail level for the log file. Overrides monitoring.log_level. Console stays INFO.",
+    )(f)
+
+
 @click.group()
 @click.version_option(package_name="coastal_calibration")
 def cli() -> None:
@@ -80,11 +93,13 @@ def cli() -> None:
     is_flag=True,
     help="Validate configuration without executing.",
 )
+@_log_level_option
 def run(
     config: Path,
     start_from: str | None,
     stop_after: str | None,
     dry_run: bool,
+    log_level: str | None,
 ) -> None:
     """Run the calibration workflow.
 
@@ -98,8 +113,11 @@ def run(
 
     try:
         cfg = CoastalCalibConfig.from_yaml(config_path)
-        runner = CoastalCalibRunner(cfg)
+        # Must precede the runner: it opens the file handler in __init__.
+        if log_level is not None:
+            cfg.monitoring.log_level = log_level.upper()
         configure_logger(level="INFO")
+        runner = CoastalCalibRunner(cfg)
 
         if dry_run:
             logger.info("Dry run mode - validating configuration...")
@@ -140,11 +158,13 @@ def run(
     is_flag=True,
     help="Validate configuration without executing.",
 )
+@_log_level_option
 def create(
     config: Path,
     start_from: str | None,
     stop_after: str | None,
     dry_run: bool,
+    log_level: str | None,
 ) -> None:
     """Create a SFINCS model from an AOI polygon.
 
@@ -158,8 +178,11 @@ def create(
 
     try:
         cfg = SfincsCreateConfig.from_yaml(config_path)
-        creator = SfincsCreator(cfg)
+        # Must precede the creator: it opens the file handler in __init__.
+        if log_level is not None:
+            cfg.monitoring.log_level = log_level.upper()
         configure_logger(level="INFO")
+        creator = SfincsCreator(cfg)
 
         if dry_run:
             logger.info("Dry run mode - validating configuration...")

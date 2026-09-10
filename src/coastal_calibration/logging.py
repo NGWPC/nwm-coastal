@@ -49,11 +49,12 @@ if not logger.handlers:
         show_level=False,
         show_path=False,
         rich_tracebacks=True,
-        tracebacks_show_locals=True,
+        # Off: workflow frames hold xarray Datasets and botocore sessions.
+        tracebacks_show_locals=False,
     )
     _console_handler.setFormatter(logging.Formatter("%(message)s"))
 
-    _console_handler.setLevel(logging.WARNING)
+    _console_handler.setLevel(logging.INFO)
     logger.addHandler(_console_handler)
 
 
@@ -150,7 +151,8 @@ def configure_logger(
         Set console logging level. Valid options: ``DEBUG``, ``INFO``, ``WARNING``,
         ``ERROR``, ``CRITICAL``, or their integer equivalents.
     verbose : bool, optional
-        Shortcut to set console level to DEBUG (True) or WARNING (False).
+        Shortcut to set console level to DEBUG (True) or back to the INFO
+        default (False).
         If both ``level`` and ``verbose`` are provided, ``level`` takes precedence.
     file : str or Path, optional
         Path to log file. If provided, enables file logging.
@@ -174,7 +176,7 @@ def configure_logger(
     -----
     The logger itself is set to DEBUG level, allowing handlers to independently
     control what messages they receive. This means file logging can capture
-    DEBUG messages even when console is set to WARNING.
+    DEBUG messages while the console stays at its INFO default.
 
     Examples
     --------
@@ -187,7 +189,7 @@ def configure_logger(
     >>> # Enable file logging (captures all levels by default)
     >>> configure_logger(verbose=True, file="debug.log")
 
-    >>> # Console shows warnings, file captures everything
+    >>> # Console at the INFO default, file captures everything
     >>> configure_logger(verbose=False, file="full.log", file_level="DEBUG")
 
     >>> # File logging with custom level
@@ -204,7 +206,7 @@ def configure_logger(
         if _console_handler is not None:
             _console_handler.setLevel(level_int)
     elif verbose is not None:
-        _user_console_level = logging.DEBUG if verbose else logging.WARNING
+        _user_console_level = logging.DEBUG if verbose else logging.INFO
         if _console_handler is not None:
             _console_handler.setLevel(_user_console_level)
 
@@ -415,30 +417,28 @@ class WorkflowMonitor:
     def _setup_logger(self) -> logging.Logger:
         """Configure logging based on monitoring config.
 
-        * If the user has already called :func:`configure_logger` with
-          a custom console level, that level is preserved.  Otherwise
-          the console handler defaults to WARNING so only problems are
-          shown on screen.
+        * The console shows INFO, so a run reads as readable progress.
+          An explicit :func:`configure_logger` call still wins.
         * A log file is always created (either the one specified in
           ``config.log_file`` or an auto-generated one under
-          ``config.work_dir``).  All DEBUG-level messages from both
-          our own code and third-party libraries end up there.
+          ``config.work_dir``) and captures messages from both our own
+          code and third-party libraries at ``config.log_level``.
         * Third-party loggers (HydroMT, xarray, ...) are silenced
           on the console but still write to the log file.
         """
-        # Console: respect user-configured level, otherwise default to WARNING.
+        # Console: fixed at INFO; an explicit configure_logger() call wins.
         if (
             _console_handler is not None
             and _console_handler in logger.handlers
             and _user_console_level is None
         ):
-            _console_handler.setLevel(logging.WARNING)
+            _console_handler.setLevel(logging.INFO)
 
-        # File: full detail
+        # File: detail level is the one user-tunable knob.
         if _file_handler is None:
             log_file: str | Path | None = self.config.log_file
             if log_file:
-                configure_logger(file=str(log_file), file_level="DEBUG")
+                configure_logger(file=str(log_file), file_level=self.config.log_level)
 
         # Mute noisy third-party console output
         silence_third_party_loggers()
@@ -564,6 +564,8 @@ class WorkflowMonitor:
 
     def update_substep(self, stage_name: str, substep: str) -> None:
         """Update current substep within a stage."""
+        if not self.config.enable_progress_tracking:
+            return
         if stage_name in self.stages:
             stage = self.stages[stage_name]
             if substep not in stage.substeps:
@@ -583,9 +585,9 @@ class WorkflowMonitor:
         """Log warning message."""
         self.logger.warning(message)
 
-    def error(self, message: str) -> None:
-        """Log error message."""
-        self.logger.error(message)
+    def error(self, message: str, exc_info: bool = False) -> None:
+        """Log error message, optionally with the active exception's traceback."""
+        self.logger.error(message, exc_info=exc_info)
 
     def debug(self, message: str) -> None:
         """Log debug message."""
