@@ -24,7 +24,12 @@ import pyproj
 import shapely
 from shapely import STRtree
 
-from coastal_calibration.logging import logger
+from coastal_calibration.logging import (
+    configure_logger,
+    generate_log_path,
+    logger,
+    silence_third_party_loggers,
+)
 from coastal_calibration.schism.constants import GeoSpatial, Performance, SCHISMFiles, Size
 from coastal_calibration.schism.project_reader import (
     BoundarySet,
@@ -1753,6 +1758,14 @@ def _subset_elevation_correction(
         )
 
 
+def _start_subset_log(log_dir: Path) -> None:
+    """Persist subsetting log output to a timestamped DEBUG file in *log_dir*."""
+    log_path = generate_log_path(log_dir, prefix="schism-subset")
+    configure_logger(file=log_path, file_level="DEBUG")
+    silence_third_party_loggers()
+    logger.info(f"Log file: {log_path}")
+
+
 def split_mesh(
     input_dir: Path | str,
     dividing_line: NDArray[np.float64] | LineString,
@@ -1807,6 +1820,8 @@ def split_mesh(
     output_dir_b = output_dir / side_b_name
     output_dir_a.mkdir(parents=True, exist_ok=True)
     output_dir_b.mkdir(parents=True, exist_ok=True)
+
+    _start_subset_log(output_dir)
 
     if buffer_size >= Size.GB:
         buffer_size_str = f"{buffer_size / Size.GB:.2f} GB"
@@ -2067,6 +2082,8 @@ def extract_mesh(
 
     if not input_dir.exists():
         raise FileNotFoundError(f"Input directory not found: {input_dir}")
+
+    _start_subset_log(out)
 
     poly = shapely.Polygon(polygon) if isinstance(polygon, np.ndarray) else polygon
 

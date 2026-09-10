@@ -8,6 +8,8 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project ad
 
 ### Added
 
+- **logging**: SCHISM subsetting (`extract_mesh`, `split_mesh`) now writes a DEBUG log
+  file, `schism-subset-<YYYYMMDD-HHMMSS>.log`, instead of logging to the console only
 - **logging**: Add `--log-level` to `run` and `create` to set the log-file detail level
   for a single run; `COASTAL_LOG_LEVEL` now works as its environment-variable form
 - **schism**: Wire pyTMD harmonic boundary; add scribes counting and discharge gating

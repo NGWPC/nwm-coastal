@@ -365,8 +365,11 @@ runner = CoastalCalibRunner(config)
 result = runner.run()
 ```
 
-To take direct control — a specific log path, or console output from library
-functions like `extract_mesh` that write no log file of their own — call
+SCHISM subsetting (`extract_mesh`, `split_mesh`) also writes its own DEBUG log,
+`schism-subset-<YYYYMMDD-HHMMSS>.log`: inside the extracted project for
+`extract_mesh`, and in `output_dir` for `split_mesh`.
+
+To take direct control — a specific log path, for example — call
 `configure_logger` before the workflow. Note the parameters are `level` and
 `file`, spelled `log_level` and `log_file` in YAML:
 

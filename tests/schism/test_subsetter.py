@@ -12,10 +12,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal
 
+import logging
+
 import numpy as np
 import pytest
 import shapely
 
+import coastal_calibration.logging as cc_logging
+from coastal_calibration.logging import configure_logger
 from coastal_calibration.schism.project_reader import NWMSCHISMProject
 from coastal_calibration.schism.stages import _chain_ring
 from coastal_calibration.schism.subsetter import (
@@ -25,6 +29,7 @@ from coastal_calibration.schism.subsetter import (
     _build_shared_nodes_graph,
     _extract_side_segments,
     extract_mesh,
+    split_mesh,
 )
 from tests.schism.schism_testkit import generate_test_case
 
@@ -574,6 +579,34 @@ class TestExtractMeshBoundaryChain:
             "chained ring revisits a node — extract_mesh boundary order is "
             "not chainable, or _chain_ring is choosing wrong matches"
         )
+
+
+class TestSubsetLogFile:
+    """extract_mesh and split_mesh persist their log output to disk."""
+
+    @pytest.fixture(autouse=True)
+    def _close_log(self):
+        yield
+        configure_logger(file=None)
+
+    def test_extract_mesh_writes_log_in_project(self, shore_project, tmp_path):
+        extract_mesh(
+            input_dir=shore_project,
+            polygon=shapely.Polygon([(1.5, 0.5), (6.5, 0.5), (6.5, 4.5), (1.5, 4.5)]),
+            output_dir=tmp_path,
+            output_name="extracted",
+            write_netcdf=False,
+        )
+        logs = list((tmp_path / "extracted").glob("schism-subset-*.log"))
+        assert len(logs) == 1
+        assert "Classifying nodes inside polygon" in logs[0].read_text()
+        assert cc_logging._file_handler.level == logging.DEBUG
+
+    def test_split_mesh_writes_log_in_output_dir(self, shore_project, cut_line, tmp_path):
+        split_mesh(shore_project, cut_line, tmp_path / "split", write_netcdf=False)
+        logs = list((tmp_path / "split").glob("schism-subset-*.log"))
+        assert len(logs) == 1
+        assert "Subsetting hgrid.gr3" in logs[0].read_text()
 
 
 class TestSubsetReachesFile:
