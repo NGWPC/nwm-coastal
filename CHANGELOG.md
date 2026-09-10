@@ -16,7 +16,7 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project ad
 
 ### Changed
 
-- **logging**: Split the two sinks by purpose. The console is now always `INFO` (a
+- **logging**: Split the console vs file by purpose. The console is now always `INFO` (a
   readable progress stream) and `monitoring.log_level` sets the level of the log
   *file*, which it previously did not affect at all. Its default changes from `INFO`
   to `DEBUG` to match the file's prior behaviour, so existing configs that leave it
