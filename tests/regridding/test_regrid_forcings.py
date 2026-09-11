@@ -6,8 +6,8 @@ Synthetic-data integration tests (``test_synthetic_*``) use tiny in-memory
 grids and run whenever ESMF is importable.  They validate the SCHISM
 volumetric-flux path (``skip_latlon=True``).
 
-Real-data comparison tests (``test_vsource_matches_original``, etc.) are
-guarded by ``have_ldasin_data``, ``have_geo_em``, and ``have_esmf_mesh``.
+Real-data tests (``test_new_vsource_output_structure``) are guarded by
+``have_ldasin_data``, ``have_geo_em``, and ``have_esmf_mesh``.
 
 Run with::
 
@@ -39,12 +39,6 @@ from .conftest import (
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
-ORIGINAL_DRIVER = (
-    REPO_ROOT
-    / "tests/legacy_scripts/wrf_hydro_workflow_dev/forcings"
-    / "WrfHydroFECPP/workflow_driver.py"
-)
-
 SCHISM_FORCING_MESH = Path("/Volumes/data/schism_models/hawaii/hgrid.nc")
 
 _GEO_EM_CANDIDATES = [
@@ -72,48 +66,8 @@ have_schism_forcing_mesh = pytest.mark.skipif(
 
 
 # ---------------------------------------------------------------------------
-# Helpers for real-data comparison tests
+# Helpers for real-data tests
 # ---------------------------------------------------------------------------
-
-
-def _run_original(
-    input_dir: Path,
-    output_dir: Path,
-    geo_em: Path,
-    schism_mesh: Path,
-    nprocs: int = 1,
-) -> None:
-    """Run the original workflow_driver.py via mpiexec.
-
-    Patches ``sys.modules`` so that legacy ``import ESMF`` resolves to
-    ``esmpy`` on installations where only esmpy (≥ v8.4.0) is available.
-    The fecpp package directory is inserted into ``sys.path`` directly rather
-    than through PYTHONPATH so no file-based shim is needed.
-    """
-    original_fecpp_dir = ORIGINAL_DRIVER.parent
-    runner = textwrap.dedent(f"""
-        import sys
-        sys.path.insert(0, {str(original_fecpp_dir)!r})
-        sys.path.insert(0, {str(REPO_ROOT / "src")!r})
-        try:
-            import ESMF
-        except ImportError:
-            import esmpy as _esmpy
-            sys.modules["ESMF"] = _esmpy
-            sys.modules["ESMF.constants"] = _esmpy.constants
-            _esmpy.Manager(debug=False)
-        import runpy
-        runpy.run_path({str(ORIGINAL_DRIVER)!r}, run_name="__main__")
-    """)
-    env = {
-        "NWM_FORCING_OUTPUT_DIR": str(input_dir.parent),
-        "COASTAL_FORCING_OUTPUT_DIR": str(output_dir),
-        "GEOGRID_FILE": str(geo_em),
-        "SCHISM_ESMFMESH": str(schism_mesh),
-        "FORCING_BEGIN_DATE": input_dir.name,
-        "LENGTH_HRS": "0",
-    }
-    run_mpi(nprocs, [sys.executable, "-c", runner], env)
 
 
 def _run_new(
@@ -447,7 +401,7 @@ def test_forecast_multitime_matches_canonical_files(
 
 
 # ---------------------------------------------------------------------------
-# Optional real-data comparison tests
+# Optional real-data tests
 # ---------------------------------------------------------------------------
 
 
@@ -493,50 +447,3 @@ def test_new_vsource_output_structure(
         assert vs.shape[0] > 0
         assert vs.shape[1] > 0
         assert f["time_step_vsource"][0] == 3600.0
-
-
-@have_esmf
-@have_esmf_mesh
-@have_mpiexec
-@have_ldasin_data
-@have_geo_em
-@have_schism_forcing_mesh
-def test_vsource_matches_original(
-    tmp_path,
-    ldasin_subdir,
-    geo_em_file,
-):
-    """New CoastalForcingRegridder vsource matches original workflow_driver output."""
-    import netCDF4
-
-    orig_out = tmp_path / "orig"
-    new_out = tmp_path / "new"
-    orig_out.mkdir()
-    new_out.mkdir()
-
-    _run_original(
-        input_dir=ldasin_subdir,
-        output_dir=orig_out,
-        geo_em=geo_em_file,
-        schism_mesh=SCHISM_FORCING_MESH,
-    )
-    _run_new(
-        input_dir=ldasin_subdir,
-        output_dir=new_out,
-        geo_em=geo_em_file,
-        schism_mesh=SCHISM_FORCING_MESH,
-    )
-
-    with netCDF4.Dataset(orig_out / "precip_source.nc") as f:
-        orig_vs = f["vsource"][:].data
-    with netCDF4.Dataset(new_out / "precip_source.nc") as f:
-        new_vs = f["vsource"][:].data
-
-    assert orig_vs.shape == new_vs.shape
-    np.testing.assert_allclose(
-        orig_vs,
-        new_vs,
-        rtol=1e-5,
-        atol=1e-8,
-        err_msg="vsource values differ between original and refactored implementation",
-    )

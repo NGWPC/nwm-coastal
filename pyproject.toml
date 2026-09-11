@@ -199,7 +199,6 @@ python = "~=3.13.0"
 test = { cmd = [
   "pytest",
   "tests/",
-  "--ignore=tests/legacy_scripts",
   "--cov",
   "--cov-branch",
   "--junitxml=junit.xml",
@@ -251,7 +250,7 @@ include = [
   "src/coastal_calibration/*.py",
   "tests/**/*.py",
 ]
-exclude = [ "docs/examples/notebooks/*.py", "legacy-coastal", "tests/legacy_scripts/**/*.py" ]
+exclude = [ "docs/examples/notebooks/*.py" ]
 lint.select = [
   # flake8-unused-arguments
   "ARG",
@@ -408,7 +407,7 @@ lint.pydocstyle.convention = "numpy"
 
 [tool.codespell]
 ignore-words-list = "gages,parm,oce,gage,nd"
-skip = "__pycache__,_build,.git,./htmlcov,pixi.lock,./site,./cache,*.ipynb,./legacy-coastal/,CHANGELOG.md"
+skip = "__pycache__,_build,.git,./htmlcov,pixi.lock,./site,./cache,*.ipynb,CHANGELOG.md"
 
 [tool.vulture]
 paths = [ "src", "tests" ]
@@ -416,9 +415,6 @@ exclude = [
   # Notebook .py files are jupytext mirrors of .ipynb; cell-level dead
   # code is intentional (e.g. final-cell expressions for display).
   "docs/examples/notebooks/",
-  # Frozen reference implementations from the pre-pixi era; not part of
-  # the live codebase.
-  "tests/legacy_scripts/",
 ]
 ignore_names = [
   # CLI command callbacks share a `ctx` parameter that goes unused
@@ -496,9 +492,6 @@ ini_options.doctest_optionflags = "NORMALIZE_WHITESPACE IGNORE_EXCEPTION_DETAIL 
 
 [tool.coverage]
 run.branch = true
-run.omit = [
-  "*/legacy_scripts/*",
-]
 run.parallel = true
 run.source_pkgs = [
   "coastal_calibration",
@@ -511,7 +504,6 @@ report.exclude_lines = [
 report.ignore_errors = true
 report.omit = [
   "**/__init__.py",
-  "*/legacy_scripts/*",
 ]
 
 [tool.jupytext]

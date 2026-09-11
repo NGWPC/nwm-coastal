@@ -4,8 +4,8 @@ Synthetic fixtures (``synthetic_*``) are always available and require only
 ESMF/ESMPy to be installed.  They use tiny grids so regridding completes in
 seconds.
 
-Real-data fixtures (``stofs_file``, ``schism_hgrid_nc``, ``ldasin_dir``) are
-still provided for optional comparison tests that need large on-disk data.
+The real-data fixture (``ldasin_dir``) is provided for optional tests that need
+large on-disk data.
 """
 
 from __future__ import annotations
@@ -23,14 +23,6 @@ import pytest
 # ---------------------------------------------------------------------------
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-
-STOFS_FILE = (
-    REPO_ROOT
-    / "docs/examples/downloads/coastal/stofs/stofs_2d_glo.20240109"
-    / "stofs_2d_glo.t00z.fields.cwl.nc"
-)
-
-SCHISM_HGRID_NC = Path("/Volumes/data/schism_models/hawaii/open_bnds_hgrid.nc")
 
 LDASIN_DIR = REPO_ROOT / "docs/examples/downloads/meteo/nwm_ana"
 
@@ -109,34 +101,6 @@ print("ok")
         return result.returncode == 0 and "ok" in result.stdout
 
 
-def _esmf_mpi_available() -> bool:
-    """Return True if ESMF/esmpy was compiled with MPI support (pet_count >= 2)."""
-    if shutil.which("mpiexec") is None or not _esmf_available():
-        return False
-    try:
-        result = subprocess.run(
-            [
-                "mpiexec",
-                "-np",
-                "2",
-                sys.executable,
-                "-c",
-                "import esmpy as ESMF; m = ESMF.Manager(); print(m.pet_count)",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=30,
-            check=False,
-        )
-    except Exception:
-        return False
-    else:
-        if result.returncode == 0:
-            last_line = result.stdout.strip().split("\n")[-1]
-            return int(last_line) >= 2
-    return False
-
-
 # ---------------------------------------------------------------------------
 # Skip markers
 # ---------------------------------------------------------------------------
@@ -144,11 +108,6 @@ def _esmf_mpi_available() -> bool:
 have_mpiexec = pytest.mark.skipif(
     shutil.which("mpiexec") is None,
     reason="mpiexec not found on PATH",
-)
-
-have_esmf_mpi = pytest.mark.skipif(
-    not _esmf_mpi_available(),
-    reason="ESMF/esmpy not compiled with MPI support (pet_count=1 under mpiexec -np 2)",
 )
 
 _SCHISM_FORCING_MESH = Path("/Volumes/data/schism_models/hawaii/hgrid.nc")
@@ -165,62 +124,19 @@ have_esmf = pytest.mark.skipif(
     reason="ESMF/ESMPy not importable",
 )
 
-have_stofs_data = pytest.mark.skipif(
-    not STOFS_FILE.exists(),
-    reason=f"STOFS example data not found: {STOFS_FILE}",
-)
-
-have_schism_hgrid = pytest.mark.skipif(
-    not SCHISM_HGRID_NC.exists(),
-    reason=f"SCHISM pacific hgrid not found: {SCHISM_HGRID_NC}",
-)
-
 have_ldasin_data = pytest.mark.skipif(
     not LDASIN_DIR.exists() or not any(LDASIN_DIR.glob("*.LDASIN_DOMAIN*")),
     reason=f"LDASIN example data not found: {LDASIN_DIR}",
 )
 
 # ---------------------------------------------------------------------------
-# Real-data fixtures (used by optional comparison tests)
+# Real-data fixtures (used by optional tests)
 # ---------------------------------------------------------------------------
-
-
-@pytest.fixture(scope="session")
-def stofs_file() -> Path:
-    return STOFS_FILE
-
-
-@pytest.fixture(scope="session")
-def schism_hgrid_nc() -> Path:
-    return SCHISM_HGRID_NC
 
 
 @pytest.fixture(scope="session")
 def ldasin_dir() -> Path:
     return LDASIN_DIR
-
-
-@pytest.fixture(scope="session")
-def stofs_cycle_env() -> dict[str, str]:
-    """Determine CYCLE_DATE/TIME from the real STOFS file's time metadata."""
-    from datetime import datetime, timedelta
-
-    import netCDF4
-    from cftime import num2date
-
-    forecast_start = 5
-    with netCDF4.Dataset(STOFS_FILE) as f:
-        tv = f["time"]
-        t = num2date(tv[forecast_start], units=tv.units)
-
-    if t.minute != 0:
-        t = datetime(t.year, t.month, t.day, t.hour) + timedelta(hours=1)
-
-    return {
-        "CYCLE_DATE": f"{t.year:04d}{t.month:02d}{t.day:02d}",
-        "CYCLE_TIME": f"{t.hour:02d}{t.minute:02d}",
-        "LENGTH_HRS": "10",
-    }
 
 
 # ---------------------------------------------------------------------------
