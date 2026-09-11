@@ -175,9 +175,7 @@ print(
 # roughly 4 minutes.
 
 # %%
-from coastal_calibration import CoastalCalibConfig, CoastalCalibRunner, configure_logger
-
-configure_logger(level="INFO")
+from coastal_calibration import CoastalCalibConfig, CoastalCalibRunner
 
 schism_run_dir = walkthrough_dir / "run_schism"
 

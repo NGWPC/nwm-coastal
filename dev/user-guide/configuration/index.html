@@ -2272,9 +2272,9 @@ NAVD88 at the domain centroid, so both parameters are set to <code>0.171</code>.
 <h3 id="monitoring-settings">Monitoring Settings<a class="headerlink" href="#monitoring-settings" title="Permanent link">#</a></h3>
 <p>Configure logging and monitoring:</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nt">monitoring</span><span class="p">:</span>
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span><span class="nt">log_level</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">INFO</span><span class="w">                 </span><span class="c1"># Logging verbosity</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span><span class="nt">log_level</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DEBUG</span><span class="w">                </span><span class="c1"># Detail level of the log FILE</span>
 </span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span><span class="nt">log_file</span><span class="p">:</span><span class="w">                       </span><span class="c1"># Optional log file path</span>
-</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">  </span><span class="nt">enable_progress_tracking</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">  </span><span class="c1"># Show progress bars</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">  </span><span class="nt">enable_progress_tracking</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">  </span><span class="c1"># Log per-stage substeps (at DEBUG)</span>
 </span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">  </span><span class="nt">enable_timing</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">             </span><span class="c1"># Track stage timing</span>
 </span></code></pre></div>
 <table>
@@ -2290,8 +2290,8 @@ NAVD88 at the domain centroid, so both parameters are set to <code>0.171</code>.
 <tr>
 <td><code>log_level</code></td>
 <td>string</td>
-<td><code>INFO</code></td>
-<td><code>DEBUG</code>, <code>INFO</code>, <code>WARNING</code>, <code>ERROR</code></td>
+<td><code>DEBUG</code></td>
+<td><code>DEBUG</code>, <code>INFO</code>, <code>WARNING</code>, <code>ERROR</code>, <code>CRITICAL</code></td>
 </tr>
 <tr>
 <td><code>log_file</code></td>
@@ -2303,7 +2303,7 @@ NAVD88 at the domain centroid, so both parameters are set to <code>0.171</code>.
 <td><code>enable_progress_tracking</code></td>
 <td>bool</td>
 <td>true</td>
-<td>Show progress bars</td>
+<td>Log per-stage substeps (at DEBUG)</td>
 </tr>
 <tr>
 <td><code>enable_timing</code></td>
@@ -2313,6 +2313,16 @@ NAVD88 at the domain centroid, so both parameters are set to <code>0.171</code>.
 </tr>
 </tbody>
 </table>
+<div class="admonition note">
+<p class="admonition-title"><code>log_level</code> sets the log <em>file</em> level, not the console</p>
+<p>The console is always <code>INFO</code> and cannot be changed — it is a readable
+progress stream. <code>log_level</code> controls how much detail is written to the
+log file, which defaults to capturing everything at <code>DEBUG</code>.</p>
+<p>Lower it to <code>INFO</code> or <code>WARNING</code> when full <code>DEBUG</code> output from HydroMT,
+xarray and botocore makes the file unwieldy. This matters most when
+<code>work_dir</code> is on an NFS mount, where the extra write volume costs real
+time. The <code>--log-level</code> flag and <code>COASTAL_LOG_LEVEL</code> both override it.</p>
+</div>
 <h3 id="download-settings">Download Settings<a class="headerlink" href="#download-settings" title="Permanent link">#</a></h3>
 <p>Configure data download behavior:</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nt">download</span><span class="p">:</span>

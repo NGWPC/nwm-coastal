@@ -1669,12 +1669,27 @@ on <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a>, and this
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">#</a></h3>
 <ul>
+<li><strong>logging</strong>: SCHISM subsetting (<code>extract_mesh</code>, <code>split_mesh</code>) now writes a DEBUG log
+  file, <code>schism-subset-&lt;YYYYMMDD-HHMMSS&gt;.log</code>, instead of logging to the console only</li>
+<li><strong>logging</strong>: Add <code>--log-level</code> to <code>run</code> and <code>create</code> to set the log-file detail level
+  for a single run; <code>COASTAL_LOG_LEVEL</code> now works as its environment-variable form</li>
 <li><strong>schism</strong>: Wire pyTMD harmonic boundary; add scribes counting and discharge gating</li>
 <li><strong>alaska</strong>: Add initial Alaska domain support</li>
 <li><strong>sflux</strong>: Subset atmospheric forcing to SCHISM mesh footprint</li>
 </ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">#</a></h3>
 <ul>
+<li><strong>logging</strong>: Split the console vs file by purpose. The console is now always <code>INFO</code> (a
+  readable progress stream) and <code>monitoring.log_level</code> sets the level of the log
+  <em>file</em>, which it previously did not affect at all. Its default changes from <code>INFO</code>
+  to <code>DEBUG</code> to match the file's prior behaviour, so existing configs that leave it
+  unset keep a full-detail log; lower it to shrink the log file. Python-API callers
+  that never called <code>configure_logger()</code> previously got a <code>WARNING</code> console and now
+  get <code>INFO</code></li>
+<li><strong>logging</strong>: <code>monitoring.enable_progress_tracking</code> now gates substep logging instead
+  of being ignored</li>
+<li><strong>logging</strong>: Log the traceback when a workflow fails, instead of only <code>str(e)</code>;
+  console tracebacks no longer render frame locals</li>
 <li><strong>tides</strong>: Replace ambiguous multiplication sign in log strings</li>
 <li><strong>tides</strong>: Apply ruff-format to data/tides.py</li>
 <li><strong>sfincs</strong>: Switch boundary forcing to pyTMD harmonic predictor</li>

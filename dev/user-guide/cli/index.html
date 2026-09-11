@@ -921,6 +921,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#logging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Logging
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#environment-variables" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1773,6 +1784,11 @@ and SFINCS coastal model workflows.</p>
 <td>Validate configuration without executing</td>
 <td>False</td>
 </tr>
+<tr>
+<td><code>--log-level</code></td>
+<td>Detail level for the log file</td>
+<td><code>DEBUG</code></td>
+</tr>
 </tbody>
 </table>
 <p><strong>Available Stages (SCHISM):</strong></p>
@@ -1918,6 +1934,11 @@ self-contained file and gives you full control over SLURM resource allocation:</
 <td><code>--dry-run</code></td>
 <td>Validate configuration without executing</td>
 <td>False</td>
+</tr>
+<tr>
+<td><code>--log-level</code></td>
+<td>Detail level for the log file</td>
+<td><code>DEBUG</code></td>
 </tr>
 </tbody>
 </table>
@@ -2123,18 +2144,52 @@ self-contained file and gives you full control over SLURM resource allocation:</
 </tr>
 <tr>
 <td>1</td>
-<td>Configuration validation error</td>
-</tr>
-<tr>
-<td>2</td>
-<td>Runtime error</td>
-</tr>
-<tr>
-<td>3</td>
-<td>Runtime error (stage failure)</td>
+<td>Any failure (validation error, runtime error, or stage failure)</td>
 </tr>
 </tbody>
 </table>
+<h2 id="logging">Logging<a class="headerlink" href="#logging" title="Permanent link">#</a></h2>
+<p>Two sinks, with different jobs:</p>
+<table>
+<thead>
+<tr>
+<th>Sink</th>
+<th>Level</th>
+<th>Set by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Console</td>
+<td>Always <code>INFO</code></td>
+<td>Nothing — it is fixed</td>
+</tr>
+<tr>
+<td>Log file</td>
+<td><code>DEBUG</code> by default</td>
+<td><code>monitoring.log_level</code></td>
+</tr>
+</tbody>
+</table>
+<p>The console is a readable progress stream, so it is not adjustable. The log
+file is the diagnostic record, and its detail level is the one knob you can
+turn. Lower it (<code>INFO</code>, <code>WARNING</code>) when full <code>DEBUG</code> output from HydroMT,
+xarray and botocore makes the file unwieldy — worth doing when <code>work_dir</code> is
+on an NFS mount, where the write volume costs real time.</p>
+<p><code>run</code> and <code>create</code> accept <code>--log-level</code> to set it for a single run. The file
+level is resolved in this order, first match winning:</p>
+<ol>
+<li><code>--log-level</code></li>
+<li><code>COASTAL_LOG_LEVEL</code></li>
+<li><code>monitoring.log_level</code> in the config file</li>
+<li><code>DEBUG</code></li>
+</ol>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="c1"># Keep the log file small on a slow filesystem</span>
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>coastal-calibration<span class="w"> </span>run<span class="w"> </span>config.yaml<span class="w"> </span>--log-level<span class="w"> </span>INFO
+</span></code></pre></div>
+<p>Commands that write no log file (<code>prepare-topobathy</code>, <code>prepare-schism-mesh</code>,
+<code>update-dem-index</code>) have no <code>--log-level</code> option; they only print to the
+console.</p>
 <h2 id="environment-variables">Environment Variables<a class="headerlink" href="#environment-variables" title="Permanent link">#</a></h2>
 <p>The CLI respects these environment variables:</p>
 <table>
@@ -2147,7 +2202,7 @@ self-contained file and gives you full control over SLURM resource allocation:</
 <tbody>
 <tr>
 <td><code>COASTAL_LOG_LEVEL</code></td>
-<td>Override default log level</td>
+<td>Log-file detail level (see Logging)</td>
 </tr>
 <tr>
 <td><code>SLURM_JOB_ID</code></td>
@@ -2157,11 +2212,11 @@ self-contained file and gives you full control over SLURM resource allocation:</
 </table>
 <h2 id="shell-completion">Shell Completion<a class="headerlink" href="#shell-completion" title="Permanent link">#</a></h2>
 <p>To enable shell completion (bash/zsh):</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="c1"># Bash</span>
-</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="nb">eval</span><span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span><span class="nv">_COASTAL_CALIBRATION_COMPLETE</span><span class="o">=</span>bash_source<span class="w"> </span>coastal-calibration<span class="k">)</span><span class="s2">&quot;</span>
-</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>
-</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="c1"># Zsh</span>
-</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="nb">eval</span><span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span><span class="nv">_COASTAL_CALIBRATION_COMPLETE</span><span class="o">=</span>zsh_source<span class="w"> </span>coastal-calibration<span class="k">)</span><span class="s2">&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="c1"># Bash</span>
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="nb">eval</span><span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span><span class="nv">_COASTAL_CALIBRATION_COMPLETE</span><span class="o">=</span>bash_source<span class="w"> </span>coastal-calibration<span class="k">)</span><span class="s2">&quot;</span>
+</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>
+</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="c1"># Zsh</span>
+</span><span id="__span-20-5"><a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a><span class="nb">eval</span><span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span><span class="nv">_COASTAL_CALIBRATION_COMPLETE</span><span class="o">=</span>zsh_source<span class="w"> </span>coastal-calibration<span class="k">)</span><span class="s2">&quot;</span>
 </span></code></pre></div>
 <p>Add this to your shell profile for persistent completion.</p>
 
