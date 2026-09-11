@@ -135,7 +135,7 @@ class CoastalCalibRunner:
         # every message (including third-party) is captured on disk.
         if not config.monitoring.log_file:
             log_path = generate_log_path(config.paths.work_dir)
-            configure_logger(file=str(log_path), file_level="DEBUG")
+            configure_logger(file=str(log_path), file_level=config.monitoring.log_level)
 
         # Silence noisy third-party loggers (HydroMT, xarray, ...)
         silence_third_party_loggers()
@@ -339,7 +339,7 @@ class CoastalCalibRunner:
             success = True
 
         except Exception as e:
-            self.monitor.error(f"Workflow failed: {e}")
+            self.monitor.error(f"Workflow failed: {e}", exc_info=True)
             self.monitor.end_workflow(success=False)
             errors.append(str(e))
             stages_failed.append(current_stage)

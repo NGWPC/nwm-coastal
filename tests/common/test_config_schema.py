@@ -582,7 +582,7 @@ class TestSfincsModelConfig:
 class TestMonitoringConfig:
     def test_defaults(self):
         cfg = MonitoringConfig()
-        assert cfg.log_level == "INFO"
+        assert cfg.log_level == "DEBUG"  # level of the log file; console is always INFO
         assert cfg.log_file is None
         assert cfg.enable_progress_tracking is True
         assert cfg.enable_timing is True

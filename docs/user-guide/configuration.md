@@ -291,18 +291,29 @@ Configure logging and monitoring:
 
 ```yaml
 monitoring:
-  log_level: INFO                 # Logging verbosity
+  log_level: DEBUG                # Detail level of the log FILE
   log_file:                       # Optional log file path
-  enable_progress_tracking: true  # Show progress bars
+  enable_progress_tracking: true  # Log per-stage substeps (at DEBUG)
   enable_timing: true             # Track stage timing
 ```
 
-| Parameter                  | Type   | Default | Options                             |
-| -------------------------- | ------ | ------- | ----------------------------------- |
-| `log_level`                | string | `INFO`  | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
-| `log_file`                 | path   | null    | Path to log file                    |
-| `enable_progress_tracking` | bool   | true    | Show progress bars                  |
-| `enable_timing`            | bool   | true    | Track and report stage timing       |
+| Parameter                  | Type   | Default | Options                                         |
+| -------------------------- | ------ | ------- | ----------------------------------------------- |
+| `log_level`                | string | `DEBUG` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
+| `log_file`                 | path   | null    | Path to log file                                |
+| `enable_progress_tracking` | bool   | true    | Log per-stage substeps (at DEBUG)               |
+| `enable_timing`            | bool   | true    | Track and report stage timing                   |
+
+!!! note "`log_level` sets the log *file* level, not the console"
+
+    The console is always `INFO` and cannot be changed — it is a readable
+    progress stream. `log_level` controls how much detail is written to the
+    log file, which defaults to capturing everything at `DEBUG`.
+
+    Lower it to `INFO` or `WARNING` when full `DEBUG` output from HydroMT,
+    xarray and botocore makes the file unwieldy. This matters most when
+    `work_dir` is on an NFS mount, where the extra write volume costs real
+    time. The `--log-level` flag and `COASTAL_LOG_LEVEL` both override it.
 
 ### Download Settings
 

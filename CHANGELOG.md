@@ -8,12 +8,27 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project ad
 
 ### Added
 
+- **logging**: SCHISM subsetting (`extract_mesh`, `split_mesh`) now writes a DEBUG log
+  file, `schism-subset-<YYYYMMDD-HHMMSS>.log`, instead of logging to the console only
+- **logging**: Add `--log-level` to `run` and `create` to set the log-file detail level
+  for a single run; `COASTAL_LOG_LEVEL` now works as its environment-variable form
 - **schism**: Wire pyTMD harmonic boundary; add scribes counting and discharge gating
 - **alaska**: Add initial Alaska domain support
 - **sflux**: Subset atmospheric forcing to SCHISM mesh footprint
 
 ### Changed
 
+- **logging**: Split the console vs file by purpose. The console is now always `INFO` (a
+  readable progress stream) and `monitoring.log_level` sets the level of the log
+  *file*, which it previously did not affect at all. Its default changes from `INFO`
+  to `DEBUG` to match the file's prior behaviour, so existing configs that leave it
+  unset keep a full-detail log; lower it to shrink the log file. Python-API callers
+  that never called `configure_logger()` previously got a `WARNING` console and now
+  get `INFO`
+- **logging**: `monitoring.enable_progress_tracking` now gates substep logging instead
+  of being ignored
+- **logging**: Log the traceback when a workflow fails, instead of only `str(e)`;
+  console tracebacks no longer render frame locals
 - **tides**: Replace ambiguous multiplication sign in log strings
 - **tides**: Apply ruff-format to data/tides.py
 - **sfincs**: Switch boundary forcing to pyTMD harmonic predictor

@@ -118,3 +118,41 @@ class TestCLIPrepareSchismMesh:
     def test_nonexistent_dir(self, runner, tmp_path):
         result = runner.invoke(cli, ["prepare-schism-mesh", str(tmp_path / "nope")])
         assert result.exit_code != 0
+
+
+class TestCLILogLevelOption:
+    """--log-level sets the log FILE level; the console is always INFO."""
+
+    def test_present_on_file_writing_commands(self, runner):
+        for command in ("run", "create"):
+            result = runner.invoke(cli, [command, "--help"])
+            assert result.exit_code == 0
+            assert "--log-level" in result.output
+
+    def test_absent_where_no_log_file_is_written(self, runner):
+        for command in ("prepare-topobathy", "prepare-schism-mesh", "update-dem-index"):
+            result = runner.invoke(cli, [command, "--help"])
+            assert result.exit_code == 0
+            assert "--log-level" not in result.output
+
+    def test_verbose_flag_removed(self, runner):
+        result = runner.invoke(cli, ["run", "--help"])
+        assert "--verbose" not in result.output
+
+    def test_rejects_invalid_level(self, runner, sample_config_yaml):
+        result = runner.invoke(cli, ["run", str(sample_config_yaml), "--log-level", "LOUD"])
+        assert result.exit_code != 0
+
+    def test_console_stays_info_when_file_is_quieted(self, runner, sample_config_yaml):
+        result = runner.invoke(
+            cli, ["run", str(sample_config_yaml), "--dry-run", "--log-level", "ERROR"]
+        )
+        assert "Dry run mode" in result.output
+
+    def test_env_var_accepted(self, runner, sample_config_yaml):
+        result = runner.invoke(
+            cli,
+            ["run", str(sample_config_yaml), "--dry-run"],
+            env={"COASTAL_LOG_LEVEL": "WARNING"},
+        )
+        assert "Dry run mode" in result.output

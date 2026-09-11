@@ -307,7 +307,8 @@ class PathConfig:
 class MonitoringConfig:
     """Workflow monitoring configuration."""
 
-    log_level: LogLevel = "INFO"
+    # Level of the log *file*; the console is always INFO.
+    log_level: LogLevel = "DEBUG"
     log_file: Path | None = None
     enable_progress_tracking: bool = True
     enable_timing: bool = True
