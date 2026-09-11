@@ -134,18 +134,31 @@ sources can be used. Pick the domain your model sits in:
 | `alaska`     | Alaska                        | Alaska      | 1981-01-01 – 2019-12-31 | 2023-10-01 – present | `harmonic`, `stofs`          |
 | `greatlakes` | Great Lakes                   | CONUS       | 1979-02-01 – 2023-01-31 | 2018-10-01 – present | `glofs` only ([details](#great-lakes-glofs)) |
 
+`greatlakes` is the one domain with no choice of boundary source: `glofs` and
+`greatlakes` must be used together, and either one without the other is rejected at
+validation. STOFS does not cover the lakes, and a harmonic boundary would be actively
+misleading there, since lake levels are driven by wind setup and seiches rather than by
+astronomical tides of a few centimetres. Every other domain accepts `stofs` or
+`harmonic`.
+
 Boundary data has its own dates: `stofs` from 2020-12-30, `glofs` from 2016 depending
 on the lake, and `harmonic` has no limit. `ngen_forecast` forcing is read from a file you
 supply, so it has no date limits.
 
-A run must fit inside the range of both its forcing source and its boundary source.
-Watch for the gaps where **no NWM forcing exists**:
+A boundary source does not require a particular forcing source. `stofs` pairs with
+`nwm_retro`, `nwm_ana` or `ngen_forecast`; what constrains a run is that it must fit
+inside the range of both its forcing source and its boundary source. Watch for the gaps
+where **no NWM forcing exists**:
 
 | Domain   | No NWM forcing                 | Consequence                                                        |
 | -------- | ------------------------------ | ------------------------------------------------------------------ |
-| `hawaii` | 2014-01-01 – 2021-04-20        | `stofs` runs need `nwm_ana`, so start on or after 2021-04-21       |
+| `hawaii` | 2014-01-01 – 2021-04-20        | `nwm_retro` ends 2013-12-31, before STOFS begins, so here a `stofs` run needs `nwm_ana` and starts on or after 2021-04-21 |
 | `prvi`   | 2023-07-01 – 2023-09-30        | runs can't include those three months                             |
-| `alaska` | 2020-01-01 – 2023-09-30        | `stofs` runs start on or after 2023-10-01; `harmonic` runs fit 1981–2019 or from 2023-10-01 |
+| `alaska` | 2020-01-01 – 2023-09-30        | `nwm_retro` ends 2019-12-31, before STOFS begins, so here a `stofs` run needs `nwm_ana` and starts on or after 2023-10-01; `harmonic` runs fit 1981–2019 or from 2023-10-01 |
+
+In `atlgulf`, `pacific` and `prvi` the two ranges do overlap, so `nwm_retro` + `stofs`
+is valid there from 2020-12-30. `init` picks it for `atlgulf` and `pacific`; `prvi`
+defaults to `nwm_ana` instead, because SCHISM currently fails there with `nwm_retro`.
 
 `coastal-calibration init --domain <domain>` writes a config with a combination that
 works for that domain.
