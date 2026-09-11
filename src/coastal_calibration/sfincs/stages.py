@@ -2093,7 +2093,7 @@ class SfincsPlotStage(_SfincsStageBase):
         import numpy as np
         from scipy.spatial import KDTree
 
-        from coastal_calibration.data.coops_api import COOPSAPIClient
+        from coastal_calibration.data.coops_api import COOPSAPIClient, comparison_datums
 
         model = _get_model(self.config)
 
@@ -2146,7 +2146,8 @@ class SfincsPlotStage(_SfincsStageBase):
             return [], []
 
         # Validate datum availability (same filter as the create step).
-        valid_ids = client.filter_stations_by_datum(list(candidates.keys()))
+        required = comparison_datums(self.config.simulation.coastal_domain)
+        valid_ids = client.filter_stations_by_datum(list(candidates.keys()), required)
         dropped = set(candidates.keys()) - valid_ids
         if dropped:
             self._log(
@@ -2259,20 +2260,31 @@ class SfincsPlotStage(_SfincsStageBase):
             [point_zs.isel({station_dim: idx}).values for idx in noaa_indices]
         )
 
+        sim = self.config.simulation
+        lakes = sim.coastal_domain == "greatlakes"
+
         # Apply mesh vdatum → MSL correction, per station (live NAVD88 from
         # CO-OPS where available, falling back to vdatum_mesh_to_msl_m
         # otherwise -- see _per_station_mesh_to_msl_offsets).
-        station_offsets = self._per_station_mesh_to_msl_offsets(noaa_station_ids)
-        sim_elevation = sim_elevation + station_offsets[np.newaxis, :]
+        # Great Lakes comparisons stay in the mesh datum (observations are shifted instead).
+        if not lakes:
+            station_offsets = self._per_station_mesh_to_msl_offsets(noaa_station_ids)
+            sim_elevation = sim_elevation + station_offsets[np.newaxis, :]
 
-        # Fetch observed water levels (MLLW → MSL)
+        # Fetch observed water levels (MLLW → MSL, or LWD → mesh datum for lakes)
         self._update_substep("Fetching NOAA CO-OPS observations")
-        sim = self.config.simulation
         begin_date = sim.start_date.strftime("%Y%m%d %H:%M")
         end_dt = sim.start_date + timedelta(hours=sim.duration_hours)
         end_date = end_dt.strftime("%Y%m%d %H:%M")
 
-        obs_ds = self._fetch_observations_msl(noaa_station_ids, begin_date, end_date)
+        if lakes:
+            from coastal_calibration.data.coops_api import query_great_lakes_in_mesh_datum
+
+            obs_ds = query_great_lakes_in_mesh_datum(
+                noaa_station_ids, begin_date, end_date, self.sfincs.forcing_to_mesh_offset_m
+            )
+        else:
+            obs_ds = self._fetch_observations_msl(noaa_station_ids, begin_date, end_date)
 
         # Generate comparison plots
         self._update_substep("Generating comparison plots")

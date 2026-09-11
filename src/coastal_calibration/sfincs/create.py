@@ -1198,7 +1198,7 @@ class CreateObservationPointsStage(_CreateStageBase):
 
         Returns the number of NOAA stations added.
         """
-        from coastal_calibration.data.coops_api import COOPSAPIClient
+        from coastal_calibration.data.coops_api import COOPSAPIClient, comparison_datums
 
         model_crs = model.crs
         if model_crs is None:
@@ -1217,7 +1217,8 @@ class CreateObservationPointsStage(_CreateStageBase):
             return 0
 
         candidate_ids = selected["station_id"].tolist()
-        valid_ids = client.filter_stations_by_datum(candidate_ids)
+        domain = "greatlakes" if selected["greatlakes"].astype(bool).any() else None
+        valid_ids = client.filter_stations_by_datum(candidate_ids, comparison_datums(domain))
         dropped = set(candidate_ids) - valid_ids
         if dropped:
             self._log(

@@ -563,7 +563,9 @@ class SchismModelConfig(ModelConfig):
             detected: int | None = None
             if self.prebuilt_dir is not None:
                 detected = count_required_scribes(
-                    self.prebuilt_dir / "param.nml", self.include_noaa_gages
+                    self.prebuilt_dir / "param.nml",
+                    self.include_noaa_gages,
+                    self.run_param_overrides,
                 )
             self.nscribes = detected if detected and detected > 0 else 2
 

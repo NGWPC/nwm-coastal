@@ -433,8 +433,6 @@ def init(output: Path, domain: str, force: bool, model: str) -> None:
             "\n  forcing_to_mesh_offset_m: 0.0  # GLOFS is relative to the lake's "
             "low-water datum; e.g. 173.5 for an absolute-datum Lake Erie mesh"
         )
-    # CO-OPS comparison assumes MLLW/MSL datums, which the Great Lakes gauges lack.
-    noaa_gages = "false" if domain == "greatlakes" else "true"
 
     if model == "sfincs":
         config_content = f"""\
@@ -488,7 +486,7 @@ boundary:
   source: {boundary_source}{boundary_extra}
 
 model_config:
-  include_noaa_gages: {noaa_gages}{model_extra}
+  include_noaa_gages: true{model_extra}
 """
 
     output_path.write_text(config_content)

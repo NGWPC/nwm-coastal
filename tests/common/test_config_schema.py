@@ -400,6 +400,16 @@ class TestSchismModelConfig:
         cfg = SchismModelConfig(prebuilt_dir=prebuilt)
         assert cfg.nscribes == 4  # iof_hydro(25) unset, so SCHISM's default (on) applies
 
+    def test_nscribes_counts_outputs_switched_off_by_overrides(self, tmp_path):
+        prebuilt = tmp_path / "prebuilt"
+        prebuilt.mkdir()
+        (prebuilt / "param.nml").write_text("&SCHOUT\n  iof_hydro(1) = 1\n  iof_hydro(26) = 1\n/\n")
+        cfg = SchismModelConfig(
+            prebuilt_dir=prebuilt,
+            run_param_overrides={"iof_hydro(25)": 0, "iof_hydro(26)": 0},
+        )
+        assert cfg.nscribes == 1  # only the shared 2-D scribe is left
+
     def test_nscribes_2d_outputs_share_one_scribe(self, tmp_path):
         prebuilt = tmp_path / "prebuilt"
         prebuilt.mkdir()

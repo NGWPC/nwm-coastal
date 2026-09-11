@@ -79,7 +79,7 @@ class TestCLIInit:
         assert cfg["boundary"] == {"source": "glofs", "glofs_model": "leofs"}
         assert cfg["model_config"]["forcing_to_mesh_offset_m"] == 0.0
         if model == "schism":
-            assert cfg["model_config"]["include_noaa_gages"] is False
+            assert cfg["model_config"]["include_noaa_gages"] is True
 
     def test_init_sfincs(self, runner, tmp_path):
         output_path = tmp_path / "config.yaml"

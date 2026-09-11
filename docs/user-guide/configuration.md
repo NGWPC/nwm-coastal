@@ -219,8 +219,13 @@ caching the result under `coastal/glofs/<lake>/` in the download directory. Data
 from NCEI's archive at
 `https://www.ncei.noaa.gov/oa/prod-model/operational-nowcast-and-forecast-hydrodynamic-model-systems-co-ops/`.
 
-Leave `include_noaa_gages` off for Great Lakes runs: the CO-OPS comparison assumes
-MLLW/MSL datums, which Great Lakes gauges don't use.
+**Gauge comparison.** With `include_noaa_gages: true`, Great Lakes runs compare
+against NOAA CO-OPS lake gauges, which record observations but publish no tide
+predictions. Lake gauges have no MSL or MLLW, so observations are fetched in the
+lake's low-water datum and shifted by the same `forcing_to_mesh_offset_m` as the
+boundary, and the comparison is made in the mesh datum. 49 of the 52 CO-OPS Great
+Lakes gauges qualify; the three Niagara River gauges (Ashland Ave, American Falls,
+Niagara Intake) publish no low-water datum and are skipped.
 
 ### Path Settings
 
@@ -626,12 +631,18 @@ elevation:
 
 Each dataset entry:
 
-| Field          | Type  | Description                                          |
-| -------------- | ----- | ---------------------------------------------------- |
-| `name`         | str   | HydroMT data-catalog dataset name                    |
-| `zmin`         | float | Minimum elevation threshold                          |
-| `source`       | str   | Auto-fetch source (`"noaa"` or null)                 |
-| `noaa_dataset` | str   | Explicit NOAA dataset name (auto-discovered if null) |
+| Field            | Type  | Description                                                                   |
+| ---------------- | ----- | ----------------------------------------------------------------------------- |
+| `name`           | str   | Dataset name; for your own data, the entry name in your data catalog          |
+| `zmin`           | float | Cells below this elevation are ignored for this dataset (after `offset`)      |
+| `source`         | str   | Download source: `nws_30m`, `noaa_3m`, `noaa_crm`, `copdem_30m`, `gebco_15arcs`; omit for your own data |
+| `offset`         | float | Metres added to this dataset before merging, to align vertical datums         |
+| `noaa_dataset`   | str   | Explicit NOAA dataset (only with `noaa_3m`; auto-discovered if null)          |
+| `coastal_domain` | str   | NWS topobathy tile (only with `nws_30m`)                                      |
+
+Datasets are merged **in list order**: the first dataset takes priority, and each later
+one only fills cells that are still empty. The same list builds both the grid bed levels
+and the subgrid tables.
 
 #### Mask Settings (`mask`)
 
@@ -661,6 +672,90 @@ Each dataset entry:
 | Parameter   | Type | Default | Description                                |
 | ----------- | ---- | ------- | ------------------------------------------ |
 | `data_libs` | list | `[]`    | Additional HydroMT data catalog YAML paths |
+
+#### Using your own topobathy data
+
+You can build the model from your own DEM (a local lidar survey, a bathymetric survey, a
+blended product) instead of, or on top of, the datasets `create` downloads. Describe the
+DEM in a HydroMT data catalog, then list it in `elevation.datasets` without a `source`.
+
+**1. Write a data catalog** for the DEM, e.g. `my_dem/data_catalog.yml`:
+
+```yaml
+meta:
+  version: v1.0.0
+  hydromt_version: '>1.0a,<2'
+
+my_lidar_dem:                  # the name you will use in the create config
+  data_type: RasterDataset
+  uri: my_lidar_dem.tif        # relative to this catalog file
+  driver:
+    name: rasterio
+  metadata:
+    crs: 26915                 # EPSG code; only needed if the file doesn't carry one
+    nodata: -9999              # only needed if the file doesn't carry one
+  data_adapter:
+    rename:
+      my_lidar_dem: elevtn     # HydroMT-SFINCS reads the variable named elevtn
+```
+
+The DEM can be in any projection; it is reprojected onto the model grid. It must hold
+**elevations in metres, positive up**. If it holds depths (positive down), flip it in the
+catalog:
+
+```yaml
+  data_adapter:
+    rename:
+      my_lidar_dem: elevtn
+    unit_mult:
+      elevtn: -1
+```
+
+If the DEM comes as **tiles**, either point `uri` at them with a wildcard and turn on
+mosaicking, or combine them into a single VRT first (`gdalbuildvrt my_dem.vrt tiles/*.tif`)
+and point `uri` at the `.vrt`:
+
+```yaml
+  uri: tiles/*.tif
+  driver:
+    name: rasterio
+    options:
+      mosaic: true             # without this, tiles fail with "Geotransform and/or shape do not match"
+```
+
+**2. Use it in the create config.** Put your DEM first so it wins where it has data, and
+keep a downloaded dataset after it to fill anywhere your DEM doesn't reach:
+
+```yaml
+elevation:
+  datasets:
+    - name: my_lidar_dem       # no source: read from the data catalog, not downloaded
+      zmin: -20000
+    - name: gebco_15arcs       # fills areas outside your DEM
+      zmin: -20000
+      source: gebco_15arcs
+      offset: -0.24            # e.g. put GEBCO (~MSL) onto your DEM's NAVD88 datum
+
+data_catalog:
+  data_libs:
+    - ./my_dem/data_catalog.yml   # relative to this config file
+```
+
+**Vertical datum.** The model takes on the vertical datum of the merged elevation, so pick
+one datum for the model, which is usually your DEM's, and use `offset` on the other datasets
+to bring them onto it. Otherwise you get a step in the bed wherever one dataset's coverage
+ends. Remember that datum when you later set the run's `forcing_to_mesh_offset_m` and
+`vdatum_mesh_to_msl_m`.
+
+**Checking it worked.** The create log lists the elevation datasets it merged. Two things
+to watch for:
+
+- `No data in domain for my_lidar_dem, skipped.` means the DEM doesn't overlap the model
+  area, usually because of a wrong `crs` in the catalog. The run carries on with the other
+  datasets, so check for this line rather than assuming your DEM was used.
+- `found no files at …/my_lidar_dem` means the name in `elevation.datasets` doesn't match
+  any catalog entry (or the catalog isn't listed in `data_libs`), so the name was tried
+  as a file path. `validate` doesn't catch this; it surfaces at the `create_elevation` stage.
 
 #### River Discharge (`river_discharge`, Optional)
 

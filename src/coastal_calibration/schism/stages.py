@@ -168,7 +168,9 @@ def _build_domain_polygon(project: Any) -> Any:
 
     outer_pts = coords[np.array(outer_ids) - 1].tolist()
     holes = [coords[np.array(isl) - 1].tolist() for isl in islands]
-    return shapely.Polygon(outer_pts, holes=holes)
+    polygon = shapely.Polygon(outer_pts, holes=holes)
+    # Some lake meshes carry the shoreline as an island loop; repair the geometry.
+    return polygon if polygon.is_valid else shapely.make_valid(polygon)
 
 
 def _read_staout(staout_path: Path) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
@@ -282,7 +284,7 @@ class SchismObservationStage(WorkflowStage):
             self._log("include_noaa_gages is disabled, skipping")
             return {"status": "skipped"}
 
-        from coastal_calibration.data.coops_api import COOPSAPIClient
+        from coastal_calibration.data.coops_api import COOPSAPIClient, comparison_datums
         from coastal_calibration.schism import NWMSCHISMProject
 
         work_dir = self.config.paths.work_dir
@@ -335,16 +337,16 @@ class SchismObservationStage(WorkflowStage):
 
         candidate_ids = selected["station_id"].tolist()
 
-        # Filter to stations with valid MSL/MLLW datums so that
-        # every station written to station.in can later be converted
-        # from MLLW to MSL during the plotting stage.
+        # Keep stations whose datums let the plot stage convert them:
+        # MSL/MLLW for tidal gauges, the lake low-water datum for Great Lakes.
         self._update_substep("Filtering stations by datum availability")
-        valid_ids = client.filter_stations_by_datum(candidate_ids)
+        required = comparison_datums(self.config.simulation.coastal_domain)
+        valid_ids = client.filter_stations_by_datum(candidate_ids, required)
 
         dropped = set(candidate_ids) - valid_ids
         if dropped:
             self._log(
-                f"Excluded {len(dropped)} station(s) without datum data: "
+                f"Excluded {len(dropped)} station(s) without {'/'.join(required)} datum: "
                 f"{', '.join(sorted(dropped))}",
                 "warning",
             )
@@ -968,8 +970,9 @@ class SchismPlotStage(WorkflowStage):
             raise RuntimeError(msg)
 
         # Apply per-station datum correction so simulated values are in MSL.
+        # Great Lakes comparisons stay in the mesh datum (observations are shifted instead).
         corr_path = self.model.elevation_correction_csv
-        if corr_path is not None:
+        if corr_path is not None and self.config.simulation.coastal_domain != "greatlakes":
             offsets = self._per_station_datum_offsets(station_ids, corr_path)
             if offsets is not None:
                 elevation = elevation + offsets[None, :]
@@ -1001,7 +1004,14 @@ class SchismPlotStage(WorkflowStage):
         end_dt = sim.start_date + timedelta(hours=sim.duration_hours)
         end_date = end_dt.strftime("%Y%m%d %H:%M")
 
-        obs_ds = self._fetch_observations_msl(station_ids, begin_date, end_date)
+        if sim.coastal_domain == "greatlakes":
+            from coastal_calibration.data.coops_api import query_great_lakes_in_mesh_datum
+
+            obs_ds = query_great_lakes_in_mesh_datum(
+                station_ids, begin_date, end_date, self.model.forcing_to_mesh_offset_m
+            )
+        else:
+            obs_ds = self._fetch_observations_msl(station_ids, begin_date, end_date)
 
         self._update_substep("Generating comparison plots")
         from coastal_calibration.plotting import plot_station_comparison

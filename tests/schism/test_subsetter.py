@@ -639,3 +639,25 @@ class TestSubsetReachesFile:
         assert "1 1072639236903480" in lines
         assert "2 1075116176753856" in lines
         assert not any("1073115932546594" in ln for ln in lines)  # dropped
+
+
+class TestDomainPolygonShorelineAsIsland:
+    """Lake meshes may carry the shoreline as an island loop; gauges must still match."""
+
+    def test_repaired_polygon_contains_interior_points(self):
+        from types import SimpleNamespace
+
+        from coastal_calibration.schism.stages import _build_domain_polygon
+
+        # Open boundary: a small square. "Island": a larger loop around it.
+        coords = np.array(
+            [[0, 0], [1, 0], [1, 1], [0, 1], [-1, -1], [2, -1], [2, 2], [-1, 2]], dtype=float
+        )
+        island = SimpleNamespace(nodes=[5, 6, 7, 8], is_exterior=False, is_island=True)
+        boundaries = SimpleNamespace(open_boundaries=[[1, 2, 3, 4, 1]], land_boundaries=[island])
+        project = SimpleNamespace(read_boundaries=lambda: boundaries, nodes_coordinates=coords)
+
+        polygon = _build_domain_polygon(project)
+
+        assert polygon.is_valid
+        assert polygon.contains(shapely.Point(1.5, 1.5))  # inside the shoreline loop

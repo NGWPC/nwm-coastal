@@ -44,11 +44,15 @@ def _format_namelist_value(value: Any) -> str:
     return str(value)
 
 
+_SCHOUT_KEY_PREFIXES = ("iof_", "nc_out", "nhot", "iout_sta", "nspool_sta")
+
+
 def _apply_namelist_overrides(text: str, overrides: dict[str, Any]) -> str:
     """Replace ``key = ...`` lines in a Fortran namelist with new values.
 
     Keys not already present in *text* are appended just before the
-    closing ``/`` of the ``&OPT`` block (SCHISM's general physics/
+    closing ``/`` of ``&SCHOUT`` for output-control keys (``iof_*``,
+    station and hotstart output), and otherwise of the ``&OPT`` block (SCHISM's general physics/
     numerics namelist -- home to the vast majority of ad-hoc override
     keys, e.g. ``nramp``/``nrampbc`` alongside their already-present
     siblings ``dramp``/``drampbc``). SCHISM's real ``param.nml`` has
@@ -65,8 +69,6 @@ def _apply_namelist_overrides(text: str, overrides: dict[str, Any]) -> str:
     # \s): \s also matches \n, so a greedy \s*$ silently swallows the
     # blank lines *between* this block's "/" and the next block's "&NAME",
     # moving the match's end() past where "/" actually is.
-    opt_close_re = re.compile(r"(?mi)^&OPT[ \t]*$.*?(^[ \t]*/[ \t]*$)", flags=re.DOTALL)
-
     out = text
     for key, value in overrides.items():
         rendered = _format_namelist_value(value)
@@ -76,8 +78,11 @@ def _apply_namelist_overrides(text: str, overrides: dict[str, Any]) -> str:
             out,
         )
         if n == 0:
-            opt_match = opt_close_re.search(out)
-            insert_at = opt_match.start(1) if opt_match else out.rfind("/")
+            # Output-control keys (iof_*, station/hotstart output) belong in &SCHOUT.
+            block = "SCHOUT" if key.lower().startswith(_SCHOUT_KEY_PREFIXES) else "OPT"
+            close_re = re.compile(rf"(?mi)^&{block}[ \t]*$.*?(^[ \t]*/[ \t]*$)", flags=re.DOTALL)
+            block_match = close_re.search(out)
+            insert_at = block_match.start(1) if block_match else out.rfind("/")
             if insert_at < 0:
                 raise KeyError(f"No namelist closing '/' found in param.nml; cannot insert {key}")
             out = out[:insert_at] + f"  {key} = {rendered}\n" + out[insert_at:]
@@ -959,7 +964,9 @@ _HYDRO_3D_SCRIBES = {**dict.fromkeys(range(17, 26), 1), 26: 2, 27: 2, 28: 1, 29:
 _HYDRO_DEFAULTS_ON = (1, 25, 26)
 
 
-def count_required_scribes(param_nml: Path, include_noaa_gages: bool) -> int | None:
+def count_required_scribes(
+    param_nml: Path, include_noaa_gages: bool, overrides: dict[str, Any] | None = None
+) -> int | None:
     """Count the SCHISM scribes implied by an active ``param.nml``.
 
     Follows SCHISM's own rule in ``schism_init.F90``: every 2-D output
@@ -969,7 +976,8 @@ def count_required_scribes(param_nml: Path, include_noaa_gages: bool) -> int | N
     them off. Outputs of other modules are counted one each, and station
     output (``iout_sta``, forced on by ``include_noaa_gages``) adds one.
     SCHISM aborts at init when its CLI ``nscribes`` argument is below the
-    number it computes.
+    number it computes. ``overrides`` (``run_param_overrides``) are applied
+    first, so outputs switched off for the run aren't counted.
 
     Returns
     -------
@@ -981,6 +989,8 @@ def count_required_scribes(param_nml: Path, include_noaa_gages: bool) -> int | N
         text = param_nml.read_text()
     except OSError:
         return None
+    if overrides:
+        text = _apply_namelist_overrides(text, overrides)
     flags = re.findall(r"(?m)^\s*(iof_\w+)\((\d+)\)\s*=\s*(-?\d+)", text)
     hydro = dict.fromkeys(_HYDRO_DEFAULTS_ON, 1)
     hydro.update({int(i): int(v) for name, i, v in flags if name == "iof_hydro"})
