@@ -18,6 +18,7 @@ from tiny_retriever import download
 from coastal_calibration.config.schema import (
     BoundarySource,
     CoastalDomain,
+    GLOFSModel,
     MeteoSource,
     PathConfig,
 )
@@ -36,8 +37,7 @@ HydroSource = Literal["nwm", "ngen"]
 # are downloaded from NOAA. ``tpxo`` is accepted as the deprecated
 # upstream alias for ``harmonic`` and normalized at the schema boundary.
 CoastalSource = Literal["stofs", "harmonic", "glofs"]
-Domain = Literal["conus", "hawaii", "prvi", "atlgulf", "pacific", "alaska"]
-GLOFSModel = Literal["leofs", "loofs", "lsofs", "lmhofs"]
+Domain = Literal["conus", "hawaii", "prvi", "atlgulf", "pacific", "alaska", "greatlakes"]
 
 
 @dataclass
@@ -134,17 +134,24 @@ DATA_SOURCE_DATE_RANGES: dict[str, dict[str, DateRange]] = {
             description="STOFS (operational)",
         ),
     },
+    # First day archived at NCEI per lake. Michigan-Huron before 2019-09-17
+    # exists only as the separate lmofs/lhofs models, which aren't supported.
+    # ``_default`` matches the default lake (leofs) used by ``init``.
     "glofs": {
         "_default": DateRange(
-            start=datetime(2005, 9, 30),
+            start=datetime(2016, 3, 10),
             end=None,
             description="GLOFS (Great Lakes)",
         ),
+        "leofs": DateRange(start=datetime(2016, 3, 10), end=None, description="GLOFS LEOFS"),
+        "lmhofs": DateRange(start=datetime(2019, 9, 17), end=None, description="GLOFS LMHOFS"),
+        "loofs": DateRange(start=datetime(2016, 3, 1), end=None, description="GLOFS LOOFS"),
+        "lsofs": DateRange(start=datetime(2016, 3, 1), end=None, description="GLOFS LSOFS"),
     },
 }
 
 # Domains that share CONUS data
-_CONUS_DOMAINS = {"conus", "atlgulf", "pacific"}
+_CONUS_DOMAINS = {"conus", "atlgulf", "pacific", "greatlakes"}
 
 
 def get_date_range(source: str, domain: str = "conus") -> DateRange | None:
@@ -239,7 +246,7 @@ def get_default_sources(
     ----------
     domain : CoastalDomain
         Model domain: ``"prvi"``, ``"hawaii"``, ``"atlgulf"``,
-        ``"pacific"``, or ``"alaska"``.
+        ``"pacific"``, ``"alaska"``, or ``"greatlakes"``.
 
     Returns
     -------
@@ -253,7 +260,12 @@ def get_default_sources(
     """
     # Preferred combinations in priority order.
     # PRVI uses nwm_ana first because SCHISM currently fails with nwm_retro.
-    if domain == "prvi":
+    if domain == "greatlakes":
+        combos: list[tuple[MeteoSource, BoundarySource]] = [
+            ("nwm_retro", "glofs"),
+            ("nwm_ana", "glofs"),
+        ]
+    elif domain == "prvi":
         combos: list[tuple[MeteoSource, BoundarySource]] = [
             ("nwm_ana", "stofs"),
             ("nwm_ana", "harmonic"),
@@ -324,6 +336,7 @@ _DOMAIN_MAP_RETRO = {
     "conus": "CONUS",
     "atlgulf": "CONUS",
     "pacific": "CONUS",
+    "greatlakes": "CONUS",
     "hawaii": "Hawaii",
     "prvi": "PR",
     "alaska": "Alaska",
@@ -333,16 +346,10 @@ _DOMAIN_MAP_ANA = {
     "conus": ("", "conus"),
     "atlgulf": ("", "conus"),
     "pacific": ("", "conus"),
+    "greatlakes": ("", "conus"),
     "hawaii": ("_hawaii", "hawaii"),
     "prvi": ("_puertorico", "puertorico"),
     "alaska": ("_alaska", "alaska"),
-}
-
-_GLOFS_MODEL_DIRS = {
-    "leofs": "lake-erie-operational-forecast-system-leofs",
-    "loofs": "lower-ohio-operational-forecast-system-loofs",
-    "lsofs": "lake-st-clair-operational-forecast-system-lsofs",
-    "lmhofs": "lake-michigan-huron-operational-forecast-system-lmhofs",
 }
 
 
@@ -853,41 +860,6 @@ def _stofs_local_file_covers(path: Path, needed_start: datetime, needed_end: dat
         return False
 
 
-def _build_glofs_urls(
-    start: datetime,
-    end: datetime,
-    output_dir: Path,
-    model: str,
-) -> tuple[list[str], list[Path]]:
-    """Build URLs for GLOFS water level files."""
-    base_url = (
-        "https://www.ncei.noaa.gov/data/"
-        "operational-nowcast-and-forecast-hydrodynamic-model-systems-co-ops/access"
-    )
-    model_dir = _GLOFS_MODEL_DIRS.get(model, _GLOFS_MODEL_DIRS["leofs"])
-
-    urls: list[str] = []
-    paths: list[Path] = []
-    out_dir = output_dir / PathConfig.COASTAL_SUBDIR / "glofs"
-
-    for h in _hour_range(start, end):
-        dt = start + timedelta(hours=h)
-        date_str = dt.strftime("%Y%m%d")
-        year = dt.strftime("%Y")
-        month = dt.strftime("%m")
-
-        cycle_hour = (dt.hour // 6) * 6
-        cycle = f"t{cycle_hour:02d}z"
-        suffix = f"n{dt.hour % 6:03d}"
-
-        filename = f"{model}.{cycle}.{date_str}.fields.{suffix}.nc"
-        url = f"{base_url}/{model_dir}/{year}/{month}/{filename}"
-        urls.append(url)
-        paths.append(out_dir / filename)
-
-    return urls, paths
-
-
 def _execute_download(
     urls: list[str],
     file_paths: list[Path],
@@ -969,8 +941,13 @@ def validate_date_ranges(
     meteo_source: str,
     coastal_source: str,
     domain: str,
+    glofs_model: str | None = None,
 ) -> list[str]:
-    """Validate that requested dates are within available ranges."""
+    """Validate that requested dates are within available ranges.
+
+    GLOFS coverage depends on the lake, so ``glofs_model`` selects the
+    per-lake range when ``coastal_source`` is ``"glofs"``.
+    """
     errors: list[str] = []
 
     meteo_range = get_date_range(meteo_source, domain)
@@ -980,7 +957,8 @@ def validate_date_ranges(
             errors.append(error)
 
     if coastal_source != "harmonic":
-        coastal_range = get_date_range(coastal_source, domain)
+        key = glofs_model if coastal_source == "glofs" and glofs_model else domain
+        coastal_range = get_date_range(coastal_source, key)
         if coastal_range:
             error = coastal_range.validate(start_time, end_time)
             if error:
@@ -1095,9 +1073,9 @@ def download_data(
         End of simulation period (datetime or ISO format string).
     output_dir : str or pathlib.Path
         Root directory for downloaded data.
-    domain : {"conus", "hawaii", "prvi", "atlgulf", "pacific"}
+    domain : {"conus", "hawaii", "prvi", "atlgulf", "pacific", "alaska", "greatlakes"}
         Model domain: ``conus``, ``hawaii``, ``prvi``, ``atlgulf``,
-        or ``pacific``.
+        ``pacific``, ``alaska``, or ``greatlakes``.
     meteo_source : {"nwm_retro", "nwm_ana"}, optional
         Meteorological data source: ``nwm_retro`` or ``nwm_ana``.
         Defaults to ``nwm_retro``.
@@ -1107,9 +1085,9 @@ def download_data(
     coastal_source : {"harmonic", "stofs", "glofs"}, optional
         Coastal water level source: ``harmonic`` (predict locally from
         a tidal atlas), ``stofs``, or ``glofs``. Defaults to ``stofs``.
-    glofs_model : {"leofs", "loofs", "lsofs", "lmhofs"}, optional
-        GLOFS model (only used if ``coastal_source`` is ``glofs``):
-        ``leofs``, ``loofs``, ``lsofs``, or ``lmhofs``.
+    glofs_model : {"leofs", "lmhofs", "loofs", "lsofs"}, optional
+        GLOFS model (only used if ``coastal_source`` is ``glofs``): Lake
+        Erie, Michigan-Huron, Ontario, or Superior.
         Defaults to ``leofs``.
     tidal_atlas_path : str or pathlib.Path, optional
         Local path to the tidal atlas directory. Required when
@@ -1142,7 +1120,9 @@ def download_data(
     out_dir = Path(output_dir)
     atlas_path = Path(tidal_atlas_path) if tidal_atlas_path else None
 
-    errors = validate_date_ranges(start, end, meteo_source, coastal_source, domain)
+    errors = validate_date_ranges(
+        start, end, meteo_source, coastal_source, domain, glofs_model=glofs_model
+    )
     if errors:
         raise ValueError("Date range validation failed:\n" + "\n".join(f"  - {e}" for e in errors))
 
@@ -1232,8 +1212,9 @@ def download_data(
             mesh_urls, mesh_paths, "coastal/stofs-mesh", max(timeout, 3600), raise_on_error=False
         )
     else:
-        urls, paths = _build_glofs_urls(start, end, out_dir, glofs_model)
-        coastal_result = _execute_download(urls, paths, "coastal/glofs", timeout, raise_on_error)
+        from coastal_calibration.data.glofs import fetch_glofs
+
+        coastal_result = fetch_glofs(glofs_model, start, end, out_dir, raise_on_error)
 
     results = DownloadResults(meteo=meteo_result, hydro=hydro_result, coastal=coastal_result)
     _log_summary(results)

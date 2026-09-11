@@ -15,8 +15,13 @@ import subprocess
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from coastal_calibration.logging import logger
+
+if TYPE_CHECKING:
+    import numpy as np
+    from numpy.typing import NDArray
 
 # ---------------------------------------------------------------------------
 # Time handling
@@ -165,6 +170,7 @@ __all__ = [
     "detect_mpi",
     "expand_cpu_affinity_if_constrained",
     "get_cpu_count",
+    "idw_interpolate",
     "to_naive_utc",
     "utc_now",
 ]
@@ -369,3 +375,64 @@ def build_isolated_env(
         env.update(runtime_env)
 
     return env
+
+
+def idw_interpolate(
+    src_xy: NDArray[np.floating[Any]],
+    target_xy: NDArray[np.floating[Any]],
+    values: NDArray[np.floating[Any]],
+    k: int = 4,
+) -> NDArray[np.floating[Any]]:
+    """Inverse-distance weighted interpolation from source to target points.
+
+    Parameters
+    ----------
+    src_xy : ndarray, shape (N, 2)
+        Source point coordinates.
+    target_xy : ndarray, shape (M, 2)
+        Target point coordinates.
+    values : ndarray, shape (T, N)
+        Timeseries values at each source point.
+    k : int
+        Number of nearest neighbors to use (capped at N).
+
+    Returns
+    -------
+    ndarray, shape (T, M)
+        Interpolated values at each target point.
+
+    Notes
+    -----
+    Vectorised over both targets and time. An exact match
+    (``d < 1e-10``) is handled by clamping the distance from below
+    with the same epsilon: the inverse-distance weight then becomes
+    large enough that the exact-match neighbour dominates the
+    normalized weights, exactly matching the single-target fallback
+    path in the previous Python-loop implementation.
+    """
+    import numpy as np
+    from scipy.spatial import KDTree
+
+    k = min(k, len(src_xy))
+    tree = KDTree(src_xy)
+    result: Any = tree.query(target_xy, k=k)
+    # ``target_xy`` is 2-D so ``query`` returns arrays (scalar return
+    # is the 1-D-input edge case); asarray narrows for pyright.
+    dists = np.asarray(result[0], dtype=np.float64)
+    idxs = np.asarray(result[1], dtype=np.int64)
+
+    # KDTree returns 1-D arrays for k=1; promote to (n_targets, 1)
+    # so the downstream broadcast against ``values`` is uniform.
+    if dists.ndim == 1:
+        dists = dists[:, np.newaxis]
+        idxs = idxs[:, np.newaxis]
+
+    # Clamp distance from below so an exact match does not blow up
+    # to inf; the resulting inverse-distance weight still dominates.
+    weights = 1.0 / np.maximum(dists, 1e-10)
+    weights /= weights.sum(axis=1, keepdims=True)
+
+    # gathered shape: (n_times, n_targets, k); broadcast weights
+    # to (1, n_targets, k) and reduce along k.
+    gathered = values[:, idxs]
+    return np.nansum(gathered * weights[np.newaxis, :, :], axis=2)

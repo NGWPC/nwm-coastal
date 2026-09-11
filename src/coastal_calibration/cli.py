@@ -380,7 +380,7 @@ def prepare_schism_mesh(prebuilt_dir: Path, force: bool) -> None:
 )
 @click.option(
     "--domain",
-    type=click.Choice(["prvi", "hawaii", "atlgulf", "pacific", "alaska"]),
+    type=click.Choice(["prvi", "hawaii", "atlgulf", "pacific", "alaska", "greatlakes"]),
     default="pacific",
     help="Coastal domain.",
 )
@@ -421,6 +421,21 @@ def init(output: Path, domain: str, force: bool, model: str) -> None:
     meteo_source, boundary_source, start_date = get_default_sources(cast("CoastalDomain", domain))
     start_date_str = start_date.strftime("%Y-%m-%d")
 
+    # GLOFS needs a lake, and its levels need a datum offset for the mesh.
+    boundary_extra = ""
+    model_extra = ""
+    if boundary_source == "glofs":
+        boundary_extra = (
+            "\n  glofs_model: leofs  # leofs (Erie), lmhofs (Michigan-Huron), "
+            "loofs (Ontario), lsofs (Superior)"
+        )
+        model_extra = (
+            "\n  forcing_to_mesh_offset_m: 0.0  # GLOFS is relative to the lake's "
+            "low-water datum; e.g. 173.5 for an absolute-datum Lake Erie mesh"
+        )
+    # CO-OPS comparison assumes MLLW/MSL datums, which the Great Lakes gauges lack.
+    noaa_gages = "false" if domain == "greatlakes" else "true"
+
     if model == "sfincs":
         config_content = f"""\
 # Minimal SFINCS configuration for {domain} domain
@@ -443,10 +458,10 @@ simulation:
   meteo_source: {meteo_source}
 
 boundary:
-  source: {boundary_source}
+  source: {boundary_source}{boundary_extra}
 
 model_config:
-  prebuilt_dir: /path/to/prebuilt/sfincs/model
+  prebuilt_dir: /path/to/prebuilt/sfincs/model{model_extra}
 """
     else:
         config_content = f"""\
@@ -470,10 +485,10 @@ simulation:
   meteo_source: {meteo_source}
 
 boundary:
-  source: {boundary_source}
+  source: {boundary_source}{boundary_extra}
 
 model_config:
-  include_noaa_gages: true
+  include_noaa_gages: {noaa_gages}{model_extra}
 """
 
     output_path.write_text(config_content)

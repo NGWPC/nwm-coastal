@@ -953,15 +953,23 @@ def make_sflux(
 # ---------------------------------------------------------------------------
 
 
+# Scribes each 3-D hydro output needs (schism_init.F90); 2-D outputs share one.
+_HYDRO_3D_SCRIBES = {**dict.fromkeys(range(17, 26), 1), 26: 2, 27: 2, 28: 1, 29: 1, 30: 1}
+# Hydro outputs SCHISM switches on before reading &SCHOUT.
+_HYDRO_DEFAULTS_ON = (1, 25, 26)
+
+
 def count_required_scribes(param_nml: Path, include_noaa_gages: bool) -> int | None:
     """Count the SCHISM scribes implied by an active ``param.nml``.
 
-    Sums uncommented ``iof_*(N) = 1`` flags plus the effective
-    ``iout_sta`` value: when ``include_noaa_gages`` is True the
-    ``schism_obs`` stage will flip ``iout_sta`` to 1, so it counts as 1
-    regardless of the template; otherwise we read the template's own
-    ``iout_sta`` value. SCHISM aborts at init when its CLI ``nscribes``
-    argument is below this number.
+    Follows SCHISM's own rule in ``schism_init.F90``: every 2-D output
+    shares one scribe, each 3-D hydro output needs one per component
+    (vectors ``iof_hydro(26)`` and ``(27)`` need two), and
+    ``iof_hydro(1)``, ``(25)`` and ``(26)`` are on unless the file turns
+    them off. Outputs of other modules are counted one each, and station
+    output (``iout_sta``, forced on by ``include_noaa_gages``) adds one.
+    SCHISM aborts at init when its CLI ``nscribes`` argument is below the
+    number it computes.
 
     Returns
     -------
@@ -973,12 +981,14 @@ def count_required_scribes(param_nml: Path, include_noaa_gages: bool) -> int | N
         text = param_nml.read_text()
     except OSError:
         return None
-    iof_count = len(re.findall(r"(?m)^\s*iof_\w+\(\d+\)\s*=\s*1\b", text))
-    if include_noaa_gages:
-        iout_sta = 1
-    else:
-        iout_sta = 1 if re.search(r"(?m)^\s*iout_sta\s*=\s*1\b", text) else 0
-    return iof_count + iout_sta
+    flags = re.findall(r"(?m)^\s*(iof_\w+)\((\d+)\)\s*=\s*(-?\d+)", text)
+    hydro = dict.fromkeys(_HYDRO_DEFAULTS_ON, 1)
+    hydro.update({int(i): int(v) for name, i, v in flags if name == "iof_hydro"})
+    required = 1 + sum(n for i, n in _HYDRO_3D_SCRIBES.items() if hydro.get(i, 0) != 0)
+    required += sum(1 for name, _, v in flags if name != "iof_hydro" and int(v) != 0)
+    if include_noaa_gages or re.search(r"(?m)^\s*iout_sta\s*=\s*1\b", text):
+        required += 1
+    return required
 
 
 def update_params(  # noqa: PLR0912, PLR0915
@@ -1123,16 +1133,22 @@ def update_params(  # noqa: PLR0912, PLR0915
         text = re.sub(r"(?m)^(\s*)ihot\s*=.*$", r"\g<1>ihot = 0", text)
 
     # Remove deprecated parameters that are incompatible with newer SCHISM
-    for deprecated in ("impose_net_flux", "isconsv", "isav", "vclose_surf_frac"):
-        text = re.sub(rf"(?m)^\s*{deprecated}\s*=.*\n", "", text)
+    deprecated_params = (
+        "impose_net_flux",
+        "isconsv",
+        "isav",
+        "vclose_surf_frac",
+        "stemp_stc",
+        "stemp_dz",
+        "veg_lai",
+    )
+    for deprecated in deprecated_params:
+        text = re.sub(rf"(?m)^\s*{deprecated}\s*(\(.*?\))?\s*=.*\n", "", text)
 
-    # Add mandatory parameters (SCHISM >= May 2024, commit 0fec598)
-    if "nbins_veg_vert" not in text:
-        text = re.sub(
-            r"(?m)(^\s*ihfskip\s*=.*$)",
-            r"\1\n  nbins_veg_vert = 1\n  nmarsh_types = 1",
-            text,
-        )
+    # Add mandatory parameters (SCHISM >= May 2024, commit 0fec598); older files may have one.
+    for name in ("nmarsh_types", "nbins_veg_vert"):
+        if not re.search(rf"(?m)^\s*{name}\s*=", text):
+            text = re.sub(r"(?m)(^\s*ihfskip\s*=.*$)", rf"\1\n  {name} = 1", text, count=1)
 
     # Apply any remaining user-supplied namelist overrides (those not
     # consumed earlier by the nspool/ihfskip/nhot_write resolver).
@@ -1436,6 +1452,109 @@ def make_stofs_boundary(
 # ---------------------------------------------------------------------------
 # 12. Combine hotstart  (was the conditional in post_schism.bash)
 # ---------------------------------------------------------------------------
+
+
+def make_glofs_boundary(
+    *,
+    work_dir: Path,
+    prebuilt_dir: Path,
+    waterlevel_file: Path,
+    start_date: datetime,
+    duration_hours: int,
+    offset_m: float = 0.0,
+    correction_file: Path | None = None,
+    max_distance_deg: float = 0.25,
+) -> Path:
+    """Write ``elev2D.th.nc`` from merged GLOFS water levels.
+
+    Interpolates the GLOFS nodes onto the SCHISM open-boundary nodes with the
+    same inverse-distance weighting the SFINCS boundary uses, adds
+    ``offset_m`` (GLOFS is relative to the lake's low-water datum), then
+    applies ``correction_file`` if given. Boundary nodes are taken from
+    ``hgrid.gr3`` in ``bctides.in`` segment order.
+
+    Parameters
+    ----------
+    waterlevel_file : Path
+        Merged file from :func:`coastal_calibration.data.glofs.ensure_glofs_waterlevel`.
+    max_distance_deg : float
+        Largest allowed gap, in degrees, between a boundary node and its
+        nearest GLOFS node. Anything larger usually means the wrong lake.
+
+    Returns the path to ``elev2D.th.nc``.
+    """
+    import netCDF4
+    from scipy.spatial import KDTree
+
+    from coastal_calibration._nc_io import write_elev2d_th
+    from coastal_calibration.schism.project_reader import NWMSCHISMProject
+    from coastal_calibration.utils import idw_interpolate
+
+    project = NWMSCHISMProject(prebuilt_dir, validate=False)
+    node_ids = [n for seg in project.read_boundaries().open_boundaries for n in seg]
+    if not node_ids:
+        raise ValueError(f"{project.hgrid_file} defines no open boundaries to force")
+    bnd = project.geographic_coordinates[np.asarray(node_ids) - 1].copy()
+    bnd[:, 0] = (bnd[:, 0] + 180.0) % 360.0 - 180.0
+
+    with netCDF4.Dataset(waterlevel_file) as ds:
+        times = netCDF4.num2date(
+            ds["time"][:],
+            ds["time"].units,
+            only_use_cftime_datetimes=False,
+            only_use_python_datetimes=True,
+        )
+        src_xy = np.column_stack([ds["x"][:], ds["y"][:]])
+        zeta = np.ma.filled(ds["zeta"][:].astype(np.float64), np.nan)
+
+    expected = [start_date + timedelta(hours=k) for k in range(duration_hours + 1)]
+    if list(times) != expected:
+        msg = (
+            f"{waterlevel_file.name} covers {times[0]} … {times[-1]} ({len(times)} h), "
+            f"expected {expected[0]} … {expected[-1]} ({len(expected)} h)"
+        )
+        raise ValueError(msg)
+
+    gap = float(KDTree(src_xy).query(bnd)[0].max())
+    if gap > max_distance_deg:
+        msg = (
+            f"A SCHISM open-boundary node is {gap:.2f}° from the nearest GLOFS node "
+            f"(limit {max_distance_deg}°). Check that boundary.glofs_model matches "
+            "the lake this mesh covers."
+        )
+        raise ValueError(msg)
+
+    series = idw_interpolate(src_xy, bnd, zeta) + offset_m
+    if np.isnan(series).any():
+        raise ValueError("GLOFS boundary interpolation produced NaN values")
+
+    output_file = work_dir / "elev2D.th.nc"
+    nt = len(expected)
+    write_elev2d_th(
+        output_file,
+        n_open_bnd_nodes=len(node_ids),
+        time_seconds=np.arange(nt, dtype=np.float64) * 3600.0,
+        time_step_seconds=3600.0,
+        time_series=series,
+        time_attrs={
+            "long_name": "Time",
+            "units": f"seconds since {start_date:%Y-%m-%d %H:%M:%S}",
+            "base_date": start_date.isoformat(),
+        },
+    )
+    logger.info(
+        "    GLOFS boundary: %d nodes, %d h, offset %+.3f m, levels %.3f to %.3f m",
+        len(node_ids),
+        nt,
+        offset_m,
+        float(series.min()),
+        float(series.max()),
+    )
+
+    if correction_file is not None and correction_file.exists():
+        correct_elevation(output_file, correction_file, n_open_boundary_nodes=len(node_ids))
+
+    return output_file
 
 
 def combine_hotstart(outputs_dir: Path) -> list[Path]:

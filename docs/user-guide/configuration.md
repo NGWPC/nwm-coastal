@@ -104,7 +104,7 @@ simulation:
 | ------------------ | -------- | ------------ | -------------------------------------- |
 | `start_date`       | datetime | **required** | ISO format date/datetime               |
 | `duration_hours`   | int      | **required** | Positive integer                       |
-| `coastal_domain`   | string   | **required** | `hawaii`, `prvi`, `atlgulf`, `pacific` |
+| `coastal_domain`   | string   | **required** | `hawaii`, `prvi`, `atlgulf`, `pacific`, `alaska`, `greatlakes` (see [Domains](#domains)) |
 | `meteo_source`     | string   | **required** | `nwm_ana`, `nwm_retro`                 |
 | `timestep_seconds` | int      | 3600         | Forcing time step in seconds           |
 
@@ -119,6 +119,37 @@ start_date: "2021-06-11 00:00:00"   # Date with space separator
 start_date: 20210611                # Compact format
 ```
 
+### Domains
+
+`simulation.coastal_domain` tells both the SCHISM and the SFINCS run workflows which
+NWM forcing grid and streamflow to download, which dates are valid, and which boundary
+sources can be used. Pick the domain your model sits in:
+
+| Domain       | Region                        | NWM grid    | `nwm_retro`             | `nwm_ana`            | Boundary sources             |
+| ------------ | ----------------------------- | ----------- | ----------------------- | -------------------- | ---------------------------- |
+| `atlgulf`    | Atlantic and Gulf coasts      | CONUS       | 1979-02-01 – 2023-01-31 | 2018-10-01 – present | `harmonic`, `stofs`          |
+| `pacific`    | Pacific coast (CONUS)         | CONUS       | 1979-02-01 – 2023-01-31 | 2018-10-01 – present | `harmonic`, `stofs`          |
+| `hawaii`     | Hawaii                        | Hawaii      | 1994-01-02 – 2013-12-31 | 2021-04-21 – present | `harmonic`, `stofs`          |
+| `prvi`       | Puerto Rico and USVI          | Puerto Rico | 2008-01-01 – 2023-06-30 | 2023-10-01 – present | `harmonic`, `stofs`          |
+| `alaska`     | Alaska                        | Alaska      | 1981-01-01 – 2019-12-31 | 2023-10-01 – present | `harmonic`, `stofs`          |
+| `greatlakes` | Great Lakes                   | CONUS       | 1979-02-01 – 2023-01-31 | 2018-10-01 – present | `glofs` only ([details](#great-lakes-glofs)) |
+
+Boundary data has its own dates: `stofs` from 2020-12-30, `glofs` from 2016 depending
+on the lake, and `harmonic` has no limit. `ngen_forecast` forcing is read from a file you
+supply, so it has no date limits.
+
+A run must fit inside the range of both its forcing source and its boundary source.
+Watch for the gaps where **no NWM forcing exists**:
+
+| Domain   | No NWM forcing                 | Consequence                                                        |
+| -------- | ------------------------------ | ------------------------------------------------------------------ |
+| `hawaii` | 2014-01-01 – 2021-04-20        | `stofs` runs need `nwm_ana`, so start on or after 2021-04-21       |
+| `prvi`   | 2023-07-01 – 2023-09-30        | runs can't include those three months                             |
+| `alaska` | 2020-01-01 – 2023-09-30        | `stofs` runs start on or after 2023-10-01; `harmonic` runs fit 1981–2019 or from 2023-10-01 |
+
+`coastal-calibration init --domain <domain>` writes a config with a combination that
+works for that domain.
+
 ### Boundary Settings
 
 Configure boundary conditions:
@@ -127,12 +158,69 @@ Configure boundary conditions:
 boundary:
   source: stofs          # Boundary condition source
   stofs_file:            # Optional: explicit STOFS file path
+  glofs_model:           # Lake, when source is glofs
 ```
 
-| Parameter    | Type   | Default | Options         | Description               |
-| ------------ | ------ | ------- | --------------- | ------------------------- |
-| `source`     | string | `tpxo`  | `tpxo`, `stofs` | Boundary condition source |
-| `stofs_file` | path   | null    | -               | Override STOFS file path  |
+| Parameter     | Type   | Default    | Options                                 | Description                  |
+| ------------- | ------ | ---------- | --------------------------------------- | ---------------------------- |
+| `source`      | string | `harmonic` | `harmonic` (alias `tpxo`), `stofs`, `glofs` | Boundary condition source |
+| `stofs_file`  | path   | null       | -                                       | Override STOFS file path     |
+| `glofs_model` | string | null       | `leofs`, `lmhofs`, `loofs`, `lsofs`     | Great Lakes OFS lake         |
+
+#### Great Lakes (GLOFS)
+
+`source: glofs` forces the open boundary with water levels from NOAA's Great Lakes
+Operational Forecast System (GLOFS) nowcasts. It requires
+`simulation.coastal_domain: greatlakes`, and that domain requires it, since STOFS and
+the tidal atlases don't cover the lakes. Pick the lake with `glofs_model`:
+
+```yaml
+simulation:
+  coastal_domain: greatlakes
+  meteo_source: nwm_ana
+
+boundary:
+  source: glofs
+  glofs_model: leofs            # leofs, lmhofs, loofs, or lsofs
+
+model_config:
+  forcing_to_mesh_offset_m: 173.5   # see "Vertical datum" below
+```
+
+| `glofs_model` | Lake           | Data from  | Model behind the archived data                                  |
+| ------------- | -------------- | ---------- | --------------------------------------------------------------- |
+| `leofs`       | Erie           | 2016-03-10 | FVCOM, 6,106 nodes, throughout                                  |
+| `lmhofs`      | Michigan-Huron | 2019-09-17 | FVCOM, 90,806 nodes, throughout                                 |
+| `loofs`       | Ontario        | 2016-03-01 | POM (~750 water cells) until 2022-10-19; FVCOM (34,395 nodes) from 2022-10-20 |
+| `lsofs`       | Superior       | 2016-03-01 | POM (~800 water cells) until 2022-10-19; FVCOM (90,964 nodes) from 2022-10-20 |
+
+**Two models, two eras.** NOAA originally ran its Great Lakes forecasts on POM (the
+Princeton Ocean Model), which uses a coarse rectangular grid, about 5 km between
+points. It has since moved each lake to FVCOM, which uses a much finer triangular mesh
+that follows the shoreline. For Ontario and Superior the switch came on 20 October
+2022, so boundaries for earlier dates are interpolated from the coarse POM grid. That
+is adequate for lake-wide water level but smooths out local detail near the boundary.
+
+A single run can't span the Ontario or Superior switch, because the two models share
+no grid points: the download stage stops with "GLOFS … changed grids at … Split the
+simulation at that time." Run the two sides separately.
+
+Only nowcast data is used; GLOFS forecast files aren't read.
+
+**Vertical datum.** GLOFS water levels are relative to the lake's **low-water datum**,
+not an absolute elevation. Set the model's `forcing_to_mesh_offset_m` to move them
+onto the mesh datum: for example `173.5` (Lake Erie's low-water datum, IGLD85) for a
+mesh in absolute IGLD85 elevations, or `0.0` if the mesh is referenced to low-water
+datum. Check the mesh's `elev.ic` or depths to tell which it uses.
+
+**Downloads.** The download stage reads only the water-level field from each hourly
+NOAA file rather than downloading it whole (the files run up to ~180 MB an hour),
+caching the result under `coastal/glofs/<lake>/` in the download directory. Data comes
+from NCEI's archive at
+`https://www.ncei.noaa.gov/oa/prod-model/operational-nowcast-and-forecast-hydrodynamic-model-systems-co-ops/`.
+
+Leave `include_noaa_gages` off for Great Lakes runs: the CO-OPS comparison assumes
+MLLW/MSL datums, which Great Lakes gauges don't use.
 
 ### Path Settings
 
@@ -178,6 +266,7 @@ model_config:
   oversubscribe: false            # Allow MPI oversubscription
   schism_exe:                     # System-compiled SCHISM executable (optional)
   include_noaa_gages: true        # Enable NOAA observation stations & comparison plots
+  forcing_to_mesh_offset_m: 0.0   # Datum offset added to GLOFS boundary levels
   runtime_env: {}                 # Extra env vars for model run (optional)
 ```
 
@@ -193,6 +282,7 @@ model_config:
 | `oversubscribe`      | bool | false   | Allow MPI oversubscription                          |
 | `schism_exe`         | path | -       | Path to a system-compiled SCHISM executable         |
 | `include_noaa_gages` | bool | false   | Enable NOAA station discovery and comparison        |
+| `forcing_to_mesh_offset_m` | float | 0.0 | Offset (m) added to GLOFS boundary levels (see [Great Lakes](#great-lakes-glofs)) |
 | `runtime_env`        | dict | `{}`    | Extra env vars for the model run subprocess         |
 
 #### NOAA Observation Stations (`include_noaa_gages`)

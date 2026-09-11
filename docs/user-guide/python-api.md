@@ -343,10 +343,10 @@ if errors:
 
 | Source      | Date Range               | Description           |
 | ----------- | ------------------------ | --------------------- |
-| `nwm_retro` | 1979-02-01 to 2023-01-31 | NWM Retrospective 3.0 |
-| `nwm_ana`   | 2018-09-17 to present    | NWM Analysis          |
+| `nwm_retro` | 1979-02-01 to 2023-01-31 (CONUS), by domain | NWM Retrospective 3.0 |
+| `nwm_ana`   | 2018-10-01 to present, by domain | NWM Analysis  |
 | `stofs`     | 2020-12-30 to present    | STOFS water levels    |
-| `glofs`     | 2005-09-30 to present    | Great Lakes OFS       |
+| `glofs`     | 2016 to present, by lake | Great Lakes OFS       |
 
 ## Logging
 

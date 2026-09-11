@@ -375,7 +375,8 @@ class TestSchismModelConfig:
             "/\n"
         )
         cfg = SchismModelConfig(prebuilt_dir=prebuilt)
-        assert cfg.nscribes == 2  # two active iof_*, iout_sta=0
+        # shared 2-D scribe + zCoordinates (25) + velocity X/Y (26, on by default)
+        assert cfg.nscribes == 4
 
     def test_nscribes_autodetect_with_noaa_gages(self, tmp_path):
         prebuilt = tmp_path / "prebuilt"
@@ -384,8 +385,29 @@ class TestSchismModelConfig:
             "  iof_hydro(1) = 1\n  iof_hydro(25) = 1\n  iof_hydro(26) = 1\n  iout_sta = 0\n"
         )
         cfg = SchismModelConfig(prebuilt_dir=prebuilt, include_noaa_gages=True)
-        # 3 iof_* + 1 for iout_sta projected on by schism_obs
-        assert cfg.nscribes == 4
+        # 2-D (1) + zcor (1) + velocity X/Y (2) + station output projected on by schism_obs
+        assert cfg.nscribes == 5
+
+    def test_nscribes_follows_schism_rule(self, tmp_path):
+        """Regression: Lake Erie's param.nml needed 4 scribes; the old count gave 2."""
+        prebuilt = tmp_path / "prebuilt"
+        prebuilt.mkdir()
+        (prebuilt / "param.nml").write_text(
+            "&SCHOUT\n"
+            + "".join(f"  iof_hydro({i}) = 0\n" for i in range(2, 25))
+            + "  iof_hydro(1) = 1\n  iof_hydro(26) = 1\n  iof_hydro(27) = 0\n/\n"
+        )
+        cfg = SchismModelConfig(prebuilt_dir=prebuilt)
+        assert cfg.nscribes == 4  # iof_hydro(25) unset, so SCHISM's default (on) applies
+
+    def test_nscribes_2d_outputs_share_one_scribe(self, tmp_path):
+        prebuilt = tmp_path / "prebuilt"
+        prebuilt.mkdir()
+        (prebuilt / "param.nml").write_text(
+            "".join(f"  iof_hydro({i}) = 1\n" for i in range(1, 17))
+            + "  iof_hydro(25) = 0\n  iof_hydro(26) = 0\n"
+        )
+        assert SchismModelConfig(prebuilt_dir=prebuilt).nscribes == 1
 
     def test_nscribes_explicit_user_value_preserved(self, tmp_path):
         prebuilt = tmp_path / "prebuilt"
@@ -919,3 +941,67 @@ class TestCoastalCalibConfig:
         config_path.write_text(yaml.dump(config_dict))
         with pytest.raises(ValueError, match="Unknown model type"):
             CoastalCalibConfig.from_yaml(config_path)
+
+
+class TestGlofsConfig:
+    """GLOFS boundary source, Great Lakes domain, and their validation."""
+
+    @staticmethod
+    def _boundary_errors(cfg):
+        return [e for e in cfg.validate() if "boundary" in e or "GLOFS" in e]
+
+    @pytest.fixture
+    def glofs_config(self, sample_config):
+        sample_config.simulation.coastal_domain = "greatlakes"
+        sample_config.simulation.start_date = datetime(2020, 6, 1)
+        sample_config.boundary = BoundaryConfig(source="glofs", glofs_model="leofs")
+        return sample_config
+
+    def test_valid_glofs_config(self, glofs_config):
+        assert self._boundary_errors(glofs_config) == []
+
+    def test_glofs_requires_lake(self, glofs_config):
+        glofs_config.boundary.glofs_model = None
+        (error,) = self._boundary_errors(glofs_config)
+        assert "glofs_model is required" in error
+
+    def test_glofs_requires_greatlakes_domain(self, glofs_config):
+        glofs_config.simulation.coastal_domain = "atlgulf"
+        assert any("must be used together" in e for e in self._boundary_errors(glofs_config))
+
+    def test_greatlakes_requires_glofs(self, glofs_config):
+        glofs_config.boundary = BoundaryConfig(source="stofs")
+        assert any("must be used together" in e for e in self._boundary_errors(glofs_config))
+
+    def test_unknown_source_rejected(self, glofs_config):
+        glofs_config.boundary.source = "fvcom"
+        (error,) = self._boundary_errors(glofs_config)
+        assert "must be one of" in error
+
+    def test_lake_date_range_checked_when_downloading(self, glofs_config):
+        glofs_config.download.enabled = True
+        glofs_config.boundary.glofs_model = "lmhofs"
+        glofs_config.simulation.start_date = datetime(2018, 6, 1)
+        assert any("2019-09-17" in e for e in glofs_config.validate())
+
+    def test_greatlakes_uses_conus_nwm_data(self):
+        sim = SimulationConfig(
+            start_date=datetime(2020, 6, 1),
+            duration_hours=3,
+            coastal_domain="greatlakes",
+            meteo_source="nwm_retro",
+        )
+        assert sim.nwm_domain == "conus"
+        assert sim.geo_grid == "geo_em_CONUS.nc"
+
+    def test_round_trip(self, glofs_config, tmp_path):
+        glofs_config.model_config.forcing_to_mesh_offset_m = 173.5
+        path = tmp_path / "gl.yaml"
+        glofs_config.to_yaml(path)
+        loaded = CoastalCalibConfig.from_yaml(path)
+        assert loaded.boundary.source == "glofs"
+        assert loaded.boundary.glofs_model == "leofs"
+        assert loaded.model_config.forcing_to_mesh_offset_m == 173.5
+
+    def test_schism_offset_defaults_to_zero(self):
+        assert SchismModelConfig().forcing_to_mesh_offset_m == 0.0

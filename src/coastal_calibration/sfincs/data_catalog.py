@@ -688,51 +688,61 @@ def _build_coastal_stofs_entry(
 
 def _build_coastal_glofs_entry(
     sim: SimulationConfig,
-    glofs_model: str = "leofs",
+    glofs_model: str | None,
 ) -> list[CatalogEntry]:
-    """Build catalog entries for GLOFS coastal water level data.
+    """Build the catalog entry for GLOFS coastal water level data.
 
-    Returns one entry per month covered by the simulation window, so a
-    download directory holding several runs of the same lake is not swept
-    up wholesale. This mirrors the meteo and streamflow entries.
+    Points at the merged file written by
+    :func:`coastal_calibration.data.glofs.ensure_glofs_waterlevel`, which
+    already has the STOFS-style ``zeta(time, node)`` layout with ``x``/``y``
+    node coordinates, so no variables need dropping.
 
     Parameters
     ----------
     sim : SimulationConfig
         Simulation configuration.
     glofs_model : str
-        GLOFS model name (leofs, loofs, lsofs, lmhofs).
+        GLOFS model name (leofs, lmhofs, loofs, lsofs).
 
     Returns
     -------
     list[CatalogEntry]
-        One catalog entry per simulation month.
+        A single catalog entry covering the simulation window.
+
+    Raises
+    ------
+    ValueError
+        If ``glofs_model`` is None.
     """
+    from coastal_calibration.data.glofs import glofs_waterlevel_path
+
+    if glofs_model is None:
+        raise ValueError("boundary.glofs_model is required when boundary.source is 'glofs'")
+
     temporal_extent = _get_temporal_extent(sim)
 
     metadata = CatalogMetadata(
         crs=4326,
         temporal_extent=temporal_extent,
         category="ocean",
-        source_url="https://www.ncei.noaa.gov/data/operational-nowcast-and-forecast-hydrodynamic-model-systems-co-ops/access",
+        source_url="https://www.ncei.noaa.gov/oa/prod-model/",
         source_license="Public Domain",
         source_version="operational",
-        notes=f"GLOFS {glofs_model.upper()} water level fields (Great Lakes)",
+        notes=(
+            f"GLOFS {glofs_model.upper()} nowcast water level (Great Lakes), relative "
+            "to the lake low-water datum"
+        ),
     )
 
-    data_adapter = DataAdapter(
-        rename={
-            "zeta": "waterlevel",
-        },
-    )
+    data_adapter = DataAdapter(rename={"zeta": "waterlevel"})
 
-    # GLOFS files: {model}.t{cycle}z.{YYYYMMDD}.fields.n{hour}.nc
+    merged = glofs_waterlevel_path(Path(), glofs_model, sim.start_date, sim.duration_hours)
     return [
         CatalogEntry(
-            name=f"glofs_{glofs_model}_waterlevel",
+            name="glofs_waterlevel",
             data_type="GeoDataset",
             driver="geodataset_xarray",
-            uri=f"{PathConfig.COASTAL_SUBDIR}/glofs/{glofs_model}.*.{_MONTH_GLOB}*.fields.*.nc",
+            uri=merged.as_posix(),
             metadata=metadata,
             data_adapter=data_adapter,
             version=temporal_extent[0][:10],
@@ -751,7 +761,7 @@ def generate_data_catalog(
     include_streamflow: bool = True,
     include_coastal: bool = True,
     coastal_source: CoastalSource | None = None,
-    glofs_model: str = "leofs",
+    glofs_model: str | None = None,
 ) -> DataCatalog:
     """Generate a HydroMT data catalog for downloaded coastal calibration data.
 
@@ -776,7 +786,8 @@ def generate_data_catalog(
     coastal_source : CoastalSource, optional
         Coastal data source (stofs, glofs, harmonic). If None, uses config.boundary.source.
     glofs_model : str, optional
-        GLOFS model name if using GLOFS coastal source. Default is "leofs".
+        GLOFS model name if using GLOFS coastal source. If None, uses
+        ``config.boundary.glofs_model``.
 
     Returns
     -------
@@ -831,7 +842,8 @@ def generate_data_catalog(
         if effective_coastal_source == "stofs":
             coastal_entries = [_build_coastal_stofs_entry(sim)]
         elif effective_coastal_source == "glofs":
-            coastal_entries = _build_coastal_glofs_entry(sim, glofs_model)
+            model = glofs_model or config.boundary.glofs_model
+            coastal_entries = _build_coastal_glofs_entry(sim, model)
 
         for entry in coastal_entries:
             catalog.add_entry(entry)

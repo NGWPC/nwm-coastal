@@ -886,6 +886,9 @@ class SfincsForcingStage(_SfincsStageBase):
         wl_min = float(df_ts.min().min())
         wl_max = float(df_ts.max().max())
         wl_floor, wl_ceil = -15.0, 15.0
+        # Absolute-datum Great Lakes meshes sit ~75-185 m above sea level.
+        if self.config.boundary.source == "glofs":
+            wl_floor, wl_ceil = wl_floor + forcing_offset, wl_ceil + forcing_offset
         if wl_min < wl_floor or wl_max > wl_ceil:
             self._log(
                 f"Boundary water levels after vdatum adjustment are outside "
@@ -998,66 +1001,6 @@ class SfincsForcingStage(_SfincsStageBase):
         # 7. Inject into HydroMT model
         self._inject_water_level(model, df_ts, gdf_bnd)
 
-    @staticmethod
-    def _idw_interpolate(
-        src_xy: NDArray[np.floating[Any]],
-        target_xy: NDArray[np.floating[Any]],
-        values: NDArray[np.floating[Any]],
-        k: int = 4,
-    ) -> NDArray[np.floating[Any]]:
-        """Inverse-distance weighted interpolation from source to target points.
-
-        Parameters
-        ----------
-        src_xy : ndarray, shape (N, 2)
-            Source point coordinates.
-        target_xy : ndarray, shape (M, 2)
-            Target point coordinates.
-        values : ndarray, shape (T, N)
-            Timeseries values at each source point.
-        k : int
-            Number of nearest neighbors to use (capped at N).
-
-        Returns
-        -------
-        ndarray, shape (T, M)
-            Interpolated values at each target point.
-
-        Notes
-        -----
-        Vectorised over both targets and time. An exact match
-        (``d < 1e-10``) is handled by clamping the distance from below
-        with the same epsilon: the inverse-distance weight then becomes
-        large enough that the exact-match neighbour dominates the
-        normalized weights, exactly matching the single-target fallback
-        path in the previous Python-loop implementation.
-        """
-        from scipy.spatial import KDTree
-
-        k = min(k, len(src_xy))
-        tree = KDTree(src_xy)
-        result: Any = tree.query(target_xy, k=k)
-        # ``target_xy`` is 2-D so ``query`` returns arrays (scalar return
-        # is the 1-D-input edge case); asarray narrows for pyright.
-        dists = np.asarray(result[0], dtype=np.float64)
-        idxs = np.asarray(result[1], dtype=np.int64)
-
-        # KDTree returns 1-D arrays for k=1; promote to (n_targets, 1)
-        # so the downstream broadcast against ``values`` is uniform.
-        if dists.ndim == 1:
-            dists = dists[:, np.newaxis]
-            idxs = idxs[:, np.newaxis]
-
-        # Clamp distance from below so an exact match does not blow up
-        # to inf; the resulting inverse-distance weight still dominates.
-        weights = 1.0 / np.maximum(dists, 1e-10)
-        weights /= weights.sum(axis=1, keepdims=True)
-
-        # gathered shape: (n_times, n_targets, k); broadcast weights
-        # to (1, n_targets, k) and reduce along k.
-        gathered = values[:, idxs]
-        return np.nansum(gathered * weights[np.newaxis, :, :], axis=2)
-
     def _load_geodataset_for_bnd(
         self,
         model: SfincsModel,
@@ -1111,7 +1054,9 @@ class SfincsForcingStage(_SfincsStageBase):
         wl_data: NDArray[np.floating[Any]] = np.asarray(
             da.transpose(..., da.vector.index_dim).values
         )
-        bnd_wl = self._idw_interpolate(src_xy, target_xy, wl_data)
+        from coastal_calibration.utils import idw_interpolate
+
+        bnd_wl = idw_interpolate(src_xy, target_xy, wl_data)
 
         time_vals = pd.DatetimeIndex(da.time.values)
         df_ts = pd.DataFrame(bnd_wl, index=time_vals, columns=range(len(bnd_points)))
@@ -1238,7 +1183,8 @@ class SfincsForcingStage(_SfincsStageBase):
         )
 
         # 4. Extend with pyTMD if the geodataset doesn't cover the full window
-        df_ts = self._extend_with_tide(df_ts, bnd_points, model)
+        if self.config.boundary.source != "glofs":  # ocean tide atlases don't cover lakes
+            df_ts = self._extend_with_tide(df_ts, bnd_points, model)
 
         # 5. Build GeoDataFrame for boundary locations (model CRS)
         xx, yy, names = zip(*bnd_points, strict=True)
@@ -2566,6 +2512,15 @@ class SfincsDataCatalogStage(WorkflowStage):
         include_meteo = (
             sfincs_cfg.include_precip or sfincs_cfg.include_wind or sfincs_cfg.include_pressure
         )
+        boundary = self.config.boundary
+        if boundary.source == "glofs" and boundary.glofs_model:
+            from coastal_calibration.data.glofs import ensure_glofs_waterlevel
+
+            sim = self.config.simulation
+            ensure_glofs_waterlevel(
+                download_dir, boundary.glofs_model, sim.start_date, sim.duration_hours
+            )
+
         catalog = generate_data_catalog(
             self.config,
             output_path=catalog_path,
