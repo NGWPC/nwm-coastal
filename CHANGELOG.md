@@ -8,6 +8,17 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project ad
 
 ### Added
 
+- **glofs**: Great Lakes boundary forcing for SCHISM and SFINCS from NOAA GLOFS
+  (FVCOM) water levels: `boundary.source: glofs` with `boundary.glofs_model` (`leofs`,
+  `lmhofs`, `loofs`, `lsofs`) and a new `greatlakes` domain. Reads only the water-level
+  field from each remote hourly file and caches it, instead of downloading files of up
+  to ~180 MB an hour
+- **schism**: `forcing_to_mesh_offset_m`, matching the SFINCS setting, to move GLOFS
+  levels from the lake's low-water datum onto the mesh datum
+- **glofs**: NOAA CO-OPS gauge comparison for Great Lakes runs (SCHISM and SFINCS).
+  Lake gauges have no MSL/MLLW, so they are selected by their low-water datum,
+  fetched in LWD, shifted by `forcing_to_mesh_offset_m`, and compared in the mesh
+  datum. `init --domain greatlakes` now turns `include_noaa_gages` on
 - **logging**: SCHISM subsetting (`extract_mesh`, `split_mesh`) now writes a DEBUG log
   file, `schism-subset-<YYYYMMDD-HHMMSS>.log`, instead of logging to the console only
 - **logging**: Add `--log-level` to `run` and `create` to set the log-file detail level
@@ -33,6 +44,33 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project ad
 - **tides**: Apply ruff-format to data/tides.py
 - **sfincs**: Switch boundary forcing to pyTMD harmonic predictor
 - **tides**: Replace pytides+OTPSnc with pyTMD predictor; consolidate pixi envs
+
+### Fixed
+
+- **glofs**: The GLOFS downloader never worked. NCEI moved the archive on 2026-07-28;
+  three of the four lake directory names were wrong; only the post-2024-09-09 filename
+  layout was built; each hour was read from the file six hours off; and the lake was
+  never passed through from the config
+- **config**: An unrecognised `boundary.source` is now a validation error instead of
+  being silently treated as STOFS by the SCHISM boundary stage
+- **schism**: A failed SCHISM run now reports the actual error (e.g. `Fortran runtime
+  error: …`, `ABORT: …`), de-duplicated across MPI ranks, instead of the last 2,000
+  characters of stderr, which were usually backtraces; SCHISM's full stdout/stderr is
+  saved to `outputs/schism_log.txt`. Follow-up to the logging changes in #62
+- **schism**: The run stage now fails when SCHISM aborts with exit status 0 (its
+  `parallel_abort` passes 0 to `mpi_abort`) by checking `outputs/fatal.error`; it
+  previously reported success and the failure surfaced only in `schism_postprocess`
+- **schism**: `param.nml` files from mid-2024 SCHISM versions now run: `nmarsh_types`
+  and `nbins_veg_vert` are added independently when missing (comments no longer count
+  as a setting), and the removed `stemp_stc`, `stemp_dz` and `veg_lai` are stripped
+- **schism**: Automatic `nscribes` follows SCHISM's own count: 2-D outputs share one
+  scribe, 3-D vectors need two, and outputs SCHISM enables by default are included
+- **schism**: `run_param_overrides` that add an output switch (`iof_*`, station or
+  hotstart output) now go into `&SCHOUT` instead of `&OPT`, where SCHISM rejected
+  them, and the automatic `nscribes` count applies the overrides first
+- **schism**: NOAA gauge discovery works for meshes whose shoreline is stored as an
+  island loop (e.g. the Lake Erie model); the domain polygon is repaired instead of
+  matching no stations
 
 ## [3.1.2.0.0-rc2] - 2026-05-16
 

@@ -58,6 +58,7 @@ class DownloadStage(WorkflowStage):
             meteo_source=meteo_source,
             hydro_source="nwm",
             coastal_source=coastal_source,
+            glofs_model=cfg.boundary.glofs_model or "leofs",
             tidal_atlas_path=atlas_path,
             timeout=download_cfg.timeout,
             raise_on_error=download_cfg.raise_on_error,
@@ -75,6 +76,15 @@ class DownloadStage(WorkflowStage):
 
         if errors and download_cfg.raise_on_error:
             raise RuntimeError(f"Download failed: {'; '.join(errors)}")
+
+        glofs_file = None
+        if coastal_source == "glofs" and cfg.boundary.glofs_model and not errors:
+            from coastal_calibration.data.glofs import ensure_glofs_waterlevel
+
+            self._update_substep("Merging GLOFS water levels")
+            glofs_file = ensure_glofs_waterlevel(
+                output_dir, cfg.boundary.glofs_model, sim.start_date, sim.duration_hours
+            )
 
         self._log(f"Download complete. Raw files stored in {output_dir}")
 
@@ -98,6 +108,7 @@ class DownloadStage(WorkflowStage):
                 "successful": results.coastal.successful,
                 "failed": results.coastal.failed,
                 "stofs_file": str(stofs_file) if stofs_file else None,
+                "glofs_file": str(glofs_file) if glofs_file else None,
             },
             "status": "completed" if not errors else "completed_with_errors",
         }

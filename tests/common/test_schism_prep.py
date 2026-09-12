@@ -497,6 +497,33 @@ class TestUpdateParams:
         assert "isav" not in text
         assert "vclose_surf_frac" not in text
 
+    def test_removes_indexed_and_older_deprecated_params(self, tmp_path):
+        """Regression: an older Lake Erie param.nml carried names SCHISM now rejects."""
+        work_dir = tmp_path / "run"
+        work_dir.mkdir()
+        prebuilt = tmp_path / "prebuilt"
+        self._create_template(prebuilt)
+        template = prebuilt / "param.nml"
+        template.write_text(
+            template.read_text().replace(
+                "  wtiminc = 600",
+                "  wtiminc = 600\n  stemp_stc  = 0.0   !heat transfer\n"
+                "  stemp_dz(1)= 1.0\n  stemp_dz(2)= 1.0\n  veg_lai = 1.\n  veg_cw = 1.5",
+            )
+        )
+
+        update_params(
+            work_dir=work_dir,
+            prebuilt_dir=prebuilt,
+            start_date=datetime(2020, 8, 26),
+            duration_hours=6,
+        )
+
+        text = (work_dir / "param.nml").read_text()
+        for name in ("stemp_stc", "stemp_dz", "veg_lai"):
+            assert name not in text
+        assert "veg_cw = 1.5" in text
+
     def test_adds_mandatory_params(self, tmp_path):
         work_dir = tmp_path / "run"
         work_dir.mkdir()
@@ -514,6 +541,32 @@ class TestUpdateParams:
         text = (work_dir / "param.nml").read_text()
         assert "nbins_veg_vert = 1" in text
         assert "nmarsh_types = 1" in text
+
+    def test_adds_nmarsh_types_when_only_nbins_present(self, tmp_path):
+        """Regression: a param.nml with nbins_veg_vert but no nmarsh_types aborted SCHISM."""
+        work_dir = tmp_path / "run"
+        work_dir.mkdir()
+        prebuilt = tmp_path / "prebuilt"
+        self._create_template(prebuilt)
+        template = prebuilt / "param.nml"
+        template.write_text(
+            template.read_text().replace(
+                "  ihfskip = 324\n",
+                "  ihfskip = 324\n  nbins_veg_vert = 2\n! scaled by nbins_veg_vert below\n",
+            )
+        )
+
+        update_params(
+            work_dir=work_dir,
+            prebuilt_dir=prebuilt,
+            start_date=datetime(2020, 8, 26),
+            duration_hours=6,
+        )
+
+        text = (work_dir / "param.nml").read_text()
+        assert "nmarsh_types = 1" in text
+        assert text.count("nbins_veg_vert =") == 1
+        assert "nbins_veg_vert = 2" in text
 
     def test_updates_date_params(self, tmp_path):
         work_dir = tmp_path / "run"
@@ -695,6 +748,25 @@ class TestUpdateParams:
 
         text = (work_dir / "param.nml").read_text()
         assert "iwbl = 1" in text
+
+    def test_new_output_key_goes_to_schout(self, tmp_path):
+        """Regression: a missing iof_* override landed in &OPT, which SCHISM rejects."""
+        work_dir = tmp_path / "run"
+        work_dir.mkdir()
+        prebuilt = tmp_path / "prebuilt"
+        self._create_template(prebuilt)
+
+        update_params(
+            work_dir=work_dir,
+            prebuilt_dir=prebuilt,
+            start_date=datetime(2020, 8, 26),
+            duration_hours=6,
+            run_param_overrides={"iof_hydro(25)": 0},
+        )
+
+        text = (work_dir / "param.nml").read_text()
+        schout = text[text.index("&SCHOUT") :]
+        assert "iof_hydro(25) = 0" in schout[: schout.index("\n/")]
 
     def test_ihfskip_override_rederives_nhot_write(self, tmp_path):
         # Pacific forecast template: ihfskip=324 (18 hourly outputs per

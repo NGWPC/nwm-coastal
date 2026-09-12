@@ -395,6 +395,11 @@ class NWMSCHISMProject:
             self._node_coordinates = self._get_node_coordinates()
         return self._node_coordinates
 
+    @property
+    def geographic_coordinates(self) -> NDArray[np.float64]:
+        """Node coordinates as (lon, lat), from ``hgrid.ll`` if the mesh is projected."""
+        return self._get_geographic_coords()
+
     def _read_node_coords_from(self, path: Path) -> NDArray[np.float64]:
         """Read node coordinates from a specific hgrid-format file."""
         coords = np.zeros((self.n_nodes, 2), dtype=np.float64)

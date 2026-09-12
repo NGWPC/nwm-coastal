@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+import yaml
 from click.testing import CliRunner
 
 from coastal_calibration.cli import cli
@@ -66,6 +67,19 @@ class TestCLIInit:
         output_path.write_text("existing")
         result = runner.invoke(cli, ["init", str(output_path)], input="n\n")
         assert result.exit_code != 0  # Abort
+
+    @pytest.mark.parametrize("model", ["schism", "sfincs"])
+    def test_init_greatlakes_uses_glofs(self, runner, tmp_path, model):
+        output_path = tmp_path / "config.yaml"
+        result = runner.invoke(
+            cli, ["init", str(output_path), "--domain", "greatlakes", "--model", model]
+        )
+        assert result.exit_code == 0
+        cfg = yaml.safe_load(output_path.read_text())
+        assert cfg["boundary"] == {"source": "glofs", "glofs_model": "leofs"}
+        assert cfg["model_config"]["forcing_to_mesh_offset_m"] == 0.0
+        if model == "schism":
+            assert cfg["model_config"]["include_noaa_gages"] is True
 
     def test_init_sfincs(self, runner, tmp_path):
         output_path = tmp_path / "config.yaml"

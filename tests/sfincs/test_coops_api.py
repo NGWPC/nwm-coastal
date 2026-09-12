@@ -19,8 +19,10 @@ from coastal_calibration.data.coops_api import (
     _add_variable_attributes,
     _check_plot_deps,
     _process_responses,
+    comparison_datums,
     query_coops_bygeometry,
     query_coops_byids,
+    query_great_lakes_in_mesh_datum,
 )
 
 # ---------------------------------------------------------------------------
@@ -498,6 +500,59 @@ class TestFilterStationsByDatum:
 # ---------------------------------------------------------------------------
 # _get_stations_metadata (cache behavior)
 # ---------------------------------------------------------------------------
+
+
+def _datum_response(datums, units="meters"):
+    """Minimal CO-OPS datums.json payload with the given (name, value) pairs."""
+    return {
+        "accepted": "",
+        "superseded": "",
+        "epoch": "",
+        "units": units,
+        "OrthometricDatum": "",
+        "datums": [{"name": n, "description": "", "value": str(v)} for n, v in datums],
+        "LAT": "0",
+        "LATdate": "",
+        "LATtime": "",
+        "HAT": "0",
+        "HATdate": "",
+        "HATtime": "",
+        "min": "0",
+        "mindate": "",
+        "mintime": "",
+        "max": "0",
+        "maxdate": "",
+        "maxtime": "",
+        "DatumAnalysisPeriod": [],
+        "NGSLink": "",
+        "ctrlStation": "",
+    }
+
+
+class TestGreatLakesGauges:
+    """Lake gauges publish only GL_LWD; they're compared in the mesh datum."""
+
+    def test_lake_gauge_needs_lwd_not_msl(self, client):
+        cleveland = _datum_response([("GL_LWD", 569.23)], units="feet")
+        with patch.object(client, "fetch_data", return_value=[cleveland]):
+            assert client.filter_stations_by_datum(["9063063"]) == set()
+        with patch.object(client, "fetch_data", return_value=[cleveland]):
+            assert client.filter_stations_by_datum(["9063063"], ("GL_LWD",)) == {"9063063"}
+
+    def test_comparison_datums_by_domain(self):
+        assert comparison_datums("greatlakes") == ("GL_LWD",)
+        assert comparison_datums("atlgulf") == ("MSL", "MLLW")
+
+    def test_lake_observations_shifted_to_mesh_datum(self):
+        lwd = xr.Dataset(
+            {"water_level": (("station", "time"), [[1.0, 0.949]])},
+            coords={"station": ["9063063"], "time": pd.date_range("2025-06-10", periods=2, freq="h")},
+        )
+        with patch("coastal_calibration.data.coops_api.query_coops_byids", return_value=lwd) as q:
+            obs = query_great_lakes_in_mesh_datum(["9063063"], "20250610 00:00", "20250610 01:00", 173.5)
+        assert q.call_args.kwargs["datum"] == "LWD"
+        np.testing.assert_allclose(obs.water_level.values, [[174.5, 174.449]])
+        assert obs.attrs["datum"] == "mesh datum"
 
 
 class TestGetStationsMetadata:

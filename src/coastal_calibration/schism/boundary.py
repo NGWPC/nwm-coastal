@@ -219,24 +219,80 @@ class STOFSBoundaryStage(WorkflowStage):
         return errors
 
 
+class GLOFSBoundaryStage(WorkflowStage):
+    """Generate boundary conditions from NOAA Great Lakes OFS water levels."""
+
+    name = "glofs_boundary"
+    description = "Interpolate GLOFS water levels to the open boundary"
+
+    def __init__(self, config: CoastalCalibConfig, monitor: WorkflowMonitor | None = None) -> None:
+        super().__init__(config, monitor)
+        self.model: SchismModelConfig = cast("SchismModelConfig", config.model_config)
+
+    def run(self) -> dict[str, Any]:
+        """Merge the fetched GLOFS hours and write ``elev2D.th.nc``."""
+        from coastal_calibration.data.glofs import ensure_glofs_waterlevel
+        from coastal_calibration.schism.prep import make_glofs_boundary
+
+        glofs_model = self.config.boundary.glofs_model
+        if glofs_model is None:
+            raise ValueError("boundary.glofs_model is required when boundary.source is 'glofs'")
+        sim = self.config.simulation
+
+        self._update_substep("Merging GLOFS water levels")
+        waterlevel_file = ensure_glofs_waterlevel(
+            self.config.paths.download_dir, glofs_model, sim.start_date, sim.duration_hours
+        )
+        self._log(f"Using GLOFS water levels: {waterlevel_file}")
+
+        self._update_substep("Interpolating to open boundary nodes")
+        prebuilt_dir = self.model.coastal_parm
+        corr_path = prebuilt_dir / "elevation_correction.csv"
+        elev_file = make_glofs_boundary(
+            work_dir=self.config.paths.work_dir,
+            prebuilt_dir=prebuilt_dir,
+            waterlevel_file=waterlevel_file,
+            start_date=sim.start_date,
+            duration_hours=sim.duration_hours,
+            offset_m=self.model.forcing_to_mesh_offset_m,
+            correction_file=corr_path if corr_path.exists() else None,
+        )
+
+        self._log(f"GLOFS boundary file created: {elev_file}")
+        return {"elev2d_file": str(elev_file), "status": "completed"}
+
+    def validate(self) -> list[str]:
+        """Require a lake; fetched hours are checked when the stage runs."""
+        if self.config.boundary.glofs_model is None:
+            return ["boundary.glofs_model is required when boundary.source is 'glofs'"]
+        return []
+
+
 class BoundaryConditionStage(WorkflowStage):
-    """Wrapper stage that selects the harmonic or STOFS path."""
+    """Wrapper stage that selects the harmonic, STOFS, or GLOFS path."""
 
     name = "schism_boundary"
     description = "Generate boundary conditions"
 
     def run(self) -> dict[str, Any]:
         """Execute appropriate boundary condition stage."""
-        if self.config.boundary.source == "harmonic":
-            stage = TidalBoundaryStage(self.config, self.monitor)
-        else:
+        source = self.config.boundary.source
+        if source == "harmonic":
+            stage: WorkflowStage = TidalBoundaryStage(self.config, self.monitor)
+        elif source == "stofs":
             stage = STOFSBoundaryStage(self.config, self.monitor)
+        elif source == "glofs":
+            stage = GLOFSBoundaryStage(self.config, self.monitor)
+        else:
+            raise ValueError(f"Unsupported boundary.source for SCHISM: {source!r}")
 
         return stage.run()
 
     def validate(self) -> list[str]:
         """Validate based on boundary source."""
-        if self.config.boundary.source == "stofs":
-            stage = STOFSBoundaryStage(self.config, self.monitor)
-            return stage.validate()
+        source = self.config.boundary.source
+        if source == "stofs":
+            return STOFSBoundaryStage(self.config, self.monitor).validate()
+        if source == "glofs":
+            return GLOFSBoundaryStage(self.config, self.monitor).validate()
         return []

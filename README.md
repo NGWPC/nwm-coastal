@@ -147,12 +147,13 @@ The AOI polygon and discharge points can be created interactively using the QGIS
 
 | Source      | Date Range               | Description           |
 | ----------- | ------------------------ | --------------------- |
-| `nwm_retro` | 1979-02-01 to 2023-01-31 | NWM Retrospective 3.0 |
-| `nwm_ana`   | 2018-09-17 to present    | NWM Analysis          |
+| `nwm_retro` | 1979-02-01 to 2023-01-31 (CONUS), by domain | NWM Retrospective 3.0 |
+| `nwm_ana`   | 2018-10-01 to present, by domain | NWM Analysis  |
 | `stofs`     | 2020-12-30 to present    | STOFS water levels    |
+| `glofs`     | 2016 to present, by lake | Great Lakes OFS water levels |
 | `tpxo`      | N/A (local installation) | TPXO tidal model      |
 
-**Domains**: `atlgulf`, `pacific`, `hawaii`, `prvi`
+**Domains**: `atlgulf`, `pacific`, `hawaii`, `prvi`, `alaska`, `greatlakes`
 
 ## Workflow Stages
 

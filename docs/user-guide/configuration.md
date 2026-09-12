@@ -104,7 +104,7 @@ simulation:
 | ------------------ | -------- | ------------ | -------------------------------------- |
 | `start_date`       | datetime | **required** | ISO format date/datetime               |
 | `duration_hours`   | int      | **required** | Positive integer                       |
-| `coastal_domain`   | string   | **required** | `hawaii`, `prvi`, `atlgulf`, `pacific` |
+| `coastal_domain`   | string   | **required** | `hawaii`, `prvi`, `atlgulf`, `pacific`, `alaska`, `greatlakes` (see [Domains](#domains)) |
 | `meteo_source`     | string   | **required** | `nwm_ana`, `nwm_retro`                 |
 | `timestep_seconds` | int      | 3600         | Forcing time step in seconds           |
 
@@ -119,6 +119,50 @@ start_date: "2021-06-11 00:00:00"   # Date with space separator
 start_date: 20210611                # Compact format
 ```
 
+### Domains
+
+`simulation.coastal_domain` tells both the SCHISM and the SFINCS run workflows which
+NWM forcing grid and streamflow to download, which dates are valid, and which boundary
+sources can be used. Pick the domain your model sits in:
+
+| Domain       | Region                        | NWM grid    | `nwm_retro`             | `nwm_ana`            | Boundary sources             |
+| ------------ | ----------------------------- | ----------- | ----------------------- | -------------------- | ---------------------------- |
+| `atlgulf`    | Atlantic and Gulf coasts      | CONUS       | 1979-02-01 – 2023-01-31 | 2018-10-01 – present | `harmonic`, `stofs`          |
+| `pacific`    | Pacific coast (CONUS)         | CONUS       | 1979-02-01 – 2023-01-31 | 2018-10-01 – present | `harmonic`, `stofs`          |
+| `hawaii`     | Hawaii                        | Hawaii      | 1994-01-02 – 2013-12-31 | 2021-04-21 – present | `harmonic`, `stofs`          |
+| `prvi`       | Puerto Rico and USVI          | Puerto Rico | 2008-01-01 – 2023-06-30 | 2023-10-01 – present | `harmonic`, `stofs`          |
+| `alaska`     | Alaska                        | Alaska      | 1981-01-01 – 2019-12-31 | 2023-10-01 – present | `harmonic`, `stofs`          |
+| `greatlakes` | Great Lakes                   | CONUS       | 1979-02-01 – 2023-01-31 | 2018-10-01 – present | `glofs` only ([details](#great-lakes-glofs)) |
+
+`greatlakes` is the one domain with no choice of boundary source: `glofs` and
+`greatlakes` must be used together, and either one without the other is rejected at
+validation. STOFS does not cover the lakes, and a harmonic boundary would be actively
+misleading there, since lake levels are driven by wind setup and seiches rather than by
+astronomical tides of a few centimetres. Every other domain accepts `stofs` or
+`harmonic`.
+
+Boundary data has its own dates: `stofs` from 2020-12-30, `glofs` from 2016 depending
+on the lake, and `harmonic` has no limit. `ngen_forecast` forcing is read from a file you
+supply, so it has no date limits.
+
+A boundary source does not require a particular forcing source. `stofs` pairs with
+`nwm_retro`, `nwm_ana` or `ngen_forecast`; what constrains a run is that it must fit
+inside the range of both its forcing source and its boundary source. Watch for the gaps
+where **no NWM forcing exists**:
+
+| Domain   | No NWM forcing                 | Consequence                                                        |
+| -------- | ------------------------------ | ------------------------------------------------------------------ |
+| `hawaii` | 2014-01-01 – 2021-04-20        | `nwm_retro` ends 2013-12-31, before STOFS begins, so here a `stofs` run needs `nwm_ana` and starts on or after 2021-04-21 |
+| `prvi`   | 2023-07-01 – 2023-09-30        | runs can't include those three months                             |
+| `alaska` | 2020-01-01 – 2023-09-30        | `nwm_retro` ends 2019-12-31, before STOFS begins, so here a `stofs` run needs `nwm_ana` and starts on or after 2023-10-01; `harmonic` runs fit 1981–2019 or from 2023-10-01 |
+
+In `atlgulf`, `pacific` and `prvi` the two ranges do overlap, so `nwm_retro` + `stofs`
+is valid there from 2020-12-30. `init` picks it for `atlgulf` and `pacific`; `prvi`
+defaults to `nwm_ana` instead, because SCHISM currently fails there with `nwm_retro`.
+
+`coastal-calibration init --domain <domain>` writes a config with a combination that
+works for that domain.
+
 ### Boundary Settings
 
 Configure boundary conditions:
@@ -127,12 +171,74 @@ Configure boundary conditions:
 boundary:
   source: stofs          # Boundary condition source
   stofs_file:            # Optional: explicit STOFS file path
+  glofs_model:           # Lake, when source is glofs
 ```
 
-| Parameter    | Type   | Default | Options         | Description               |
-| ------------ | ------ | ------- | --------------- | ------------------------- |
-| `source`     | string | `tpxo`  | `tpxo`, `stofs` | Boundary condition source |
-| `stofs_file` | path   | null    | -               | Override STOFS file path  |
+| Parameter     | Type   | Default    | Options                                 | Description                  |
+| ------------- | ------ | ---------- | --------------------------------------- | ---------------------------- |
+| `source`      | string | `harmonic` | `harmonic` (alias `tpxo`), `stofs`, `glofs` | Boundary condition source |
+| `stofs_file`  | path   | null       | -                                       | Override STOFS file path     |
+| `glofs_model` | string | null       | `leofs`, `lmhofs`, `loofs`, `lsofs`     | Great Lakes OFS lake         |
+
+#### Great Lakes (GLOFS)
+
+`source: glofs` forces the open boundary with water levels from NOAA's Great Lakes
+Operational Forecast System (GLOFS) nowcasts. It requires
+`simulation.coastal_domain: greatlakes`, and that domain requires it, since STOFS and
+the tidal atlases don't cover the lakes. Pick the lake with `glofs_model`:
+
+```yaml
+simulation:
+  coastal_domain: greatlakes
+  meteo_source: nwm_ana
+
+boundary:
+  source: glofs
+  glofs_model: leofs            # leofs, lmhofs, loofs, or lsofs
+
+model_config:
+  forcing_to_mesh_offset_m: 173.5   # see "Vertical datum" below
+```
+
+| `glofs_model` | Lake           | Data from  | Model behind the archived data                                  |
+| ------------- | -------------- | ---------- | --------------------------------------------------------------- |
+| `leofs`       | Erie           | 2016-03-10 | FVCOM, 6,106 nodes, throughout                                  |
+| `lmhofs`      | Michigan-Huron | 2019-09-17 | FVCOM, 90,806 nodes, throughout                                 |
+| `loofs`       | Ontario        | 2016-03-01 | POM (~750 water cells) until 2022-10-19; FVCOM (34,395 nodes) from 2022-10-20 |
+| `lsofs`       | Superior       | 2016-03-01 | POM (~800 water cells) until 2022-10-19; FVCOM (90,964 nodes) from 2022-10-20 |
+
+**Two models, two eras.** NOAA originally ran its Great Lakes forecasts on POM (the
+Princeton Ocean Model), which uses a coarse rectangular grid, about 5 km between
+points. It has since moved each lake to FVCOM, which uses a much finer triangular mesh
+that follows the shoreline. For Ontario and Superior the switch came on 20 October
+2022, so boundaries for earlier dates are interpolated from the coarse POM grid. That
+is adequate for lake-wide water level but smooths out local detail near the boundary.
+
+A single run can't span the Ontario or Superior switch, because the two models share
+no grid points: the download stage stops with "GLOFS … changed grids at … Split the
+simulation at that time." Run the two sides separately.
+
+Only nowcast data is used; GLOFS forecast files aren't read.
+
+**Vertical datum.** GLOFS water levels are relative to the lake's **low-water datum**,
+not an absolute elevation. Set the model's `forcing_to_mesh_offset_m` to move them
+onto the mesh datum: for example `173.5` (Lake Erie's low-water datum, IGLD85) for a
+mesh in absolute IGLD85 elevations, or `0.0` if the mesh is referenced to low-water
+datum. Check the mesh's `elev.ic` or depths to tell which it uses.
+
+**Downloads.** The download stage reads only the water-level field from each hourly
+NOAA file rather than downloading it whole (the files run up to ~180 MB an hour),
+caching the result under `coastal/glofs/<lake>/` in the download directory. Data comes
+from NCEI's archive at
+`https://www.ncei.noaa.gov/oa/prod-model/operational-nowcast-and-forecast-hydrodynamic-model-systems-co-ops/`.
+
+**Gauge comparison.** With `include_noaa_gages: true`, Great Lakes runs compare
+against NOAA CO-OPS lake gauges, which record observations but publish no tide
+predictions. Lake gauges have no MSL or MLLW, so observations are fetched in the
+lake's low-water datum and shifted by the same `forcing_to_mesh_offset_m` as the
+boundary, and the comparison is made in the mesh datum. 49 of the 52 CO-OPS Great
+Lakes gauges qualify; the three Niagara River gauges (Ashland Ave, American Falls,
+Niagara Intake) publish no low-water datum and are skipped.
 
 ### Path Settings
 
@@ -178,6 +284,7 @@ model_config:
   oversubscribe: false            # Allow MPI oversubscription
   schism_exe:                     # System-compiled SCHISM executable (optional)
   include_noaa_gages: true        # Enable NOAA observation stations & comparison plots
+  forcing_to_mesh_offset_m: 0.0   # Datum offset added to GLOFS boundary levels
   runtime_env: {}                 # Extra env vars for model run (optional)
 ```
 
@@ -193,6 +300,7 @@ model_config:
 | `oversubscribe`      | bool | false   | Allow MPI oversubscription                          |
 | `schism_exe`         | path | -       | Path to a system-compiled SCHISM executable         |
 | `include_noaa_gages` | bool | false   | Enable NOAA station discovery and comparison        |
+| `forcing_to_mesh_offset_m` | float | 0.0 | Offset (m) added to GLOFS boundary levels (see [Great Lakes](#great-lakes-glofs)) |
 | `runtime_env`        | dict | `{}`    | Extra env vars for the model run subprocess         |
 
 #### NOAA Observation Stations (`include_noaa_gages`)
@@ -536,12 +644,18 @@ elevation:
 
 Each dataset entry:
 
-| Field          | Type  | Description                                          |
-| -------------- | ----- | ---------------------------------------------------- |
-| `name`         | str   | HydroMT data-catalog dataset name                    |
-| `zmin`         | float | Minimum elevation threshold                          |
-| `source`       | str   | Auto-fetch source (`"noaa"` or null)                 |
-| `noaa_dataset` | str   | Explicit NOAA dataset name (auto-discovered if null) |
+| Field            | Type  | Description                                                                   |
+| ---------------- | ----- | ----------------------------------------------------------------------------- |
+| `name`           | str   | Dataset name; for your own data, the entry name in your data catalog          |
+| `zmin`           | float | Cells below this elevation are ignored for this dataset (after `offset`)      |
+| `source`         | str   | Download source: `nws_30m`, `noaa_3m`, `noaa_crm`, `copdem_30m`, `gebco_15arcs`; omit for your own data |
+| `offset`         | float | Metres added to this dataset before merging, to align vertical datums         |
+| `noaa_dataset`   | str   | Explicit NOAA dataset (only with `noaa_3m`; auto-discovered if null)          |
+| `coastal_domain` | str   | NWS topobathy tile (only with `nws_30m`)                                      |
+
+Datasets are merged **in list order**: the first dataset takes priority, and each later
+one only fills cells that are still empty. The same list builds both the grid bed levels
+and the subgrid tables.
 
 #### Mask Settings (`mask`)
 
@@ -571,6 +685,90 @@ Each dataset entry:
 | Parameter   | Type | Default | Description                                |
 | ----------- | ---- | ------- | ------------------------------------------ |
 | `data_libs` | list | `[]`    | Additional HydroMT data catalog YAML paths |
+
+#### Using your own topobathy data
+
+You can build the model from your own DEM (a local lidar survey, a bathymetric survey, a
+blended product) instead of, or on top of, the datasets `create` downloads. Describe the
+DEM in a HydroMT data catalog, then list it in `elevation.datasets` without a `source`.
+
+**1. Write a data catalog** for the DEM, e.g. `my_dem/data_catalog.yml`:
+
+```yaml
+meta:
+  version: v1.0.0
+  hydromt_version: '>1.0a,<2'
+
+my_lidar_dem:                  # the name you will use in the create config
+  data_type: RasterDataset
+  uri: my_lidar_dem.tif        # relative to this catalog file
+  driver:
+    name: rasterio
+  metadata:
+    crs: 26915                 # EPSG code; only needed if the file doesn't carry one
+    nodata: -9999              # only needed if the file doesn't carry one
+  data_adapter:
+    rename:
+      my_lidar_dem: elevtn     # HydroMT-SFINCS reads the variable named elevtn
+```
+
+The DEM can be in any projection; it is reprojected onto the model grid. It must hold
+**elevations in metres, positive up**. If it holds depths (positive down), flip it in the
+catalog:
+
+```yaml
+  data_adapter:
+    rename:
+      my_lidar_dem: elevtn
+    unit_mult:
+      elevtn: -1
+```
+
+If the DEM comes as **tiles**, either point `uri` at them with a wildcard and turn on
+mosaicking, or combine them into a single VRT first (`gdalbuildvrt my_dem.vrt tiles/*.tif`)
+and point `uri` at the `.vrt`:
+
+```yaml
+  uri: tiles/*.tif
+  driver:
+    name: rasterio
+    options:
+      mosaic: true             # without this, tiles fail with "Geotransform and/or shape do not match"
+```
+
+**2. Use it in the create config.** Put your DEM first so it wins where it has data, and
+keep a downloaded dataset after it to fill anywhere your DEM doesn't reach:
+
+```yaml
+elevation:
+  datasets:
+    - name: my_lidar_dem       # no source: read from the data catalog, not downloaded
+      zmin: -20000
+    - name: gebco_15arcs       # fills areas outside your DEM
+      zmin: -20000
+      source: gebco_15arcs
+      offset: -0.24            # e.g. put GEBCO (~MSL) onto your DEM's NAVD88 datum
+
+data_catalog:
+  data_libs:
+    - ./my_dem/data_catalog.yml   # relative to this config file
+```
+
+**Vertical datum.** The model takes on the vertical datum of the merged elevation, so pick
+one datum for the model, which is usually your DEM's, and use `offset` on the other datasets
+to bring them onto it. Otherwise you get a step in the bed wherever one dataset's coverage
+ends. Remember that datum when you later set the run's `forcing_to_mesh_offset_m` and
+`vdatum_mesh_to_msl_m`.
+
+**Checking it worked.** The create log lists the elevation datasets it merged. Two things
+to watch for:
+
+- `No data in domain for my_lidar_dem, skipped.` means the DEM doesn't overlap the model
+  area, usually because of a wrong `crs` in the catalog. The run carries on with the other
+  datasets, so check for this line rather than assuming your DEM was used.
+- `found no files at …/my_lidar_dem` means the name in `elevation.datasets` doesn't match
+  any catalog entry (or the catalog isn't listed in `data_libs`), so the name was tried
+  as a file path. `validate` doesn't catch this; it surfaces at the `create_elevation` stage.
 
 #### River Discharge (`river_discharge`, Optional)
 

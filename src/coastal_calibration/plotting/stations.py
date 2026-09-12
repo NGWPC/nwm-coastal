@@ -95,7 +95,8 @@ def _draw_station_panel(
         ax.scatter(times, sim_ts, label=label, color=color, marker=marker, s=25)
 
     ax.set_title(f"NOAA {sid}", fontsize=14, fontweight="bold")
-    ax.set_ylabel("Water Level (m, MSL)", fontsize=12)
+    datum = obs_ds.attrs.get("datum", "MSL") if obs_ds is not None else "MSL"
+    ax.set_ylabel(f"Water Level (m, {datum})", fontsize=12)
     ax.tick_params(axis="both", labelsize=11)
     ax.legend(fontsize=11, loc="best")
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%m-%d %H:%M"))

@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, ClassVar, Literal
+from typing import Any, ClassVar, Literal, get_args
 
 import pandas as pd
 import yaml
@@ -18,12 +18,15 @@ import yaml
 # multi-timestep file (see ``paths.forecast_meteo_file``); nothing is
 # downloaded for it.
 MeteoSource = Literal["nwm_retro", "nwm_ana", "ngen_forecast"]
-CoastalDomain = Literal["prvi", "hawaii", "atlgulf", "pacific", "alaska"]
+CoastalDomain = Literal["prvi", "hawaii", "atlgulf", "pacific", "alaska", "greatlakes"]
 # ``harmonic`` predicts boundary elevations from harmonic constituents via
 # pyTMD against ``tidal_atlas_dir`` (TPXO, FES, GOT, EOT, ...). ``tpxo``
 # is accepted for backward compatibility with older config files and is
 # normalized to ``harmonic`` in :meth:`BoundaryConfig.__post_init__`.
-BoundarySource = Literal["harmonic", "tpxo", "stofs"]
+# ``glofs`` reads NOAA Great Lakes OFS (FVCOM) water levels and applies only
+# to the ``greatlakes`` domain; ``BoundaryConfig.glofs_model`` picks the lake.
+BoundarySource = Literal["harmonic", "tpxo", "stofs", "glofs"]
+GLOFSModel = Literal["leofs", "lmhofs", "loofs", "lsofs"]
 ModelType = Literal["schism", "sfincs"]
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
@@ -65,6 +68,7 @@ class SimulationConfig:
         "hawaii": "domain_hawaii",
         "atlgulf": "domain",
         "pacific": "domain",
+        "greatlakes": "domain",
         "alaska": "domain_alaska",
     }
     _NWM_DOMAIN: ClassVar[dict[str, str]] = {
@@ -72,6 +76,7 @@ class SimulationConfig:
         "hawaii": "hawaii",
         "atlgulf": "conus",
         "pacific": "conus",
+        "greatlakes": "conus",
         "alaska": "alaska",
     }
     _GEO_GRID: ClassVar[dict[str, str]] = {
@@ -79,6 +84,7 @@ class SimulationConfig:
         "hawaii": "geo_em_HI.nc",
         "atlgulf": "geo_em_CONUS.nc",
         "pacific": "geo_em_CONUS.nc",
+        "greatlakes": "geo_em_CONUS.nc",
         "alaska": "geo_em_AK.nc",
     }
     # Every NWM domain projects its LDASIN forcing differently: CONUS,
@@ -90,6 +96,7 @@ class SimulationConfig:
         "hawaii": "+proj=lcc +lat_0=20.6 +lon_0=-157.42 +lat_1=10 +lat_2=30 +x_0=0 +y_0=0 +R=6370000 +units=m +no_defs",
         "atlgulf": NWM_CONUS_METEO_CRS,
         "pacific": NWM_CONUS_METEO_CRS,
+        "greatlakes": NWM_CONUS_METEO_CRS,
         "alaska": "+proj=stere +lat_0=90 +lat_ts=60 +lon_0=-135 +x_0=0 +y_0=0 +R=6370000 +units=m +no_defs",
     }
 
@@ -148,16 +155,23 @@ class BoundaryConfig:
 
     Parameters
     ----------
-    source : {"harmonic", "stofs"}
+    source : {"harmonic", "stofs", "glofs"}
         Boundary forcing source. ``harmonic`` predicts tides locally
         via pyTMD against the atlas at
         :attr:`PathConfig.tidal_atlas_dir`; ``stofs`` regrids the NOAA
         STOFS product (and falls back to ``harmonic`` past the STOFS
-        180 h window when the simulation runs longer).
+        180 h window when the simulation runs longer); ``glofs`` samples
+        NOAA Great Lakes OFS (FVCOM) nowcast water levels and requires
+        ``simulation.coastal_domain == "greatlakes"``.
         ``"tpxo"`` is accepted as a deprecated alias for ``"harmonic"``
         and is normalized at construction time.
     stofs_file : Path, optional
         STOFS NetCDF (only used when ``source == "stofs"``).
+    glofs_model : {"leofs", "lmhofs", "loofs", "lsofs"}, optional
+        Great Lakes OFS model, i.e. which lake (Erie, Michigan-Huron,
+        Ontario, Superior). Required when ``source == "glofs"``. GLOFS
+        water levels are relative to the lake's low-water datum; set the
+        model's ``forcing_to_mesh_offset_m`` to convert to the mesh datum.
     tidal_model : str
         pyTMD model identifier (see ``pyTMD.io.load_database()``).
         Defaults to TPXO10-atlas-v2 in netcdf form. Set to e.g.
@@ -168,6 +182,7 @@ class BoundaryConfig:
 
     source: BoundarySource = "harmonic"
     stofs_file: Path | None = None
+    glofs_model: GLOFSModel | None = None
     tidal_model: str = "TPXO10-atlas-v2-nc"
 
     def __post_init__(self) -> None:
@@ -447,6 +462,13 @@ class SchismModelConfig(ModelConfig):
         Path to a ``nwmReaches.csv`` file mapping NWM reach feature IDs
         to SCHISM source/sink elements.  When ``None`` (default), the
         discharge stage is skipped and no river forcing is generated.
+    forcing_to_mesh_offset_m : float
+        Vertical offset in meters *added* to the ``elev2D.th.nc``
+        boundary water levels, to move them onto the mesh's vertical
+        datum. Mirrors :attr:`SfincsModelConfig.forcing_to_mesh_offset_m`.
+        Currently applied to ``glofs`` boundaries, whose levels are
+        relative to the lake's low-water datum: e.g. ``173.5`` for a
+        Lake Erie mesh in absolute IGLD85 elevations. Defaults to ``0.0``.
     include_wind : bool
         When False, skips both wind/pressure regridding stages
         (``schism_forcing``'s lat-lon regrid and ``schism_sflux``)
@@ -509,6 +531,7 @@ class SchismModelConfig(ModelConfig):
     schism_exe: Path | None = None
     include_noaa_gages: bool = False
     discharge_file: Path | None = None
+    forcing_to_mesh_offset_m: float = 0.0
     include_wind: bool = True
     create_water_level_animation: bool = False
     animation_fps: int = 10
@@ -540,7 +563,9 @@ class SchismModelConfig(ModelConfig):
             detected: int | None = None
             if self.prebuilt_dir is not None:
                 detected = count_required_scribes(
-                    self.prebuilt_dir / "param.nml", self.include_noaa_gages
+                    self.prebuilt_dir / "param.nml",
+                    self.include_noaa_gages,
+                    self.run_param_overrides,
                 )
             self.nscribes = detected if detected and detected > 0 else 2
 
@@ -772,6 +797,7 @@ class SchismModelConfig(ModelConfig):
             "schism_exe": (str(self.schism_exe) if self.schism_exe else None),
             "include_noaa_gages": self.include_noaa_gages,
             "discharge_file": (str(self.discharge_file) if self.discharge_file else None),
+            "forcing_to_mesh_offset_m": self.forcing_to_mesh_offset_m,
             "create_water_level_animation": self.create_water_level_animation,
             "animation_fps": self.animation_fps,
             "animation_time_stride": self.animation_time_stride,
@@ -1599,6 +1625,7 @@ class CoastalCalibConfig:
             "boundary": {
                 "source": self.boundary.source,
                 "stofs_file": (str(self.boundary.stofs_file) if self.boundary.stofs_file else None),
+                "glofs_model": self.boundary.glofs_model,
                 "tidal_model": self.boundary.tidal_model,
             },
             "paths": {
@@ -1658,8 +1685,29 @@ class CoastalCalibConfig:
     def _validate_boundary_source(self) -> list[str]:
         """Validate boundary source configuration."""
         errors = []
+        source = self.boundary.source
+        domain = self.simulation.coastal_domain
 
-        if self.boundary.source == "stofs":
+        allowed = get_args(BoundarySource)
+        if source not in allowed:
+            errors.append(f"boundary.source must be one of {', '.join(allowed)}; got {source!r}")
+            return errors
+
+        if (source == "glofs") != (domain == "greatlakes"):
+            errors.append(
+                "boundary.source 'glofs' and simulation.coastal_domain 'greatlakes' "
+                f"must be used together (got source={source!r}, domain={domain!r})"
+            )
+
+        if source == "glofs":
+            models = get_args(GLOFSModel)
+            if self.boundary.glofs_model not in models:
+                errors.append(
+                    f"boundary.glofs_model is required when boundary.source is 'glofs' "
+                    f"and must be one of {', '.join(models)}; got {self.boundary.glofs_model!r}"
+                )
+
+        if source == "stofs":
             if not self.boundary.stofs_file and not self.download.enabled:
                 errors.append(
                     "boundary.stofs_file required when using STOFS source and download is disabled"
@@ -1724,6 +1772,7 @@ class CoastalCalibConfig:
                 sim.meteo_source,
                 self.boundary.source,
                 sim.coastal_domain,
+                glofs_model=self.boundary.glofs_model,
             )
             errors.extend(date_errors)
 

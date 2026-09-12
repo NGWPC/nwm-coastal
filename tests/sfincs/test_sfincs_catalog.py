@@ -218,15 +218,14 @@ class TestGenerateDataCatalog:
         assert len(catalog.entries) == 1
         assert "glofs" in catalog.entries[0].name
 
-    def test_glofs_uri_is_scoped_by_placeholder(self, catalog_config):
-        """Regression: the URI used to sweep up every cached run of a lake.
+    def test_glofs_entry_points_at_this_runs_merged_file(self, catalog_config):
+        """One entry, scoped to this run's window, named as the forcing stage expects.
 
-        hydromt expands ``{year}``/``{month}`` over the requested window, so
-        one entry covers a run of any length. Emitting one entry per month
-        instead left the extras suffixed ``_1``, ``_2``, ... which no
-        consumer ever asks for.
+        Regression: the entry used to be named ``glofs_{model}_waterlevel``
+        while the stage looked up ``glofs_waterlevel``, and its URI swept up
+        every cached run of the lake.
         """
-        catalog_config.simulation.duration_hours = 24 * 40  # crosses into July
+        catalog_config.simulation.duration_hours = 24 * 40
         catalog = generate_data_catalog(
             catalog_config,
             coastal_source="glofs",
@@ -236,8 +235,20 @@ class TestGenerateDataCatalog:
         )
 
         assert len(catalog.entries) == 1
-        assert catalog.entries[0].name == "glofs_leofs_waterlevel"
-        assert catalog.entries[0].uri == ("coastal/glofs/leofs.*.{year}{month:02d}*.fields.*.nc")
+        assert catalog.entries[0].name == "glofs_waterlevel"
+        assert catalog.entries[0].uri == "coastal/glofs/glofs_leofs_2021061100_2021072100.nc"
+
+    def test_glofs_model_comes_from_config(self, catalog_config):
+        catalog_config.boundary = BoundaryConfig(source="glofs", glofs_model="lsofs")
+        catalog = generate_data_catalog(
+            catalog_config, include_meteo=False, include_streamflow=False
+        )
+        assert "glofs_lsofs_" in catalog.entries[0].uri
+
+    def test_glofs_without_model_raises(self, catalog_config):
+        catalog_config.boundary = BoundaryConfig(source="glofs")
+        with pytest.raises(ValueError, match="glofs_model is required"):
+            generate_data_catalog(catalog_config, include_meteo=False, include_streamflow=False)
 
     def test_multi_month_run_yields_one_meteo_entry(self, catalog_config):
         """A cross-month window must not split into entries nobody loads."""

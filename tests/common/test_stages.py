@@ -623,3 +623,67 @@ class TestPlotStationComparison:
         paths = plot_station_comparison({"sim": run}, ids, tmp_path / "figs", obs_ds=obs)
         assert len(paths) == 1
         assert paths[0].exists()
+
+
+class TestSchismRunErrorReporting:
+    """SCHISMRunStage keeps SCHISM's full output and surfaces the real error."""
+
+    BACKTRACE = "Error termination. Backtrace:\n" + "".join(f"#{i}  0x55 in ???\n" for i in range(9))
+
+    @pytest.fixture
+    def run_stage(self, sample_config, monkeypatch):
+        from pathlib import Path
+
+        stage = SCHISMRunStage(sample_config)
+        monkeypatch.setattr(stage, "_resolve_exe", lambda model: Path("/bin/pschism"))
+        monkeypatch.setattr(stage, "_build_mpi_command", lambda exe, env: ["mpiexec", "pschism"])
+        monkeypatch.setattr(stage, "build_environment", dict)
+        return stage
+
+    def _fake_schism(self, monkeypatch, work_dir, *, returncode=0, stderr="", fatal=None):
+        import subprocess
+
+        def run(cmd, cwd, **kwargs):
+            if fatal is not None:
+                (work_dir / "outputs" / "fatal.error").write_text(fatal)
+            return subprocess.CompletedProcess(cmd, returncode, stdout="Run begins\n", stderr=stderr)
+
+        monkeypatch.setattr(subprocess, "run", run)
+
+    def test_abort_with_exit_zero_fails_the_stage(self, run_stage, sample_config, monkeypatch):
+        work_dir = sample_config.paths.work_dir
+        self._fake_schism(
+            monkeypatch, work_dir, fatal="  13: ABORT: INIT: Too few scribes (2).\n"
+        )
+        with pytest.raises(RuntimeError, match=r"exit 0\):\nABORT: INIT: Too few scribes"):
+            run_stage.run()
+
+    def test_real_error_survives_long_backtraces(self, run_stage, sample_config, monkeypatch):
+        error = (
+            "At line 537 of file schism_init.F90 (unit = 15, file = './/param.nml')\n"
+            "Fortran runtime error: Cannot match namelist object name stemp_stc\n"
+        )
+        stderr = (error + self.BACKTRACE) * 18
+        self._fake_schism(monkeypatch, sample_config.paths.work_dir, returncode=2, stderr=stderr)
+
+        with pytest.raises(RuntimeError) as excinfo:
+            run_stage.run()
+
+        message = str(excinfo.value)
+        assert message.count("Cannot match namelist object name stemp_stc") == 1
+        assert "schism_log.txt" in message
+        log = (sample_config.paths.work_dir / "outputs" / "schism_log.txt").read_text()
+        assert log.count("stemp_stc") == 18
+
+    def test_quicksearch_only_is_success(self, run_stage, sample_config, monkeypatch):
+        work_dir = sample_config.paths.work_dir
+        self._fake_schism(monkeypatch, work_dir, fatal="QUICKSEARCH: dry node 42\n")
+        assert run_stage.run()["status"] == "completed"
+        assert (work_dir / "outputs" / "schism_log.txt").exists()
+
+    def test_stale_fatal_error_is_cleared(self, run_stage, sample_config, monkeypatch):
+        outputs = sample_config.paths.work_dir / "outputs"
+        outputs.mkdir(parents=True, exist_ok=True)
+        (outputs / "fatal.error").write_text("0: ABORT: from an earlier attempt\n")
+        self._fake_schism(monkeypatch, sample_config.paths.work_dir)
+        assert run_stage.run()["status"] == "completed"

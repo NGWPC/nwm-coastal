@@ -14,7 +14,6 @@ from coastal_calibration.data.downloader import (
     DateRange,
     DownloadResult,
     DownloadResults,
-    _build_glofs_urls,
     _build_nwm_ana_forcing_urls,
     _build_nwm_ana_streamflow_urls,
     _build_nwm_retro_forcing_urls,
@@ -369,20 +368,6 @@ class TestBuildUrls:
         _, paths_a = _build_stofs_urls(datetime(2022, 6, 1, 0), tmp_path)
         _, paths_b = _build_stofs_urls(datetime(2022, 7, 1, 0), tmp_path)
         assert paths_a[0] != paths_b[0]
-
-    def test_glofs_urls(self, tmp_path):
-        start = datetime(2023, 1, 1, 0)
-        end = datetime(2023, 1, 1, 3)
-        urls, _paths = _build_glofs_urls(start, end, tmp_path, "leofs")
-        assert len(urls) == 3
-        assert "leofs" in urls[0]
-        assert "lake-erie" in urls[0]
-
-    def test_glofs_urls_lmhofs(self, tmp_path):
-        start = datetime(2023, 1, 1, 0)
-        end = datetime(2023, 1, 1, 1)
-        urls, _paths = _build_glofs_urls(start, end, tmp_path, "lmhofs")
-        assert "lake-michigan-huron" in urls[0]
 
 
 class TestExecuteDownload:

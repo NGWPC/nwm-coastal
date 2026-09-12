@@ -168,7 +168,9 @@ def _build_domain_polygon(project: Any) -> Any:
 
     outer_pts = coords[np.array(outer_ids) - 1].tolist()
     holes = [coords[np.array(isl) - 1].tolist() for isl in islands]
-    return shapely.Polygon(outer_pts, holes=holes)
+    polygon = shapely.Polygon(outer_pts, holes=holes)
+    # Some lake meshes carry the shoreline as an island loop; repair the geometry.
+    return polygon if polygon.is_valid else shapely.make_valid(polygon)
 
 
 def _read_staout(staout_path: Path) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
@@ -282,7 +284,7 @@ class SchismObservationStage(WorkflowStage):
             self._log("include_noaa_gages is disabled, skipping")
             return {"status": "skipped"}
 
-        from coastal_calibration.data.coops_api import COOPSAPIClient
+        from coastal_calibration.data.coops_api import COOPSAPIClient, comparison_datums
         from coastal_calibration.schism import NWMSCHISMProject
 
         work_dir = self.config.paths.work_dir
@@ -335,16 +337,16 @@ class SchismObservationStage(WorkflowStage):
 
         candidate_ids = selected["station_id"].tolist()
 
-        # Filter to stations with valid MSL/MLLW datums so that
-        # every station written to station.in can later be converted
-        # from MLLW to MSL during the plotting stage.
+        # Keep stations whose datums let the plot stage convert them:
+        # MSL/MLLW for tidal gauges, the lake low-water datum for Great Lakes.
         self._update_substep("Filtering stations by datum availability")
-        valid_ids = client.filter_stations_by_datum(candidate_ids)
+        required = comparison_datums(self.config.simulation.coastal_domain)
+        valid_ids = client.filter_stations_by_datum(candidate_ids, required)
 
         dropped = set(candidate_ids) - valid_ids
         if dropped:
             self._log(
-                f"Excluded {len(dropped)} station(s) without datum data: "
+                f"Excluded {len(dropped)} station(s) without {'/'.join(required)} datum: "
                 f"{', '.join(sorted(dropped))}",
                 "warning",
             )
@@ -584,6 +586,43 @@ class PreSCHISMStage(WorkflowStage):
         }
 
 
+# SCHISM writes dry-node diagnostics (QUICKSEARCH) to fatal.error even on healthy runs.
+_NONFATAL_PATTERNS = ("QUICKSEARCH",)
+_ERROR_MARKERS = (
+    "Fortran runtime error",
+    "ABORT",
+    "At line ",
+    "MPI ERROR",
+    "Segmentation fault",
+    "out of memory",
+    "Killed",
+)
+
+
+def _fatal_error_lines(outputs_dir: Path) -> list[str]:
+    """Return the real errors in ``fatal.error``, ignoring known non-fatal diagnostics."""
+    fatal_error = outputs_dir / "fatal.error"
+    if not fatal_error.exists():
+        return []
+    return [
+        line.strip()
+        for line in fatal_error.read_text(errors="replace").splitlines()
+        if line.strip() and not any(p in line for p in _NONFATAL_PATTERNS)
+    ]
+
+
+def _summarize_schism_errors(text: str, limit: int = 8) -> str:
+    """Pick the distinct error lines from SCHISM output, dropping per-rank repeats."""
+    seen: dict[str, None] = {}
+    for line in text.splitlines():
+        if any(m in line for m in _ERROR_MARKERS):
+            seen.setdefault(re.sub(r"^\s*\d+:\s*", "", line).strip(), None)
+    lines = list(seen)[:limit]
+    if not lines:
+        lines = [ln for ln in text.strip().splitlines()[-10:] if ln.strip()]
+    return "\n".join(lines)
+
+
 class SCHISMRunStage(WorkflowStage):
     """Execute SCHISM model with MPI.
 
@@ -661,6 +700,10 @@ class SCHISMRunStage(WorkflowStage):
         cmd = self._build_mpi_command(exe, env)
         self._log(f"Command: {' '.join(cmd)}")
 
+        outputs_dir = self.config.paths.work_dir / "outputs"
+        outputs_dir.mkdir(parents=True, exist_ok=True)
+        (outputs_dir / "fatal.error").unlink(missing_ok=True)  # clear a previous attempt's
+
         result = subprocess.run(
             cmd,
             cwd=self.config.paths.work_dir,
@@ -670,12 +713,21 @@ class SCHISMRunStage(WorkflowStage):
             check=False,
         )
 
-        if result.returncode != 0:
-            stderr = result.stderr or ""
-            self._log(f"SCHISM run failed: {stderr[-2000:]}", "error")
-            raise RuntimeError(f"SCHISM run failed (exit {result.returncode}): {stderr[-2000:]}")
+        log_path = outputs_dir / "schism_log.txt"
+        log_path.write_text(
+            f"$ {' '.join(cmd)}\n\n--- stdout ---\n{result.stdout or ''}"
+            f"\n--- stderr ---\n{result.stderr or ''}"
+        )
 
-        self._log("SCHISM run completed successfully")
+        # SCHISM's parallel_abort exits 0, so fatal.error is checked as well as the exit code.
+        fatal = _fatal_error_lines(outputs_dir)
+        if result.returncode != 0 or fatal:
+            summary = _summarize_schism_errors("\n".join([*fatal, result.stderr or ""]))
+            msg = f"SCHISM run failed (exit {result.returncode}):\n{summary}\nFull output: {log_path}"
+            self._log(msg, "error")
+            raise RuntimeError(msg)
+
+        self._log(f"SCHISM run completed successfully (output: {log_path})")
         return {
             "outputs_dir": str(self.config.paths.work_dir / "outputs"),
             "status": "completed",
@@ -710,18 +762,10 @@ class PostSCHISMStage(WorkflowStage):
         self._update_substep("Checking for errors")
         fatal_error = outputs_dir / "fatal.error"
         if fatal_error.exists() and fatal_error.stat().st_size > 0:
-            error_content = fatal_error.read_text()
-            # SCHISM writes dry-node diagnostics (QUICKSEARCH) to
-            # fatal.error even on successful runs.  Only treat lines
-            # that do NOT match known non-fatal patterns as true errors.
-            non_fatal_patterns = ("QUICKSEARCH",)
-            true_errors = [
-                line
-                for line in error_content.splitlines()
-                if line.strip() and not any(p in line for p in non_fatal_patterns)
-            ]
+            true_errors = _fatal_error_lines(outputs_dir)
             if true_errors:
-                raise RuntimeError(f"SCHISM run failed: {error_content[-2000:]}")
+                summary = _summarize_schism_errors("\n".join(true_errors))
+                raise RuntimeError(f"SCHISM run failed:\n{summary}")
             self._log("fatal.error contains only dry-node warnings (QUICKSEARCH); continuing")
 
         # Combine any hotstarts SCHISM wrote (nhot_write now always targets
@@ -926,8 +970,9 @@ class SchismPlotStage(WorkflowStage):
             raise RuntimeError(msg)
 
         # Apply per-station datum correction so simulated values are in MSL.
+        # Great Lakes comparisons stay in the mesh datum (observations are shifted instead).
         corr_path = self.model.elevation_correction_csv
-        if corr_path is not None:
+        if corr_path is not None and self.config.simulation.coastal_domain != "greatlakes":
             offsets = self._per_station_datum_offsets(station_ids, corr_path)
             if offsets is not None:
                 elevation = elevation + offsets[None, :]
@@ -959,7 +1004,14 @@ class SchismPlotStage(WorkflowStage):
         end_dt = sim.start_date + timedelta(hours=sim.duration_hours)
         end_date = end_dt.strftime("%Y%m%d %H:%M")
 
-        obs_ds = self._fetch_observations_msl(station_ids, begin_date, end_date)
+        if sim.coastal_domain == "greatlakes":
+            from coastal_calibration.data.coops_api import query_great_lakes_in_mesh_datum
+
+            obs_ds = query_great_lakes_in_mesh_datum(
+                station_ids, begin_date, end_date, self.model.forcing_to_mesh_offset_m
+            )
+        else:
+            obs_ds = self._fetch_observations_msl(station_ids, begin_date, end_date)
 
         self._update_substep("Generating comparison plots")
         from coastal_calibration.plotting import plot_station_comparison

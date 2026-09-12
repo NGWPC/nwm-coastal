@@ -54,9 +54,20 @@ __all__ = [
     "COOPSAPIClient",
     "DatumValue",
     "StationDatum",
+    "comparison_datums",
     "query_coops_bygeometry",
     "query_coops_byids",
+    "query_great_lakes_in_mesh_datum",
 ]
+
+# Great Lakes gauges publish only the lake low-water datum (no MSL/MLLW).
+GREAT_LAKES_DATUMS = ("GL_LWD",)
+TIDAL_DATUMS = ("MSL", "MLLW")
+
+
+def comparison_datums(coastal_domain: str | None) -> tuple[str, ...]:
+    """Datums a gauge must publish to be compared with the model in *coastal_domain*."""
+    return GREAT_LAKES_DATUMS if coastal_domain == "greatlakes" else TIDAL_DATUMS
 
 
 @dataclass
@@ -493,22 +504,27 @@ class COOPSAPIClient:
             return datum_objects[0]
         return datum_objects
 
-    def filter_stations_by_datum(self, station_ids: list[str]) -> set[str]:
-        """Return station IDs that have valid MSL and MLLW datum values.
+    def filter_stations_by_datum(
+        self, station_ids: list[str], required: tuple[str, ...] = TIDAL_DATUMS
+    ) -> set[str]:
+        """Return station IDs that publish every datum in *required*.
 
-        Stations whose datum endpoint returns ``null`` or that lack
-        MSL/MLLW entries are excluded so that every retained station
-        can be converted from MLLW to MSL.
+        Stations whose datum endpoint returns ``null`` or that lack a
+        required entry are excluded, so every retained station can later
+        be converted: MLLW to MSL for tidal gauges (the default), or LWD to
+        the mesh datum for Great Lakes gauges (``required=("GL_LWD",)``).
 
         Parameters
         ----------
         station_ids : list[str]
             Candidate station IDs to check.
+        required : tuple[str, ...]
+            Datum names each station must publish.
 
         Returns
         -------
         set[str]
-            Subset of *station_ids* with valid MSL **and** MLLW datums.
+            Subset of *station_ids* with every required datum.
         """
         try:
             datums = self.get_datums(station_ids)
@@ -517,13 +533,11 @@ class COOPSAPIClient:
             # outage raises COOPSUnavailableError, which propagates on purpose.
             return set()
 
-        valid: set[str] = set()
-        for d in datums:
-            msl = d.get_datum_value("MSL")
-            mllw = d.get_datum_value("MLLW")
-            if msl is not None and mllw is not None:
-                valid.add(d.station_id)
-        return valid
+        return {
+            d.station_id
+            for d in datums
+            if all(d.get_datum_value(name) is not None for name in required)
+        }
 
 
 def _add_variable_attributes(
@@ -940,3 +954,31 @@ def query_coops_bygeometry(
         time_zone=time_zone,
         interval=interval,
     )
+
+
+
+def query_great_lakes_in_mesh_datum(
+    station_ids: list[str],
+    begin_date: str,
+    end_date: str,
+    offset_m: float,
+) -> xr.Dataset:
+    """Fetch Great Lakes gauge water levels on the model mesh's datum.
+
+    Great Lakes gauges have no MSL or MLLW, so observations are fetched in
+    the lake's low-water datum (LWD) -- the same datum as GLOFS boundary
+    forcing -- and shifted by *offset_m*, the model's
+    ``forcing_to_mesh_offset_m``. Model output then compares directly.
+    """
+    obs_ds = query_coops_byids(
+        station_ids,
+        begin_date,
+        end_date,
+        product="water_level",
+        datum="LWD",
+        units="metric",
+        time_zone="gmt",
+    )
+    obs_ds["water_level"] = obs_ds["water_level"] + offset_m
+    obs_ds.attrs["datum"] = "mesh datum"
+    return obs_ds
