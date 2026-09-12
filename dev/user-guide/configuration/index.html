@@ -878,6 +878,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#domains" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Domains
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#boundary-settings" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1878,7 +1889,7 @@ details and complete examples in <code>docs/examples/</code>.</p>
 <td><code>coastal_domain</code></td>
 <td>string</td>
 <td><strong>required</strong></td>
-<td><code>hawaii</code>, <code>prvi</code>, <code>atlgulf</code>, <code>pacific</code></td>
+<td><code>hawaii</code>, <code>prvi</code>, <code>atlgulf</code>, <code>pacific</code>, <code>alaska</code>, <code>greatlakes</code> (see <a href="#domains">Domains</a>)</td>
 </tr>
 <tr>
 <td><code>meteo_source</code></td>
@@ -1901,11 +1912,122 @@ details and complete examples in <code>docs/examples/</code>.</p>
 </span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="nt">start_date</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;2021-06-11</span><span class="nv"> </span><span class="s">00:00:00&quot;</span><span class="w">   </span><span class="c1"># Date with space separator</span>
 </span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="nt">start_date</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20210611</span><span class="w">                </span><span class="c1"># Compact format</span>
 </span></code></pre></div>
+<h3 id="domains">Domains<a class="headerlink" href="#domains" title="Permanent link">#</a></h3>
+<p><code>simulation.coastal_domain</code> tells both the SCHISM and the SFINCS run workflows which
+NWM forcing grid and streamflow to download, which dates are valid, and which boundary
+sources can be used. Pick the domain your model sits in:</p>
+<table>
+<thead>
+<tr>
+<th>Domain</th>
+<th>Region</th>
+<th>NWM grid</th>
+<th><code>nwm_retro</code></th>
+<th><code>nwm_ana</code></th>
+<th>Boundary sources</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>atlgulf</code></td>
+<td>Atlantic and Gulf coasts</td>
+<td>CONUS</td>
+<td>1979-02-01 – 2023-01-31</td>
+<td>2018-10-01 – present</td>
+<td><code>harmonic</code>, <code>stofs</code></td>
+</tr>
+<tr>
+<td><code>pacific</code></td>
+<td>Pacific coast (CONUS)</td>
+<td>CONUS</td>
+<td>1979-02-01 – 2023-01-31</td>
+<td>2018-10-01 – present</td>
+<td><code>harmonic</code>, <code>stofs</code></td>
+</tr>
+<tr>
+<td><code>hawaii</code></td>
+<td>Hawaii</td>
+<td>Hawaii</td>
+<td>1994-01-02 – 2013-12-31</td>
+<td>2021-04-21 – present</td>
+<td><code>harmonic</code>, <code>stofs</code></td>
+</tr>
+<tr>
+<td><code>prvi</code></td>
+<td>Puerto Rico and USVI</td>
+<td>Puerto Rico</td>
+<td>2008-01-01 – 2023-06-30</td>
+<td>2023-10-01 – present</td>
+<td><code>harmonic</code>, <code>stofs</code></td>
+</tr>
+<tr>
+<td><code>alaska</code></td>
+<td>Alaska</td>
+<td>Alaska</td>
+<td>1981-01-01 – 2019-12-31</td>
+<td>2023-10-01 – present</td>
+<td><code>harmonic</code>, <code>stofs</code></td>
+</tr>
+<tr>
+<td><code>greatlakes</code></td>
+<td>Great Lakes</td>
+<td>CONUS</td>
+<td>1979-02-01 – 2023-01-31</td>
+<td>2018-10-01 – present</td>
+<td><code>glofs</code> only (<a href="#great-lakes-glofs">details</a>)</td>
+</tr>
+</tbody>
+</table>
+<p><code>greatlakes</code> is the one domain with no choice of boundary source: <code>glofs</code> and
+<code>greatlakes</code> must be used together, and either one without the other is rejected at
+validation. STOFS does not cover the lakes, and a harmonic boundary would be actively
+misleading there, since lake levels are driven by wind setup and seiches rather than by
+astronomical tides of a few centimetres. Every other domain accepts <code>stofs</code> or
+<code>harmonic</code>.</p>
+<p>Boundary data has its own dates: <code>stofs</code> from 2020-12-30, <code>glofs</code> from 2016 depending
+on the lake, and <code>harmonic</code> has no limit. <code>ngen_forecast</code> forcing is read from a file you
+supply, so it has no date limits.</p>
+<p>A boundary source does not require a particular forcing source. <code>stofs</code> pairs with
+<code>nwm_retro</code>, <code>nwm_ana</code> or <code>ngen_forecast</code>; what constrains a run is that it must fit
+inside the range of both its forcing source and its boundary source. Watch for the gaps
+where <strong>no NWM forcing exists</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Domain</th>
+<th>No NWM forcing</th>
+<th>Consequence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>hawaii</code></td>
+<td>2014-01-01 – 2021-04-20</td>
+<td><code>nwm_retro</code> ends 2013-12-31, before STOFS begins, so here a <code>stofs</code> run needs <code>nwm_ana</code> and starts on or after 2021-04-21</td>
+</tr>
+<tr>
+<td><code>prvi</code></td>
+<td>2023-07-01 – 2023-09-30</td>
+<td>runs can't include those three months</td>
+</tr>
+<tr>
+<td><code>alaska</code></td>
+<td>2020-01-01 – 2023-09-30</td>
+<td><code>nwm_retro</code> ends 2019-12-31, before STOFS begins, so here a <code>stofs</code> run needs <code>nwm_ana</code> and starts on or after 2023-10-01; <code>harmonic</code> runs fit 1981–2019 or from 2023-10-01</td>
+</tr>
+</tbody>
+</table>
+<p>In <code>atlgulf</code>, <code>pacific</code> and <code>prvi</code> the two ranges do overlap, so <code>nwm_retro</code> + <code>stofs</code>
+is valid there from 2020-12-30. <code>init</code> picks it for <code>atlgulf</code> and <code>pacific</code>; <code>prvi</code>
+defaults to <code>nwm_ana</code> instead, because SCHISM currently fails there with <code>nwm_retro</code>.</p>
+<p><code>coastal-calibration init --domain &lt;domain&gt;</code> writes a config with a combination that
+works for that domain.</p>
 <h3 id="boundary-settings">Boundary Settings<a class="headerlink" href="#boundary-settings" title="Permanent link">#</a></h3>
 <p>Configure boundary conditions:</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">boundary</span><span class="p">:</span>
 </span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stofs</span><span class="w">          </span><span class="c1"># Boundary condition source</span>
 </span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nt">stofs_file</span><span class="p">:</span><span class="w">            </span><span class="c1"># Optional: explicit STOFS file path</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span><span class="nt">glofs_model</span><span class="p">:</span><span class="w">           </span><span class="c1"># Lake, when source is glofs</span>
 </span></code></pre></div>
 <table>
 <thead>
@@ -1921,8 +2043,8 @@ details and complete examples in <code>docs/examples/</code>.</p>
 <tr>
 <td><code>source</code></td>
 <td>string</td>
-<td><code>tpxo</code></td>
-<td><code>tpxo</code>, <code>stofs</code></td>
+<td><code>harmonic</code></td>
+<td><code>harmonic</code> (alias <code>tpxo</code>), <code>stofs</code>, <code>glofs</code></td>
 <td>Boundary condition source</td>
 </tr>
 <tr>
@@ -1932,18 +2054,104 @@ details and complete examples in <code>docs/examples/</code>.</p>
 <td>-</td>
 <td>Override STOFS file path</td>
 </tr>
+<tr>
+<td><code>glofs_model</code></td>
+<td>string</td>
+<td>null</td>
+<td><code>leofs</code>, <code>lmhofs</code>, <code>loofs</code>, <code>lsofs</code></td>
+<td>Great Lakes OFS lake</td>
+</tr>
 </tbody>
 </table>
+<h4 id="great-lakes-glofs">Great Lakes (GLOFS)<a class="headerlink" href="#great-lakes-glofs" title="Permanent link">#</a></h4>
+<p><code>source: glofs</code> forces the open boundary with water levels from NOAA's Great Lakes
+Operational Forecast System (GLOFS) nowcasts. It requires
+<code>simulation.coastal_domain: greatlakes</code>, and that domain requires it, since STOFS and
+the tidal atlases don't cover the lakes. Pick the lake with <code>glofs_model</code>:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">simulation</span><span class="p">:</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">coastal_domain</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">greatlakes</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="nt">meteo_source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nwm_ana</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="nt">boundary</span><span class="p">:</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">  </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">glofs</span>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">  </span><span class="nt">glofs_model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">leofs</span><span class="w">            </span><span class="c1"># leofs, lmhofs, loofs, or lsofs</span>
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>
+</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="nt">model_config</span><span class="p">:</span>
+</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="w">  </span><span class="nt">forcing_to_mesh_offset_m</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">173.5</span><span class="w">   </span><span class="c1"># see &quot;Vertical datum&quot; below</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th><code>glofs_model</code></th>
+<th>Lake</th>
+<th>Data from</th>
+<th>Model behind the archived data</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>leofs</code></td>
+<td>Erie</td>
+<td>2016-03-10</td>
+<td>FVCOM, 6,106 nodes, throughout</td>
+</tr>
+<tr>
+<td><code>lmhofs</code></td>
+<td>Michigan-Huron</td>
+<td>2019-09-17</td>
+<td>FVCOM, 90,806 nodes, throughout</td>
+</tr>
+<tr>
+<td><code>loofs</code></td>
+<td>Ontario</td>
+<td>2016-03-01</td>
+<td>POM (~750 water cells) until 2022-10-19; FVCOM (34,395 nodes) from 2022-10-20</td>
+</tr>
+<tr>
+<td><code>lsofs</code></td>
+<td>Superior</td>
+<td>2016-03-01</td>
+<td>POM (~800 water cells) until 2022-10-19; FVCOM (90,964 nodes) from 2022-10-20</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Two models, two eras.</strong> NOAA originally ran its Great Lakes forecasts on POM (the
+Princeton Ocean Model), which uses a coarse rectangular grid, about 5 km between
+points. It has since moved each lake to FVCOM, which uses a much finer triangular mesh
+that follows the shoreline. For Ontario and Superior the switch came on 20 October
+2022, so boundaries for earlier dates are interpolated from the coarse POM grid. That
+is adequate for lake-wide water level but smooths out local detail near the boundary.</p>
+<p>A single run can't span the Ontario or Superior switch, because the two models share
+no grid points: the download stage stops with "GLOFS … changed grids at … Split the
+simulation at that time." Run the two sides separately.</p>
+<p>Only nowcast data is used; GLOFS forecast files aren't read.</p>
+<p><strong>Vertical datum.</strong> GLOFS water levels are relative to the lake's <strong>low-water datum</strong>,
+not an absolute elevation. Set the model's <code>forcing_to_mesh_offset_m</code> to move them
+onto the mesh datum: for example <code>173.5</code> (Lake Erie's low-water datum, IGLD85) for a
+mesh in absolute IGLD85 elevations, or <code>0.0</code> if the mesh is referenced to low-water
+datum. Check the mesh's <code>elev.ic</code> or depths to tell which it uses.</p>
+<p><strong>Downloads.</strong> The download stage reads only the water-level field from each hourly
+NOAA file rather than downloading it whole (the files run up to ~180 MB an hour),
+caching the result under <code>coastal/glofs/&lt;lake&gt;/</code> in the download directory. Data comes
+from NCEI's archive at
+<code>https://www.ncei.noaa.gov/oa/prod-model/operational-nowcast-and-forecast-hydrodynamic-model-systems-co-ops/</code>.</p>
+<p><strong>Gauge comparison.</strong> With <code>include_noaa_gages: true</code>, Great Lakes runs compare
+against NOAA CO-OPS lake gauges, which record observations but publish no tide
+predictions. Lake gauges have no MSL or MLLW, so observations are fetched in the
+lake's low-water datum and shifted by the same <code>forcing_to_mesh_offset_m</code> as the
+boundary, and the comparison is made in the mesh datum. 49 of the 52 CO-OPS Great
+Lakes gauges qualify; the three Niagara River gauges (Ashland Ave, American Falls,
+Niagara Intake) publish no low-water datum and are skipped.</p>
 <h3 id="path-settings">Path Settings<a class="headerlink" href="#path-settings" title="Permanent link">#</a></h3>
 <p>Configure file system paths:</p>
 <p>All path fields support <code>~</code> (tilde) expansion, so you can write <code>~/my_data</code> instead of
 the full home directory path.</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">paths</span><span class="p">:</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">work_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/work</span><span class="w">         </span><span class="c1"># Working directory (auto-generated if not set)</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="nt">raw_download_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/data</span><span class="w"> </span><span class="c1"># Download directory (auto-generated if not set)</span>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span><span class="nt">nwm_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/nwm.v3.0.6</span>
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span><span class="nt">hot_start_file</span><span class="p">:</span><span class="w">                 </span><span class="c1"># Hot restart file for warm start</span>
-</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">  </span><span class="nt">parm_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/coastal/parm</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">paths</span><span class="p">:</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">work_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/work</span><span class="w">         </span><span class="c1"># Working directory (auto-generated if not set)</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="nt">raw_download_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/data</span><span class="w"> </span><span class="c1"># Download directory (auto-generated if not set)</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span><span class="nt">nwm_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/nwm.v3.0.6</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">  </span><span class="nt">hot_start_file</span><span class="p">:</span><span class="w">                 </span><span class="c1"># Hot restart file for warm start</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">  </span><span class="nt">parm_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/coastal/parm</span>
 </span></code></pre></div>
 <table>
 <thead>
@@ -1985,19 +2193,20 @@ the full home directory path.</p>
 <p>Model-specific parameters live in the <code>model_config</code> section. The contents depend on the
 <code>model</code> key.</p>
 <h4 id="schism-model-configuration">SCHISM Model Configuration<a class="headerlink" href="#schism-model-configuration" title="Permanent link">#</a></h4>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># model: schism (default, can be omitted)</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="nt">model_config</span><span class="p">:</span>
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="nt">prebuilt_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/coastal/hawaii</span>
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span><span class="nt">geogrid_file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/coastal/hawaii/geo_em_HI.nc</span>
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">  </span><span class="nt">nodes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span><span class="w">                        </span><span class="c1"># Number of compute nodes</span>
-</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">  </span><span class="nt">ntasks_per_node</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">18</span><span class="w">             </span><span class="c1"># MPI tasks per node</span>
-</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">  </span><span class="nt">exclusive</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">                 </span><span class="c1"># Request exclusive node access</span>
-</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">  </span><span class="nt">nscribes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span><span class="w">                     </span><span class="c1"># SCHISM I/O scribes</span>
-</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">  </span><span class="nt">omp_num_threads</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span><span class="w">              </span><span class="c1"># OpenMP threads</span>
-</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="w">  </span><span class="nt">oversubscribe</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span><span class="w">            </span><span class="c1"># Allow MPI oversubscription</span>
-</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="w">  </span><span class="nt">schism_exe</span><span class="p">:</span><span class="w">                     </span><span class="c1"># System-compiled SCHISM executable (optional)</span>
-</span><span id="__span-8-12"><a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="w">  </span><span class="nt">include_noaa_gages</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">        </span><span class="c1"># Enable NOAA observation stations &amp; comparison plots</span>
-</span><span id="__span-8-13"><a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a><span class="w">  </span><span class="nt">runtime_env</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{}</span><span class="w">                 </span><span class="c1"># Extra env vars for model run (optional)</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># model: schism (default, can be omitted)</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="nt">model_config</span><span class="p">:</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span><span class="nt">prebuilt_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/coastal/hawaii</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">  </span><span class="nt">geogrid_file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/coastal/hawaii/geo_em_HI.nc</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">  </span><span class="nt">nodes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span><span class="w">                        </span><span class="c1"># Number of compute nodes</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">  </span><span class="nt">ntasks_per_node</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">18</span><span class="w">             </span><span class="c1"># MPI tasks per node</span>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">  </span><span class="nt">exclusive</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">                 </span><span class="c1"># Request exclusive node access</span>
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">  </span><span class="nt">nscribes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span><span class="w">                     </span><span class="c1"># SCHISM I/O scribes</span>
+</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">  </span><span class="nt">omp_num_threads</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span><span class="w">              </span><span class="c1"># OpenMP threads</span>
+</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="w">  </span><span class="nt">oversubscribe</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span><span class="w">            </span><span class="c1"># Allow MPI oversubscription</span>
+</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="w">  </span><span class="nt">schism_exe</span><span class="p">:</span><span class="w">                     </span><span class="c1"># System-compiled SCHISM executable (optional)</span>
+</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="w">  </span><span class="nt">include_noaa_gages</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">        </span><span class="c1"># Enable NOAA observation stations &amp; comparison plots</span>
+</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="w">  </span><span class="nt">forcing_to_mesh_offset_m</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span><span class="w">   </span><span class="c1"># Datum offset added to GLOFS boundary levels</span>
+</span><span id="__span-9-14"><a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="w">  </span><span class="nt">runtime_env</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{}</span><span class="w">                 </span><span class="c1"># Extra env vars for model run (optional)</span>
 </span></code></pre></div>
 <table>
 <thead>
@@ -2070,6 +2279,12 @@ the full home directory path.</p>
 <td>Enable NOAA station discovery and comparison</td>
 </tr>
 <tr>
+<td><code>forcing_to_mesh_offset_m</code></td>
+<td>float</td>
+<td>0.0</td>
+<td>Offset (m) added to GLOFS boundary levels (see <a href="#great-lakes-glofs">Great Lakes</a>)</td>
+</tr>
+<tr>
 <td><code>runtime_env</code></td>
 <td>dict</td>
 <td><code>{}</code></td>
@@ -2093,28 +2308,28 @@ the full home directory path.</p>
 <p>Both stages require network access for NOAA CO-OPS API calls and are classified as
 Python-only stages.</p>
 <h4 id="sfincs-model-configuration">SFINCS Model Configuration<a class="headerlink" href="#sfincs-model-configuration" title="Permanent link">#</a></h4>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sfincs</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="nt">model_config</span><span class="p">:</span>
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">  </span><span class="nt">prebuilt_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/model</span><span class="w">    </span><span class="c1"># Required: pre-built SFINCS model directory</span>
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">  </span><span class="nt">model_root</span><span class="p">:</span><span class="w">                     </span><span class="c1"># Output directory (defaults to {work_dir}/sfincs_model)</span>
-</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">  </span><span class="nt">observation_points</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span><span class="w">          </span><span class="c1"># Observation point coordinates</span>
-</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">  </span><span class="nt">observation_locations_file</span><span class="p">:</span><span class="w">     </span><span class="c1"># Observation locations file</span>
-</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">  </span><span class="nt">merge_observations</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span><span class="w">       </span><span class="c1"># Merge observations into model</span>
-</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">  </span><span class="nt">discharge_locations_file</span><span class="p">:</span><span class="w">       </span><span class="c1"># Discharge source locations file</span>
-</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="w">  </span><span class="nt">merge_discharge</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span><span class="w">          </span><span class="c1"># Merge discharge into model</span>
-</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="w">  </span><span class="nt">include_noaa_gages</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">        </span><span class="c1"># Enable NOAA station discovery &amp; comparison plots</span>
-</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="w">  </span><span class="nt">include_precip</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">            </span><span class="c1"># Add precipitation forcing</span>
-</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="w">  </span><span class="nt">include_wind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">              </span><span class="c1"># Add wind forcing</span>
-</span><span id="__span-9-14"><a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="w">  </span><span class="nt">include_pressure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">          </span><span class="c1"># Add atmospheric pressure forcing</span>
-</span><span id="__span-9-15"><a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a><span class="w">  </span><span class="nt">forcing_to_mesh_offset_m</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span><span class="w">  </span><span class="c1"># Vertical offset added to boundary forcing</span>
-</span><span id="__span-9-16"><a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a><span class="w">  </span><span class="nt">vdatum_mesh_to_msl_m</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span><span class="w">      </span><span class="c1"># Vertical offset converting model output to MSL</span>
-</span><span id="__span-9-17"><a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a><span class="w">  </span><span class="nt">meteo_res</span><span class="p">:</span><span class="w">                      </span><span class="c1"># Meteo forcing resolution in meters (auto if null)</span>
-</span><span id="__span-9-18"><a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a><span class="w">  </span><span class="nt">sfincs_exe</span><span class="p">:</span><span class="w">                     </span><span class="c1"># Explicit SFINCS executable path (overrides PATH lookup)</span>
-</span><span id="__span-9-19"><a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a><span class="w">  </span><span class="nt">omp_num_threads</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">36</span><span class="w">             </span><span class="c1"># OpenMP threads (defaults to CPU count)</span>
-</span><span id="__span-9-20"><a id="__codelineno-9-20" name="__codelineno-9-20" href="#__codelineno-9-20"></a><span class="w">  </span><span class="nt">floodmap_dem</span><span class="p">:</span><span class="w">                   </span><span class="c1"># High-resolution DEM for flood depth map</span>
-</span><span id="__span-9-21"><a id="__codelineno-9-21" name="__codelineno-9-21" href="#__codelineno-9-21"></a><span class="w">  </span><span class="nt">floodmap_hmin</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.05</span><span class="w">             </span><span class="c1"># Minimum flood depth threshold (m)</span>
-</span><span id="__span-9-22"><a id="__codelineno-9-22" name="__codelineno-9-22" href="#__codelineno-9-22"></a><span class="w">  </span><span class="nt">floodmap_enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">          </span><span class="c1"># Enable flood depth map generation</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sfincs</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="nt">model_config</span><span class="p">:</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">  </span><span class="nt">prebuilt_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/model</span><span class="w">    </span><span class="c1"># Required: pre-built SFINCS model directory</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">  </span><span class="nt">model_root</span><span class="p">:</span><span class="w">                     </span><span class="c1"># Output directory (defaults to {work_dir}/sfincs_model)</span>
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="w">  </span><span class="nt">observation_points</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span><span class="w">          </span><span class="c1"># Observation point coordinates</span>
+</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="w">  </span><span class="nt">observation_locations_file</span><span class="p">:</span><span class="w">     </span><span class="c1"># Observation locations file</span>
+</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="w">  </span><span class="nt">merge_observations</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span><span class="w">       </span><span class="c1"># Merge observations into model</span>
+</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="w">  </span><span class="nt">discharge_locations_file</span><span class="p">:</span><span class="w">       </span><span class="c1"># Discharge source locations file</span>
+</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="w">  </span><span class="nt">merge_discharge</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span><span class="w">          </span><span class="c1"># Merge discharge into model</span>
+</span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="w">  </span><span class="nt">include_noaa_gages</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">        </span><span class="c1"># Enable NOAA station discovery &amp; comparison plots</span>
+</span><span id="__span-10-12"><a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a><span class="w">  </span><span class="nt">include_precip</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">            </span><span class="c1"># Add precipitation forcing</span>
+</span><span id="__span-10-13"><a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="w">  </span><span class="nt">include_wind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">              </span><span class="c1"># Add wind forcing</span>
+</span><span id="__span-10-14"><a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a><span class="w">  </span><span class="nt">include_pressure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">          </span><span class="c1"># Add atmospheric pressure forcing</span>
+</span><span id="__span-10-15"><a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a><span class="w">  </span><span class="nt">forcing_to_mesh_offset_m</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span><span class="w">  </span><span class="c1"># Vertical offset added to boundary forcing</span>
+</span><span id="__span-10-16"><a id="__codelineno-10-16" name="__codelineno-10-16" href="#__codelineno-10-16"></a><span class="w">  </span><span class="nt">vdatum_mesh_to_msl_m</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span><span class="w">      </span><span class="c1"># Vertical offset converting model output to MSL</span>
+</span><span id="__span-10-17"><a id="__codelineno-10-17" name="__codelineno-10-17" href="#__codelineno-10-17"></a><span class="w">  </span><span class="nt">meteo_res</span><span class="p">:</span><span class="w">                      </span><span class="c1"># Meteo forcing resolution in meters (auto if null)</span>
+</span><span id="__span-10-18"><a id="__codelineno-10-18" name="__codelineno-10-18" href="#__codelineno-10-18"></a><span class="w">  </span><span class="nt">sfincs_exe</span><span class="p">:</span><span class="w">                     </span><span class="c1"># Explicit SFINCS executable path (overrides PATH lookup)</span>
+</span><span id="__span-10-19"><a id="__codelineno-10-19" name="__codelineno-10-19" href="#__codelineno-10-19"></a><span class="w">  </span><span class="nt">omp_num_threads</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">36</span><span class="w">             </span><span class="c1"># OpenMP threads (defaults to CPU count)</span>
+</span><span id="__span-10-20"><a id="__codelineno-10-20" name="__codelineno-10-20" href="#__codelineno-10-20"></a><span class="w">  </span><span class="nt">floodmap_dem</span><span class="p">:</span><span class="w">                   </span><span class="c1"># High-resolution DEM for flood depth map</span>
+</span><span id="__span-10-21"><a id="__codelineno-10-21" name="__codelineno-10-21" href="#__codelineno-10-21"></a><span class="w">  </span><span class="nt">floodmap_hmin</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.05</span><span class="w">             </span><span class="c1"># Minimum flood depth threshold (m)</span>
+</span><span id="__span-10-22"><a id="__codelineno-10-22" name="__codelineno-10-22" href="#__codelineno-10-22"></a><span class="w">  </span><span class="nt">floodmap_enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">          </span><span class="c1"># Enable flood depth map generation</span>
 </span></code></pre></div>
 <table>
 <thead>
@@ -2271,11 +2486,11 @@ NAVD88 at the domain centroid, so both parameters are set to <code>0.171</code>.
 </div>
 <h3 id="monitoring-settings">Monitoring Settings<a class="headerlink" href="#monitoring-settings" title="Permanent link">#</a></h3>
 <p>Configure logging and monitoring:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nt">monitoring</span><span class="p">:</span>
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span><span class="nt">log_level</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DEBUG</span><span class="w">                </span><span class="c1"># Detail level of the log FILE</span>
-</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span><span class="nt">log_file</span><span class="p">:</span><span class="w">                       </span><span class="c1"># Optional log file path</span>
-</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">  </span><span class="nt">enable_progress_tracking</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">  </span><span class="c1"># Log per-stage substeps (at DEBUG)</span>
-</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">  </span><span class="nt">enable_timing</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">             </span><span class="c1"># Track stage timing</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nt">monitoring</span><span class="p">:</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">  </span><span class="nt">log_level</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DEBUG</span><span class="w">                </span><span class="c1"># Detail level of the log FILE</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">  </span><span class="nt">log_file</span><span class="p">:</span><span class="w">                       </span><span class="c1"># Optional log file path</span>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">  </span><span class="nt">enable_progress_tracking</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">  </span><span class="c1"># Log per-stage substeps (at DEBUG)</span>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">  </span><span class="nt">enable_timing</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">             </span><span class="c1"># Track stage timing</span>
 </span></code></pre></div>
 <table>
 <thead>
@@ -2325,12 +2540,12 @@ time. The <code>--log-level</code> flag and <code>COASTAL_LOG_LEVEL</code> both 
 </div>
 <h3 id="download-settings">Download Settings<a class="headerlink" href="#download-settings" title="Permanent link">#</a></h3>
 <p>Configure data download behavior:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nt">download</span><span class="p">:</span>
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">  </span><span class="nt">enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">           </span><span class="c1"># Enable automatic downloads</span>
-</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">  </span><span class="nt">skip_existing</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">     </span><span class="c1"># Skip already downloaded files</span>
-</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">  </span><span class="nt">timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">600</span><span class="w">            </span><span class="c1"># Download timeout in seconds</span>
-</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">  </span><span class="nt">raise_on_error</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">    </span><span class="c1"># Fail on download errors</span>
-</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">  </span><span class="nt">limit_per_host</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4</span><span class="w">       </span><span class="c1"># Concurrent downloads per host</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="nt">download</span><span class="p">:</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">  </span><span class="nt">enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">           </span><span class="c1"># Enable automatic downloads</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">  </span><span class="nt">skip_existing</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">     </span><span class="c1"># Skip already downloaded files</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">  </span><span class="nt">timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">600</span><span class="w">            </span><span class="c1"># Download timeout in seconds</span>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="w">  </span><span class="nt">raise_on_error</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">    </span><span class="c1"># Fail on download errors</span>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="w">  </span><span class="nt">limit_per_host</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4</span><span class="w">       </span><span class="c1"># Concurrent downloads per host</span>
 </span></code></pre></div>
 <table>
 <thead>
@@ -2392,30 +2607,30 @@ package's own setup, so they always win.</p>
 </ul>
 <h3 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">#</a></h3>
 <h4 id="aws-c5n9xlarge-with-healthy-efa">AWS c5n.9xlarge with healthy EFA<a class="headerlink" href="#aws-c5n9xlarge-with-healthy-efa" title="Permanent link">#</a></h4>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="nt">model_config</span><span class="p">:</span>
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">  </span><span class="nt">runtime_env</span><span class="p">:</span>
-</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">    </span><span class="nt">OMPI_MCA_pml</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cm</span>
-</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">    </span><span class="nt">OMPI_MCA_mtl</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ofi</span>
-</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="w">    </span><span class="nt">OMPI_MCA_btl</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">^openib</span>
-</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="w">    </span><span class="nt">FI_OFI_RXM_SAR_LIMIT</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;3145728&#39;</span>
-</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="w">    </span><span class="nt">FI_EFA_RECVWIN_SIZE</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;65536&#39;</span>
-</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="w">    </span><span class="nt">OMP_PROC_BIND</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">close</span>
-</span><span id="__span-12-9"><a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="w">    </span><span class="nt">OMP_PLACES</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cores</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="nt">model_config</span><span class="p">:</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span><span class="nt">runtime_env</span><span class="p">:</span>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">    </span><span class="nt">OMPI_MCA_pml</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cm</span>
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">    </span><span class="nt">OMPI_MCA_mtl</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ofi</span>
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">    </span><span class="nt">OMPI_MCA_btl</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">^openib</span>
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="w">    </span><span class="nt">FI_OFI_RXM_SAR_LIMIT</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;3145728&#39;</span>
+</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="w">    </span><span class="nt">FI_EFA_RECVWIN_SIZE</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;65536&#39;</span>
+</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="w">    </span><span class="nt">OMP_PROC_BIND</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">close</span>
+</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="w">    </span><span class="nt">OMP_PLACES</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cores</span>
 </span></code></pre></div>
 <h4 id="aws-c5n9xlarge-falling-back-to-tcp">AWS c5n.9xlarge falling back to TCP<a class="headerlink" href="#aws-c5n9xlarge-falling-back-to-tcp" title="Permanent link">#</a></h4>
 <p>If EFA is misbehaving and you want TCP-over-ENA instead:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="nt">model_config</span><span class="p">:</span>
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span><span class="nt">runtime_env</span><span class="p">:</span>
-</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">    </span><span class="nt">OMPI_MCA_pml</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ob1</span>
-</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">    </span><span class="nt">OMPI_MCA_btl</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">self,tcp</span>
-</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">    </span><span class="nt">OMPI_MCA_btl_tcp_if_exclude</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">lo,docker0</span>
-</span></code></pre></div>
-<h4 id="noaa-wcoss-cray-mpich-on-slingshot">NOAA WCOSS (Cray MPICH on Slingshot)<a class="headerlink" href="#noaa-wcoss-cray-mpich-on-slingshot" title="Permanent link">#</a></h4>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="nt">model_config</span><span class="p">:</span>
 </span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">  </span><span class="nt">runtime_env</span><span class="p">:</span>
-</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">    </span><span class="nt">MPICH_OFI_STARTUP_CONNECT</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;1&#39;</span>
-</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">    </span><span class="nt">MPICH_COLL_SYNC</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">MPI_Bcast</span>
-</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="w">    </span><span class="nt">MPICH_REDUCE_NO_SMP</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;1&#39;</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">    </span><span class="nt">OMPI_MCA_pml</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ob1</span>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">    </span><span class="nt">OMPI_MCA_btl</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">self,tcp</span>
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="w">    </span><span class="nt">OMPI_MCA_btl_tcp_if_exclude</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">lo,docker0</span>
+</span></code></pre></div>
+<h4 id="noaa-wcoss-cray-mpich-on-slingshot">NOAA WCOSS (Cray MPICH on Slingshot)<a class="headerlink" href="#noaa-wcoss-cray-mpich-on-slingshot" title="Permanent link">#</a></h4>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="nt">model_config</span><span class="p">:</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">  </span><span class="nt">runtime_env</span><span class="p">:</span>
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">    </span><span class="nt">MPICH_OFI_STARTUP_CONNECT</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;1&#39;</span>
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">    </span><span class="nt">MPICH_COLL_SYNC</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">MPI_Bcast</span>
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="w">    </span><span class="nt">MPICH_REDUCE_NO_SMP</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;1&#39;</span>
 </span></code></pre></div>
 <h4 id="single-process-openmp-workloads-sfincs-post-processing">Single-process OpenMP workloads (SFINCS, post-processing)<a class="headerlink" href="#single-process-openmp-workloads-sfincs-post-processing" title="Permanent link">#</a></h4>
 <p>Single-process workloads usually run best with <strong>no</strong> thread pinning, so the kernel can
@@ -2436,27 +2651,27 @@ CPU mask, and any single-process OpenMP workload (e.g. SFINCS) gets pinned to on
 </ul>
 <h2 id="configuration-inheritance">Configuration Inheritance<a class="headerlink" href="#configuration-inheritance" title="Permanent link">#</a></h2>
 <p>Use <code>_base</code> to inherit settings from another configuration file:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1"># base.yaml - shared settings</span>
-</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="nt">simulation</span><span class="p">:</span>
-</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">  </span><span class="nt">duration_hours</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">24</span>
-</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">  </span><span class="nt">meteo_source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nwm_ana</span>
-</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>
-</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="nt">boundary</span><span class="p">:</span>
-</span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="w">  </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stofs</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1"># base.yaml - shared settings</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="nt">simulation</span><span class="p">:</span>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="w">  </span><span class="nt">duration_hours</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">24</span>
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="w">  </span><span class="nt">meteo_source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nwm_ana</span>
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>
+</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="nt">boundary</span><span class="p">:</span>
+</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="w">  </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stofs</span>
 </span></code></pre></div>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1"># hawaii_run.yaml - inherits from base.yaml</span>
-</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="nt">_base</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">base.yaml</span>
-</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>
-</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="nt">simulation</span><span class="p">:</span>
-</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="w">  </span><span class="nt">start_date</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2021-06-11</span>
-</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="w">  </span><span class="nt">coastal_domain</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hawaii</span>
-</span></code></pre></div>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1"># prvi_run.yaml - different domain, same settings</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1"># hawaii_run.yaml - inherits from base.yaml</span>
 </span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="nt">_base</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">base.yaml</span>
 </span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>
 </span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="nt">simulation</span><span class="p">:</span>
-</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="w">  </span><span class="nt">start_date</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2022-09-18</span>
-</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="w">  </span><span class="nt">coastal_domain</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prvi</span>
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="w">  </span><span class="nt">start_date</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2021-06-11</span>
+</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="w">  </span><span class="nt">coastal_domain</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hawaii</span>
+</span></code></pre></div>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1"># prvi_run.yaml - different domain, same settings</span>
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="nt">_base</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">base.yaml</span>
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="nt">simulation</span><span class="p">:</span>
+</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="w">  </span><span class="nt">start_date</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2022-09-18</span>
+</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="w">  </span><span class="nt">coastal_domain</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prvi</span>
 </span></code></pre></div>
 <p>This allows you to:</p>
 <ul>
@@ -2469,17 +2684,17 @@ CPU mask, and any single-process OpenMP workload (e.g. SFINCS) gets pinned to on
 build a new SFINCS quadtree model from an AOI polygon. This config is independent of the
 run/simulation config above.</p>
 <h3 id="minimal-create-config">Minimal Create Config<a class="headerlink" href="#minimal-create-config" title="Permanent link">#</a></h3>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="nt">aoi</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./texas_aoi.geojson</span>
-</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="nt">output_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./my_sfincs_model</span>
-</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>
-</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="nt">elevation</span><span class="p">:</span>
-</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="w">  </span><span class="nt">datasets</span><span class="p">:</span>
-</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nws_topobathy</span>
-</span><span id="__span-18-7"><a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="w">      </span><span class="nt">zmin</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-20000</span>
-</span><span id="__span-18-8"><a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>
-</span><span id="__span-18-9"><a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a><span class="nt">data_catalog</span><span class="p">:</span>
-</span><span id="__span-18-10"><a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a><span class="w">  </span><span class="nt">data_libs</span><span class="p">:</span>
-</span><span id="__span-18-11"><a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./dem/data_catalog.yml</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="nt">aoi</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./texas_aoi.geojson</span>
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="nt">output_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./my_sfincs_model</span>
+</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>
+</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="nt">elevation</span><span class="p">:</span>
+</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="w">  </span><span class="nt">datasets</span><span class="p">:</span>
+</span><span id="__span-19-6"><a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nws_topobathy</span>
+</span><span id="__span-19-7"><a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a><span class="w">      </span><span class="nt">zmin</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-20000</span>
+</span><span id="__span-19-8"><a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a>
+</span><span id="__span-19-9"><a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a><span class="nt">data_catalog</span><span class="p">:</span>
+</span><span id="__span-19-10"><a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a><span class="w">  </span><span class="nt">data_libs</span><span class="p">:</span>
+</span><span id="__span-19-11"><a id="__codelineno-19-11" name="__codelineno-19-11" href="#__codelineno-19-11"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./dem/data_catalog.yml</span>
 </span></code></pre></div>
 <h3 id="create-configuration-sections">Create Configuration Sections<a class="headerlink" href="#create-configuration-sections" title="Permanent link">#</a></h3>
 <h4 id="top-level-fields">Top-Level Fields<a class="headerlink" href="#top-level-fields" title="Permanent link">#</a></h4>
@@ -2538,14 +2753,14 @@ run/simulation config above.</p>
 </tbody>
 </table>
 <h4 id="grid-settings-grid">Grid Settings (<code>grid</code>)<a class="headerlink" href="#grid-settings-grid" title="Permanent link">#</a></h4>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="nt">grid</span><span class="p">:</span>
-</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="w">  </span><span class="nt">resolution</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">50.0</span>
-</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="w">  </span><span class="nt">crs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">utm</span>
-</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="w">  </span><span class="nt">rotated</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="w">  </span><span class="nt">refinement</span><span class="p">:</span>
-</span><span id="__span-19-6"><a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">polygon</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./aoi.geojson</span>
-</span><span id="__span-19-7"><a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a><span class="w">      </span><span class="nt">level</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4</span>
-</span><span id="__span-19-8"><a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a><span class="w">      </span><span class="nt">buffer_m</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-3072</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="nt">grid</span><span class="p">:</span>
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="w">  </span><span class="nt">resolution</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">50.0</span>
+</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="w">  </span><span class="nt">crs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">utm</span>
+</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="w">  </span><span class="nt">rotated</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</span><span id="__span-20-5"><a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a><span class="w">  </span><span class="nt">refinement</span><span class="p">:</span>
+</span><span id="__span-20-6"><a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">polygon</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./aoi.geojson</span>
+</span><span id="__span-20-7"><a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a><span class="w">      </span><span class="nt">level</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4</span>
+</span><span id="__span-20-8"><a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a><span class="w">      </span><span class="nt">buffer_m</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-3072</span>
 </span></code></pre></div>
 <table>
 <thead>
@@ -2611,13 +2826,13 @@ run/simulation config above.</p>
 </tbody>
 </table>
 <h4 id="elevation-settings-elevation">Elevation Settings (<code>elevation</code>)<a class="headerlink" href="#elevation-settings-elevation" title="Permanent link">#</a></h4>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="nt">elevation</span><span class="p">:</span>
-</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="w">  </span><span class="nt">datasets</span><span class="p">:</span>
-</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nws_topobathy</span>
-</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="w">      </span><span class="nt">zmin</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-20000</span>
-</span><span id="__span-20-5"><a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gebco</span>
-</span><span id="__span-20-6"><a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a><span class="w">      </span><span class="nt">zmin</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-20000</span>
-</span><span id="__span-20-7"><a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a><span class="w">  </span><span class="nt">buffer_cells</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="nt">elevation</span><span class="p">:</span>
+</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="w">  </span><span class="nt">datasets</span><span class="p">:</span>
+</span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nws_topobathy</span>
+</span><span id="__span-21-4"><a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="w">      </span><span class="nt">zmin</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-20000</span>
+</span><span id="__span-21-5"><a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gebco</span>
+</span><span id="__span-21-6"><a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a><span class="w">      </span><span class="nt">zmin</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-20000</span>
+</span><span id="__span-21-7"><a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a><span class="w">  </span><span class="nt">buffer_cells</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
 </span></code></pre></div>
 <table>
 <thead>
@@ -2656,25 +2871,38 @@ run/simulation config above.</p>
 <tr>
 <td><code>name</code></td>
 <td>str</td>
-<td>HydroMT data-catalog dataset name</td>
+<td>Dataset name; for your own data, the entry name in your data catalog</td>
 </tr>
 <tr>
 <td><code>zmin</code></td>
 <td>float</td>
-<td>Minimum elevation threshold</td>
+<td>Cells below this elevation are ignored for this dataset (after <code>offset</code>)</td>
 </tr>
 <tr>
 <td><code>source</code></td>
 <td>str</td>
-<td>Auto-fetch source (<code>"noaa"</code> or null)</td>
+<td>Download source: <code>nws_30m</code>, <code>noaa_3m</code>, <code>noaa_crm</code>, <code>copdem_30m</code>, <code>gebco_15arcs</code>; omit for your own data</td>
+</tr>
+<tr>
+<td><code>offset</code></td>
+<td>float</td>
+<td>Metres added to this dataset before merging, to align vertical datums</td>
 </tr>
 <tr>
 <td><code>noaa_dataset</code></td>
 <td>str</td>
-<td>Explicit NOAA dataset name (auto-discovered if null)</td>
+<td>Explicit NOAA dataset (only with <code>noaa_3m</code>; auto-discovered if null)</td>
+</tr>
+<tr>
+<td><code>coastal_domain</code></td>
+<td>str</td>
+<td>NWS topobathy tile (only with <code>nws_30m</code>)</td>
 </tr>
 </tbody>
 </table>
+<p>Datasets are merged <strong>in list order</strong>: the first dataset takes priority, and each later
+one only fills cells that are still empty. The same list builds both the grid bed levels
+and the subgrid tables.</p>
 <h4 id="mask-settings-mask">Mask Settings (<code>mask</code>)<a class="headerlink" href="#mask-settings-mask" title="Permanent link">#</a></h4>
 <table>
 <thead>
@@ -2798,14 +3026,83 @@ run/simulation config above.</p>
 </tr>
 </tbody>
 </table>
+<h4 id="using-your-own-topobathy-data">Using your own topobathy data<a class="headerlink" href="#using-your-own-topobathy-data" title="Permanent link">#</a></h4>
+<p>You can build the model from your own DEM (a local lidar survey, a bathymetric survey, a
+blended product) instead of, or on top of, the datasets <code>create</code> downloads. Describe the
+DEM in a HydroMT data catalog, then list it in <code>elevation.datasets</code> without a <code>source</code>.</p>
+<p><strong>1. Write a data catalog</strong> for the DEM, e.g. <code>my_dem/data_catalog.yml</code>:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="nt">meta</span><span class="p">:</span>
+</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1.0.0</span>
+</span><span id="__span-22-3"><a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a><span class="w">  </span><span class="nt">hydromt_version</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;&gt;1.0a,&lt;2&#39;</span>
+</span><span id="__span-22-4"><a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a>
+</span><span id="__span-22-5"><a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a><span class="nt">my_lidar_dem</span><span class="p">:</span><span class="w">                  </span><span class="c1"># the name you will use in the create config</span>
+</span><span id="__span-22-6"><a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a><span class="w">  </span><span class="nt">data_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">RasterDataset</span>
+</span><span id="__span-22-7"><a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a><span class="w">  </span><span class="nt">uri</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_lidar_dem.tif</span><span class="w">        </span><span class="c1"># relative to this catalog file</span>
+</span><span id="__span-22-8"><a id="__codelineno-22-8" name="__codelineno-22-8" href="#__codelineno-22-8"></a><span class="w">  </span><span class="nt">driver</span><span class="p">:</span>
+</span><span id="__span-22-9"><a id="__codelineno-22-9" name="__codelineno-22-9" href="#__codelineno-22-9"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rasterio</span>
+</span><span id="__span-22-10"><a id="__codelineno-22-10" name="__codelineno-22-10" href="#__codelineno-22-10"></a><span class="w">  </span><span class="nt">metadata</span><span class="p">:</span>
+</span><span id="__span-22-11"><a id="__codelineno-22-11" name="__codelineno-22-11" href="#__codelineno-22-11"></a><span class="w">    </span><span class="nt">crs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">26915</span><span class="w">                 </span><span class="c1"># EPSG code; only needed if the file doesn&#39;t carry one</span>
+</span><span id="__span-22-12"><a id="__codelineno-22-12" name="__codelineno-22-12" href="#__codelineno-22-12"></a><span class="w">    </span><span class="nt">nodata</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-9999</span><span class="w">              </span><span class="c1"># only needed if the file doesn&#39;t carry one</span>
+</span><span id="__span-22-13"><a id="__codelineno-22-13" name="__codelineno-22-13" href="#__codelineno-22-13"></a><span class="w">  </span><span class="nt">data_adapter</span><span class="p">:</span>
+</span><span id="__span-22-14"><a id="__codelineno-22-14" name="__codelineno-22-14" href="#__codelineno-22-14"></a><span class="w">    </span><span class="nt">rename</span><span class="p">:</span>
+</span><span id="__span-22-15"><a id="__codelineno-22-15" name="__codelineno-22-15" href="#__codelineno-22-15"></a><span class="w">      </span><span class="nt">my_lidar_dem</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">elevtn</span><span class="w">     </span><span class="c1"># HydroMT-SFINCS reads the variable named elevtn</span>
+</span></code></pre></div>
+<p>The DEM can be in any projection; it is reprojected onto the model grid. It must hold
+<strong>elevations in metres, positive up</strong>. If it holds depths (positive down), flip it in the
+catalog:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="w">  </span><span class="nt">data_adapter</span><span class="p">:</span>
+</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="w">    </span><span class="nt">rename</span><span class="p">:</span>
+</span><span id="__span-23-3"><a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="w">      </span><span class="nt">my_lidar_dem</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">elevtn</span>
+</span><span id="__span-23-4"><a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="w">    </span><span class="nt">unit_mult</span><span class="p">:</span>
+</span><span id="__span-23-5"><a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="w">      </span><span class="nt">elevtn</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-1</span>
+</span></code></pre></div>
+<p>If the DEM comes as <strong>tiles</strong>, either point <code>uri</code> at them with a wildcard and turn on
+mosaicking, or combine them into a single VRT first (<code>gdalbuildvrt my_dem.vrt tiles/*.tif</code>)
+and point <code>uri</code> at the <code>.vrt</code>:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="w">  </span><span class="nt">uri</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tiles/*.tif</span>
+</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="w">  </span><span class="nt">driver</span><span class="p">:</span>
+</span><span id="__span-24-3"><a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rasterio</span>
+</span><span id="__span-24-4"><a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="w">    </span><span class="nt">options</span><span class="p">:</span>
+</span><span id="__span-24-5"><a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a><span class="w">      </span><span class="nt">mosaic</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">             </span><span class="c1"># without this, tiles fail with &quot;Geotransform and/or shape do not match&quot;</span>
+</span></code></pre></div>
+<p><strong>2. Use it in the create config.</strong> Put your DEM first so it wins where it has data, and
+keep a downloaded dataset after it to fill anywhere your DEM doesn't reach:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="nt">elevation</span><span class="p">:</span>
+</span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="w">  </span><span class="nt">datasets</span><span class="p">:</span>
+</span><span id="__span-25-3"><a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_lidar_dem</span><span class="w">       </span><span class="c1"># no source: read from the data catalog, not downloaded</span>
+</span><span id="__span-25-4"><a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="w">      </span><span class="nt">zmin</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-20000</span>
+</span><span id="__span-25-5"><a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gebco_15arcs</span><span class="w">       </span><span class="c1"># fills areas outside your DEM</span>
+</span><span id="__span-25-6"><a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a><span class="w">      </span><span class="nt">zmin</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-20000</span>
+</span><span id="__span-25-7"><a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a><span class="w">      </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gebco_15arcs</span>
+</span><span id="__span-25-8"><a id="__codelineno-25-8" name="__codelineno-25-8" href="#__codelineno-25-8"></a><span class="w">      </span><span class="nt">offset</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-0.24</span><span class="w">            </span><span class="c1"># e.g. put GEBCO (~MSL) onto your DEM&#39;s NAVD88 datum</span>
+</span><span id="__span-25-9"><a id="__codelineno-25-9" name="__codelineno-25-9" href="#__codelineno-25-9"></a>
+</span><span id="__span-25-10"><a id="__codelineno-25-10" name="__codelineno-25-10" href="#__codelineno-25-10"></a><span class="nt">data_catalog</span><span class="p">:</span>
+</span><span id="__span-25-11"><a id="__codelineno-25-11" name="__codelineno-25-11" href="#__codelineno-25-11"></a><span class="w">  </span><span class="nt">data_libs</span><span class="p">:</span>
+</span><span id="__span-25-12"><a id="__codelineno-25-12" name="__codelineno-25-12" href="#__codelineno-25-12"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./my_dem/data_catalog.yml</span><span class="w">   </span><span class="c1"># relative to this config file</span>
+</span></code></pre></div>
+<p><strong>Vertical datum.</strong> The model takes on the vertical datum of the merged elevation, so pick
+one datum for the model, which is usually your DEM's, and use <code>offset</code> on the other datasets
+to bring them onto it. Otherwise you get a step in the bed wherever one dataset's coverage
+ends. Remember that datum when you later set the run's <code>forcing_to_mesh_offset_m</code> and
+<code>vdatum_mesh_to_msl_m</code>.</p>
+<p><strong>Checking it worked.</strong> The create log lists the elevation datasets it merged. Two things
+to watch for:</p>
+<ul>
+<li><code>No data in domain for my_lidar_dem, skipped.</code> means the DEM doesn't overlap the model
+  area, usually because of a wrong <code>crs</code> in the catalog. The run carries on with the other
+  datasets, so check for this line rather than assuming your DEM was used.</li>
+<li><code>found no files at …/my_lidar_dem</code> means the name in <code>elevation.datasets</code> doesn't match
+  any catalog entry (or the catalog isn't listed in <code>data_libs</code>), so the name was tried
+  as a file path. <code>validate</code> doesn't catch this; it surfaces at the <code>create_elevation</code> stage.</li>
+</ul>
 <h4 id="river-discharge-river_discharge-optional">River Discharge (<code>river_discharge</code>, Optional)<a class="headerlink" href="#river-discharge-river_discharge-optional" title="Permanent link">#</a></h4>
 <p>When configured, adds river discharge source points to the model by intersecting
 hydrofabric flowpaths with the AOI boundary.</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="nt">river_discharge</span><span class="p">:</span>
-</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="w">  </span><span class="nt">flowlines</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./selected_flowpaths.geojson</span>
-</span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="w">  </span><span class="nt">nwm_id_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">feature_id</span>
-</span><span id="__span-21-4"><a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="w">  </span><span class="nt">max_snap_distance_m</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2000</span>
-</span><span id="__span-21-5"><a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a><span class="w">  </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nwm</span><span class="w">                        </span><span class="c1"># or &quot;ngen&quot;</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="nt">river_discharge</span><span class="p">:</span>
+</span><span id="__span-26-2"><a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a><span class="w">  </span><span class="nt">flowlines</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./selected_flowpaths.geojson</span>
+</span><span id="__span-26-3"><a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a><span class="w">  </span><span class="nt">nwm_id_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">feature_id</span>
+</span><span id="__span-26-4"><a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a><span class="w">  </span><span class="nt">max_snap_distance_m</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2000</span>
+</span><span id="__span-26-5"><a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a><span class="w">  </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nwm</span><span class="w">                        </span><span class="c1"># or &quot;ngen&quot;</span>
 </span></code></pre></div>
 <table>
 <thead>
@@ -2845,7 +3142,7 @@ hydrofabric flowpaths with the AOI boundary.</p>
 </table>
 <h2 id="validation">Validation<a class="headerlink" href="#validation" title="Permanent link">#</a></h2>
 <p>Validate your configuration before running:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>coastal-calibration<span class="w"> </span>validate<span class="w"> </span>config.yaml
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>coastal-calibration<span class="w"> </span>validate<span class="w"> </span>config.yaml
 </span></code></pre></div>
 <p>The validation checks:</p>
 <ul>

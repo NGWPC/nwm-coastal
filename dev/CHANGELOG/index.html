@@ -1414,6 +1414,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1454,7 +1465,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixed" class="md-nav__link">
+  <a href="#fixed_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fixed
@@ -1504,7 +1515,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixed_1" class="md-nav__link">
+  <a href="#fixed_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fixed
@@ -1565,7 +1576,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixed_2" class="md-nav__link">
+  <a href="#fixed_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fixed
@@ -1669,6 +1680,17 @@ on <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a>, and this
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">#</a></h3>
 <ul>
+<li><strong>glofs</strong>: Great Lakes boundary forcing for SCHISM and SFINCS from NOAA GLOFS
+  (FVCOM) water levels: <code>boundary.source: glofs</code> with <code>boundary.glofs_model</code> (<code>leofs</code>,
+  <code>lmhofs</code>, <code>loofs</code>, <code>lsofs</code>) and a new <code>greatlakes</code> domain. Reads only the water-level
+  field from each remote hourly file and caches it, instead of downloading files of up
+  to ~180 MB an hour</li>
+<li><strong>schism</strong>: <code>forcing_to_mesh_offset_m</code>, matching the SFINCS setting, to move GLOFS
+  levels from the lake's low-water datum onto the mesh datum</li>
+<li><strong>glofs</strong>: NOAA CO-OPS gauge comparison for Great Lakes runs (SCHISM and SFINCS).
+  Lake gauges have no MSL/MLLW, so they are selected by their low-water datum,
+  fetched in LWD, shifted by <code>forcing_to_mesh_offset_m</code>, and compared in the mesh
+  datum. <code>init --domain greatlakes</code> now turns <code>include_noaa_gages</code> on</li>
 <li><strong>logging</strong>: SCHISM subsetting (<code>extract_mesh</code>, <code>split_mesh</code>) now writes a DEBUG log
   file, <code>schism-subset-&lt;YYYYMMDD-HHMMSS&gt;.log</code>, instead of logging to the console only</li>
 <li><strong>logging</strong>: Add <code>--log-level</code> to <code>run</code> and <code>create</code> to set the log-file detail level
@@ -1695,6 +1717,33 @@ on <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a>, and this
 <li><strong>sfincs</strong>: Switch boundary forcing to pyTMD harmonic predictor</li>
 <li><strong>tides</strong>: Replace pytides+OTPSnc with pyTMD predictor; consolidate pixi envs</li>
 </ul>
+<h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">#</a></h3>
+<ul>
+<li><strong>glofs</strong>: The GLOFS downloader never worked. NCEI moved the archive on 2026-07-28;
+  three of the four lake directory names were wrong; only the post-2024-09-09 filename
+  layout was built; each hour was read from the file six hours off; and the lake was
+  never passed through from the config</li>
+<li><strong>config</strong>: An unrecognised <code>boundary.source</code> is now a validation error instead of
+  being silently treated as STOFS by the SCHISM boundary stage</li>
+<li><strong>schism</strong>: A failed SCHISM run now reports the actual error (e.g. <code>Fortran runtime
+  error: …</code>, <code>ABORT: …</code>), de-duplicated across MPI ranks, instead of the last 2,000
+  characters of stderr, which were usually backtraces; SCHISM's full stdout/stderr is
+  saved to <code>outputs/schism_log.txt</code>. Follow-up to the logging changes in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/NGWPC/nwm-coastal/issues/62" title="GitHub Issue: NGWPC/nwm-coastal #62">#62</a></li>
+<li><strong>schism</strong>: The run stage now fails when SCHISM aborts with exit status 0 (its
+  <code>parallel_abort</code> passes 0 to <code>mpi_abort</code>) by checking <code>outputs/fatal.error</code>; it
+  previously reported success and the failure surfaced only in <code>schism_postprocess</code></li>
+<li><strong>schism</strong>: <code>param.nml</code> files from mid-2024 SCHISM versions now run: <code>nmarsh_types</code>
+  and <code>nbins_veg_vert</code> are added independently when missing (comments no longer count
+  as a setting), and the removed <code>stemp_stc</code>, <code>stemp_dz</code> and <code>veg_lai</code> are stripped</li>
+<li><strong>schism</strong>: Automatic <code>nscribes</code> follows SCHISM's own count: 2-D outputs share one
+  scribe, 3-D vectors need two, and outputs SCHISM enables by default are included</li>
+<li><strong>schism</strong>: <code>run_param_overrides</code> that add an output switch (<code>iof_*</code>, station or
+  hotstart output) now go into <code>&amp;SCHOUT</code> instead of <code>&amp;OPT</code>, where SCHISM rejected
+  them, and the automatic <code>nscribes</code> count applies the overrides first</li>
+<li><strong>schism</strong>: NOAA gauge discovery works for meshes whose shoreline is stored as an
+  island loop (e.g. the Lake Erie model); the domain polygon is repaired instead of
+  matching no stations</li>
+</ul>
 <h2 id="31200-rc2-2026-05-16">[3.1.2.0.0-rc2] - 2026-05-16<a class="headerlink" href="#31200-rc2-2026-05-16" title="Permanent link">#</a></h2>
 <h3 id="added_1">Added<a class="headerlink" href="#added_1" title="Permanent link">#</a></h3>
 <ul>
@@ -1705,7 +1754,7 @@ on <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a>, and this
 <li><strong>mpi</strong>: Make thread-pinning user-supplied and self-heal SLURM affinity</li>
 <li>Remove backward-compatibility shims</li>
 </ul>
-<h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">#</a></h3>
+<h3 id="fixed_1">Fixed<a class="headerlink" href="#fixed_1" title="Permanent link">#</a></h3>
 <ul>
 <li><strong>mpi</strong>: Propagate runtime_env into make_stofs_boundary</li>
 <li><strong>mpi</strong>: Remove EFA auto-detection from build_mpi_env</li>
@@ -1788,7 +1837,7 @@ on <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a>, and this
 <li>Replace rioxarray with gdalwarp for NOAA DEM and topobathy clipping</li>
 <li>Code quality improvements and performance fixes</li>
 </ul>
-<h3 id="fixed_1">Fixed<a class="headerlink" href="#fixed_1" title="Permanent link">#</a></h3>
+<h3 id="fixed_2">Fixed<a class="headerlink" href="#fixed_2" title="Permanent link">#</a></h3>
 <ul>
 <li><strong>stages</strong>: Apply runtime_env in regrid forcing and predict_tide</li>
 <li><strong>schism</strong>: Chain ring falls back to concat on endpoint mismatch</li>
@@ -1950,7 +1999,7 @@ on <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a>, and this
 <li>Make submit and run identical so --start-from/--stop-after gets supported by submit.</li>
 <li>Replace SCHISM-centric config with polymorphic ModelConfig ABC (<strong>breaking</strong>)</li>
 </ul>
-<h3 id="fixed_2">Fixed<a class="headerlink" href="#fixed_2" title="Permanent link">#</a></h3>
+<h3 id="fixed_3">Fixed<a class="headerlink" href="#fixed_3" title="Permanent link">#</a></h3>
 <ul>
 <li>Address mkdocs warnings</li>
 <li>Address issues raised by PR reviewer</li>
