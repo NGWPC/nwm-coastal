@@ -46,18 +46,22 @@ Commands:
 
 ## Available Environments
 
-| Environment | Description               | Command                         |
-| ----------- | ------------------------- | ------------------------------- |
-| `dev`       | Every binary and dev tool | `pixi r -e dev <cmd>`           |
-| `test311`   | CI matrix on Python 3.11  | `pixi r -e test311 test`        |
-| `test313`   | CI matrix on Python 3.13  | `pixi r -e test313 test`        |
-| `typecheck` | Type checking             | `pixi r -e typecheck typecheck` |
-| `lint`      | Linting with pre-commit   | `pixi r lint`                   |
-| `docs`      | Documentation building    | `pixi r -e docs docs-serve`     |
+| Environment | Description                          | Command                         |
+| ----------- | ------------------------------------ | ------------------------------- |
+| `dev`       | Every binary and dev tool            | `pixi r -e dev <cmd>`           |
+| `default`   | Python package only, no model binaries | `pixi r <cmd>`                |
+| `test313`   | Test suite as run in CI              | `pixi r -e test313 test`        |
+| `typecheck` | Type checking                        | `pixi r -e typecheck typecheck` |
+| `lint`      | Linting with pre-commit              | `pixi r lint`                   |
+| `docs`      | Documentation building               | `pixi r -e docs docs-serve`     |
+
+All environments use Python 3.13; the package requires 3.13 or newer.
 
 `dev` installs every binary (SCHISM, SFINCS, predict_tide) and every Python dependency
-needed to develop, test, and run the package. The `test311` / `test313` envs mirror it
-for the CI Python-version matrix.
+needed to develop, test, and run the package. `test313` mirrors it without the notebook
+and changelog tooling, and is what CI runs. `default` is the lightweight option: the
+Python package and its dependencies, without SCHISM, SFINCS, or the MPI/ESMF stack, so
+it installs without compiling anything.
 
 ## QGIS Plugin
 

@@ -128,8 +128,8 @@ numpy = ">=2,<2.5"
 # `.pixi/envs/dev/` directly, so this env name is load-bearing.
 # Run tasks here with `pixi r -e dev <task>`.
 dev = { features = [ "dev", "models", "plot", "test", "py313" ] }
-# CI matrix across Python versions; same composition as dev minus the
-# notebook/changelog tooling. CI runs `pixi r -e test311 test` etc.
+# Same composition as dev minus the notebook/changelog tooling.
+# CI runs `pixi r -e test313 test`.
 test313 = { features = [ "test", "models", "plot", "py313" ] }
 typecheck = { features = [ "typecheck", "models", "plot", "test", "py313" ] }
 lint = { features = [ "lint", "py313" ], no-default-feature = true }

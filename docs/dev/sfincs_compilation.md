@@ -17,8 +17,8 @@ recipe lives at `coastal_models/sfincs/` with three files:
 | `recipe.yaml` | Conda recipe (source path, build/host/run dependencies, tests) |
 | `build.sh`    | Build script (autotools configure + make, macOS SDK probe)     |
 
-Any pixi environment that includes the `sfincs` feature (**`sfincs`**, **`dev`**,
-**`test311`**, **`test313`**) will **automatically build and install the `sfincs` conda
+Any pixi environment that includes the `models` feature (**`dev`**, **`test313`**,
+**`typecheck`**) will **automatically build and install the `sfincs` conda
 package** on first `pixi install`. Subsequent runs use the cached package and complete
 instantly (~0.3 s) unless the submodule source or recipe changes.
 
