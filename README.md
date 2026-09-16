@@ -81,6 +81,7 @@ This package supports two primary use cases:
     catchment-level workflows
 
 ## Quick Start
+See documentation pages for cluster installation.
 
 ### Installation
 
