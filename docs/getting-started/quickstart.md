@@ -52,9 +52,9 @@ pixi r -e dev coastal-calibration validate config.yaml
 pixi r -e dev coastal-calibration run config.yaml
 ```
 
-The pipeline executes 11 stages: download, forcing preparation, atmospheric regridding,
-boundary conditions, mesh partitioning, model execution, and validation against NOAA
-observations.
+The pipeline executes 12 stages: download, forcing preparation, atmospheric regridding,
+boundary conditions, river discharge, mesh partitioning, model execution, and validation
+against NOAA observations.
 
 ### Running on HPC
 

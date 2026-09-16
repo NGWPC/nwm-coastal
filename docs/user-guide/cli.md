@@ -116,6 +116,7 @@ coastal-calibration run <config> [OPTIONS]
 - `schism_params`
 - `schism_obs`
 - `schism_boundary`
+- `schism_discharge`
 - `schism_prep`
 - `schism_run`
 - `schism_postprocess`
@@ -365,10 +366,11 @@ SCHISM workflow stages:
   5. schism_params: Create SCHISM param.nml
   6. schism_obs: Add NOAA observation stations
   7. schism_boundary: Generate boundary conditions (TPXO/STOFS)
-  8. schism_prep: Prepare SCHISM inputs
-  9. schism_run: Run SCHISM model (MPI)
-  10. schism_postprocess: Post-process SCHISM outputs
-  11. schism_plot: Plot simulated vs observed water levels
+  8. schism_discharge: Generate river discharge forcing
+  9. schism_prep: Partition mesh and finalize inputs
+  10. schism_run: Run SCHISM model (MPI)
+  11. schism_postprocess: Post-process SCHISM outputs
+  12. schism_plot: Plot simulated vs observed water levels
 
 SFINCS workflow stages:
   1. download: Download NWM/STOFS data (optional)
@@ -400,28 +402,28 @@ SFINCS creation stages (create subcommand):
 
 ## Exit Codes
 
-| Code | Description                                             |
-| ---- | ------------------------------------------------------- |
-| 0    | Success                                                 |
+| Code | Description                                                     |
+| ---- | --------------------------------------------------------------- |
+| 0    | Success                                                         |
 | 1    | Any failure (validation error, runtime error, or stage failure) |
 
 ## Logging
 
 Two sinks, with different jobs:
 
-| Sink        | Level                       | Set by                          |
-| ----------- | --------------------------- | ------------------------------- |
-| Console     | Always `INFO`               | Nothing — it is fixed           |
-| Log file    | `DEBUG` by default          | `monitoring.log_level`          |
+| Sink     | Level              | Set by                 |
+| -------- | ------------------ | ---------------------- |
+| Console  | Always `INFO`      | Nothing — it is fixed  |
+| Log file | `DEBUG` by default | `monitoring.log_level` |
 
-The console is a readable progress stream, so it is not adjustable. The log
-file is the diagnostic record, and its detail level is the one knob you can
-turn. Lower it (`INFO`, `WARNING`) when full `DEBUG` output from HydroMT,
-xarray and botocore makes the file unwieldy — worth doing when `work_dir` is
-on an NFS mount, where the write volume costs real time.
+The console is a readable progress stream, so it is not adjustable. The log file is the
+diagnostic record, and its detail level is the one knob you can turn. Lower it (`INFO`,
+`WARNING`) when full `DEBUG` output from HydroMT, xarray and botocore makes the file
+unwieldy — worth doing when `work_dir` is on an NFS mount, where the write volume costs
+real time.
 
-`run` and `create` accept `--log-level` to set it for a single run. The file
-level is resolved in this order, first match winning:
+`run` and `create` accept `--log-level` to set it for a single run. The file level is
+resolved in this order, first match winning:
 
 1. `--log-level`
 1. `COASTAL_LOG_LEVEL`
@@ -434,17 +436,16 @@ coastal-calibration run config.yaml --log-level INFO
 ```
 
 Commands that write no log file (`prepare-topobathy`, `prepare-schism-mesh`,
-`update-dem-index`) have no `--log-level` option; they only print to the
-console.
+`update-dem-index`) have no `--log-level` option; they only print to the console.
 
 ## Environment Variables
 
 The CLI respects these environment variables:
 
-| Variable            | Description                                  |
-| ------------------- | -------------------------------------------- |
-| `COASTAL_LOG_LEVEL` | Log-file detail level (see Logging)          |
-| `SLURM_JOB_ID`      | Detected when running in SLURM               |
+| Variable            | Description                         |
+| ------------------- | ----------------------------------- |
+| `COASTAL_LOG_LEVEL` | Log-file detail level (see Logging) |
+| `SLURM_JOB_ID`      | Detected when running in SLURM      |
 
 ## Shell Completion
 

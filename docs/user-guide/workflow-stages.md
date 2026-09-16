@@ -1,12 +1,15 @@
 # Workflow Stages
 
-The coastal calibration workflow consists of sequential stages, each performing a
-specific task in the simulation pipeline. The stage order depends on the selected model
-(SCHISM or SFINCS).
+The coastal calibration workflow consists of stages, each performing a specific task in
+the simulation pipeline. The stage order depends on the selected model (SCHISM or
+SFINCS).
 
-The `run` command executes all stages sequentially. All stages run natively; no
-containers are required. Stages execute locally on the allocated compute nodes (e.g.,
-inside an `sbatch` script).
+The `run` command executes all stages sequentially. It runs wherever you invoke it — on
+a local workstation, or on a compute node inside an `sbatch` script. All stages run
+natively; no containers are required.
+
+Each stage below lists how it executes (**Execution**) and anything external it needs,
+such as network access or a local data store (**Requires**).
 
 ## SCHISM Stage Overview
 
@@ -18,10 +21,11 @@ flowchart TD
     D --> E[schism_params]
     E --> F[schism_obs]
     F --> G[schism_boundary]
-    G --> H[schism_prep]
-    H --> I[schism_run]
-    I --> J[schism_postprocess]
-    J --> K[schism_plot]
+    G --> H[schism_discharge]
+    H --> I[schism_prep]
+    I --> J[schism_run]
+    J --> K[schism_postprocess]
+    K --> L[schism_plot]
 ```
 
 ## SFINCS Stage Overview
@@ -55,7 +59,9 @@ flowchart TD
 - NWM streamflow data (CHRTOUT files)
 - STOFS or GLOFS water level data (when applicable)
 
-**Runs On:** Compute node (Python-only)
+**Execution:** Python-only
+
+**Requires:** Network access for NWM, STOFS, and GLOFS sources
 
 **Outputs:**
 
@@ -79,7 +85,7 @@ raw_download_dir/
 - Set up directory structure for forcing generation
 - Validate input data integrity
 
-**Runs On:** Compute node (Python)
+**Execution:** Python-only
 
 ### 3. schism_forcing
 
@@ -91,7 +97,7 @@ raw_download_dir/
 - Interpolate forcing variables
 - Generate SCHISM-compatible forcing files
 
-**Runs On:** Compute node (MPI parallel via `mpiexec`)
+**Execution:** MPI via `mpiexec` (ESMF regridding)
 
 ### 4. schism_sflux
 
@@ -102,7 +108,7 @@ raw_download_dir/
 - Generate sflux air, precipitation, and radiation files
 - Inline sea-level pressure reduction
 
-**Runs On:** Compute node (Python)
+**Execution:** Python-only
 
 ### 5. schism_params
 
@@ -115,7 +121,7 @@ raw_download_dir/
 - Set time stepping configuration
 - Configure output options
 
-**Runs On:** Compute node (Python)
+**Execution:** Python-only
 
 **Outputs:**
 
@@ -144,7 +150,9 @@ at those locations.
     and a companion `station_noaa_ids.txt` that maps each station index to its NOAA
     station ID.
 
-**Runs On:** Compute node (Python). Requires network access for the CO-OPS API call.
+**Execution:** Python-only
+
+**Requires:** Network access for the NOAA CO-OPS API
 
 **Outputs:**
 
@@ -178,9 +186,28 @@ work_dir/
 - Generate time-varying boundary files
 - Create `elev2D.th.nc` file
 
-**Runs On:** Compute node (Python / MPI for ESMF regridding)
+**Execution:** Python, with MPI via `mpiexec` for STOFS ESMF regridding
 
-### 8. schism_prep
+**Requires:** Local TPXO atlas for harmonic tides; network access for STOFS/GLOFS
+
+### 8. schism_discharge
+
+**Purpose:** Generate river discharge forcing for the mesh.
+
+**Tasks:**
+
+- Read streamflow for the reaches in the discharge crosswalk (`nwmReaches.csv`, or
+    `ngenReaches.csv` for forecast runs)
+- Map reaches to mesh source/sink elements and combine them
+- Merge river discharge with precipitation sources into `source.nc`
+
+Skipped when no discharge crosswalk is configured or found in `prebuilt_dir`.
+
+**Execution:** Python-only
+
+**Requires:** Network access when reading `nwm_retro` streamflow from S3
+
+### 9. schism_prep
 
 **Purpose:** Final preparation before SCHISM execution.
 
@@ -191,10 +218,9 @@ work_dir/
 - Combine hotstart files
 - Configure MPI environment
 
-**Runs On:** Compute node (Python + subprocess calls to `metis_prep`, `gpmetis`,
-`combine_hotstart7`)
+**Execution:** Python + `metis_prep`, `gpmetis`, `combine_hotstart7`
 
-### 9. schism_run
+### 10. schism_run
 
 **Purpose:** Execute the SCHISM model.
 
@@ -204,7 +230,7 @@ work_dir/
 - Monitor progress
 - Handle I/O scribes
 
-**Runs On:** Compute node (MPI parallel, native binary)
+**Execution:** Native binary, MPI via `mpiexec`
 
 **Configuration:**
 
@@ -212,7 +238,7 @@ work_dir/
 - OpenMP threads configured via `omp_num_threads`
 - Total processes = `nodes * ntasks_per_node`
 
-### 10. schism_postprocess
+### 11. schism_postprocess
 
 **Purpose:** Post-process SCHISM outputs.
 
@@ -222,9 +248,9 @@ work_dir/
 - Generate statistics
 - Create visualization-ready files
 
-**Runs On:** Compute node (Python)
+**Execution:** Python + `combine_hotstart7`
 
-### 11. schism_plot
+### 12. schism_plot
 
 **Purpose:** Compare SCHISM-simulated water levels against NOAA CO-OPS observations at
 every station discovered by the `schism_obs` stage.
@@ -241,8 +267,9 @@ every station discovered by the `schism_obs` stage.
     observed water levels.
 1. Saves PNG figures to the `figs/` subdirectory.
 
-**Runs On:** Compute node (Python-only). Requires network access for the CO-OPS API
-call.
+**Execution:** Python-only
+
+**Requires:** Network access for the NOAA CO-OPS API
 
 **Outputs:**
 
@@ -267,6 +294,10 @@ work_dir/
 Same as SCHISM download stage. Downloads NWM meteorological forcing, streamflow, and
 STOFS water level data.
 
+**Execution:** Python-only
+
+**Requires:** Network access for NWM and STOFS sources
+
 ### 2. sfincs_symlinks
 
 **Purpose:** Create .nc symlinks for NWM data.
@@ -276,6 +307,8 @@ STOFS water level data.
 - Create symlinks in the working directory pointing to downloaded NWM files
 - Organize files by type (meteo, hydro)
 
+**Execution:** Python-only
+
 ### 3. sfincs_data_catalog
 
 **Purpose:** Generate a HydroMT data catalog.
@@ -284,6 +317,8 @@ STOFS water level data.
 
 - Build YAML data catalog for HydroMT-SFINCS
 - Register NWM meteo, streamflow, and STOFS data sources
+
+**Execution:** Python-only
 
 ### 4. sfincs_init
 
@@ -296,6 +331,8 @@ STOFS water level data.
     `write_netcdf_safely` encounters files with an incompatible schema)
 - Set up model directory structure
 
+**Execution:** Python-only
+
 ### 5. sfincs_timing
 
 **Purpose:** Set SFINCS model timing.
@@ -304,6 +341,8 @@ STOFS water level data.
 
 - Configure simulation start/end times
 - Set output intervals
+
+**Execution:** Python-only
 
 ### 6. sfincs_forcing
 
@@ -322,6 +361,10 @@ STOFS water level data.
 - Emit a warning if the adjusted water levels fall outside the ±15 m sanity range
 - Write boundary forcing netCDF (`sfincs_netbndbzsbzifile.nc`) with a zero-filled `bzi`
     (infragravity) variable required by the SFINCS binary
+
+**Execution:** Python (HydroMT-SFINCS)
+
+**Requires:** Local TPXO atlas for harmonic tides; downloaded STOFS data
 
 !!! tip "Forcing vertical datum offset"
 
@@ -343,6 +386,10 @@ STOFS water level data.
     segfault caused by out-of-bounds array access)
 - Generate discharge forcing time series
 
+**Execution:** Python (HydroMT-SFINCS)
+
+**Requires:** Network access when reading `nwm_retro` streamflow from S3
+
 ### 8. sfincs_precip
 
 **Purpose:** Add precipitation forcing.
@@ -352,6 +399,8 @@ STOFS water level data.
 - Add NWM precipitation data as spatially distributed forcing
 - Set the output resolution to `meteo_res` (or auto-derive from the quadtree grid)
 - Clip the reprojected grid to the model domain to prevent CONUS-scale inflation
+
+**Execution:** Python (HydroMT-SFINCS)
 
 ### 9. sfincs_wind
 
@@ -363,7 +412,7 @@ STOFS water level data.
 - Set the output resolution to `meteo_res` (or auto-derive from the quadtree grid)
 - Clip the reprojected grid to the model domain to prevent CONUS-scale inflation
 
-**Runs On:** Login node (Python-only)
+**Execution:** Python (HydroMT-SFINCS)
 
 ### 10. sfincs_pressure
 
@@ -376,7 +425,7 @@ STOFS water level data.
 - Clip the reprojected grid to the model domain to prevent CONUS-scale inflation
 - Enable barometric pressure correction (`baro=1`)
 
-**Runs On:** Login node (Python-only)
+**Execution:** Python (HydroMT-SFINCS)
 
 ### 11. sfincs_write
 
@@ -387,7 +436,7 @@ STOFS water level data.
 - Write all SFINCS input files (`sfincs.inp`, `sfincs.bnd`, etc.)
 - Generate boundary and forcing NetCDF files
 
-**Runs On:** Login node (Python-only)
+**Execution:** Python (HydroMT-SFINCS)
 
 ### 12. sfincs_run
 
@@ -398,7 +447,7 @@ STOFS water level data.
 - Run SFINCS via compiled native binary
 - Uses single-node OpenMP parallelism (`omp_num_threads`)
 
-**Runs On:** Compute node (OpenMP, native binary)
+**Execution:** Native binary, OpenMP
 
 ### 13. sfincs_floodmap
 
@@ -423,7 +472,7 @@ is skipped when `floodmap_dem` is not configured, `floodmap_enabled` is false,
     masked out
 - `floodmap_enabled`: set to `false` to skip this stage entirely (default: `true`)
 
-**Runs On:** Login node or compute node (Python-only)
+**Execution:** Python + `gdalwarp`
 
 **Outputs:**
 
@@ -446,7 +495,9 @@ model_root/
 - Generate comparison plots (simulated vs observed)
 - Save figures to the `figs/` directory
 
-**Runs On:** Login node or compute node (Python, requires network access)
+**Execution:** Python-only
+
+**Requires:** Network access for the NOAA CO-OPS API
 
 !!! tip "Output datum conversion"
 
@@ -550,6 +601,8 @@ flowchart TD
 - Create the base grid in the specified CRS
 - Apply quadtree refinement based on configured levels and criteria
 
+**Execution:** Python (HydroMT-SFINCS)
+
 ### 2. create_fetch_data
 
 **Purpose:** Fetch elevation and land cover data for the AOI.
@@ -568,6 +621,11 @@ Skipped when all datasets are user-provided (no auto-fetch configured).
 - For ESA WorldCover land cover: download and mosaic land-use / land-cover tiles
 - Write a HydroMT data catalog YAML for the fetched datasets
 
+**Execution:** Python + `gdalwarp`, `gdalbuildvrt`
+
+**Requires:** Network access for the configured elevation and land-cover sources; AWS
+credentials for the NWS topobathy store
+
 ### 3. create_elevation
 
 **Purpose:** Add elevation and bathymetry data to the grid.
@@ -578,6 +636,8 @@ Skipped when all datasets are user-provided (no auto-fetch configured).
 - Interpolate elevation values onto the quadtree grid cells
 - Apply `zmin`/`zmax` filters per dataset
 
+**Execution:** Python (HydroMT-SFINCS)
+
 ### 4. create_mask
 
 **Purpose:** Create the active cell mask.
@@ -587,6 +647,8 @@ Skipped when all datasets are user-provided (no auto-fetch configured).
 - Determine which grid cells are active based on elevation thresholds
 - Apply land/water masking criteria
 
+**Execution:** Python (HydroMT-SFINCS)
+
 ### 5. create_boundary
 
 **Purpose:** Create water level boundary cells.
@@ -595,6 +657,8 @@ Skipped when all datasets are user-provided (no auto-fetch configured).
 
 - Identify grid cells along the open ocean boundary
 - Assign boundary condition flags
+
+**Execution:** Python (HydroMT-SFINCS)
 
 ### 6. create_discharge _(optional)_
 
@@ -611,6 +675,8 @@ when `river_discharge` is not present.
 - Write the SFINCS `.src` file and a discharge locations file usable by the simulation
     workflow
 
+**Execution:** Python-only
+
 ### 7. create_subgrid
 
 **Purpose:** Generate subgrid lookup tables.
@@ -620,6 +686,9 @@ when `river_discharge` is not present.
 - Compute high-resolution subgrid tables from the DEM
 - These tables allow SFINCS to use coarse computational cells while capturing fine-scale
     topographic detail
+
+**Execution:** Python (HydroMT-SFINCS). The most compute- and memory-intensive creation
+stage.
 
 ### 8. create_obs _(optional)_
 
@@ -637,6 +706,10 @@ these are configured.
     user-specified observation points
 - Write observation point locations into the SFINCS model
 
+**Execution:** Python-only
+
+**Requires:** Network access for the NOAA CO-OPS API when `add_noaa_gages` is true
+
 ### 9. create_write
 
 **Purpose:** Write the complete SFINCS model to disk.
@@ -645,3 +718,5 @@ these are configured.
 
 - Write all SFINCS input files to the configured `output_dir`
 - The output directory can be used as `prebuilt_dir` in a simulation config
+
+**Execution:** Python (HydroMT-SFINCS)
