@@ -11,7 +11,7 @@ from source. No containers are required.
 ## Install
 
 ```bash
-git clone https://github.com/NGWPC/nwm-coastal
+git clone --recurse-submodules https://github.com/NGWPC/nwm-coastal
 cd nwm-coastal
 pixi install -e dev
 ```

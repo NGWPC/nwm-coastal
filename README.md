@@ -47,7 +47,9 @@ execution to validation against NOAA tide gauges.
 | **Compute**         | Single-node, OpenMP        | Multi-node, MPI            |
 | **Model Creation**  | Automated                  | Prebuilt mesh required     |
 | **Flood Depth Map** | Yes (downscaled to DEM)    | Not yet supported          |
-| **Domains**         | CONUS, Hawaii, Puerto Rico | CONUS, Hawaii, Puerto Rico |
+
+Both models support the same domains: CONUS, Hawaii, Puerto Rico/Virgin Islands,
+Alaska, and the Great Lakes.
 
 ## Design
 
@@ -87,7 +89,7 @@ Prerequisites: [Git](https://git-scm.com/) and
 dependencies including Python and compiling SFINCS and SCHISM from source.
 
 ```bash
-git clone https://github.com/NGWPC/nwm-coastal
+git clone --recurse-submodules https://github.com/NGWPC/nwm-coastal
 cd nwm-coastal
 pixi install -e dev
 ```
