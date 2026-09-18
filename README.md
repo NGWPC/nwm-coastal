@@ -41,13 +41,15 @@ execution to validation against NOAA tide gauges.
 
 ## Supported Models
 
-|                     | SFINCS                     | SCHISM                     |
-| ------------------- | -------------------------- | -------------------------- |
-| **Grid**            | Quadtree (regular)         | Unstructured triangular    |
-| **Compute**         | Single-node, OpenMP        | Multi-node, MPI            |
-| **Model Creation**  | Automated                  | Prebuilt mesh required     |
-| **Flood Depth Map** | Yes (downscaled to DEM)    | Not yet supported          |
-| **Domains**         | CONUS, Hawaii, Puerto Rico | CONUS, Hawaii, Puerto Rico |
+|                     | SFINCS                  | SCHISM                  |
+| ------------------- | ----------------------- | ----------------------- |
+| **Grid**            | Quadtree (regular)      | Unstructured triangular |
+| **Compute**         | Single-node, OpenMP     | Multi-node, MPI         |
+| **Model Creation**  | Automated               | Prebuilt mesh required  |
+| **Flood Depth Map** | Yes (downscaled to DEM) | Not yet supported       |
+
+Both models support the same domains: CONUS, Hawaii, Puerto Rico/Virgin Islands, Alaska,
+and the Great Lakes.
 
 ## Design
 
@@ -80,6 +82,8 @@ This package supports two primary use cases:
 
 ## Quick Start
 
+See documentation pages for cluster installation.
+
 ### Installation
 
 Prerequisites: [Git](https://git-scm.com/) and
@@ -87,7 +91,7 @@ Prerequisites: [Git](https://git-scm.com/) and
 dependencies including Python and compiling SFINCS and SCHISM from source.
 
 ```bash
-git clone https://github.com/NGWPC/nwm-coastal
+git clone --recurse-submodules https://github.com/NGWPC/nwm-coastal
 cd nwm-coastal
 pixi install -e dev
 ```
@@ -145,23 +149,23 @@ The AOI polygon and discharge points can be created interactively using the QGIS
 
 ## Supported Data Sources
 
-| Source      | Date Range               | Description           |
-| ----------- | ------------------------ | --------------------- |
-| `nwm_retro` | 1979-02-01 to 2023-01-31 (CONUS), by domain | NWM Retrospective 3.0 |
-| `nwm_ana`   | 2018-10-01 to present, by domain | NWM Analysis  |
-| `stofs`     | 2020-12-30 to present    | STOFS water levels    |
-| `glofs`     | 2016 to present, by lake | Great Lakes OFS water levels |
-| `tpxo`      | N/A (local installation) | TPXO tidal model      |
+| Source      | Date Range                                  | Description                  |
+| ----------- | ------------------------------------------- | ---------------------------- |
+| `nwm_retro` | 1979-02-01 to 2023-01-31 (CONUS), by domain | NWM Retrospective 3.0        |
+| `nwm_ana`   | 2018-10-01 to present, by domain            | NWM Analysis                 |
+| `stofs`     | 2020-12-30 to present                       | STOFS water levels           |
+| `glofs`     | 2016 to present, by lake                    | Great Lakes OFS water levels |
+| `tpxo`      | N/A (local installation)                    | TPXO tidal model             |
 
 **Domains**: `atlgulf`, `pacific`, `hawaii`, `prvi`, `alaska`, `greatlakes`
 
 ## Workflow Stages
 
-### SCHISM (11 stages)
+### SCHISM (12 stages)
 
 `download` → `schism_forcing_prep` → `schism_forcing` → `schism_sflux` → `schism_params`
-→ `schism_obs` → `schism_boundary` → `schism_prep` → `schism_run` → `schism_postprocess`
-→ `schism_plot`
+→ `schism_obs` → `schism_boundary` → `schism_discharge` → `schism_prep` → `schism_run` →
+`schism_postprocess` → `schism_plot`
 
 ### SFINCS (14 stages)
 

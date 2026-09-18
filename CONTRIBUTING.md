@@ -170,7 +170,7 @@ Ready to contribute? Here's how to set up NWM Coastal for local development.
 1. Clone your fork locally and add the main `nwm-coastal` as the upstream remote:
 
     ```console
-    git clone git@github.com:your_name_here/nwm-coastal.git
+    git clone --recurse-submodules git@github.com:your_name_here/nwm-coastal.git
     git remote add upstream git@github.com:NGWPC/nwm-coastal.git
     ```
 
@@ -206,7 +206,6 @@ Ready to contribute? Here's how to set up NWM Coastal for local development.
     ```console
     pixi r lint
     pixi r -e typecheck typecheck
-    pixi r -e test311 test
     pixi r -e test313 test
     ```
 
