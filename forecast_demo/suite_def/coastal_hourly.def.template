@@ -74,8 +74,8 @@ suite coastal_hourly
   edit NWM_COASTAL_CLI       '${NWM_COASTAL_ROOT}/nwm-coastal-cli'
   edit NWM_COASTAL_PY        '${NWM_COASTAL_ROOT}/nwm-coastal-py'
   edit GEN_SCRIPT            '${NWM_COASTAL_ROOT}/forecast_demo/bin/gen_cycle_config.py'
-  edit SCHISM_BASE_YAML       '${RUN_COASTAL_ROOT}/schism_sims/run.yaml'
-  edit SFINCS_BASE_YAML       '${RUN_COASTAL_ROOT}/sfincs_sims/run.yaml'
+  edit SCHISM_BASE_YAML       '${RUN_COASTAL_ROOT}/schism_sims/example_schism_forecast_run.yaml'
+  edit SFINCS_BASE_YAML       '${RUN_COASTAL_ROOT}/sfincs_sims/example_sfincs_forecast_run.yaml'
   # Everything ecflow generates (per-cycle configs + work dirs) lives under
   # run_coastal/, nested next to the base templates and the S3-staged
   # prebuilt models -- nothing generated ever lands inside the nwm-coastal

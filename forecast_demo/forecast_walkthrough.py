@@ -50,9 +50,9 @@ PREV_CYCLE = _prev_cycle(TARGET_CYCLE)
 CYCLE_DT = f"{TARGET_CYCLE[0:4]}-{TARGET_CYCLE[4:6]}-{TARGET_CYCLE[6:8]} {TARGET_CYCLE[8:10]}:00:00"
 print(f"TARGET_CYCLE={TARGET_CYCLE}  PREV_CYCLE={PREV_CYCLE}  VPU={VPU}")
 
-# Location of  the base run.yaml files and where the cycles will be populated
-SCHISM_BASE_YAML = RUN_COASTAL_ROOT / "schism_sims" / "run.yaml"
-SFINCS_BASE_YAML = RUN_COASTAL_ROOT / "sfincs_sims" / "run.yaml"
+# Location of the base run templates and where the cycles will be populated
+SCHISM_BASE_YAML = RUN_COASTAL_ROOT / "schism_sims" / "example_schism_forecast_run.yaml"
+SFINCS_BASE_YAML = RUN_COASTAL_ROOT / "sfincs_sims" / "example_sfincs_forecast_run.yaml"
 SCHISM_CYCLES_DIR = RUN_COASTAL_ROOT / "schism_sims" / "cycles"
 SFINCS_CYCLES_DIR = RUN_COASTAL_ROOT / "sfincs_sims" / "cycles"
 
@@ -80,7 +80,7 @@ def run_nwm_rte(module: str, args: list[str]) -> subprocess.CompletedProcess:
     print(f"--- run_nwm_rte: {module} {quoted_args} ---")
     return subprocess.run(["bash", "-c", script], check=True)
 
-# Helper function to call the automatic coastal model configuration generator (edits base run.yaml files for
+# Helper function to call the automatic coastal model configuration generator (edits base run templates for
 # the coastal models)
 def run_gen_cycle_config(model: str, run_type: str, **kwargs) -> subprocess.CompletedProcess:
     gen_script = NWM_COASTAL_ROOT / "forecast_demo" / "bin" / "gen_cycle_config.py"
