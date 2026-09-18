@@ -1722,7 +1722,7 @@ suggestion and find related suggestions.</p>
 </li>
 <li>
 <p>Clone your fork locally and add the main <code>nwm-coastal</code> as the upstream remote:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="go">git clone git@github.com:your_name_here/nwm-coastal.git</span>
+<div class="language-console highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="go">git clone --recurse-submodules git@github.com:your_name_here/nwm-coastal.git</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="go">git remote add upstream git@github.com:NGWPC/nwm-coastal.git</span>
 </span></code></pre></div>
 </li>
@@ -1754,8 +1754,7 @@ suggestion and find related suggestions.</p>
 <p>Then run linting, type checking, and tests:</p>
 <div class="language-console highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="go">pixi r lint</span>
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="go">pixi r -e typecheck typecheck</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="go">pixi r -e test311 test</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="go">pixi r -e test313 test</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="go">pixi r -e test313 test</span>
 </span></code></pre></div>
 </li>
 <li>

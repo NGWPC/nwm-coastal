@@ -1000,10 +1000,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#8-schism_prep" class="md-nav__link">
+  <a href="#8-schism_discharge" class="md-nav__link">
     <span class="md-ellipsis">
       
-        8. schism_prep
+        8. schism_discharge
       
     </span>
   </a>
@@ -1011,10 +1011,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#9-schism_run" class="md-nav__link">
+  <a href="#9-schism_prep" class="md-nav__link">
     <span class="md-ellipsis">
       
-        9. schism_run
+        9. schism_prep
       
     </span>
   </a>
@@ -1022,10 +1022,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#10-schism_postprocess" class="md-nav__link">
+  <a href="#10-schism_run" class="md-nav__link">
     <span class="md-ellipsis">
       
-        10. schism_postprocess
+        10. schism_run
       
     </span>
   </a>
@@ -1033,10 +1033,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#11-schism_plot" class="md-nav__link">
+  <a href="#11-schism_postprocess" class="md-nav__link">
     <span class="md-ellipsis">
       
-        11. schism_plot
+        11. schism_postprocess
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-schism_plot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. schism_plot
       
     </span>
   </a>
@@ -2003,12 +2014,14 @@
 
 
 <h1 id="workflow-stages">Workflow Stages<a class="headerlink" href="#workflow-stages" title="Permanent link">#</a></h1>
-<p>The coastal calibration workflow consists of sequential stages, each performing a
-specific task in the simulation pipeline. The stage order depends on the selected model
-(SCHISM or SFINCS).</p>
-<p>The <code>run</code> command executes all stages sequentially. All stages run natively; no
-containers are required. Stages execute locally on the allocated compute nodes (e.g.,
-inside an <code>sbatch</code> script).</p>
+<p>The coastal calibration workflow consists of stages, each performing a specific task in
+the simulation pipeline. The stage order depends on the selected model (SCHISM or
+SFINCS).</p>
+<p>The <code>run</code> command executes all stages sequentially. It runs wherever you invoke it — on
+a local workstation, or on a compute node inside an <code>sbatch</code> script. All stages run
+natively; no containers are required.</p>
+<p>Each stage below lists how it executes (<strong>Execution</strong>) and anything external it needs,
+such as network access or a local data store (<strong>Requires</strong>).</p>
 <h2 id="schism-stage-overview">SCHISM Stage Overview<a class="headerlink" href="#schism-stage-overview" title="Permanent link">#</a></h2>
 <pre class="mermaid"><code>flowchart TD
     A[download] --&gt; B[schism_forcing_prep]
@@ -2017,10 +2030,11 @@ inside an <code>sbatch</code> script).</p>
     D --&gt; E[schism_params]
     E --&gt; F[schism_obs]
     F --&gt; G[schism_boundary]
-    G --&gt; H[schism_prep]
-    H --&gt; I[schism_run]
-    I --&gt; J[schism_postprocess]
-    J --&gt; K[schism_plot]</code></pre>
+    G --&gt; H[schism_discharge]
+    H --&gt; I[schism_prep]
+    I --&gt; J[schism_run]
+    J --&gt; K[schism_postprocess]
+    K --&gt; L[schism_plot]</code></pre>
 <h2 id="sfincs-stage-overview">SFINCS Stage Overview<a class="headerlink" href="#sfincs-stage-overview" title="Permanent link">#</a></h2>
 <pre class="mermaid"><code>flowchart TD
     A[download] --&gt; B[sfincs_symlinks]
@@ -2045,7 +2059,8 @@ inside an <code>sbatch</code> script).</p>
 <li>NWM streamflow data (CHRTOUT files)</li>
 <li>STOFS or GLOFS water level data (when applicable)</li>
 </ul>
-<p><strong>Runs On:</strong> Compute node (Python-only)</p>
+<p><strong>Execution:</strong> Python-only</p>
+<p><strong>Requires:</strong> Network access for NWM, STOFS, and GLOFS sources</p>
 <p><strong>Outputs:</strong></p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>raw_download_dir/
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>├── meteo/nwm_ana/
@@ -2063,7 +2078,7 @@ inside an <code>sbatch</code> script).</p>
 <li>Set up directory structure for forcing generation</li>
 <li>Validate input data integrity</li>
 </ul>
-<p><strong>Runs On:</strong> Compute node (Python)</p>
+<p><strong>Execution:</strong> Python-only</p>
 <h3 id="3-schism_forcing">3. schism_forcing<a class="headerlink" href="#3-schism_forcing" title="Permanent link">#</a></h3>
 <p><strong>Purpose:</strong> Generate atmospheric forcing files using MPI.</p>
 <p><strong>Tasks:</strong></p>
@@ -2072,7 +2087,7 @@ inside an <code>sbatch</code> script).</p>
 <li>Interpolate forcing variables</li>
 <li>Generate SCHISM-compatible forcing files</li>
 </ul>
-<p><strong>Runs On:</strong> Compute node (MPI parallel via <code>mpiexec</code>)</p>
+<p><strong>Execution:</strong> MPI via <code>mpiexec</code> (ESMF regridding)</p>
 <h3 id="4-schism_sflux">4. schism_sflux<a class="headerlink" href="#4-schism_sflux" title="Permanent link">#</a></h3>
 <p><strong>Purpose:</strong> Generate sflux atmospheric forcing files.</p>
 <p><strong>Tasks:</strong></p>
@@ -2080,7 +2095,7 @@ inside an <code>sbatch</code> script).</p>
 <li>Generate sflux air, precipitation, and radiation files</li>
 <li>Inline sea-level pressure reduction</li>
 </ul>
-<p><strong>Runs On:</strong> Compute node (Python)</p>
+<p><strong>Execution:</strong> Python-only</p>
 <h3 id="5-schism_params">5. schism_params<a class="headerlink" href="#5-schism_params" title="Permanent link">#</a></h3>
 <p><strong>Purpose:</strong> Generate SCHISM parameter file and symlink mesh files.</p>
 <p><strong>Tasks:</strong></p>
@@ -2090,7 +2105,7 @@ inside an <code>sbatch</code> script).</p>
 <li>Set time stepping configuration</li>
 <li>Configure output options</li>
 </ul>
-<p><strong>Runs On:</strong> Compute node (Python)</p>
+<p><strong>Execution:</strong> Python-only</p>
 <p><strong>Outputs:</strong></p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>work_dir/
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>├── hgrid.gr3 (symlink)
@@ -2112,7 +2127,8 @@ at those locations.</p>
     and a companion <code>station_noaa_ids.txt</code> that maps each station index to its NOAA
     station ID.</li>
 </ol>
-<p><strong>Runs On:</strong> Compute node (Python). Requires network access for the CO-OPS API call.</p>
+<p><strong>Execution:</strong> Python-only</p>
+<p><strong>Requires:</strong> Network access for the NOAA CO-OPS API</p>
 <p><strong>Outputs:</strong></p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>work_dir/
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>├── station.in             # SCHISM station definition file
@@ -2140,8 +2156,21 @@ constraint <code>mod(nhot_write, nspool_sta) == 0</code>.</p>
 <li>Generate time-varying boundary files</li>
 <li>Create <code>elev2D.th.nc</code> file</li>
 </ul>
-<p><strong>Runs On:</strong> Compute node (Python / MPI for ESMF regridding)</p>
-<h3 id="8-schism_prep">8. schism_prep<a class="headerlink" href="#8-schism_prep" title="Permanent link">#</a></h3>
+<p><strong>Execution:</strong> Python, with MPI via <code>mpiexec</code> for STOFS ESMF regridding</p>
+<p><strong>Requires:</strong> Local TPXO atlas for harmonic tides; network access for STOFS/GLOFS</p>
+<h3 id="8-schism_discharge">8. schism_discharge<a class="headerlink" href="#8-schism_discharge" title="Permanent link">#</a></h3>
+<p><strong>Purpose:</strong> Generate river discharge forcing for the mesh.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>Read streamflow for the reaches in the discharge crosswalk (<code>nwmReaches.csv</code>, or
+    <code>ngenReaches.csv</code> for forecast runs)</li>
+<li>Map reaches to mesh source/sink elements and combine them</li>
+<li>Merge river discharge with precipitation sources into <code>source.nc</code></li>
+</ul>
+<p>Skipped when no discharge crosswalk is configured or found in <code>prebuilt_dir</code>.</p>
+<p><strong>Execution:</strong> Python-only</p>
+<p><strong>Requires:</strong> Network access when reading <code>nwm_retro</code> streamflow from S3</p>
+<h3 id="9-schism_prep">9. schism_prep<a class="headerlink" href="#9-schism_prep" title="Permanent link">#</a></h3>
 <p><strong>Purpose:</strong> Final preparation before SCHISM execution.</p>
 <p><strong>Tasks:</strong></p>
 <ul>
@@ -2150,9 +2179,8 @@ constraint <code>mod(nhot_write, nspool_sta) == 0</code>.</p>
 <li>Combine hotstart files</li>
 <li>Configure MPI environment</li>
 </ul>
-<p><strong>Runs On:</strong> Compute node (Python + subprocess calls to <code>metis_prep</code>, <code>gpmetis</code>,
-<code>combine_hotstart7</code>)</p>
-<h3 id="9-schism_run">9. schism_run<a class="headerlink" href="#9-schism_run" title="Permanent link">#</a></h3>
+<p><strong>Execution:</strong> Python + <code>metis_prep</code>, <code>gpmetis</code>, <code>combine_hotstart7</code></p>
+<h3 id="10-schism_run">10. schism_run<a class="headerlink" href="#10-schism_run" title="Permanent link">#</a></h3>
 <p><strong>Purpose:</strong> Execute the SCHISM model.</p>
 <p><strong>Tasks:</strong></p>
 <ul>
@@ -2160,14 +2188,14 @@ constraint <code>mod(nhot_write, nspool_sta) == 0</code>.</p>
 <li>Monitor progress</li>
 <li>Handle I/O scribes</li>
 </ul>
-<p><strong>Runs On:</strong> Compute node (MPI parallel, native binary)</p>
+<p><strong>Execution:</strong> Native binary, MPI via <code>mpiexec</code></p>
 <p><strong>Configuration:</strong></p>
 <ul>
 <li>Uses <code>nscribes</code> I/O processes from model config</li>
 <li>OpenMP threads configured via <code>omp_num_threads</code></li>
 <li>Total processes = <code>nodes * ntasks_per_node</code></li>
 </ul>
-<h3 id="10-schism_postprocess">10. schism_postprocess<a class="headerlink" href="#10-schism_postprocess" title="Permanent link">#</a></h3>
+<h3 id="11-schism_postprocess">11. schism_postprocess<a class="headerlink" href="#11-schism_postprocess" title="Permanent link">#</a></h3>
 <p><strong>Purpose:</strong> Post-process SCHISM outputs.</p>
 <p><strong>Tasks:</strong></p>
 <ul>
@@ -2175,8 +2203,8 @@ constraint <code>mod(nhot_write, nspool_sta) == 0</code>.</p>
 <li>Generate statistics</li>
 <li>Create visualization-ready files</li>
 </ul>
-<p><strong>Runs On:</strong> Compute node (Python)</p>
-<h3 id="11-schism_plot">11. schism_plot<a class="headerlink" href="#11-schism_plot" title="Permanent link">#</a></h3>
+<p><strong>Execution:</strong> Python + <code>combine_hotstart7</code></p>
+<h3 id="12-schism_plot">12. schism_plot<a class="headerlink" href="#12-schism_plot" title="Permanent link">#</a></h3>
 <p><strong>Purpose:</strong> Compare SCHISM-simulated water levels against NOAA CO-OPS observations at
 every station discovered by the <code>schism_obs</code> stage.</p>
 <p><strong>Enabled by:</strong> <code>model_config.include_noaa_gages: true</code></p>
@@ -2190,8 +2218,8 @@ every station discovered by the <code>schism_obs</code> stage.</p>
     observed water levels.</li>
 <li>Saves PNG figures to the <code>figs/</code> subdirectory.</li>
 </ol>
-<p><strong>Runs On:</strong> Compute node (Python-only). Requires network access for the CO-OPS API
-call.</p>
+<p><strong>Execution:</strong> Python-only</p>
+<p><strong>Requires:</strong> Network access for the NOAA CO-OPS API</p>
 <p><strong>Outputs:</strong></p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>work_dir/
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>└── figs/
@@ -2209,6 +2237,8 @@ conversion offset is obtained from the CO-OPS datums endpoint for each station.<
 <h3 id="1-download_1">1. download<a class="headerlink" href="#1-download_1" title="Permanent link">#</a></h3>
 <p>Same as SCHISM download stage. Downloads NWM meteorological forcing, streamflow, and
 STOFS water level data.</p>
+<p><strong>Execution:</strong> Python-only</p>
+<p><strong>Requires:</strong> Network access for NWM and STOFS sources</p>
 <h3 id="2-sfincs_symlinks">2. sfincs_symlinks<a class="headerlink" href="#2-sfincs_symlinks" title="Permanent link">#</a></h3>
 <p><strong>Purpose:</strong> Create .nc symlinks for NWM data.</p>
 <p><strong>Tasks:</strong></p>
@@ -2216,6 +2246,7 @@ STOFS water level data.</p>
 <li>Create symlinks in the working directory pointing to downloaded NWM files</li>
 <li>Organize files by type (meteo, hydro)</li>
 </ul>
+<p><strong>Execution:</strong> Python-only</p>
 <h3 id="3-sfincs_data_catalog">3. sfincs_data_catalog<a class="headerlink" href="#3-sfincs_data_catalog" title="Permanent link">#</a></h3>
 <p><strong>Purpose:</strong> Generate a HydroMT data catalog.</p>
 <p><strong>Tasks:</strong></p>
@@ -2223,6 +2254,7 @@ STOFS water level data.</p>
 <li>Build YAML data catalog for HydroMT-SFINCS</li>
 <li>Register NWM meteo, streamflow, and STOFS data sources</li>
 </ul>
+<p><strong>Execution:</strong> Python-only</p>
 <h3 id="4-sfincs_init">4. sfincs_init<a class="headerlink" href="#4-sfincs_init" title="Permanent link">#</a></h3>
 <p><strong>Purpose:</strong> Initialize the SFINCS model from a pre-built template.</p>
 <p><strong>Tasks:</strong></p>
@@ -2232,6 +2264,7 @@ STOFS water level data.</p>
     <code>write_netcdf_safely</code> encounters files with an incompatible schema)</li>
 <li>Set up model directory structure</li>
 </ul>
+<p><strong>Execution:</strong> Python-only</p>
 <h3 id="5-sfincs_timing">5. sfincs_timing<a class="headerlink" href="#5-sfincs_timing" title="Permanent link">#</a></h3>
 <p><strong>Purpose:</strong> Set SFINCS model timing.</p>
 <p><strong>Tasks:</strong></p>
@@ -2239,6 +2272,7 @@ STOFS water level data.</p>
 <li>Configure simulation start/end times</li>
 <li>Set output intervals</li>
 </ul>
+<p><strong>Execution:</strong> Python-only</p>
 <h3 id="6-sfincs_forcing">6. sfincs_forcing<a class="headerlink" href="#6-sfincs_forcing" title="Permanent link">#</a></h3>
 <p><strong>Purpose:</strong> Add water level forcing.</p>
 <p><strong>Tasks:</strong></p>
@@ -2255,6 +2289,8 @@ STOFS water level data.</p>
 <li>Write boundary forcing netCDF (<code>sfincs_netbndbzsbzifile.nc</code>) with a zero-filled <code>bzi</code>
     (infragravity) variable required by the SFINCS binary</li>
 </ul>
+<p><strong>Execution:</strong> Python (HydroMT-SFINCS)</p>
+<p><strong>Requires:</strong> Local TPXO atlas for harmonic tides; downloaded STOFS data</p>
 <div class="admonition tip">
 <p class="admonition-title">Forcing vertical datum offset</p>
 <p>Tidal-only sources like TPXO provide oscillations centered on zero (MSL) but carry no
@@ -2273,6 +2309,8 @@ set this to <code>0.0</code>. The offset can be obtained from the
     segfault caused by out-of-bounds array access)</li>
 <li>Generate discharge forcing time series</li>
 </ul>
+<p><strong>Execution:</strong> Python (HydroMT-SFINCS)</p>
+<p><strong>Requires:</strong> Network access when reading <code>nwm_retro</code> streamflow from S3</p>
 <h3 id="8-sfincs_precip">8. sfincs_precip<a class="headerlink" href="#8-sfincs_precip" title="Permanent link">#</a></h3>
 <p><strong>Purpose:</strong> Add precipitation forcing.</p>
 <p><strong>Tasks:</strong></p>
@@ -2281,6 +2319,7 @@ set this to <code>0.0</code>. The offset can be obtained from the
 <li>Set the output resolution to <code>meteo_res</code> (or auto-derive from the quadtree grid)</li>
 <li>Clip the reprojected grid to the model domain to prevent CONUS-scale inflation</li>
 </ul>
+<p><strong>Execution:</strong> Python (HydroMT-SFINCS)</p>
 <h3 id="9-sfincs_wind">9. sfincs_wind<a class="headerlink" href="#9-sfincs_wind" title="Permanent link">#</a></h3>
 <p><strong>Purpose:</strong> Add wind forcing.</p>
 <p><strong>Tasks:</strong></p>
@@ -2289,7 +2328,7 @@ set this to <code>0.0</code>. The offset can be obtained from the
 <li>Set the output resolution to <code>meteo_res</code> (or auto-derive from the quadtree grid)</li>
 <li>Clip the reprojected grid to the model domain to prevent CONUS-scale inflation</li>
 </ul>
-<p><strong>Runs On:</strong> Login node (Python-only)</p>
+<p><strong>Execution:</strong> Python (HydroMT-SFINCS)</p>
 <h3 id="10-sfincs_pressure">10. sfincs_pressure<a class="headerlink" href="#10-sfincs_pressure" title="Permanent link">#</a></h3>
 <p><strong>Purpose:</strong> Add atmospheric pressure forcing.</p>
 <p><strong>Tasks:</strong></p>
@@ -2299,7 +2338,7 @@ set this to <code>0.0</code>. The offset can be obtained from the
 <li>Clip the reprojected grid to the model domain to prevent CONUS-scale inflation</li>
 <li>Enable barometric pressure correction (<code>baro=1</code>)</li>
 </ul>
-<p><strong>Runs On:</strong> Login node (Python-only)</p>
+<p><strong>Execution:</strong> Python (HydroMT-SFINCS)</p>
 <h3 id="11-sfincs_write">11. sfincs_write<a class="headerlink" href="#11-sfincs_write" title="Permanent link">#</a></h3>
 <p><strong>Purpose:</strong> Write the final SFINCS model.</p>
 <p><strong>Tasks:</strong></p>
@@ -2307,7 +2346,7 @@ set this to <code>0.0</code>. The offset can be obtained from the
 <li>Write all SFINCS input files (<code>sfincs.inp</code>, <code>sfincs.bnd</code>, etc.)</li>
 <li>Generate boundary and forcing NetCDF files</li>
 </ul>
-<p><strong>Runs On:</strong> Login node (Python-only)</p>
+<p><strong>Execution:</strong> Python (HydroMT-SFINCS)</p>
 <h3 id="12-sfincs_run">12. sfincs_run<a class="headerlink" href="#12-sfincs_run" title="Permanent link">#</a></h3>
 <p><strong>Purpose:</strong> Execute the SFINCS model.</p>
 <p><strong>Tasks:</strong></p>
@@ -2315,7 +2354,7 @@ set this to <code>0.0</code>. The offset can be obtained from the
 <li>Run SFINCS via compiled native binary</li>
 <li>Uses single-node OpenMP parallelism (<code>omp_num_threads</code>)</li>
 </ul>
-<p><strong>Runs On:</strong> Compute node (OpenMP, native binary)</p>
+<p><strong>Execution:</strong> Native binary, OpenMP</p>
 <h3 id="13-sfincs_floodmap">13. sfincs_floodmap<a class="headerlink" href="#13-sfincs_floodmap" title="Permanent link">#</a></h3>
 <p><strong>Purpose:</strong> Downscale SFINCS water levels to a high-resolution flood depth map.</p>
 <p><strong>Tasks:</strong></p>
@@ -2336,7 +2375,7 @@ is skipped when <code>floodmap_dem</code> is not configured, <code>floodmap_enab
     masked out</li>
 <li><code>floodmap_enabled</code>: set to <code>false</code> to skip this stage entirely (default: <code>true</code>)</li>
 </ul>
-<p><strong>Runs On:</strong> Login node or compute node (Python-only)</p>
+<p><strong>Execution:</strong> Python + <code>gdalwarp</code></p>
 <p><strong>Outputs:</strong></p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>model_root/
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>├── floodmap_hmax.tif    # Flood depth COG
@@ -2353,7 +2392,8 @@ is skipped when <code>floodmap_dem</code> is not configured, <code>floodmap_enab
 <li>Generate comparison plots (simulated vs observed)</li>
 <li>Save figures to the <code>figs/</code> directory</li>
 </ul>
-<p><strong>Runs On:</strong> Login node or compute node (Python, requires network access)</p>
+<p><strong>Execution:</strong> Python-only</p>
+<p><strong>Requires:</strong> Network access for the NOAA CO-OPS API</p>
 <div class="admonition tip">
 <p class="admonition-title">Output datum conversion</p>
 <p>SFINCS output inherits the vertical datum of the mesh (e.g. NAVD88). The
@@ -2433,6 +2473,7 @@ separate configuration schema (<code>SfincsCreateConfig</code>) and a dedicated 
 <li>Create the base grid in the specified CRS</li>
 <li>Apply quadtree refinement based on configured levels and criteria</li>
 </ul>
+<p><strong>Execution:</strong> Python (HydroMT-SFINCS)</p>
 <h3 id="2-create_fetch_data">2. create_fetch_data<a class="headerlink" href="#2-create_fetch_data" title="Permanent link">#</a></h3>
 <p><strong>Purpose:</strong> Fetch elevation and land cover data for the AOI.</p>
 <p><strong>Enabled by:</strong> Any elevation dataset with a <code>source</code> field, or <code>subgrid.lulc_source</code>.
@@ -2448,6 +2489,9 @@ Skipped when all datasets are user-provided (no auto-fetch configured).</p>
 <li>For ESA WorldCover land cover: download and mosaic land-use / land-cover tiles</li>
 <li>Write a HydroMT data catalog YAML for the fetched datasets</li>
 </ul>
+<p><strong>Execution:</strong> Python + <code>gdalwarp</code>, <code>gdalbuildvrt</code></p>
+<p><strong>Requires:</strong> Network access for the configured elevation and land-cover sources; AWS
+credentials for the NWS topobathy store</p>
 <h3 id="3-create_elevation">3. create_elevation<a class="headerlink" href="#3-create_elevation" title="Permanent link">#</a></h3>
 <p><strong>Purpose:</strong> Add elevation and bathymetry data to the grid.</p>
 <p><strong>Tasks:</strong></p>
@@ -2456,6 +2500,7 @@ Skipped when all datasets are user-provided (no auto-fetch configured).</p>
 <li>Interpolate elevation values onto the quadtree grid cells</li>
 <li>Apply <code>zmin</code>/<code>zmax</code> filters per dataset</li>
 </ul>
+<p><strong>Execution:</strong> Python (HydroMT-SFINCS)</p>
 <h3 id="4-create_mask">4. create_mask<a class="headerlink" href="#4-create_mask" title="Permanent link">#</a></h3>
 <p><strong>Purpose:</strong> Create the active cell mask.</p>
 <p><strong>Tasks:</strong></p>
@@ -2463,6 +2508,7 @@ Skipped when all datasets are user-provided (no auto-fetch configured).</p>
 <li>Determine which grid cells are active based on elevation thresholds</li>
 <li>Apply land/water masking criteria</li>
 </ul>
+<p><strong>Execution:</strong> Python (HydroMT-SFINCS)</p>
 <h3 id="5-create_boundary">5. create_boundary<a class="headerlink" href="#5-create_boundary" title="Permanent link">#</a></h3>
 <p><strong>Purpose:</strong> Create water level boundary cells.</p>
 <p><strong>Tasks:</strong></p>
@@ -2470,6 +2516,7 @@ Skipped when all datasets are user-provided (no auto-fetch configured).</p>
 <li>Identify grid cells along the open ocean boundary</li>
 <li>Assign boundary condition flags</li>
 </ul>
+<p><strong>Execution:</strong> Python (HydroMT-SFINCS)</p>
 <h3 id="6-create_discharge-optional">6. create_discharge <em>(optional)</em><a class="headerlink" href="#6-create_discharge-optional" title="Permanent link">#</a></h3>
 <p><strong>Purpose:</strong> Add river discharge source points to the model.</p>
 <p><strong>Enabled by:</strong> Configuring a <code>river_discharge</code> section in the creation config. Skipped
@@ -2482,6 +2529,7 @@ when <code>river_discharge</code> is not present.</p>
 <li>Write the SFINCS <code>.src</code> file and a discharge locations file usable by the simulation
     workflow</li>
 </ul>
+<p><strong>Execution:</strong> Python-only</p>
 <h3 id="7-create_subgrid">7. create_subgrid<a class="headerlink" href="#7-create_subgrid" title="Permanent link">#</a></h3>
 <p><strong>Purpose:</strong> Generate subgrid lookup tables.</p>
 <p><strong>Tasks:</strong></p>
@@ -2490,6 +2538,8 @@ when <code>river_discharge</code> is not present.</p>
 <li>These tables allow SFINCS to use coarse computational cells while capturing fine-scale
     topographic detail</li>
 </ul>
+<p><strong>Execution:</strong> Python (HydroMT-SFINCS). The most compute- and memory-intensive creation
+stage.</p>
 <h3 id="8-create_obs-optional">8. create_obs <em>(optional)</em><a class="headerlink" href="#8-create_obs-optional" title="Permanent link">#</a></h3>
 <p><strong>Purpose:</strong> Add observation points to the model.</p>
 <p><strong>Enabled by:</strong> Setting <code>add_noaa_gages: true</code>, providing <code>observation_points</code>, or
@@ -2503,6 +2553,8 @@ these are configured.</p>
     user-specified observation points</li>
 <li>Write observation point locations into the SFINCS model</li>
 </ul>
+<p><strong>Execution:</strong> Python-only</p>
+<p><strong>Requires:</strong> Network access for the NOAA CO-OPS API when <code>add_noaa_gages</code> is true</p>
 <h3 id="9-create_write">9. create_write<a class="headerlink" href="#9-create_write" title="Permanent link">#</a></h3>
 <p><strong>Purpose:</strong> Write the complete SFINCS model to disk.</p>
 <p><strong>Tasks:</strong></p>
@@ -2510,6 +2562,7 @@ these are configured.</p>
 <li>Write all SFINCS input files to the configured <code>output_dir</code></li>
 <li>The output directory can be used as <code>prebuilt_dir</code> in a simulation config</li>
 </ul>
+<p><strong>Execution:</strong> Python (HydroMT-SFINCS)</p>
 
 
 

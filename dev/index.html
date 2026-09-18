@@ -669,10 +669,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#schism-11-stages" class="md-nav__link">
+  <a href="#schism-12-stages" class="md-nav__link">
     <span class="md-ellipsis">
       
-        SCHISM (11 stages)
+        SCHISM (12 stages)
       
     </span>
   </a>
@@ -1726,13 +1726,10 @@ execution to validation against NOAA tide gauges.</p>
 <td>Yes (downscaled to DEM)</td>
 <td>Not yet supported</td>
 </tr>
-<tr>
-<td><strong>Domains</strong></td>
-<td>CONUS, Hawaii, Puerto Rico</td>
-<td>CONUS, Hawaii, Puerto Rico</td>
-</tr>
 </tbody>
 </table>
+<p>Both models support the same domains: CONUS, Hawaii, Puerto Rico/Virgin Islands, Alaska,
+and the Great Lakes.</p>
 <h2 id="design">Design<a class="headerlink" href="#design" title="Permanent link">#</a></h2>
 <ul>
 <li><strong>Single configuration</strong>: one YAML file (or Python dictionary) defines the entire
@@ -1762,11 +1759,12 @@ execution to validation against NOAA tide gauges.</p>
     catchment-level workflows</li>
 </ol>
 <h2 id="quick-start">Quick Start<a class="headerlink" href="#quick-start" title="Permanent link">#</a></h2>
+<p>See documentation pages for cluster installation.</p>
 <h3 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">#</a></h3>
 <p>Prerequisites: <a href="https://git-scm.com/">Git</a> and
 <a href="https://pixi.prefix.dev/latest/installation/">Pixi</a>. Pixi handles all other
 dependencies including Python and compiling SFINCS and SCHISM from source.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/NGWPC/nwm-coastal
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git<span class="w"> </span>clone<span class="w"> </span>--recurse-submodules<span class="w"> </span>https://github.com/NGWPC/nwm-coastal
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">cd</span><span class="w"> </span>nwm-coastal
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>pixi<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>dev
 </span></code></pre></div>
@@ -1841,10 +1839,10 @@ dependencies including Python and compiling SFINCS and SCHISM from source.</p>
 </table>
 <p><strong>Domains</strong>: <code>atlgulf</code>, <code>pacific</code>, <code>hawaii</code>, <code>prvi</code>, <code>alaska</code>, <code>greatlakes</code></p>
 <h2 id="workflow-stages">Workflow Stages<a class="headerlink" href="#workflow-stages" title="Permanent link">#</a></h2>
-<h3 id="schism-11-stages">SCHISM (11 stages)<a class="headerlink" href="#schism-11-stages" title="Permanent link">#</a></h3>
+<h3 id="schism-12-stages">SCHISM (12 stages)<a class="headerlink" href="#schism-12-stages" title="Permanent link">#</a></h3>
 <p><code>download</code> → <code>schism_forcing_prep</code> → <code>schism_forcing</code> → <code>schism_sflux</code> → <code>schism_params</code>
-→ <code>schism_obs</code> → <code>schism_boundary</code> → <code>schism_prep</code> → <code>schism_run</code> → <code>schism_postprocess</code>
-→ <code>schism_plot</code></p>
+→ <code>schism_obs</code> → <code>schism_boundary</code> → <code>schism_discharge</code> → <code>schism_prep</code> → <code>schism_run</code> →
+<code>schism_postprocess</code> → <code>schism_plot</code></p>
 <h3 id="sfincs-14-stages">SFINCS (14 stages)<a class="headerlink" href="#sfincs-14-stages" title="Permanent link">#</a></h3>
 <p><code>download</code> → <code>sfincs_symlinks</code> → <code>sfincs_data_catalog</code> → <code>sfincs_init</code> → <code>sfincs_timing</code>
 → <code>sfincs_forcing</code> → <code>sfincs_discharge</code> → <code>sfincs_precip</code> → <code>sfincs_wind</code> →

@@ -1745,9 +1745,9 @@ defaults.</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>pixi<span class="w"> </span>r<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>coastal-calibration<span class="w"> </span>validate<span class="w"> </span>config.yaml
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>pixi<span class="w"> </span>r<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>coastal-calibration<span class="w"> </span>run<span class="w"> </span>config.yaml
 </span></code></pre></div>
-<p>The pipeline executes 11 stages: download, forcing preparation, atmospheric regridding,
-boundary conditions, mesh partitioning, model execution, and validation against NOAA
-observations.</p>
+<p>The pipeline executes 12 stages: download, forcing preparation, atmospheric regridding,
+boundary conditions, river discharge, mesh partitioning, model execution, and validation
+against NOAA observations.</p>
 <h3 id="running-on-hpc">Running on HPC<a class="headerlink" href="#running-on-hpc" title="Permanent link">#</a></h3>
 <p>On clusters, write an <code>sbatch</code> script with an inline YAML config:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="ch">#!/usr/bin/env bash</span>

@@ -1558,7 +1558,7 @@
 <p>Pixi handles all other dependencies including Python, and compiling SFINCS and SCHISM
 from source. No containers are required.</p>
 <h2 id="install">Install<a class="headerlink" href="#install" title="Permanent link">#</a></h2>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/NGWPC/nwm-coastal
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git<span class="w"> </span>clone<span class="w"> </span>--recurse-submodules<span class="w"> </span>https://github.com/NGWPC/nwm-coastal
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">cd</span><span class="w"> </span>nwm-coastal
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>pixi<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>dev
 </span></code></pre></div>
@@ -1598,13 +1598,13 @@ git submodules). Subsequent activations skip the build if dependencies have not 
 <td><code>pixi r -e dev &lt;cmd&gt;</code></td>
 </tr>
 <tr>
-<td><code>test311</code></td>
-<td>CI matrix on Python 3.11</td>
-<td><code>pixi r -e test311 test</code></td>
+<td><code>default</code></td>
+<td>Python package only, no model binaries</td>
+<td><code>pixi r &lt;cmd&gt;</code></td>
 </tr>
 <tr>
 <td><code>test313</code></td>
-<td>CI matrix on Python 3.13</td>
+<td>Test suite as run in CI</td>
 <td><code>pixi r -e test313 test</code></td>
 </tr>
 <tr>
@@ -1624,9 +1624,12 @@ git submodules). Subsequent activations skip the build if dependencies have not 
 </tr>
 </tbody>
 </table>
+<p>All environments use Python 3.13; the package requires 3.13 or newer.</p>
 <p><code>dev</code> installs every binary (SCHISM, SFINCS, predict_tide) and every Python dependency
-needed to develop, test, and run the package. The <code>test311</code> / <code>test313</code> envs mirror it
-for the CI Python-version matrix.</p>
+needed to develop, test, and run the package. <code>test313</code> mirrors it without the notebook
+and changelog tooling, and is what CI runs. <code>default</code> is the lightweight option: the
+Python package and its dependencies, without SCHISM, SFINCS, or the MPI/ESMF stack, so
+it installs without compiling anything.</p>
 <h2 id="qgis-plugin">QGIS Plugin<a class="headerlink" href="#qgis-plugin" title="Permanent link">#</a></h2>
 <p>The repository includes a QGIS plugin for interactive domain definition. See the
 <a href="../../user-guide/qgis-plugin/">QGIS Plugin guide</a> for installation and usage
