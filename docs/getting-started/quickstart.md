@@ -9,6 +9,8 @@ This guide walks you through running your first coastal simulation.
 - For SFINCS: a pre-built model directory (or create one from an AOI polygon using the
     `create` workflow)
 
+See [Download Model Data](installation.md#download-model-data) for where to get these.
+
 ## SCHISM Quick Start
 
 ### Step 1: Generate a Configuration File

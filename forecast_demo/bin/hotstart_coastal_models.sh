@@ -30,7 +30,7 @@
 #
 # Discharge, precip, and wind/pressure are all disabled for the SCHISM/SFINCS
 # spin-up via config overrides in gen_cycle_config.py's --run-type spinup
-# (not by editing schism_sims/run.yaml or sfincs_sims/run.yaml - this way
+# (not by editing the schism_sims/ or sfincs_sims/ base templates - this way
 # every other real ana/sr cycle sharing those base templates is unaffected):
 #   - SCHISM: discharge_file pointed at a deliberately nonexistent path
 #     (skips schism_discharge AND the precip regridding that feeds it,
@@ -117,10 +117,14 @@ done
 NWM_COASTAL_PY="${NWM_COASTAL_ROOT}/nwm-coastal-py"
 NWM_COASTAL_CLI="${NWM_COASTAL_ROOT}/nwm-coastal-cli"
 GEN_SCRIPT="${NWM_COASTAL_ROOT}/forecast_demo/bin/gen_cycle_config.py"
-SCHISM_BASE_YAML="${RUN_COASTAL_ROOT}/schism_sims/run.yaml"
-SFINCS_BASE_YAML="${RUN_COASTAL_ROOT}/sfincs_sims/run.yaml"
+SCHISM_BASE_YAML="${RUN_COASTAL_ROOT}/schism_sims/example_schism_forecast_run.yaml"
+SFINCS_BASE_YAML="${RUN_COASTAL_ROOT}/sfincs_sims/example_sfincs_forecast_run.yaml"
 SCHISM_CYCLES_DIR="${RUN_COASTAL_ROOT}/schism_sims/cycles"
 SFINCS_CYCLES_DIR="${RUN_COASTAL_ROOT}/sfincs_sims/cycles"
+
+for _yaml in "${SCHISM_BASE_YAML}" "${SFINCS_BASE_YAML}"; do
+  [ -f "${_yaml}" ] || { echo "ERROR: base run template not found: ${_yaml} -- see forecast_demo/README.md" >&2; exit 1; }
+done
 
 # VPU/NWM_RTE_DIR/EWTS_ENABLED/TROUTE_REGIONALIZATION_ROOT* mirror
 # suite_def/coastal_hourly.def.template's own `edit` block exactly (see
