@@ -1827,6 +1827,10 @@ directory.</p>
 <p>Check that model binaries exist in the environment:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>ls<span class="w"> </span>&lt;SHARED_DIR&gt;/coastal-calibration/.pixi/envs/dev/bin/<span class="o">{</span>sfincs,pschism,mpiexec,gpmetis<span class="o">}</span>
 </span></code></pre></div>
+<p>Once the environment is verified, download the model data with
+<code>scripts/setup_data_coastal.sh</code> — see
+<a href="../installation/#download-model-data">Download Model Data</a>. Put it on the shared
+filesystem so every compute node can reach it.</p>
 <h2 id="uninstalling">Uninstalling<a class="headerlink" href="#uninstalling" title="Permanent link">#</a></h2>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>rm<span class="w"> </span>-rf<span class="w"> </span>&lt;SHARED_DIR&gt;/coastal-calibration
 </span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>sudo<span class="w"> </span>rm<span class="w"> </span>-f<span class="w"> </span>/etc/profile.d/coastal-calibration.sh

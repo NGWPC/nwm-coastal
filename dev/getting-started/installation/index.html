@@ -655,6 +655,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#download-model-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Download Model Data
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Download Model Data">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#without-aws-credentials" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Without AWS credentials
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#available-environments" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1582,6 +1610,65 @@ git submodules). Subsequent activations skip the build if dependencies have not 
 </span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="go">  update-dem-index   Rebuild the NOAA DEM spatial index from S3 STAC metadata.</span>
 </span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="go">  validate           Validate a configuration file.</span>
 </span></code></pre></div>
+<h2 id="download-model-data">Download Model Data<a class="headerlink" href="#download-model-data" title="Permanent link">#</a></h2>
+<p>The workflows need model data that is not in the repository: prebuilt SCHISM and SFINCS
+models, ESMF mesh and domain files, the TPXO tidal atlas, and hydrofabric copies. With
+AWS credentials for <code>s3://ngwpc-dev</code>, one script fetches all of it:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>./scripts/setup_data_coastal.sh
+</span></code></pre></div>
+<p>It asks where each directory should go, defaulting to siblings of your <code>nwm-coastal</code>
+checkout, and writes:</p>
+<table>
+<thead>
+<tr>
+<th>Directory</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>run_coastal/</code></td>
+<td>Prebuilt SCHISM and SFINCS models</td>
+</tr>
+<tr>
+<td><code>coastal_data/</code></td>
+<td>TPXO tidal atlas, hydrofabric copies</td>
+</tr>
+<tr>
+<td><code>run_ngen/data/esmf_mesh/</code></td>
+<td>ESMF mesh, domain, and extract files</td>
+</tr>
+</tbody>
+</table>
+<p>Set <code>RUN_NGEN_ROOT</code> or <code>RUN_COASTAL_ROOT</code> beforehand to skip those prompts. Use
+<code>--dry-run</code> to preview, and <code>--help</code> for the full options. <code>run_coastal</code> is large, so
+the first run takes a while.</p>
+<p>Point <code>paths.tidal_atlas_dir</code> at <code>coastal_data/TPXO10_atlas_v2_nc</code> in any configuration
+that uses harmonic tides.</p>
+<h3 id="without-aws-credentials">Without AWS credentials<a class="headerlink" href="#without-aws-credentials" title="Permanent link">#</a></h3>
+<p>Most of this data has a public equivalent:</p>
+<ul>
+<li><strong>SCHISM models.</strong> NOAA publishes the NWM coastal module parameters at
+    <a href="https://water.noaa.gov/about/nwm">water.noaa.gov/about/nwm</a>, as
+    <a href="https://www.nohrsc.noaa.gov/owp_files/nwm/nwm_parameters/NWM_coastal_parameters.tar.gz"><code>NWM_coastal_parameters.tar.gz</code></a>.
+    Use an unpacked domain directory as <code>model_config.prebuilt_dir</code>. These may not
+    include the WRF geogrid file that <code>model_config.geogrid_file</code> needs; check the
+    <a href="https://www.nohrsc.noaa.gov/owp_files/nwm/nwm_parameters/NWM_parameter_files_v3.0.tar.gz">NWM parameter files</a>
+    as well.</li>
+<li><strong>SFINCS models.</strong> No credentials needed. The <code>create</code> workflow builds a model from an
+    AOI polygon using public elevation and land-cover sources, so you can make your own
+    — see the <a href="../../examples/notebooks/lavaca/">Lavaca Bay example</a>.</li>
+<li><strong>Tides.</strong> The TPXO10 atlas is free for academic and non-commercial use but requires
+    registration at <a href="https://www.tpxo.net/">tpxo.net</a>. It is only needed for
+    <code>boundary.source: harmonic</code>; <code>stofs</code> and <code>glofs</code> are public and need no
+    registration.</li>
+<li><strong>Hydrofabric.</strong> NextGen hydrofabric geopackages are published by
+    <a href="https://noaa-owp.github.io/hydrofabric/">Lynker Spatial</a> under ODbL.</li>
+</ul>
+<p>Retrospective and analysis runs work entirely from public data once you have a model:
+NWM forcing, STOFS, and GLOFS are all open. The ecFlow forecast demo in <code>forecast_demo/</code>
+is the exception — it additionally needs the <code>nwm-rte</code> repository and the staged data
+above.</p>
 <h2 id="available-environments">Available Environments<a class="headerlink" href="#available-environments" title="Permanent link">#</a></h2>
 <table>
 <thead>
