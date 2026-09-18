@@ -17,11 +17,11 @@ if TYPE_CHECKING:
 
 # S3 prefixes keyed by short domain name.
 _PREFIXES: dict[str, str] = {
-    "atlgulf": "surface/nws-topobathy/tbdem_conus_atlantic_gulf_30m",
-    "hi": "surface/nws-topobathy/tbdem_hawaii_30m",
-    "prvi": "surface/nws-topobathy/tbdem_pr_usvi_30m",
-    "pacific": "surface/nws-topobathy/tbdem_conus_pacific_30m",
-    "ak": "surface/nws-topobathy/tbdem_alaska_30m",
+    "atlgulf": "nwm-tools-data/nws-topobathy/tbdem_conus_atlantic_gulf_30m",
+    "hi": "nwm-tools-data/nws-topobathy/tbdem_hawaii_30m",
+    "prvi": "nwm-tools-data/nws-topobathy/tbdem_pr_usvi_30m",
+    "pacific": "nwm-tools-data/nws-topobathy/tbdem_conus_pacific_30m",
+    "ak": "nwm-tools-data/nws-topobathy/tbdem_alaska_30m",
 }
 
 # Aliases so callers can use the CoastalDomain literals directly.
@@ -30,7 +30,7 @@ _DOMAIN_ALIASES: dict[str, str] = {
     "alaska": "ak",
 }
 
-_S3_BUCKET = "edfs-data"
+_S3_BUCKET = "ngwpc-dev"
 _S3_REGION = "us-east-1"
 
 

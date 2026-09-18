@@ -44,6 +44,58 @@ Commands:
   validate           Validate a configuration file.
 ```
 
+## Download Model Data
+
+The workflows need model data that is not in the repository: prebuilt SCHISM and SFINCS
+models, ESMF mesh and domain files, the TPXO tidal atlas, and hydrofabric copies. With
+AWS credentials for `s3://ngwpc-dev`, one script fetches all of it:
+
+```bash
+./scripts/setup_data_coastal.sh
+```
+
+It asks where each directory should go, defaulting to siblings of your `nwm-coastal`
+checkout, and writes:
+
+| Directory                  | Contents                                  |
+| -------------------------- | ----------------------------------------- |
+| `run_coastal/`             | Prebuilt SCHISM and SFINCS models         |
+| `coastal_data/`            | TPXO tidal atlas, hydrofabric copies      |
+| `run_ngen/data/esmf_mesh/` | ESMF mesh, domain, and extract files      |
+
+Set `RUN_NGEN_ROOT` or `RUN_COASTAL_ROOT` beforehand to skip those prompts. Use
+`--dry-run` to preview, and `--help` for the full options. `run_coastal` is large, so
+the first run takes a while.
+
+Point `paths.tidal_atlas_dir` at `coastal_data/TPXO10_atlas_v2_nc` in any configuration
+that uses harmonic tides.
+
+### Without AWS credentials
+
+Most of this data has a public equivalent:
+
+- **SCHISM models.** NOAA publishes the NWM coastal module parameters at
+    [water.noaa.gov/about/nwm](https://water.noaa.gov/about/nwm), as
+    [`NWM_coastal_parameters.tar.gz`](https://www.nohrsc.noaa.gov/owp_files/nwm/nwm_parameters/NWM_coastal_parameters.tar.gz).
+    Use an unpacked domain directory as `model_config.prebuilt_dir`. These may not
+    include the WRF geogrid file that `model_config.geogrid_file` needs; check the
+    [NWM parameter files](https://www.nohrsc.noaa.gov/owp_files/nwm/nwm_parameters/NWM_parameter_files_v3.0.tar.gz)
+    as well.
+- **SFINCS models.** No credentials needed. The `create` workflow builds a model from an
+    AOI polygon using public elevation and land-cover sources, so you can make your own
+    — see the [Lavaca Bay example](../examples/notebooks/lavaca.ipynb).
+- **Tides.** The TPXO10 atlas is free for academic and non-commercial use but requires
+    registration at [tpxo.net](https://www.tpxo.net/). It is only needed for
+    `boundary.source: harmonic`; `stofs` and `glofs` are public and need no
+    registration.
+- **Hydrofabric.** NextGen hydrofabric geopackages are published by
+    [Lynker Spatial](https://noaa-owp.github.io/hydrofabric/) under ODbL.
+
+Retrospective and analysis runs work entirely from public data once you have a model:
+NWM forcing, STOFS, and GLOFS are all open. The ecFlow forecast demo in `forecast_demo/`
+is the exception — it additionally needs the `nwm-rte` repository and the staged data
+above.
+
 ## Available Environments
 
 | Environment | Description                          | Command                         |

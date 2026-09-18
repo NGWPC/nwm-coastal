@@ -226,6 +226,11 @@ Check that model binaries exist in the environment:
 ls <SHARED_DIR>/coastal-calibration/.pixi/envs/dev/bin/{sfincs,pschism,mpiexec,gpmetis}
 ```
 
+Once the environment is verified, download the model data with
+`scripts/setup_data_coastal.sh` — see
+[Download Model Data](installation.md#download-model-data). Put it on the shared
+filesystem so every compute node can reach it.
+
 ## Uninstalling
 
 ```bash
