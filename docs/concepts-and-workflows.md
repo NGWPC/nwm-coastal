@@ -1,10 +1,26 @@
 # Concepts and Workflows
 
-This page explains how the pieces fit together: where data lives, why SCHISM and SFINCS
-are set up differently, what topobathy is available and how to add your own, and what a
-forecast needs beyond a normal run.
+NWM Coastal is a toolset for configuring, calibrating, and validating SCHISM and SFINCS
+coastal models for the Next Generation National Water Model, driving each simulation
+from a single configuration file and command-line interface. Routed NWM streamflow
+enters at the models' river inflow points, tides and storm surge at the ocean boundary,
+and meteorological data over the domain surface. From these inputs, the models simulate
+total water level and coastal flooding. NOAA CO-OPS water level observations can be
+downloaded automatically and compared against the simulated results.
 
-For step-by-step stage details, see [Workflow Stages](user-guide/workflow-stages.md).
+Each NWM v3.0 coastal domain has an existing SCHISM mesh, and this package can subset
+one to a smaller region of interest. Generating new SCHISM meshes programmatically is
+not yet feasible for implementation into the package. SFINCS was included for the
+complementary capability: HydroMT-SFINCS can build a complete model — grid, elevation,
+roughness, and boundaries — programmatically from an area-of-interest polygon, making it
+practical to stand up coverage or improve resolution wherever it may be needed.
+
+This page describes the system as a whole: the directory structure it expects, the
+topobathy and land cover available for building models, the forcing data that drives
+simulations, and the additional components required to run a forecast through the
+NextGen framework.
+
+For per-stage details, see [Workflow Stages](user-guide/workflow-stages.md).
 
 ## Directory Layout
 
