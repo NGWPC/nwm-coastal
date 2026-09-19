@@ -105,7 +105,7 @@ coast** — that gives sources with no sinks, which is what the model is designe
 practice that means drawing the AOI so each contributing river crosses the boundary once,
 rather than meandering in and out of it. The QGIS plugin's watershed-aligned domain tools
 make this straightforward; see
-[Concepts and Workflows](../concepts-and-workflows.md#qgis-plugin).
+[Concepts and Workflows](../concepts/index.md#qgis-plugin).
 
 When comparing results between the two models, expect the largest discrepancies at river
 mouths where a SCHISM mesh carries spurious source/sink pairs, and interpret them as a

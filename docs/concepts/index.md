@@ -20,13 +20,13 @@ topobathy and land cover available for building models, the forcing data that dr
 simulations, and the additional components required to run a forecast through the
 NextGen framework.
 
-For per-stage details, see [Workflow Stages](user-guide/workflow-stages.md).
+For per-stage details, see [Workflow Stages](../user-guide/workflow-stages.md).
 
 ## Directory Layout
 
 `nwm-coastal` expects several sibling directories. Everything except the repository
 itself is populated by
-[`scripts/setup_data_coastal.sh`](getting-started/installation.md#download-model-data).
+[`scripts/setup_data_coastal.sh`](../getting-started/installation.md#download-model-data).
 
 ```
 ngwpc/
@@ -69,19 +69,19 @@ generated per run and should not be copied between machines.
 Running a whole domain needs no special mode — you simply skip the subsetting step and
 point `prebuilt_dir` at the full mesh instead of a subset. A worked retrospective
 configuration is at
-[`schism_retro_full_domain.yaml`](examples/schism_retro_full_domain.yaml).
+[`schism_retro_full_domain.yaml`](../examples/schism_retro_full_domain.yaml).
 
 Full domains are large. The Atlantic/Gulf mesh is roughly 10.5 million nodes and 2.7
 million elements, so it needs a genuine multi-node MPI allocation rather than a
-workstation — see the [sbatch pattern](user-guide/cli.md#using-run-inside-a-slurm-job-heredoc-recommended).
+workstation — see the [sbatch pattern](../user-guide/cli.md#using-run-inside-a-slurm-job-heredoc-recommended).
 Subsetting exists precisely so that regional studies do not pay that cost.
 
 ## QGIS Plugin
 
-The [QGIS plugin](user-guide/qgis-plugin.md) produces the GeoJSON inputs for both
+The [QGIS plugin](../user-guide/qgis-plugin.md) produces the GeoJSON inputs for both
 models. It does two jobs.
 
-![The nwm_coastal toolbar in QGIS](examples/images/plugin_window.png)
+![The nwm_coastal toolbar in QGIS](../examples/images/plugin_window.png)
 
 **Subsetting a SCHISM mesh.** Load a full mesh, draw a polygon around the region you
 care about, and save it. `extract_mesh` then clips the mesh to that polygon and rebuilds
@@ -89,14 +89,14 @@ the open boundaries where the polygon cuts across it, producing a small, self-co
 model directory. A regional subset runs in minutes on a workstation where the full
 domain needs a cluster.
 
-![Drawing a subset polygon over the Pacific SCHISM mesh](examples/images/plugin_extract_schism.png)
+![Drawing a subset polygon over the Pacific SCHISM mesh](../examples/images/plugin_extract_schism.png)
 
 **Defining a SFINCS domain.** The same drawing tools produce the AOI polygon that
 `create` consumes, an optional refinement polygon for finer quadtree resolution, and the
 NWM flowpaths that become river discharge points. Aligning the AOI to watershed
 boundaries keeps the hydrology coherent.
 
-![Model domain aligned to watershed boundaries](examples/images/plugin_divide_union.png)
+![Model domain aligned to watershed boundaries](../examples/images/plugin_divide_union.png)
 
 ## SFINCS: Models Are Created
 
@@ -111,7 +111,7 @@ pixi r -e dev coastal-calibration create create_config.yaml
 hood. It builds a quadtree grid from the AOI, fetches and applies elevation and land
 cover, masks active cells, sets boundary cells, adds river discharge points, builds
 subgrid tables, and writes the model. The output directory becomes the `prebuilt_dir`
-for simulation runs. See the [create stages](user-guide/workflow-stages.md#sfincs-creation-stages)
+for simulation runs. See the [create stages](../user-guide/workflow-stages.md#sfincs-creation-stages)
 for what each step does.
 
 ## Topobathy and Land Cover
@@ -199,7 +199,7 @@ with `--start-from` rather than restarted. `--dry-run` validates without executi
 
 Forcing comes from `simulation.meteo_source`: `nwm_retro` for historical periods and
 `nwm_ana` for 2018 onward. Both are public and need no credentials. See
-[Supported Data Sources](user-guide/configuration.md#domains) for coverage by domain.
+[Supported Data Sources](../user-guide/configuration.md#domains) for coverage by domain.
 
 ## Forecasts
 
@@ -250,4 +250,4 @@ The two models handle river discharge differently, which matters when comparing 
 
 The practical recommendation for SFINCS is to define the domain so rivers enter across
 the boundary and drain to the open coast, giving sources with no sinks. See
-[Spurious source/sink points](dev/schism_sink_source_issue.md) for the full analysis.
+[Spurious source/sink points](../dev/schism_sink_source_issue.md) for the full analysis.
