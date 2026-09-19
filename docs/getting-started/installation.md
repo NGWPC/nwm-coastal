@@ -89,7 +89,8 @@ Most of this data has a public equivalent:
     `boundary.source: harmonic`; `stofs` and `glofs` are public and need no
     registration.
 - **Hydrofabric.** NextGen hydrofabric geopackages are published by
-    [Lynker Spatial](https://noaa-owp.github.io/hydrofabric/) under ODbL.
+    [Lynker Spatial](https://docs.lynker-spatial.com/data-service/hydrofabric) under
+    ODbL.
 
 Retrospective and analysis runs work entirely from public data once you have a model:
 NWM forcing, STOFS, and GLOFS are all open. The ecFlow forecast demo in `forecast_demo/`

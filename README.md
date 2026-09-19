@@ -12,6 +12,9 @@ arithmetic, and manual data management.
 configuration file drives the entire pipeline, from data download through model
 execution to validation against NOAA tide gauges.
 
+See [Concepts and Workflows](docs/concepts/index.md) for the context behind these tools
+and how they are meant to be used together.
+
 ## What It Does
 
 - **Domain definition**: QGIS plugin for interactively drawing the model domain and

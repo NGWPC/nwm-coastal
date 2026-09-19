@@ -24,30 +24,56 @@ For per-stage details, see [Workflow Stages](../user-guide/workflow-stages.md).
 
 ## Directory Layout
 
-`nwm-coastal` expects several sibling directories. Everything except the repository
-itself is populated by
-[`scripts/setup_data_coastal.sh`](../getting-started/installation.md#download-model-data).
+`nwm-coastal` is typically cloned alongside the other NWM repositories in a common
+parent directory, conventionally named `ngwpc/`. `nwm-rte`, the NextGen runtime
+environment, is required for forecast runs and is cloned separately.
 
 ```
 ngwpc/
 ├── nwm-coastal/      this repository — the coastal-calibration package and CLI
-├── nwm-rte/          NextGen runtime; needed only for forecasts
-├── run_ngen/         forcing engine and t-route outputs, ESMF mesh/domain files
+├── nwm-rte/          NextGen runtime environment; needed for forecasts only
+├── run_ngen/         ESMF mesh/domain files; forcing engine and t-route outputs for forecasts
 ├── run_coastal/      coastal models and simulation configs
 └── coastal_data/     TPXO tidal atlas, hydrofabric copies
 ```
+
+[`scripts/setup_data_coastal.sh`](../getting-started/installation.md#download-model-data)
+populates `coastal_data/`, `run_coastal/`, and the ESMF mesh and domain files under
+`run_ngen/data/esmf_mesh/`. The rest of `run_ngen/` is produced by running the forcing
+engine and t-route from `nwm-rte`.
+
+The forecast workflows locate these directories through four environment variables:
+
+| Variable           | Points to                  |
+| ------------------ | -------------------------- |
+| `NWM_COASTAL_ROOT` | this repository's checkout |
+| `NWM_RTE_ROOT`     | the `nwm-rte` checkout     |
+| `RUN_NGEN_ROOT`    | `run_ngen/`                |
+| `RUN_COASTAL_ROOT` | `run_coastal/`             |
+
+The setup script honors `RUN_NGEN_ROOT` and `RUN_COASTAL_ROOT`, prompting with the
+layout above when they are unset.
 
 `run_coastal/` is where the modeling actually happens:
 
 | Directory | Contents |
 | --------- | -------- |
-| `schism_models/` | Prebuilt SCHISM meshes, one per domain, plus subsets |
-| `sfincs_models/` | SFINCS models you have created |
+| `schism_models/` | Prebuilt SCHISM models, subset SCHISM models you have created |
+| `sfincs_models/` | Example SFINCS models, SFINCS models you have created |
 | `schism_sims/` | SCHISM run configurations and per-cycle outputs |
 | `sfincs_sims/` | SFINCS run configurations and per-cycle outputs |
 
-Paths in a run configuration are resolved relative to the configuration file, which is
-why the example configs use relative paths like `../schism_models/atlgulf`.
+`coastal_data/` is where supporting data is kept:
+
+| Directory | Contents |
+| --------- | -------- |
+| `TPXO10_atlas_v2_nc/` | TPXO10 tidal constituents, used for harmonic boundary forcing |
+| `hydrofabric_copies/ngen/` | NextGen hydrofabric geopackages, one per domain |
+| `hydrofabric_copies/nwmv3/` | NWM v3 hydrofabric geodatabase |
+
+If you cannot run the setup script, see
+[Without AWS credentials](../getting-started/installation.md#without-aws-credentials)
+for where to obtain this data publicly.
 
 ## SCHISM: Prebuilt Meshes
 
