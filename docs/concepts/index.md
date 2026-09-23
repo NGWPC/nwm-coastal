@@ -161,7 +161,7 @@ resources.
 
 You aren't locked into these SCHISM models - if you build a new SCHISM model, just add your model to the `schism_models\` directory and point to it in your run config to use it.
 
-## QGIS Plugin
+## QGIS Plugin: a tool for subsetting SCHISM models and/or creating SFINCS models
 
 The [QGIS plugin](../user-guide/qgis-plugin.md) produces GeoJSON files that can be used for either subsetting an existing SCHISM mesh, or creating a new SFINCS model.
 
