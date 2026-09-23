@@ -180,7 +180,7 @@ boundaries keeps the hydrology coherent.
 
 ![Model domain aligned to watershed boundaries](../examples/images/plugin_divide_union.png)
 
-## SFINCS Models Creation
+## SFINCS Model Creation
 
 There is no prebuilt SFINCS model library, but you can build a model for your area of interest with
 a create configuration file:
@@ -304,10 +304,9 @@ generated upstream by [`nwm-rte`](https://github.com/NGWPC/nwm-rte):
    `paths.troute_file`.
 
 With those in hand the coastal configuration sets `meteo_source: ngen_forecast` and runs
-exactly like any other simulation. Each cycle warm-starts from the previous cycle's
-hotstart or restart file, so the sequence is continuous rather than a series of cold
-starts.
+exactly like any other simulation.
 
 The [forecast demo](https://github.com/NGWPC/nwm-coastal/tree/development/forecast_demo)
-wires this together with ecFlow, running SCHISM and SFINCS hourly for analysis and
-short-range cycles.
+gives more information on doing this, running example SCHISM and SFINCS simulations for 
+AnA and short-range cycles. The forecast demo also showcases how to hotstart SCHISM and 
+SFINCS models by setting the relevant keywords in the run configs.
