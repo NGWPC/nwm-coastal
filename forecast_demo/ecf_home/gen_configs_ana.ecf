@@ -15,7 +15,7 @@ PREV_CYCLE=$(date -u -d "-1 hour ${CYCLE_DT}" +"%%Y%%m%%d%%H")
 
 T_MINUS_3_STAMP=$(date -u -d "-3 hours ${CYCLE_DT}" +"%%Y%%m%%d.%%H0000")
 
-# ngen_forcing_ana's output is named after the raw cycle time (run_coastal.py
+# ngen_forcing_ana's output is named after the raw cycle time (make_coastal_forcing.py
 # passes -dt straight through as RefcstBDateProc, unshifted.
 
 STAMP=${CYCLE}00

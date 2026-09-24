@@ -57,7 +57,27 @@ SCHISM_CYCLES_DIR = RUN_COASTAL_ROOT / "schism_sims" / "cycles"
 SFINCS_CYCLES_DIR = RUN_COASTAL_ROOT / "sfincs_sims" / "cycles"
 
 # Container-side paths for troute (baked into the RTE image, not host paths) - should not edit
-INSTALLED_REGIONALIZATION_RESULTS = "/ngen-app/ngen-python/lib/python3.11/site-packages/mswm/example_inputs/regionalization"
+def _installed_regionalization_results() -> str:
+    """Ask nwm-rte's config.bashrc where the image's regionalization results live."""
+    script = (
+        f'cd "{NWM_RTE_ROOT}" && '
+        "source config.bashrc && "
+        "resolve_installed_regionalization_results && "
+        'printf "%s" "${INSTALLED_REGIONALIZATION_RESULTS}"'
+    )
+    result = subprocess.run(
+        ["bash", "-c", script, f"{NWM_RTE_ROOT}/run.sh"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    path = result.stdout.strip()
+    if not path:
+        raise RuntimeError("resolve_installed_regionalization_results returned nothing")
+    return path
+
+
+INSTALLED_REGIONALIZATION_RESULTS = _installed_regionalization_results()
 FORMULATION_ASSIGNMENT_CSV = f"{INSTALLED_REGIONALIZATION_RESULTS}/vpu_{VPU}/formulation_assignment.csv"
 CATCHMENT_GROUPS_CSV = f"{INSTALLED_REGIONALIZATION_RESULTS}/vpu_{VPU}/catchment_groups.csv"
 HYDROFAB_FILE_CONTAINER = f"/ngwpc/run_ngen/data/hydrofabric/vpu_{VPU}.gpkg"
@@ -66,14 +86,14 @@ HYDROFAB_FILE_CONTAINER = f"/ngwpc/run_ngen/data/hydrofabric/vpu_{VPU}.gpkg"
 def run_nwm_rte(module: str, args: list[str]) -> subprocess.CompletedProcess:
     """cd into nwm-rte, source config, call an ngen_rte module in the RTE container.
 
-    EWTS_ENABLED=NO - this is a setting that was put into the RTE for this
+    RTE_EWTS_ENABLED=NO - this is a setting that was put into the RTE for this
     workflow because some logging files were getting stuck and throttling/
     stalling termination of troute runs.
     """
     quoted_args = " ".join(f'"{a}"' for a in args)
     script = (
         f'cd "{NWM_RTE_ROOT}" && '
-        f'export EWTS_ENABLED="NO" && '
+        f'export RTE_EWTS_ENABLED="NO" && '
         f"source config.bashrc && source run.sh && "
         f'docker_run python -um "{module}" {quoted_args}'
     )
@@ -310,7 +330,7 @@ run_nwm_rte(
 
 # Met forcing AnA: -lb/-fih 240 widens to T-3, emits all 4 hourly samples
 run_nwm_rte(
-    "ngen_rte.run_coastal",
+    "ngen_rte.coastal.make_coastal_forcing",
     [
         "-dt", CYCLE_DT,
         "-rname", "coastal_ana",
@@ -404,7 +424,7 @@ run_nwm_rte(
 
 # Met forcing SR
 run_nwm_rte(
-    "ngen_rte.run_coastal",
+    "ngen_rte.coastal.make_coastal_forcing",
     [
         "-dt", CYCLE_DT,
         "-rname", "coastal_short_range",
