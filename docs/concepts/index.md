@@ -24,6 +24,21 @@ For per-stage details, see [Workflow Stages](../user-guide/workflow-stages.md).
 
 ## Directory Layout
 
+### ParallelWorks EA Cluster
+NOTE: On ParallelWorks EA cluster, the common parent directory is called `ngencerf-app`
+and the `nwm-coastal` repo is called `coastal-calibration`. This section is written
+to be general, such that a user can set things up on their own machine (e.g. a Linux
+machine or a Windows machine with WSL) or their own cluster. When working on the EA 
+cluster, the environment variables would be: 
+```
+export NWM_COASTAL_ROOT=/ngencerf-app/coastal-calibration
+export NWM_RTE_ROOT=/ngencerf-app/nwm-rte
+export RUN_NGEN_ROOT=/ngencerf-app/run_ngen
+```
+It is users choice where they would like `RUN_COASTAL_ROOT` to be, and the supporting
+coastal data.
+
+### General
 `nwm-coastal` is typically cloned alongside the other NWM repositories in a common
 parent directory, conventionally named `ngwpc/`. `nwm-rte`, the NextGen runtime
 environment, is required for forecast runs and is cloned separately.
