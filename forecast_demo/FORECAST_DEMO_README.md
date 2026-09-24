@@ -179,11 +179,10 @@ Proceed to `forecast_walkthrough.py`, either as a script:
 nwm-coastal-py forecast_demo/forecast_walkthrough.py
 ```
 
-or cell by cell in the paired notebook:
-
-```bash
-pixi run -e docs jupyter lab docs/examples/notebooks/forecast_walkthrough.ipynb
-```
+or cell by cell in the paired notebook,
+`docs/examples/notebooks/forecast_walkthrough.ipynb`. Open it in VS Code (or any
+editor with Jupyter support) and select the `dev` pixi environment as the
+kernel -- the same environment `nwm-coastal-py` uses.
 
 Start Jupyter inside `tmux`/`screen` -- several cells may take a long time to
 run, and a dropped connection kills the kernel along with every variable it
