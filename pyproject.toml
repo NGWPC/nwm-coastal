@@ -141,9 +141,11 @@ changelog = "git cliff -c pyproject.toml --unreleased"
 # Update CHANGELOG.md with all unreleased commits
 changelog-update = "git cliff -c pyproject.toml -o CHANGELOG.md"
 # Sync all percent-format .py scripts → paired .ipynb files
-nb-sync = "jupytext --sync docs/examples/notebooks/*.py"
-# Execute all notebooks in-place (requires .ipynb to exist; run nb-sync first)
-nb-execute = "jupyter nbconvert --to notebook --execute --inplace docs/examples/notebooks/*.ipynb"
+nb-sync = "jupytext --sync docs/examples/notebooks/*.py forecast_demo/forecast_walkthrough.py"
+# Execute notebooks in-place (requires .ipynb to exist; run nb-sync first).
+# forecast_walkthrough is excluded on purpose: it needs docker + the RTE image
+# and may take a long time to run. Run it as a script, or cell by cell in Jupyter.
+nb-execute = "jupyter nbconvert --to notebook --execute --inplace docs/examples/notebooks/walkthrough.ipynb docs/examples/notebooks/lavaca.ipynb"
 # Full workflow: sync .py → .ipynb, then execute — use before building docs or committing
 nb-run = { depends-on = [ "nb-sync", "nb-execute" ] }
 # Pair an existing .ipynb with a .py counterpart (one-time setup for imported notebooks)

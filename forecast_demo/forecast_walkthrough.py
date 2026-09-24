@@ -1,15 +1,58 @@
-"""Run one AnA hour + one SR cycle by hand, no ecflow.
+# ---
+# jupyter:
+#   jupytext:
+#     cell_metadata_filter: -all
+#     formats: forecast_demo//py:percent,docs/examples/notebooks//ipynb
+#     notebook_metadata_filter: kernelspec,jupytext
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.19.5
+#   kernelspec:
+#     display_name: dev
+#     language: python
+#     name: python3
+# ---
 
-Setup steps are in README2.md. This script assumes setup is already done.
+# %% [markdown]
+# # Coastal forecast walkthrough: one AnA hour + one SR cycle
+#
+# Runs a single hourly cycle of the coastal pipeline by hand, without
+# ecflow, so each step can be inspected and re-run on its own:
+#
+# 1. **Environment + helpers** -- roots, target cycle, VPU.
+# 2. **Hydrofabric + ESMF mesh** -- one-time per VPU.
+# 3. **Hotstart** -- SCHISM/SFINCS spin-up and the troute AnA-A bootstrap.
+# 4. **AnA cycle** -- troute AnA-A/AnA-B, met forcing, then both coastal models.
+# 5. **SR cycle** -- troute SR, met forcing, then both coastal models.
+#
+# Each expensive step is its own cell: if one fails, fix it and re-run
+# that cell rather than starting over. Setup steps are in
+# `FORECAST_DEMO_README.md`; this assumes setup is already done.
+#
+# Run the whole thing non-interactively with:
+# `nwm-coastal-py forecast_demo/forecast_walkthrough.py`
+#
+# **Cells are order-dependent and not all idempotent** -- re-running a
+# troute cell overwrites saved state a later cell reads. Re-run forward
+# from the failure, not backward.
 
-Run with: nwm-coastal-py forecast_walkthrough2.py
-"""
+# %%
+"""Run one AnA hour + one SR cycle by hand, no ecflow."""
+
+from __future__ import annotations
 
 import os
 import shutil
 import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
+
+import pandas as pd
+
+from coastal_calibration.data.coops_api import query_coops_byids
+from coastal_calibration.plotting import plot_station_comparison
 
 
 def _required_env(name: str) -> str:
@@ -18,14 +61,13 @@ def _required_env(name: str) -> str:
         raise RuntimeError(f"{name} is not set")
     return value
 
-
-# ---------------------------------------------------------------------------
-# 1. Env vars
+# %% [markdown]
+# ## 1. Env vars
 # You must have NWM_COASTAL_ROOT, NWM_RTE_ROOT, RUN_NGEN_ROOT, and
 # RUN_COASTAL_ROOT populated before running this script. See README.md
 # and FORECAST_DEMO_README.md for the other setup requirements.
-# ---------------------------------------------------------------------------
 
+# %%
 NWM_COASTAL_ROOT = Path(_required_env("NWM_COASTAL_ROOT"))
 NWM_RTE_ROOT = Path(_required_env("NWM_RTE_ROOT"))
 RUN_NGEN_ROOT = Path(_required_env("RUN_NGEN_ROOT"))
@@ -56,6 +98,7 @@ SFINCS_BASE_YAML = RUN_COASTAL_ROOT / "sfincs_sims" / "example_sfincs_forecast_r
 SCHISM_CYCLES_DIR = RUN_COASTAL_ROOT / "schism_sims" / "cycles"
 SFINCS_CYCLES_DIR = RUN_COASTAL_ROOT / "sfincs_sims" / "cycles"
 
+# %%
 # Container-side paths for troute (baked into the RTE image, not host paths) - should not edit
 def _installed_regionalization_results() -> str:
     """Ask nwm-rte's config.bashrc where the image's regionalization results live."""
@@ -82,9 +125,23 @@ FORMULATION_ASSIGNMENT_CSV = f"{INSTALLED_REGIONALIZATION_RESULTS}/vpu_{VPU}/for
 CATCHMENT_GROUPS_CSV = f"{INSTALLED_REGIONALIZATION_RESULTS}/vpu_{VPU}/catchment_groups.csv"
 HYDROFAB_FILE_CONTAINER = f"/ngwpc/run_ngen/data/hydrofabric/vpu_{VPU}.gpkg"
 
+# %%
+# Subprocesses write straight to fd 1, which bypasses the notebook's stdout
+# capture -- pipe it back through print() so output appears in the cell.
+def run_streamed(cmd: list[str], env: dict | None = None) -> subprocess.CompletedProcess:
+    proc = subprocess.Popen(
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        text=True, bufsize=1, env=env,
+    )
+    for line in proc.stdout:
+        print(line, end="", flush=True)
+    if proc.wait() != 0:
+        raise subprocess.CalledProcessError(proc.returncode, cmd)
+    return subprocess.CompletedProcess(cmd, proc.returncode)
+
 # Helper function for when we call things through the RTE later (e.g. to run forcing engine and troute)
 def run_nwm_rte(module: str, args: list[str]) -> subprocess.CompletedProcess:
-    """cd into nwm-rte, source config, call an ngen_rte module in the RTE container.
+    """Cd into nwm-rte, source config, call an ngen_rte module in the RTE container.
 
     RTE_EWTS_ENABLED=NO - this is a setting that was put into the RTE for this
     workflow because some logging files were getting stuck and throttling/
@@ -98,7 +155,7 @@ def run_nwm_rte(module: str, args: list[str]) -> subprocess.CompletedProcess:
         f'docker_run python -um "{module}" {quoted_args}'
     )
     print(f"--- run_nwm_rte: {module} {quoted_args} ---")
-    return subprocess.run(["bash", "-c", script], check=True)
+    return run_streamed(["bash", "-c", script])
 
 # Helper function to call the automatic coastal model configuration generator (edits base run templates for
 # the coastal models)
@@ -111,7 +168,7 @@ def run_gen_cycle_config(model: str, run_type: str, **kwargs) -> subprocess.Comp
             continue
         args.extend([f"--{key.replace('_', '-')}", str(value)])
     print(f"--- run_gen_cycle_config: model={model} run_type={run_type} ---")
-    return subprocess.run(args, check=True)
+    return run_streamed(args)
 
 # Helper function to find troute output if it exists, to pull into the config generator
 def find_troute_output(region_dir: Path) -> Path:
@@ -125,11 +182,10 @@ def find_troute_output(region_dir: Path) -> Path:
 def nwm_coastal_cli(args: list[str]) -> subprocess.CompletedProcess:
     cli = NWM_COASTAL_ROOT / "nwm-coastal-cli"
     print(f"--- nwm-coastal-cli {' '.join(args)} ---")
-    return subprocess.run([str(cli), *args], check=True)
+    return run_streamed([str(cli), *args])
 
-
-# ---------------------------------------------------------------------------
-# 2a. SCHISM crosswalk (nwmReaches.csv -> ngenReaches.csv)
+# %% [markdown]
+# ## 2a. SCHISM crosswalk (nwmReaches.csv -> ngenReaches.csv)
 #
 # One-time, per SCHISM domain. Not a per-cycle step. Left commented out --
 # uncomment only when standing up a new SCHISM domain, or if ngenReaches.csv
@@ -142,9 +198,8 @@ def nwm_coastal_cli(args: list[str]) -> subprocess.CompletedProcess:
 # 2b. SFINCS crosswalk - in the QGIS workflow and the SFINCS create stage, use
 # the nhf 1.2.2 geopackage when selecting and exporting the flowpaths. In the
 # create config, set river_discharge: source: ngen
-#
-# ---------------------------------------------------------------------------
 
+# %%
 # from coastal_calibration.schism.ngen_reaches import translate_nwm_to_ngen_reaches
 #
 # schism_domain_dir = RUN_COASTAL_ROOT / "schism_models" / "atlgulf_extract_03S"
@@ -155,16 +210,16 @@ def nwm_coastal_cli(args: list[str]) -> subprocess.CompletedProcess:
 # )
 # print(stats)
 
-# ---------------------------------------------------------------------------
-# 3. VPU hydrofabric geopackage + ESMF mesh
+# %% [markdown]
+# ## 3. VPU hydrofabric geopackage + ESMF mesh
 #
 # One-time per VPU -- only needs re-running if you want a different
 # domain/VPU. The gpkg copy is needed to be moved to the run_ngen
 # because the Icefabric API t-route would normally query for this isn't
 # reliably reachable from all networks; skipped if the file already exists.
 # This step may be removed if the API call is available for you.
-# ---------------------------------------------------------------------------
 
+# %%
 hydrofab_file_host = RUN_NGEN_ROOT / "data" / "hydrofabric" / f"vpu_{VPU}.gpkg"
 if not hydrofab_file_host.exists():
     hydrofab_file_host.parent.mkdir(parents=True, exist_ok=True)
@@ -179,9 +234,9 @@ if not hydrofab_file_host.exists():
 # e.g. a VPU size to run the forcing engine on. This step is optional,
 # you can run the forcing engine with one of the existing ESMF meshes.
 
-# Skip the ESMF mesh extract if this was run already and both output files 
-# already exist under $RUN_NGEN_ROOT/data/esmf_mesh/NWM/domain/. If only one 
-# exists, pass --overwrite so extract_esmf_domain.py doesn't error on the 
+# Skip the ESMF mesh extract if this was run already and both output files
+# already exist under $RUN_NGEN_ROOT/data/esmf_mesh/NWM/domain/. If only one
+# exists, pass --overwrite so extract_esmf_domain.py doesn't error on the
 # partial state
 
 # In this example, we are creating a new esmf mesh, geo_em_vpu03s.nc from the
@@ -204,27 +259,23 @@ else:
     ]
     if any(p.exists() for p in esmf_domain_outputs):
         esmf_extract_args.append("--overwrite")
-    subprocess.run(
-        esmf_extract_args,
-        check=True,
-    )
+    run_streamed(esmf_extract_args)
 
-# ---------------------------------------------------------------------------
-# 4. hotstart_coastal_models.sh -- spin up SCHISM/SFINCS, bootstrap troute AnA-A
+# %% [markdown]
+# ## 4. hotstart_coastal_models.sh -- spin up SCHISM/SFINCS, bootstrap troute AnA-A
 #
 # Produces state for PREV_CYCLE. hotstart_coastal_models.sh's default
 # is 18h spinup / 9h ramp; this demo uses 24h/6h instead.
-# ---------------------------------------------------------------------------
 
+# %%
 SPINUP_HOURS = 24
 RAMP_HOURS = 6
 
-subprocess.run(
+run_streamed(
     [
         str(NWM_COASTAL_ROOT / "forecast_demo" / "bin" / "hotstart_coastal_models.sh"),
         TARGET_CYCLE, str(SPINUP_HOURS), str(RAMP_HOURS),
     ],
-    check=True,
     env={
         **os.environ,
         "NWM_COASTAL_ROOT": str(NWM_COASTAL_ROOT),
@@ -234,16 +285,14 @@ subprocess.run(
     },
 )
 
+# %% [markdown]
 # After the spinup runs, the code below will plot comparisons between observed
 # tidal signals at NOAA gauges and the SFINCS and SCHISM outputs for gauges which
 # they both have data. The individual model vs observations for all gauges within
 # each respective domain were called in the run process and can be found in the
 # cycle run simulation folder under "figs" as usual.
-import pandas as pd
 
-from coastal_calibration.data.coops_api import query_coops_byids
-from coastal_calibration.plotting import plot_station_comparison
-
+# %%
 spinup_schism_series = pd.read_parquet(SCHISM_CYCLES_DIR / f"ana_{PREV_CYCLE}" / "run" / "obs_water_level.parquet")
 spinup_sfincs_series = pd.read_parquet(SFINCS_CYCLES_DIR / f"ana_{PREV_CYCLE}" / "run" / "sfincs_model" / "obs_water_level.parquet")
 spinup_station_ids = sorted(set(spinup_schism_series.columns) & set(spinup_sfincs_series.columns))
@@ -276,13 +325,13 @@ else:
         stations_per_figure=1,
     )
 
-# ---------------------------------------------------------------------------
-# 5. AnA cycle
+# %% [markdown]
+# ## 5. AnA cycle
 #
 # gen_cycle_config.py needs a troute output and a met forcing file as inputs
 # -- both are produced by separate ngen_rte calls first, then handed to it.
-# ---------------------------------------------------------------------------
 
+# %%
 prev_ana_a_save_host = RUN_NGEN_ROOT / "regionalization" / f"region_ana_a_{PREV_CYCLE}" / VPU / "state_save" / "troute"
 load_state_args = (
     ["-lsf", f"/ngwpc/run_ngen/regionalization/region_ana_a_{PREV_CYCLE}/{VPU}/state_save"]
@@ -290,6 +339,7 @@ load_state_args = (
     else []
 )
 
+# %%
 # troute AnA-A: 1h window, self-chains from PREV_CYCLE
 run_nwm_rte(
     "ngen_rte.run_regionalization_standalone",
@@ -309,6 +359,7 @@ run_nwm_rte(
     ],
 )
 
+# %%
 # troute AnA-B: 3h window, T-3 -> T0
 run_nwm_rte(
     "ngen_rte.run_regionalization_standalone",
@@ -328,6 +379,7 @@ run_nwm_rte(
     ],
 )
 
+# %%
 # Met forcing AnA: -lb/-fih 240 widens to T-3, emits all 4 hourly samples
 run_nwm_rte(
     "ngen_rte.coastal.make_coastal_forcing",
@@ -342,7 +394,7 @@ run_nwm_rte(
 )
 ana_forcing_file = RUN_NGEN_ROOT / "data" / "scratch" / "standard_ana_coastal" / f"vpu03s_{TARGET_CYCLE}00.nc"
 
-
+# %%
 # Once the forcing engine has produced MET data and ngen has run t-route, generate the cycle run configs
 # for SCHISM and SFINCS
 for model, base_yaml, cycles_dir in (
@@ -361,6 +413,7 @@ for model, base_yaml, cycles_dir in (
         extra_run_param_overrides='{"tspinup": 0}' if model == "sfincs" else None,
     )
 
+# %%
 # Run the coastal model AnA cycle
 nwm_coastal_cli(["run", str(SCHISM_CYCLES_DIR / f"ana_{TARGET_CYCLE}" / "run.yaml")])
 nwm_coastal_cli(["run", str(SFINCS_CYCLES_DIR / f"ana_{TARGET_CYCLE}" / "run.yaml")])
@@ -371,6 +424,7 @@ sfincs_rst = sorted((SFINCS_CYCLES_DIR / f"ana_{TARGET_CYCLE}").glob("**/*.rst")
 print("SCHISM hotstart files:", schism_hotstart)
 print("SFINCS restart files:", sfincs_rst)
 
+# %%
 # Make observed vs. SCHISM vs. SFINCS comparison plots for the AnA cycle that just ran
 ana_schism_series = pd.read_parquet(SCHISM_CYCLES_DIR / f"ana_{TARGET_CYCLE}" / "run" / "obs_water_level.parquet")
 ana_sfincs_series = pd.read_parquet(SFINCS_CYCLES_DIR / f"ana_{TARGET_CYCLE}" / "run" / "sfincs_model" / "obs_water_level.parquet")
@@ -400,10 +454,10 @@ else:
         stations_per_figure=1,
     )
 
-# ---------------------------------------------------------------------------
-# 6. SR cycle
-# ---------------------------------------------------------------------------
+# %% [markdown]
+# ## 6. SR cycle
 
+# %%
 # troute SR: loads this cycle's ana_b saved state, no state saving -ss/-ssd for SR
 # needed
 run_nwm_rte(
@@ -422,6 +476,7 @@ run_nwm_rte(
     ],
 )
 
+# %%
 # Met forcing SR
 run_nwm_rte(
     "ngen_rte.coastal.make_coastal_forcing",
@@ -435,6 +490,7 @@ run_nwm_rte(
 # Forcing file is named after the gdomain - this will be passed to the coastal model config generator
 sr_forcing_file = RUN_NGEN_ROOT / "data" / "scratch" / "short_range_coastal" / f"vpu03s_{TARGET_CYCLE}00.nc"
 
+# %%
 # Give SR label to cycle dir that models will run in
 sr_cycle_dir = {
     "schism": SCHISM_CYCLES_DIR / f"sr_{TARGET_CYCLE}",
@@ -468,10 +524,12 @@ run_gen_cycle_config(
     extra_run_param_overrides='{"tspinup": 0}',
 )
 
+# %%
 # Run the coastal models SR cycle
 nwm_coastal_cli(["run", str(sr_cycle_dir["schism"] / "run.yaml")])
 nwm_coastal_cli(["run", str(sr_cycle_dir["sfincs"] / "run.yaml")])
 
+# %%
 # SCHISM + SFINCS + observed, one figure per shared station
 sr_schism_series = pd.read_parquet(sr_cycle_dir["schism"] / "run" / "obs_water_level.parquet")
 sr_sfincs_series = pd.read_parquet(sr_cycle_dir["sfincs"] / "run" / "sfincs_model" / "obs_water_level.parquet")
@@ -501,6 +559,7 @@ else:
         stations_per_figure=1,
     )
 
+# %%
 print("Done. AnA + SR outputs are under:")
 print(" ", SCHISM_CYCLES_DIR / f"ana_{TARGET_CYCLE}")
 print(" ", SFINCS_CYCLES_DIR / f"ana_{TARGET_CYCLE}")

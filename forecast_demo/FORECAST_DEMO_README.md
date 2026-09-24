@@ -5,6 +5,10 @@ covered in `README.md`. For the full reference, use that file.
 
 Two parts: this file covers one-time environment setup. `forecast_walkthrough.py`
 is the script used to actually generate a forecast once setup is complete.
+The same steps are available as a notebook at
+[`docs/examples/notebooks/forecast_walkthrough.ipynb`](../docs/examples/notebooks/forecast_walkthrough.ipynb),
+generated from that script by jupytext -- run the script start to finish, or
+step through the notebook a cell at a time.
 
 ## Setup (one-time per machine)
 
@@ -169,4 +173,18 @@ export RUN_NGEN_ROOT=/path/to/run_ngen    # usually on same level as rte
 export RUN_COASTAL_ROOT=/path/to/run_coastal    # also usually on same level as rte
 ```
 
-Proceed to `forecast_walkthrough.py`.
+Proceed to `forecast_walkthrough.py`, either as a script:
+
+```bash
+nwm-coastal-py forecast_demo/forecast_walkthrough.py
+```
+
+or cell by cell in the paired notebook:
+
+```bash
+pixi run -e docs jupyter lab docs/examples/notebooks/forecast_walkthrough.ipynb
+```
+
+Start Jupyter inside `tmux`/`screen` -- several cells may take a long time to
+run, and a dropped connection kills the kernel along with every variable it
+holds.

@@ -50,7 +50,9 @@ repos:
   hooks:
   - id: jupytext
     args: [--sync]
-    files: ^docs/examples/notebooks/.*\.(py|ipynb)$
+    # forecast_walkthrough.py is paired across directories: the source lives in
+    # forecast_demo/, the .ipynb under docs/examples/notebooks/.
+    files: ^(docs/examples/notebooks/.*|forecast_demo/forecast_walkthrough)\.(py|ipynb)$
 
 - repo: https://github.com/astral-sh/ruff-pre-commit
   rev: v0.16.1
