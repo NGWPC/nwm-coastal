@@ -20,12 +20,14 @@ topobathy and land cover available for building models, the forcing data that dr
 simulations, and the additional components required to run a forecast through the
 NextGen framework.
 
+For setting up, configuring, and calibrating the coastal models, 
+
 For per-stage details, see [Workflow Stages](../user-guide/workflow-stages.md).
 
 ## Directory Layout
 
 ### ParallelWorks EA Cluster
-NOTE: On ParallelWorks EA cluster, the common parent directory is called `ngencerf-app`
+NOTE: On ParallelWorks EA cluster, the parent directory for repos is called `ngencerf-app`
 and the `nwm-coastal` repo is called `coastal-calibration`. This section is written
 to be general, such that a user can set things up on their own machine (e.g. a Linux
 machine or a Windows machine with WSL) or their own cluster. When working on the EA 
@@ -33,8 +35,10 @@ cluster, the environment variables would be:
 ```
 export NWM_COASTAL_ROOT=/ngencerf-app/coastal-calibration
 export NWM_RTE_ROOT=/ngencerf-app/nwm-rte
-export RUN_NGEN_ROOT=/ngencerf-app/run_ngen
 ```
+It is recommended to set the 
+With this setup, it is recommended to put `RUN_COASTAL_ROOT` in a users own directory,
+for example /ngen-test/  
 It is users choice where they would like `RUN_COASTAL_ROOT` to be, and the supporting
 coastal data.
 
