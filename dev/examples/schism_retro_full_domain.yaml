@@ -1,0 +1,38 @@
+# AtlGulf (full NWMv3 domain) — SCHISM retrospective run configuration
+#
+# Runs the complete Atlantic/Gulf SCHISM mesh against NWM Retrospective
+# forcing, with no subsetting step. The only difference from a subset run is
+# that model_config.prebuilt_dir points at the full mesh.
+#
+# The full mesh is ~10.5M nodes / 2.7M elements and needs a multi-node MPI
+# allocation. Adjust nodes/ntasks_per_node to match your cluster, and keep
+# the #SBATCH directives consistent with them.
+#
+# Usage:
+#   coastal-calibration run schism_retro_full_domain.yaml --dry-run   # validate
+#   coastal-calibration run schism_retro_full_domain.yaml
+
+model: schism
+
+simulation:
+  start_date: 2021-06-11
+  duration_hours: 24
+  coastal_domain: atlgulf
+  meteo_source: nwm_retro
+
+boundary:
+  source: stofs
+
+paths:
+  work_dir: ./run_retro_full
+  raw_download_dir: ../downloads
+
+download:
+  enabled: true
+
+model_config:
+  prebuilt_dir: ../schism_models/atlgulf
+  geogrid_file: ../../run_ngen/data/esmf_mesh/NWM/domain/geo_em_CONUS.nc
+  nodes: 4
+  ntasks_per_node: 18
+  include_noaa_gages: true
