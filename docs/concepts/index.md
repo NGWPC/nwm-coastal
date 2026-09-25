@@ -20,27 +20,48 @@ topobathy and land cover available for building models, the forcing data that dr
 simulations, and the additional components required to run a forecast through the
 NextGen framework.
 
-For setting up, configuring, and calibrating the coastal models, 
+NWM Coastal runs in two modes with different purposes. Standalone runs, driven by
+retrospective or historical AnA NWM forcing, serve the primary purpose: building a
+coastal model, configuring it, calibrating it, and validating the result against 
+observational water levels. This requires only this package, and can be run in any
+location with sufficient disk space.
 
-For per-stage details, see [Workflow Stages](../user-guide/workflow-stages.md).
+The second mode, forecast, is a step towards an operational setup integrated with
+NextGen. It depends on `nwm-rte`, the NextGen runtime environment, to deliver the
+meteorological forcing and routed streamflow to the coastal models. These products are
+written to where the RTE places them, so the directory layouts recommended below 
+reflect the current status of the workflow. Provided examples show how coastal models
+can be integrated for AnA and Short Range forecast cycles in connection with the RTE
+at this stage.
 
 ## Directory Layout
 
 ### ParallelWorks EA Cluster
-NOTE: On ParallelWorks EA cluster, the parent directory for repos is called `ngencerf-app`
+On ParallelWorks EA cluster, the parent directory for repos is called `ngencerf-app`
 and the `nwm-coastal` repo is called `coastal-calibration`. This section is written
 to be general, such that a user can set things up on their own machine (e.g. a Linux
 machine or a Windows machine with WSL) or their own cluster. When working on the EA 
-cluster, the environment variables would be: 
+cluster, the repos and RTE are already available, the environment variables would be: 
 ```
 export NWM_COASTAL_ROOT=/ngencerf-app/coastal-calibration
 export NWM_RTE_ROOT=/ngencerf-app/nwm-rte
 ```
-It is recommended to set the 
-With this setup, it is recommended to put `RUN_COASTAL_ROOT` in a users own directory,
-for example /ngen-test/  
-It is users choice where they would like `RUN_COASTAL_ROOT` to be, and the supporting
-coastal data.
+It is recommended to set the run directories, `RUN_COASTAL_ROOT` and `RUN_NGEN_ROOT`
+to your own folder where you have read/write permissions, since data will be downloaded,
+read, and written within those folders.
+
+First, export the environment variable for the RTE. This will be the same location that
+you will set `RUN_NGEN_ROOT` to:
+```
+export RUN_NGEN_ROOT__HOST=/ngen-test/coastal/<firstname.lastname>/run_ngen
+```
+Next set `RUN_NGEN_ROOT` and `RUN_COASTAL_ROOT`:
+```
+export RUN_NGEN_ROOT=/ngen-test/coastal/<firstname.lastname>/run_ngen
+export RUN_COASTAL_ROOT=/ngen-test/coastal/<firstname.lastname>/run_coastal
+```
+The supporting coastal data (see below for details) will already be populated on the
+cluster at /ngen-test/coastal/coastal_data.
 
 ### General
 `nwm-coastal` is typically cloned alongside the other NWM repositories in a common
@@ -75,6 +96,11 @@ The setup script honors `RUN_NGEN_ROOT` and `RUN_COASTAL_ROOT`, prompting for th
 when they are unset. Forecast runs require these to be set, and optionally 
 `TARGET_IMAGE_NAME`, the tag of the `nwm-rte` Docker image to run, which defaults to 
 `ngen_rte_ghcr`.
+
+The `run_ngen/` and `run_coastal/` folders are where data will be downloaded, read,
+and written, so on a cluster it might be prudent to have the repos in one location
+and the run folders in a place user specific for running workflows and generating
+input/output data (see for example, the ParallelWorks EA Cluster section above).
 
 `run_coastal/` is where the modeling actually happens:
 
@@ -306,7 +332,8 @@ pixi r -e dev coastal-calibration run <run_config_name>.yaml
 ```
 
 Stages run in sequence and are resumable, so a failure part-way through can be picked up
-with `--start-from` rather than restarted. `--dry-run` validates without executing.
+with `--start-from` rather than restarted. `--dry-run` validates without executing. For 
+per-stage details, see [Workflow Stages](../user-guide/workflow-stages.md).
 
 Forcing comes from `simulation.meteo_source`: `nwm_retro` for historical periods and
 `nwm_ana` for 2018 onward. Both are public and need no credentials. See
@@ -323,7 +350,9 @@ generated upstream by [`nwm-rte`](https://github.com/NGWPC/nwm-rte):
    `paths.troute_file`.
 
 With those in hand the coastal configuration sets `meteo_source: ngen_forecast` and runs
-exactly like any other simulation.
+exactly like any other simulation. Both products are passed as completed files. Coupling
+directly to the coastal models through BMI remains the long-term direction, so the
+setup should be revisited as development continues.
 
 The [forecast demo](https://github.com/NGWPC/nwm-coastal/tree/development/forecast_demo)
 gives more information on doing this, running example SCHISM and SFINCS simulations for 
