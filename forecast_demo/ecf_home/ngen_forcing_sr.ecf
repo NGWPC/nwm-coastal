@@ -17,11 +17,11 @@ export CYCLE_DT
 bash -c '
   set -euo pipefail
   cd "%NWM_RTE_DIR%"
-  export EWTS_ENABLED="%EWTS_ENABLED%"
+  export RTE_EWTS_ENABLED="%EWTS_ENABLED%"
   export TARGET_IMAGE_NAME="${TARGET_IMAGE_NAME:-ngen_rte_ghcr}"
   source config.bashrc
   source run.sh
-  docker_run python -um "ngen_rte.run_coastal" -dt "${CYCLE_DT}" -rname "coastal_short_range" -fconfig short_range -gdomain vpu03s
+  docker_run python -um "ngen_rte.coastal.make_coastal_forcing" -dt "${CYCLE_DT}" -rname "coastal_short_range" -fconfig short_range -gdomain vpu03s
 ' "%NWM_RTE_DIR%/run.sh"
 # ---- END LAUNCH ------------------------------------------------------------
 

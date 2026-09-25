@@ -178,6 +178,7 @@ nav:
   - Overview: examples/index.md
   - Mendocino Walkthrough: examples/notebooks/walkthrough.ipynb
   - Lavaca Bay: examples/notebooks/lavaca.ipynb
+  - Forecast Walkthrough: examples/notebooks/forecast_walkthrough.ipynb
 - Developer Notes:
   - SFINCS Compilation: dev/sfincs_compilation.md
   - HydroMT-SFINCS Issues: dev/hydromt_sfincs_issues.md
