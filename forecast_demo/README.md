@@ -13,7 +13,12 @@ to do to get from a fresh checkout to a running forecast.
   shows performance issues so may not be fully functional
 - **`forecast_walkthrough.py`** -- runs one spinup + one AnA hour + one SR
   cycle directly, step by step, with no ecflow involved at all. Good for
-  understanding exactly what each stage does and what it produces.
+  understanding exactly what each stage does and what it produces. Run it
+  as a script, or step through the same content cell by cell as
+  [`docs/examples/notebooks/forecast_walkthrough.ipynb`](../docs/examples/notebooks/forecast_walkthrough.ipynb)
+  -- the notebook is generated from this script by jupytext
+  (`pixi run nb-sync`), so the two never diverge. Prefer the notebook if a
+  long step fails: re-run that one cell instead of the whole pipeline.
 
 Both share every prerequisite below (env vars, `nwm-rte` build, data
 staging, wrappers) and both call the same underlying tools

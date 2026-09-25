@@ -175,9 +175,10 @@ if [ "${RUN_TROUTE}" -eq 1 ]; then
   run bash -c '
     set -euo pipefail
     cd "'"${NWM_RTE_DIR}"'"
-    export EWTS_ENABLED="'"${EWTS_ENABLED}"'"
+    export RTE_EWTS_ENABLED="'"${EWTS_ENABLED}"'"
     export TARGET_IMAGE_NAME="${TARGET_IMAGE_NAME:-ngen_rte_ghcr}"
     source config.bashrc
+    resolve_installed_regionalization_results
     source run.sh
     TEST_VPU="vpu_'"${VPU}"'"
     TEST_FORM_ASSIGN_VPU="${INSTALLED_REGIONALIZATION_RESULTS}/${TEST_VPU}/formulation_assignment.csv"

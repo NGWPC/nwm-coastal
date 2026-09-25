@@ -363,7 +363,7 @@ def main() -> int:
     print(f"  {dst_geo_em}")
     print(f"  {dst_ldasout}")
     print()
-    print(f"To use: pass -gdomain {args.output_name} to ngen_rte.run_coastal.")
+    print(f"To use: pass -gdomain {args.output_name} to ngen_rte.coastal.make_coastal_forcing.")
     return 0
 
 
