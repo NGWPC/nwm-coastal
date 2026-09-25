@@ -1,15 +1,15 @@
-# Lake Erie (Fairport Harbor, OH) — SFINCS model creation from AOI
+# Lake Erie (Fairport Harbor, OH) - SFINCS model creation from AOI
 #
 # Unlike the Lavaca example, elevation does NOT come from one of the built-in
 # auto-fetched sources: none of them cover the Great Lakes lake bed. The DEM is
-# downloaded by hand and registered through ./dem_catalog.yml — see step 1 of
+# downloaded by hand and registered through ./dem_catalog.yml - see step 1 of
 # ../notebooks/lake_erie.ipynb.
 #
 # Usage:
 #   coastal-calibration create create.yaml
 #   coastal-calibration create create.yaml --dry-run
 
-aoi: ./sfincs_aoi_lake_erie.geojson   # you supply this; see README.md
+aoi: ./sfincs_aoi_lake_erie.geojson   # shipped; replace to model elsewhere
 output_dir: ./sfincs_fh_lake_erie
 download_dir: ./downloads/grid    # inside the example, so a copied folder is self-contained
 
@@ -19,7 +19,7 @@ grid:
   resolution: 256        # base resolution in meters
   crs: utm               # auto-detect UTM zone (-> EPSG:32617 here)
   rotated: false
-  # No refine.geojson yet — add one and uncomment to resolve the river mouths finer.
+  # No refine.geojson yet - add one and uncomment to resolve the river mouths finer.
   # refinement:
   # - polygon: ./refine.geojson   # refine interior to 64 m (256 / 2^2)
   #   level: 2                    # 2 refinement steps: 256->128->64 m
@@ -53,7 +53,7 @@ subgrid:
   manning_land: 0.04
   manning_sea: 0.02
 
-# You supply the flowpaths; delete this block to run without river inflow.
+# Shipped flowpaths (Chagrin + Grand); delete this block to run without river inflow.
 river_discharge:
   flowlines: ./discharge_nwm.geojson # GeoJSON of selected NWM flowpaths
   nwm_id_column: ID                  # column with NWM feature IDs

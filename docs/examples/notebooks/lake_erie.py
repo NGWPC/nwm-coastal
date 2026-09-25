@@ -15,15 +15,15 @@
 # ---
 
 # %% [markdown]
-# # Lake Erie SFINCS Tutorial — bring your own DEM
+# # Lake Erie SFINCS Tutorial - bring your own DEM
 #
 # This notebook builds and runs a [SFINCS](https://sfincs.readthedocs.io)
 # model for a spot on the Ohio shore of Lake Erie (Fairport Harbor), forced at
 # the open boundary by NOAA's **Lake Erie Operational Forecast System
-# (LEOFS)** — the FVCOM model behind GLOFS.
+# (LEOFS)** - the FVCOM model behind GLOFS.
 #
 # It follows the same three phases as the
-# [Lavaca Bay notebook](lavaca.ipynb) — create, run, visualize — and differs
+# [Lavaca Bay notebook](lavaca.ipynb), create, run, visualize, and differs
 # from it in three ways that matter:
 #
 # | | Lavaca Bay | Lake Erie |
@@ -38,23 +38,27 @@
 # yourself. The rest of the pipeline then behaves exactly as it does on the
 # coast.
 #
-# ## What you supply
+# ## The domain files
 #
-# Everything to do with the DEM is in this notebook. Three geometry files are
-# not, because they describe *your* domain: make them and drop them in
-# `docs/examples/lake-erie/` (the directory holding the configs; its `README.md`
-# repeats this).
+# This example runs end to end as shipped - a working Fairport Harbor domain is
+# included, so you can execute every cell before changing anything. The geometry
+# lives in `docs/examples/lake-erie/` next to the configs:
 #
-# | File | What it is |
-# | --- | --- |
-# | `aoi.geojson` | model domain polygon |
-# | `refine.geojson` | sub-area to resolve at the finest quadtree level (optional) |
-# | `discharge_nwm.geojson` | NWM / ngen flowpaths entering the AOI, with a `flowpath_id` column (optional) |
+# | File | Shipped? | What it is |
+# | --- | --- | --- |
+# | `sfincs_aoi_lake_erie.geojson` | **yes** | model domain polygon, 425 km² at Fairport Harbor |
+# | `discharge_nwm.geojson` | **yes** | 4 NWM flowpaths - the Chagrin and Grand Rivers - keyed by an `ID` column |
+# | `refine.geojson` | no | optional sub-area to resolve finer quadtree levels; `grid.refinement` is commented out in `create.yaml` unless you add one |
 #
-# Any CRS is fine. Section 1 runs without them — the DEM covers the whole lake.
-# Section 2 reads whatever you put there, reports how it sits against the DEM,
-# and prints the `grid` and `mask` settings to paste into `create.yaml`, so the
-# numbers in that file come from your domain rather than from a guess.
+# **To model somewhere else on the lake, replace those two files** and re-run
+# from section 2, which measures whatever geometry it finds against the DEM and
+# prints the `grid` and `mask` settings to paste into `create.yaml` - so those
+# numbers come from your domain rather than from the shipped one. Any CRS is
+# fine; everything is reprojected. Section 1 needs no geometry at all, since the
+# DEM covers the whole lake.
+#
+# The two sections below show how the shipped files were made, which is also the
+# recipe for making your own.
 #
 # ### Working in your own copy
 #
@@ -75,44 +79,36 @@
 #
 # ### Drawing the AOI
 #
-# The domain shipped with this example was digitized with the `nwm_coastal`
-# QGIS plugin's polygon sketcher — the orange rectangle below, on the Lake
-# Erie shore at Fairport Harbor, Ohio.
+# The shipped domain was created with the `nwm_coastal` QGIS plugin's polygon
+# sketcher - the orange rectangle below, on the Lake Erie shore at Fairport
+# Harbor, Ohio. Use the same workflow to draw your own.
 #
 # ![AOI sketched over Lake Erie with CO-OPS gauges](../images/Lake_Erie_SFINCS_SketcherPoly.jpg)
 #
-# Two things to copy from how it is drawn:
+# Two things to note from how it is drawn:
 #
 # - **It straddles the shoreline.** The lakeward half gives the LEOFS boundary
-#   somewhere deep to attach to; the landward half is the floodplain you
+#   somewhere to attach to; the landward half is the floodplain you
 #   actually want results in. An AOI entirely offshore has nothing to inundate,
 #   and one entirely onshore has no boundary.
 # - **It contains a gauge.** The stars are NOAA CO-OPS stations; this domain
 #   captures **9063053 (Fairport Harbor)**, which is what the pipeline validates
-#   against later. Cleveland (9063063) sits just west of the box — if you want a
+#   against later. Cleveland (9063063) sits just west of the box - if you want a
 #   particular gauge in the comparison, make sure the polygon covers it.
-#
-# It is also drawn as a *rotated* rectangle to follow the coastline, which
-# wastes far fewer cells than an axis-aligned box on a diagonal shore. Setting
-# `grid.rotated: true` lets the quadtree follow that orientation.
 #
 # ### Selecting the flowpaths
 #
 # The plugin loads the National Hydrofabric, so the flowpaths (blue), their
 # nexus points (green) and the catchment divides can be seen while selecting.
-# The yellow reaches here are the two rivers entering this domain — the Chagrin
-# (USGS 04209000) and the Grand (USGS 04212100) —
-# exported to `discharge_nwm.geojson`.
+# Because this notebook runs a historical case, the flowpaths override option
+# was chosen when loading the basemap. The NWM_v3_hydrofabric.gdb was chosen
+# as the override, with nwm_reaches_conus as the name. After selecting the
+# flowpaths entering the domain, they are exported to `discharge_nwm.geojson`.
 #
 # ![Merged divides polygon with the selected discharge flowpaths](../images/Lake_Erie_SFINCS_MergedPoly_SelectedFlowpaths.jpg)
 #
 # Select the reach that **crosses the AOI boundary**, since that crossing point
-# is where the pipeline injects the discharge. One caution learned on this
-# domain: if you select a reach *and* the reach immediately downstream of it,
-# you get the same water twice. Their NWM flows are near-identical (correlation
-# 0.9996 for the pair that was in the first export here), so keep only one.
-# Two *different* tributaries meeting at the same nexus are not duplicates —
-# their flows add, and both belong in the file.
+# is where the pipeline injects the discharge.
 
 # %% [markdown]
 # ## Setup
@@ -154,37 +150,35 @@ print(f"working in {example_dir}")
 #
 # We use NCEI's
 # [Bathymetry of Lake Erie and Lake Saint Clair](https://www.ncei.noaa.gov/products/great-lakes-bathymetry)
-# — a seamless 3 arc-second (~70 x 90 m) topobathy grid covering the whole
+# - a seamless 3 arc-second (~70 x 90 m) topobathy grid covering the whole
 # lake, distributed as a 22 MB tarball. Good properties for this tutorial:
 # one small file, real bathymetry, and a documented datum.
 #
 # Its ~70 m resolution is the ceiling on what the model can resolve on land,
-# which is why `create.yaml` uses a 256 m base grid refined to 64 m rather
-# than going finer. For a production run, merge in a finer topographic source
-# — see 1e.
+# which is why `create.yaml` uses a uniform 256 m grid: refining below the DEM
+# pixel would invent detail the data does not have. Add a `refine.geojson` and
+# re-enable `grid.refinement` if you bring a finer DEM. For a production run,
+# merge in a finer topographic source - see 1e.
 #
 # Other candidates, if you need more detail:
 #
-# - **NOAA OCM Coastal DEM: Lake Erie** — ~3 m lidar + sonar topobathy,
+# - **NOAA OCM Coastal DEM: Lake Erie** - ~3 m lidar + sonar topobathy,
 #   NAVD88, via the [Data Access Viewer](https://coast.noaa.gov/dataviewer/).
 #   Best resolution, but it is an interactive order rather than a direct
 #   download, and it is NAVD88 rather than LWD.
 # - **USGS Lake Erie seamless topobathymetric DEM**
-#   ([doi:10.5066/P1DA6L6U](https://doi.org/10.5066/P1DA6L6U)) — lidar plus
+#   ([doi:10.5066/P1DA6L6U](https://doi.org/10.5066/P1DA6L6U)) - lidar plus
 #   USACE dredge surveys.
-# - **USGS 3DEP** 1 m / 10 m — land only, no lake bed.
+# - **USGS 3DEP** 1 m / 10 m - land only, no lake bed.
 
 # %% [markdown]
 # ### 1b. Download and unpack
 #
-# The catalog expects the GeoTIFF at `downloads/dem/erie_lld.tif`, relative to
-# the example folder. Everything this example downloads stays inside that
-# folder — DEM, grid clips and forcing — so you can copy the folder somewhere
-# else and run it as-is.
+# The example catalog provided with the demo expects the GeoTIFF at
+# `downloads/dem/erie_lld.tif`, relative to the example folder.
 #
-# It is deliberately *not* under `create.yaml`'s `download_dir`: the creator
-# namespaces that directory by an AOI hash, so a file placed there by hand
-# would be orphaned the moment you edit the AOI.
+# It is deliberately *not* under `create.yaml`'s `download_dir` as
+# the `create` stage populates that.
 
 # %%
 import tarfile
@@ -215,7 +209,7 @@ else:
 # Three things decide whether a DEM can be used as-is: its CRS, its NoData
 # value, and its **vertical datum**. The first two are in the file; the third
 # is not, so it has to be inferred and cross-checked against something you
-# know. This reads the whole lake — no AOI needed yet.
+# know. This reads the whole lake - no AOI needed yet.
 
 # %%
 import numpy as np
@@ -238,25 +232,17 @@ print(f"below zero : {(values < 0).mean():.0%} of the lake-wide grid")
 # %% [markdown]
 # The datum is the interesting one. The lake bed reads **negative**, bottoming
 # out near -62 m, which matches Lake Erie's true ~64 m maximum depth. The lake
-# surface sits at ~174 m IGLD85, so these cannot be absolute elevations — they
+# surface sits at ~174 m IGLD85, so these cannot be absolute elevations - they
 # are heights relative to the lake's **Low Water Datum (173.5 m IGLD85)**,
 # which is what the NCEI product description says and, conveniently, the same
 # datum GLOFS publishes water levels in. That is why `run.yaml` can leave
 # `forcing_to_mesh_offset_m` at `0.0`.
 
 # %% [markdown]
-# Rendered, the seamless topobathy looks like this — lake bed in blues, land in
-# greens and tans, with this example's AOI in red and the merged catchment
-# divides extending inland from it.
+# Rendered, the seamless topobathy looks like this - lake bed in blues, land in
+# greens and tans, with this example's AOI in red.
 #
 # ![Lake Erie topobathy under the AOI](../images/Lake_Erie_Topobathy.jpg)
-#
-# The continuity across the shoreline is the point: bed and floodplain come
-# from one grid on one datum, so there is no seam for the mask or the subgrid
-# to trip over. It is also visibly *smooth* on land — at ~70 m this DEM
-# resolves the lake bed well but flattens small topography, which is the
-# argument for merging in a finer land source (1e) before doing serious
-# inundation work.
 
 # %% [markdown]
 # ### 1d. Write the HydroMT data catalog
@@ -291,12 +277,12 @@ print(f"below zero : {(values < 0).mean():.0%} of the lake-wide grid")
 # - **`data_type: RasterDataset`** with **`driver: {name: rasterio}`** for any
 #   GeoTIFF; use `driver: {name: raster_xarray}` for NetCDF.
 # - **`metadata.crs`** is only needed when the file itself lacks a CRS, but
-#   stating it is cheap insurance.
+#   stating it is good practice.
 # - **`data_adapter.rename`** must map the variable HydroMT reads to
 #   **`elevtn`**, which is the name HydroMT-SFINCS looks for. For a
 #   single-band GeoTIFF, HydroMT names the variable after the *catalog entry
-#   key* — `erie_lld` here — so the mapping is `erie_lld: elevtn`. Get this
-#   wrong and the elevation stage fails with a missing-variable error.
+#   key* - `erie_lld` here - so the mapping is `erie_lld: elevtn`. Get this
+#   wrong and the elevation stage will fail with a missing-variable error.
 #
 # The cell below is the check that saves you a failed `create` run: it reads
 # the dataset through the catalog exactly as the pipeline will.
@@ -306,44 +292,14 @@ from hydromt import DataCatalog
 
 catalog = DataCatalog(data_libs=["./dem_catalog.yml"])
 da = catalog.get_rasterdataset("erie_lld", bbox=[-83.6, 41.55, -82.9, 41.85])
-assert da.name == "elevtn", f"expected variable 'elevtn', got {da.name!r} — fix data_adapter.rename"
+assert da.name == "elevtn", f"expected variable 'elevtn', got {da.name!r} - fix data_adapter.rename"
 print(da)
-
-# %% [markdown]
-# ### 1e. Optional: merge in finer land topography
-#
-# `erie_lld` is the only bathymetry available, but at ~70 m it is coarse on
-# land. `copdem_30m` is finer there and auto-fetches, so it can be listed
-# *first* (earlier datasets win; later ones fill gaps) — except that it
-# reports **absolute** elevation while `erie_lld` is LWD-relative. Merging
-# them directly would leave a 173.5 m cliff wherever the Copernicus footprint
-# ends.
-#
-# The `offset` field exists for this: it is added to a dataset's elevations
-# before the merge and before its `zmin` filter.
-#
-# ```yaml
-# elevation:
-#   datasets:
-#   - name: copdem_30m
-#     zmin: 0.001        # land only, in LWD (applied after the offset)
-#     source: copdem_30m
-#     offset: -173.5     # absolute IGLD85 -> LWD
-#   - name: erie_lld
-#     zmin: -20000
-#     source: null
-# ```
-#
-# `-173.5` is a *local* approximation: LWD is IGLD85 while Copernicus is
-# EGM2008, and the two differ by a few decimetres that vary across the lake.
-# Check the seam in the merged bed elevation before relying on it. The entry
-# is commented out in `create.yaml`; start with `erie_lld` alone.
 
 # %% [markdown]
 # ## 2. Measure your AOI against the DEM
 #
-# With `aoi.geojson` in place, this reads it and reports what the DEM says
-# about it. Nothing here is a pass/fail check — it is the measurement that
+# This reads the AOI in the example folder and reports what the DEM says
+# about it. Nothing here is a pass/fail check - it is the measurement that
 # tells you what `grid.resolution`, `grid.refinement` and the `mask`
 # thresholds should be, in the LWD datum the DEM turned out to use.
 
@@ -355,7 +311,7 @@ aoi_path = aoi_candidates[0] if aoi_candidates else Path("./aoi.geojson")
 if not aoi_path.exists():
     raise FileNotFoundError(
         f"No {aoi_path.resolve()}. Digitize your model domain and save it there "
-        "(see the README in that directory), then re-run from here."
+        '(see "The domain files" at the top of this notebook), then re-run from here.'
     )
 
 aoi = gpd.read_file(aoi_path).to_crs(4326)
@@ -376,12 +332,12 @@ if refine is not None:
         f"refine    : {len(refine)} feature(s), {overlap_m2 / 1e6:,.0f} km^2 of it inside the AOI"
     )
 else:
-    print("refine    : none — drop grid.refinement from create.yaml")
+    print("refine    : none - drop grid.refinement from create.yaml")
 if flowlines is not None:
     cols = [c for c in flowlines.columns if c != "geometry"]
     print(f"flowpaths : {len(flowlines)} feature(s); columns {cols}")
 else:
-    print("flowpaths : none — drop river_discharge from create.yaml")
+    print("flowpaths : none - drop river_discharge from create.yaml")
 
 # %% [markdown]
 # ### What the DEM says inside your AOI
@@ -399,7 +355,7 @@ if wet.size:
     for pct in (5, 25, 50, 75, 95):
         print(f"  {pct:>2}% of submerged cells are deeper than {np.percentile(wet, pct):+.2f}")
 else:
-    print("\nno submerged cells — this AOI is entirely above low water, which cannot be")
+    print("\nno submerged cells - this AOI is entirely above low water, which cannot be")
     print("right for a lake model; extend it lakeward before going on")
 
 # %% [markdown]
@@ -411,7 +367,7 @@ else:
 # shallow enough that a usable band of cells qualifies. Taking the depth that
 # a quarter of the submerged cells are deeper than is a reasonable first cut.
 #
-# For resolution, the DEM is the ceiling — refining below its ~70 m pixel
+# For resolution, the DEM is the ceiling - refining below its ~70 m pixel
 # invents detail. This targets a finest cell near the pixel size and backs out
 # the base resolution from the refinement level.
 
@@ -531,7 +487,7 @@ print(result)
 # %%
 output = Path("./sfincs_fh_lake_erie")
 assert output.exists(), (
-    f"Output directory not found: {output.resolve()} — run the create step first."
+    f"Output directory not found: {output.resolve()} - run the create step first."
 )
 
 for f in sorted(output.iterdir()):
@@ -550,13 +506,13 @@ for f in sorted(output.iterdir()):
 # constraints come with it:
 #
 # - `simulation.coastal_domain` must be `greatlakes`, and that domain accepts
-#   no other boundary source — the tidal atlases and STOFS do not cover the
+#   no other boundary source - the tidal atlases and STOFS do not cover the
 #   lakes. Either setting without the other is rejected at config load.
 # - Only **nowcast** files are read, from NCEI's archive, so the run window
 #   must be in the past (2016 onward, depending on the lake).
 #
 # The download stage reads only `time`, `lon`, `lat` and `zeta` out of each
-# hourly FVCOM file — those files run up to ~180 MB an hour — and caches the
+# hourly FVCOM file - those files run up to ~180 MB an hour - and caches the
 # slices under `downloads/forcing/coastal/glofs/leofs/`. If LEOFS changed its
 # unstructured grid inside your window, the stage stops and tells you where;
 # split the run at that time.
@@ -567,39 +523,15 @@ for f in sorted(output.iterdir()):
 # %% [markdown]
 # ### Why these overrides
 #
-# Four `run_param_overrides` are specific to running SFINCS on a lake surface
-# 174 m above sea level, and none of them announce themselves if you leave
-# them out:
+# A few `run_param_overrides` are specific to running SFINCS on a lake surface
+# 174 m above sea level:
 #
 # | Override | Default | Why it is wrong here |
 # | --- | --- | --- |
-# | *(nothing — see below)* | — | The boundary inverse-barometer correction (`pavbnd`) used to need overriding here. It is now handled automatically: the pipeline enables it only for tide-only boundaries. |
-# | `zsini` = `0.4` | `0` | Initial water level, in mesh datum. On LWD, 0 means "exactly at low water" — usable, but Erie typically sits a few decimetres above LWD. Set it from the CO-OPS Fairport Harbor (9063053) record at your start time. On an *absolute* IGLD85 mesh the default would start the model bone dry. |
-# | `latitude` = `41.7` | `0` | A projected grid carries no latitude, so Coriolis would be computed at the equator. |
-# | `coriolis` = `1` | — | Enable it once the latitude is right; the wind-driven seiche across the basin is the whole point. |
+# | `zsini` = `0.89` | `0` | Initial water level, in mesh datum. On LWD, 0 means "exactly at low water" - usable, but Erie typically sits a few decimetres above LWD. Set it from the CO-OPS Fairport Harbor (9063053) record at your start time. On an *absolute* IGLD85 mesh the default would start the model dry. |
+# | `latitude` = `41.75` | `0` | A projected grid carries no latitude, so Coriolis would be computed at the equator. |
 #
-# ### A note on atmospheric pressure
-#
-# SFINCS can add an inverse-barometer correction to the *boundary* water
-# levels, `(pavbnd - patmb) / (rho g)`. It is off by default (`pavbnd = 0`),
-# and that is correct here: GLOFS is a full hydrodynamic model whose levels
-# already contain the barometric response, so correcting again double-counts.
-# The pipeline therefore enables it only for tide-only (`harmonic`) boundaries,
-# where the tidal atlas carries no atmosphere and the correction restores what
-# it omits.
-#
-# This matters far more on a lake than on the coast. The old behaviour wrote a
-# sea-level reference of 101 200 Pa unconditionally; against the ~99 400 Pa
-# actually observed over Lake Erie that lifted the boundary by **0.18 m**. At
-# sea level the same constant is wrong by about a centimetre, which is why it
-# went unnoticed for so long.
-#
-# Resist the temptation to tune `pavbnd` to make the gauge comparison look
-# better. Setting it to the domain-mean pressure scores well here purely by
-# cancelling a LEOFS bias of the opposite sign — a compensating error, not a
-# better model.
-#
-# `forcing_to_mesh_offset_m: 0.0` is correct **because** the mesh and GLOFS
+# `forcing_to_mesh_offset_m: 0.0` is correct because the mesh and GLOFS
 # share the LWD datum. If you rebuild the mesh from an absolute-elevation DEM
 # (the NOAA OCM 3 m product, say), set it to `173.5` and raise `zsini`
 # accordingly.
@@ -642,7 +574,6 @@ run_config = CoastalCalibConfig.from_dict(
                 "cdval": [0.001, 0.0025, 0.0025],
                 "zsini": 0.89,
                 "latitude": 41.75,
-                "coriolis": 1,
             },
         },
     }
@@ -659,7 +590,7 @@ print(result)
 # ## 5. Gauge comparison
 #
 # With `add_noaa_gages: true` the pipeline compares against NOAA CO-OPS lake
-# gauges — Fairport Harbor (9063053) and its neighbours for this AOI. Lake gauges publish observations but no tide
+# gauges - Fairport Harbor (9063053) and its neighbours for this AOI. Lake gauges publish observations but no tide
 # predictions and no MSL or MLLW, so observations are fetched in the lake's
 # low-water datum and shifted by `forcing_to_mesh_offset_m`: the comparison
 # is made in the **mesh datum**, not MSL as on the coast.
@@ -668,7 +599,7 @@ print(result)
 from IPython.display import Image, display
 
 figs_dir = Path("run/sfincs_model/figs")
-assert figs_dir.exists(), f"Results not found: {figs_dir.resolve()} — run the pipeline first."
+assert figs_dir.exists(), f"Results not found: {figs_dir.resolve()} - run the pipeline first."
 
 for png in sorted(figs_dir.glob("stations_comparison_*.png")):
     display(Image(filename=str(png), width=800))
@@ -695,7 +626,7 @@ fig.savefig("../images/lake_erie_thumb.png", dpi=150, bbox_inches="tight")
 # %% [markdown]
 # ## 7. Water-level field
 #
-# Identical to Lavaca from here — the post-processing API does not care which
+# Identical to Lavaca from here - the post-processing API does not care which
 # boundary source drove the run. One reading difference: `zs` is in the mesh
 # datum, so on this model the numbers are metres **above Lake Erie LWD**, not
 # above MSL.
@@ -713,7 +644,7 @@ print(f"zs range (m)  : {float(ds['zs'].min()):+.3f} .. {float(ds['zs'].max()):+
 # %%
 from coastal_calibration.plotting import animate_water_level, plot_water_level
 
-DRY_THRESHOLD = 0.05  # m — same default as plot_water_level
+DRY_THRESHOLD = 0.05  # m - same default as plot_water_level
 wet = ds["h"] > DRY_THRESHOLD
 vmin, vmax = (float(v) for v in ds["zs"].where(wet).quantile([0.02, 0.98]).values)
 
@@ -787,7 +718,7 @@ Video(str(anim_path), embed=True, width=800)
 # ## Summary
 #
 # 1. Downloaded a Great Lakes topobathy DEM by hand, checked its CRS, NoData
-#    and vertical datum, and registered it in `dem_catalog.yml` — the step
+#    and vertical datum, and registered it in `dem_catalog.yml` - the step
 #    the coastal examples get for free from the built-in fetchers.
 # 2. Validated AOI, refinement polygon and flowpaths against that DEM before
 #    building anything.

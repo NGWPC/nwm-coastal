@@ -3,7 +3,7 @@ meta:
   name: lake_erie_dem
   hydromt_version: '>1.0a,<2'
 
-# NGDC/NCEI "Bathymetry of Lake Erie and Lake Saint Clair" — 3 arc-second
+# NGDC/NCEI "Bathymetry of Lake Erie and Lake Saint Clair" - 3 arc-second
 # (~70 x 90 m) seamless topobathy, EPSG:4269, Float32, NoData -9999.
 # Elevations are in meters relative to Lake Erie's Low Water Datum
 # (173.5 m IGLD85), so the lake bed is negative and the shoreline is ~0.

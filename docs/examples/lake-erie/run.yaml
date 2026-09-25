@@ -1,4 +1,4 @@
-# Lake Erie (Fairport Harbor, OH) — SFINCS run pipeline configuration
+# Lake Erie (Fairport Harbor, OH) - SFINCS run pipeline configuration
 #
 # Uses the model created via:
 #   coastal-calibration create create.yaml
@@ -55,5 +55,5 @@ model_config:
     cdval: [0.001, 0.0025, 0.0025]  # drag coefficient at each breakpoint
     # --- Great Lakes specific; see the notebook's "Why these overrides" note ---
     zsini: 0.89                     # observed lake level at 9063053, 2026-09-21 12:00 UTC
-    latitude: 41.75                 # projected grid carries no latitude
-    coriolis: 1
+    latitude: 41.75                 # projected grid carries no latitude; SFINCS's
+                                    # coriolis defaults on, so this is the real switch
