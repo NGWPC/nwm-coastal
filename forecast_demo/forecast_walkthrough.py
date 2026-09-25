@@ -190,17 +190,18 @@ def nwm_coastal_cli(args: list[str]) -> subprocess.CompletedProcess:
     return run_streamed([str(cli), *args])
 
 # %% [markdown]
-# ## 2a. SCHISM crosswalk (nwmReaches.csv -> ngenReaches.csv)
+# ## 2. Crosswalking troute and coastal models
 #
-# One-time, per SCHISM domain. Not a per-cycle step. Left commented out --
-# uncomment only when standing up a new SCHISM domain, or if ngenReaches.csv
-# is missing/needs regenerating.
-# Requires a hydrofabric build overlapping the domain, e.g. one of the following
-# s3://edfs-data/hydrofabric-builds/<domain>/<prefix>nhf_1.2.2.gpkg
-# with domain = super_conus, ak, hi, prvi and prefix = (empty), ak_, hi_, prvi_
-# respectively
+# SCHISM crosswalk (nwmReaches.csv -> ngenReaches.csv). One-time, per SCHISM
+# domain. Not a per-cycle step. Left commented out -- uncomment only when
+# standing up a new SCHISM domain, or if ngenReaches.csv is missing/needs
+# regenerating. Requires a hydrofabric build overlapping the domain, e.g. one
+# of the following
+# coastal_data/hydrofabric_copies/ngen/<prefix>nhf_1.2.2.gpkg
+# with prefix = (empty), ak_, hi_, prvi_ for super_conus, Alaska, Hawaii and
+# Puerto Rico/Virgin Islands respectively
 #
-# 2b. SFINCS crosswalk - in the QGIS workflow and the SFINCS create stage, use
+# SFINCS crosswalk - in the QGIS workflow and the SFINCS create stage, use
 # the nhf 1.2.2 geopackage when selecting and exporting the flowpaths. In the
 # create config, set river_discharge: source: ngen
 
@@ -271,6 +272,16 @@ else:
 #
 # Produces state for PREV_CYCLE. hotstart_coastal_models.sh's default
 # is 18h spinup / 9h ramp; this demo uses 24h/6h instead.
+#
+# This is a convenience script, included to show one way the hotstart setup
+# could be automated. What it does is warm up both coastal models from cold
+# and drop the resulting state into the ana_<PREV_CYCLE> cycle directory, the
+# same place an automated hourly cycle would look for a previous cycle's state
+# to hot-start from.
+#
+# The hotstart state itself is required, since the models have nothing to
+# start from without it, but this script is not the only way of producing it.
+# It should be taken as an example, not a prescription.
 
 # %%
 SPINUP_HOURS = 24
@@ -296,6 +307,10 @@ run_streamed(
 # they both have data. The individual model vs observations for all gauges within
 # each respective domain were called in the run process and can be found in the
 # cycle run simulation folder under "figs" as usual.
+#
+# Note that these figures are saved to disk rather than displayed, so nothing
+# appears inline when this is run as a notebook. Open the PNGs written to
+# spinup_figs_dir (printed below) to view them.
 
 # %%
 spinup_schism_series = pd.read_parquet(SCHISM_CYCLES_DIR / f"ana_{PREV_CYCLE}" / "run" / "obs_water_level.parquet")
@@ -319,7 +334,7 @@ else:
     )
     spinup_figs_dir = RUN_COASTAL_ROOT / "comparison_plots" / f"spinup_{PREV_CYCLE}"
     spinup_figs_dir.mkdir(parents=True, exist_ok=True)
-    plot_station_comparison(
+    spinup_figs = plot_station_comparison(
         {
             "SCHISM": (spinup_schism_series.index.to_numpy(), spinup_schism_series[spinup_station_ids].to_numpy()),
             "SFINCS": (spinup_sfincs_series.index.to_numpy(), spinup_sfincs_series[spinup_station_ids].to_numpy()),
@@ -329,6 +344,7 @@ else:
         obs_ds=spinup_obs_ds,
         stations_per_figure=1,
     )
+    print(f"Spinup comparison figures ({len(spinup_figs)}) written to: {spinup_figs_dir}")
 
 # %% [markdown]
 # ## 5. AnA cycle
