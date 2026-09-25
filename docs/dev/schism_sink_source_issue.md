@@ -75,38 +75,3 @@ For the existing pre-built meshes, the duplication produces a small but real bia
 inland streamflow injection — most coastal gauges are downstream and dominated by tidal
 forcing, so the effect is hard to see in the validation plots, but for any retrospective
 run that focuses on river-mouth dynamics it should be acknowledged.
-
-## How this differs from SFINCS
-
-The two models apply river discharge differently, which matters when comparing SCHISM and
-SFINCS results over the same area.
-
-| | SCHISM | SFINCS |
-| --- | --- | --- |
-| Discharge points | Paired **sources and sinks** | **Sources only** |
-| Where they come from | Precomputed at mesh-generation time, shipped with the mesh | Computed at model-creation time by `create_discharge` |
-| How they are placed | Every flowpath crossing of the mesh outline is flagged | The upstream crossing of each flowpath is used, then snapped to the nearest active cell |
-| How water leaves | Through the open coastal boundary, but interior sinks also remove it | Through the open coastal boundary only |
-
-Two consequences follow:
-
-1. **Sinks have no SFINCS equivalent.** A SCHISM mesh can remove water at an interior
-   point where a flowpath exits the domain; SFINCS never does. If a river crosses in and
-   out of a SCHISM mesh, some of its flow is injected and then removed again, while the
-   SFINCS model for the same area injects it once and routes it to the coast.
-2. **Duplicate injection is a SCHISM-only artifact.** The per-crossing flagging described
-   above can inject the same tributary several times. SFINCS picks one point per
-   flowpath, so it does not have this failure mode.
-
-### Recommended practice for SFINCS
-
-Define the SFINCS domain so rivers **enter across the boundary and drain to the open
-coast** — that gives sources with no sinks, which is what the model is designed for. In
-practice that means drawing the AOI so each contributing river crosses the boundary once,
-rather than meandering in and out of it. The QGIS plugin's watershed-aligned domain tools
-make this straightforward; see
-[Concepts and Workflows](../concepts/index.md#qgis-plugin).
-
-When comparing results between the two models, expect the largest discrepancies at river
-mouths where a SCHISM mesh carries spurious source/sink pairs, and interpret them as a
-mesh artifact rather than a physical difference between the models.
