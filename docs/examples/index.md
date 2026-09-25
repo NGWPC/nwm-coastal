@@ -1,6 +1,6 @@
 # Examples
 
-Three notebooks cover the client-facing surface of the library:
+Four notebooks cover the client-facing surface of the library:
 
 - **Mendocino Walkthrough** is the headliner — extract a SCHISM subdomain from the
     Pacific mesh, drive it through the 12-stage SCHISM pipeline, derive the SFINCS AOI
@@ -12,6 +12,11 @@ Three notebooks cover the client-facing surface of the library:
     drives the post-processing plotting API directly (mesh inspection, flood depth map,
     water-surface/depth/anomaly snapshots, satellite basemap overlay, animation, and
     time series at user-specified observation points).
+- **Lake Erie** is the Great Lakes counterpart to Lavaca: boundary forcing from NOAA's
+    Lake Erie OFS (`leofs`, the FVCOM model behind GLOFS) instead of STOFS, and a DEM
+    you download and register in your own HydroMT data catalog instead of one of the
+    built-in auto-fetched sources, none of which carry Great Lakes bathymetry. It also
+    documents the elevated-domain settings a lake 174 m above sea level needs.
 - **Forecast Walkthrough** is the operational pipeline rather than a single model run —
     one spinup, one analysis-and-assimilation hour, and one short-range cycle, driving
     the nwm-rte forcing engine and t-route regionalization alongside SCHISM and SFINCS.
@@ -19,16 +24,16 @@ Three notebooks cover the client-facing surface of the library:
 
 !!! note "Prerequisites"
 
-    The Mendocino and Lavaca notebooks need a compiled SFINCS executable; Mendocino also
-    needs SCHISM. Both binaries are built automatically when activating a pixi
-    environment with the corresponding feature (`schism` or `sfincs`), so no manual build
-    is needed in the standard workflow. See
-    [Compiling SFINCS](../dev/sfincs_compilation.md) for build instructions when not
-    using pixi.
+    The Mendocino, Lavaca and Lake Erie notebooks need a compiled SFINCS executable;
+    Mendocino also needs SCHISM. Both binaries are built automatically when activating a
+    pixi environment with the corresponding feature (`schism` or `sfincs`), so no manual
+    build is needed in the standard workflow. See
+    [Compiling SFINCS](../dev/sfincs_compilation.md) for build instructions when not using
+    pixi.
 
 !!! warning "Forecast Walkthrough is not self-contained"
 
-    Unlike the other two, it drives external infrastructure: a built `nwm-rte` Docker
+    Unlike the other three, it drives external infrastructure: a built `nwm-rte` Docker
     image, `sudo docker` access, staged forcing data, and the four `NWM_COASTAL_ROOT` /
     `NWM_RTE_ROOT` / `RUN_NGEN_ROOT` / `RUN_COASTAL_ROOT` environment variables. Several
     cells may take a long time to run, so start Jupyter under `tmux`/`screen`. Setup is in
@@ -57,6 +62,16 @@ Three notebooks cover the client-facing surface of the library:
     Drives the post-processing plotting API directly to produce mesh and flood-map
     inspections, water-surface/depth/anomaly snapshots, a satellite-basemap overlay, an
     animation, and time series at three user-specified observation points.
+
+- [**Lake Erie (SFINCS + LEOFS)**](notebooks/lake_erie.ipynb)
+
+    Great Lakes build-from-AOI workflow on the Ohio shore of Lake Erie (Fairport Harbor).
+    Walks through downloading a Great Lakes topobathy DEM, checking its CRS, NoData and
+    vertical datum, and registering it in a HydroMT data catalog — the step the coastal
+    examples get for free. Then runs SFINCS with `boundary.source: glofs` /
+    `glofs_model: leofs` FVCOM forcing, validated against CO-OPS Fairport Harbor
+    (9063053), on a mesh referenced to Lake Erie Low Water Datum, with the `zsini` /
+    `zsini` / `latitude` / `coriolis` settings an elevated domain needs.
 
 - [**Forecast Walkthrough (hourly cycle)**](notebooks/forecast_walkthrough.ipynb)
 

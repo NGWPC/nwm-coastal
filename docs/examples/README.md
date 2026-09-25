@@ -16,6 +16,7 @@ docs/examples/
 │                            is paired to forecast_demo/forecast_walkthrough.py instead
 │
 ├── lavaca-tx/             ← SFINCS Lavaca Bay tutorial inputs
+├── lake-erie/             ← SFINCS Lake Erie (LEOFS boundary, BYO DEM) tutorial inputs
 └── walkthrough/           ← SCHISM + SFINCS Mendocino comparison inputs
 ```
 
@@ -25,11 +26,12 @@ meshes, the proprietary mesh symlinks, etc.) are gitignored.
 
 ## Per-domain inputs and notebook map
 
-| Domain         | Notebook            | Tracked input files                                                                   |
-| -------------- | ------------------- | ------------------------------------------------------------------------------------- |
-| `lavaca-tx/`   | `lavaca.ipynb`      | `aoi.geojson`, `refine.geojson`, `discharge_nwm.geojson`, `create.yaml`, `run.yaml`   |
-| `walkthrough/` | `walkthrough.ipynb` | `extract_poly.geojson`, `aoi.geojson`, `refine_poly.geojson`, `discharge_nwm.geojson` |
-| _(none)_       | `forecast_walkthrough.ipynb` | none — inputs come from `RUN_NGEN_ROOT`/`RUN_COASTAL_ROOT`, not this tree |
+| Domain         | Notebook                     | Tracked input files                                                                                                                  |
+| -------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `lavaca-tx/`   | `lavaca.ipynb`               | `aoi.geojson`, `refine.geojson`, `discharge_nwm.geojson`, `create.yaml`, `run.yaml`                                                  |
+| `lake-erie/`   | `lake_erie.ipynb`            | `dem_catalog.yml`, `create.yaml`, `run.yaml` — the AOI, refine and flowpath GeoJSONs are user-supplied |
+| `walkthrough/` | `walkthrough.ipynb`          | `extract_poly.geojson`, `aoi.geojson`, `refine_poly.geojson`, `discharge_nwm.geojson`                                                |
+| _(none)_       | `forecast_walkthrough.ipynb` | none — inputs come from `RUN_NGEN_ROOT`/`RUN_COASTAL_ROOT`, not this tree                                                            |
 
 Earlier per-domain demos (Narragansett, Hawaii, Pacific extract, Hawaii subset, the
 single-domain post-run plotting notebooks, and the cluster-side `1_schism_subset.py` /
@@ -59,15 +61,16 @@ symlink is matched by the `**/model` pattern in `.gitignore`; the geogrid by
 After running a notebook each per-domain directory grows additional subdirectories that
 the `.gitignore` keeps untracked:
 
-| Subdir          | Source                                                                  | Safe to delete?                    |
-| --------------- | ----------------------------------------------------------------------- | ---------------------------------- |
-| `cache/`        | per-notebook lookup cache (CO-OPS metadata, station lists, …)           | yes                                |
-| `run/`          | SCHISM work directory (param.nml, partitioned mesh, model outputs, log) | yes (re-runs the pipeline)         |
-| `output/`       | SFINCS work directory (sfincs.inp, sfincs\_\*.nc, …)                    | yes                                |
-| `extracted/`    | output of `extract_mesh` — the small subset SCHISM project              | yes (re-runs the extract notebook) |
-| `figs/`         | per-run plotting output                                                 | yes                                |
-| `sfincs_model/` | HydroMT-SFINCS model root                                               | yes                                |
-| `downloads/`    | shared NWM/STOFS forcing cache (top-level, ~83 GB)                      | only if you're OK re-downloading   |
+| Subdir                 | Source                                                                                                         | Safe to delete?                    |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| `cache/`               | per-notebook lookup cache (CO-OPS metadata, station lists, …)                                                  | yes                                |
+| `run/`                 | SCHISM work directory (param.nml, partitioned mesh, model outputs, log)                                        | yes (re-runs the pipeline)         |
+| `output/`              | SFINCS work directory (sfincs.inp, sfincs\_\*.nc, …)                                                           | yes                                |
+| `extracted/`           | output of `extract_mesh` — the small subset SCHISM project                                                     | yes (re-runs the extract notebook) |
+| `figs/`                | per-run plotting output                                                                                        | yes                                |
+| `sfincs_model/`        | HydroMT-SFINCS model root                                                                                      | yes                                |
+| `downloads/`           | shared NWM/STOFS forcing cache (top-level, ~83 GB)                                                             | only if you're OK re-downloading   |
+| `lake-erie/downloads/` | that example's own DEM, grid clips and forcing — it is deliberately self-contained so the folder can be copied | yes (re-downloads)                 |
 
 ## Notebooks
 
@@ -75,21 +78,22 @@ Every notebook is paired with a `.py` source via `jupytext`. Edit the `.py` and 
 `pixi run nb-sync` to regenerate the `.ipynb`. Both files must be staged together —
 `pre-commit` enforces this.
 
-`lavaca` and `walkthrough` keep their `.py` beside the `.ipynb` in this directory, and
-each starts with `os.chdir(notebook_dir.parent / "<domain>")`, then references inputs as
-plain `./<file>.geojson` relative to that working directory.
+`lavaca`, `lake_erie` and `walkthrough` keep their `.py` beside the `.ipynb` in this
+directory, and each starts with `os.chdir(notebook_dir.parent / "<domain>")`, then
+references inputs as plain `./<file>.geojson` relative to that working directory.
 
 `forecast_walkthrough` is the exception on both counts:
 
-- **Its source lives outside this directory**, at `forecast_demo/forecast_walkthrough.py`,
-    next to the `bin/` scripts and READMEs it belongs with. The pair is declared in that
-    file's own jupytext header (`formats: forecast_demo//py:percent,docs/examples/notebooks//ipynb`),
-    and the `pre-commit` jupytext hook's `files` pattern covers both paths.
+- **Its source lives outside this directory**, at
+    `forecast_demo/forecast_walkthrough.py`, next to the `bin/` scripts and READMEs it
+    belongs with. The pair is declared in that file's own jupytext header
+    (`formats: forecast_demo//py:percent,docs/examples/notebooks//ipynb`), and the
+    `pre-commit` jupytext hook's `files` pattern covers both paths.
 - **It does not `os.chdir`.** All paths derive from the four `NWM_COASTAL_ROOT` /
-    `NWM_RTE_ROOT` / `RUN_NGEN_ROOT` / `RUN_COASTAL_ROOT` environment variables, so there
-    is no per-domain input directory here and nothing to stage.
+    `NWM_RTE_ROOT` / `RUN_NGEN_ROOT` / `RUN_COASTAL_ROOT` environment variables, so
+    there is no per-domain input directory here and nothing to stage.
 
 It is also deliberately excluded from `nb-execute` (and therefore `nb-run`): it needs a
-built `nwm-rte` Docker image plus `sudo docker`, and may take a long time to run. Execute
-it by hand — as a script, or cell by cell — and run `pixi run nb-clear` before committing
-if you populated outputs.
+built `nwm-rte` Docker image plus `sudo docker`, and may take a long time to run.
+Execute it by hand — as a script, or cell by cell — and run `pixi run nb-clear` before
+committing if you populated outputs.

@@ -69,6 +69,9 @@ exclude_docs: |
   examples/hawaii/
   examples/lavaca-tx/run/
   examples/lavaca-tx/cache/
+  examples/lake-erie/run/
+  examples/lake-erie/downloads/
+  examples/lake-erie/cache/
   examples/narragansett-ri/
   examples/walkthrough/
   examples/pacific/
@@ -177,6 +180,7 @@ nav:
   - Overview: examples/index.md
   - Mendocino Walkthrough: examples/notebooks/walkthrough.ipynb
   - Lavaca Bay: examples/notebooks/lavaca.ipynb
+  - Lake Erie: examples/notebooks/lake_erie.ipynb
   - Forecast Walkthrough: examples/notebooks/forecast_walkthrough.ipynb
 - Developer Notes:
   - SFINCS Compilation: dev/sfincs_compilation.md

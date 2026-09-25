@@ -1,0 +1,59 @@
+# Lake Erie (Fairport Harbor, OH) — SFINCS run pipeline configuration
+#
+# Uses the model created via:
+#   coastal-calibration create create.yaml
+#
+# Quadtree mesh, EPSG:32617 (UTM zone 17N), 256 m base resolution, elevations
+# relative to Lake Erie Low Water Datum (173.5 m IGLD85).
+#
+# Usage:
+#   coastal-calibration run run.yaml
+#   coastal-calibration run run.yaml --stop-after sfincs_write
+#   coastal-calibration run run.yaml --start-from sfincs_run
+
+model: sfincs
+
+simulation:
+  start_date: 2026-09-21 12:00:00   # GLOFS nowcasts run 2016 -> present
+  duration_hours: 24
+  coastal_domain: greatlakes  # required by boundary.source glofs, and vice versa
+  meteo_source: nwm_ana       # CONUS NWM forcing covers the lakes
+
+boundary:
+  source: glofs               # NOAA Great Lakes OFS (FVCOM) nowcast water levels
+  glofs_model: leofs          # Lake Erie OFS
+
+paths:
+  work_dir: ./run
+  # Kept inside the example so the folder can be copied and run anywhere. Point this
+  # at a shared cache instead to reuse NWM forcing you have already downloaded.
+  raw_download_dir: ./downloads/forcing
+
+download:
+  enabled: true
+
+model_config:
+  prebuilt_dir: ./sfincs_fh_lake_erie   # created by: coastal-calibration create create.yaml
+  discharge_locations_file: ./sfincs_fh_lake_erie/sfincs_nwm.src
+  merge_discharge: true
+  # GLOFS and the erie_lld mesh are both on LWD, so no shift; 173.5 for an IGLD85 mesh.
+  forcing_to_mesh_offset_m: 0.0
+  # Unused on the lakes: gauge comparisons stay in the mesh datum, not MSL.
+  vdatum_mesh_to_msl_m: 0.0
+  include_precip: true
+  include_wind: true
+  include_pressure: true
+  # Flood depth map DEM; at 3 arc-second this is coarser than the refined mesh.
+  floodmap_dem: ./downloads/dem/erie_lld.tif
+  run_param_overrides:
+    tspinup: 10800                  # 3 h spin-up
+    advection: 0                    # disable momentum advection
+    viscosity: 0                    # disable SFINCS built-in viscosity model
+    nuvisc: 0.01                    # explicit horizontal viscosity (m^2/s)
+    cdnrb: 3                        # number of wind-drag breakpoints
+    cdwnd: [0.0, 28.0, 50.0]        # wind speed breakpoints (m/s)
+    cdval: [0.001, 0.0025, 0.0025]  # drag coefficient at each breakpoint
+    # --- Great Lakes specific; see the notebook's "Why these overrides" note ---
+    zsini: 0.89                     # observed lake level at 9063053, 2026-09-21 12:00 UTC
+    latitude: 41.75                 # projected grid carries no latitude
+    coriolis: 1
