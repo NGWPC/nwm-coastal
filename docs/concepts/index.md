@@ -148,6 +148,8 @@ Prebuilt SCHISM models that the setup script downloads include:
 | `alaska`              | South-central Alaska                               | 2.3 M / 1.2 M                  |
 | `lake_erie`           | Lake Erie                                          | 1.9 M / 1.0 M                  |
 | `lake_michigan-huron` | Lakes Michigan and Huron                           | 10.0 M / 5.0 M                 |
+| `lake_ontario`        | Lake Ontario                                       | 1.7 M / 0.9 M                  |
+| `lake_superior`       | Lake Superior                                      | 1.8 M / 0.9 M                  |
 | `atlgulf_extract_03S` | Florida peninsula (VPU 03S), a subset of `atlgulf` | 2.7 M / 1.4 M                  |
 
 The `atlgulf_extract_03S` model is an example of what the subsetting workflow produces from a full domain.
@@ -166,9 +168,9 @@ coordinates — and is what the forcing stages use to regrid LDASIN data onto th
 mesh. It is set explicitly with `model_config.geogrid_file`, so it must match the NWM
 forcing domain your model sits in:
 
-| Model                                                    | Geogrid file            |
-| -------------------------------------------------------- | ----------------------- |
-| `atlgulf`, `pacific`, `lake_erie`, `lake_michigan-huron` | `geo_em_CONUS.nc`       |
+| Model                                                     | Geogrid file            |
+| --------------------------------------------------------- | ----------------------- |
+| `atlgulf`, `pacific`, and all four Great Lakes models     | `geo_em_CONUS.nc`       |
 | `hawaii`                                                 | `geo_em_Hawaii.nc`      |
 | `prvi`                                                   | `geo_em_Puerto_Rico.nc` |
 | `alaska`                                                 | `geo_em_Alaska.nc`      |
