@@ -12,6 +12,9 @@ arithmetic, and manual data management.
 configuration file drives the entire pipeline, from data download through model
 execution to validation against NOAA tide gauges.
 
+See [Concepts and Workflows](docs/concepts/index.md) for the context behind these tools
+and how they are meant to be used together.
+
 ## What It Does
 
 - **Domain definition**: QGIS plugin for interactively drawing the model domain and
@@ -149,13 +152,20 @@ The AOI polygon and discharge points can be created interactively using the QGIS
 
 ## Supported Data Sources
 
-| Source      | Date Range                                  | Description                  |
-| ----------- | ------------------------------------------- | ---------------------------- |
-| `nwm_retro` | 1979-02-01 to 2023-01-31 (CONUS), by domain | NWM Retrospective 3.0        |
-| `nwm_ana`   | 2018-10-01 to present, by domain            | NWM Analysis                 |
-| `stofs`     | 2020-12-30 to present                       | STOFS water levels           |
-| `glofs`     | 2016 to present, by lake                    | Great Lakes OFS water levels |
-| `tpxo`      | N/A (local installation)                    | TPXO tidal model             |
+| Source      | Date Range                                  | Retrieved from                                                                                                              | Fields used                                            |
+| ----------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `nwm_retro` | 1979-02-01 to 2023-01-31 (CONUS), by domain | [`noaa-nwm-retrospective-3-0-pds`](https://noaa-nwm-retrospective-3-0-pds.s3.amazonaws.com/index.html), `{DOMAIN}/netcdf/FORCING/{year}/*.LDASIN_DOMAIN1` | `T2D`, `Q2D`, `PSFC`, `U2D`, `V2D`, `RAINRATE`, `SWDOWN`, `LWDOWN` |
+| `nwm_ana`   | 2018-10-01 to present, by domain            | [`national-water-model`](https://console.cloud.google.com/storage/browser/national-water-model) on Google Cloud (public)      | same LDASIN fields as above                            |
+| Streamflow  | with the meteo source above                 | NWM Retrospective Zarr store (read directly, not downloaded) or NWM Analysis CHRTOUT files                                   | `streamflow`                                           |
+| `stofs`     | 2020-12-30 to present                       | [`noaa-gestofs-pds`](https://noaa-gestofs-pds.s3.amazonaws.com/index.html)                                                    | water level                                            |
+| `glofs`     | 2016 to present, by lake                    | [NOAA NCEI](https://www.ncei.noaa.gov/oa/prod-model/)                                                                         | water level                                            |
+| `harmonic`  | N/A (local atlas)                           | TPXO10 atlas, installed locally ([registration required](https://www.tpxo.net/))                                             | tidal constituents                                     |
+
+SCHISM reads `T2D`, `Q2D`, `PSFC`, `U2D`, and `V2D` when building `sflux` files; SFINCS
+maps `RAINRATE`, `T2D`, `U2D`/`V2D`, `SWDOWN`, and `LWDOWN` into its own forcing.
+
+The NWM Retrospective forcing is AORC-derived (verified for CONUS and Alaska), so AORC
+is not configured separately — selecting `nwm_retro` already uses it.
 
 **Domains**: `atlgulf`, `pacific`, `hawaii`, `prvi`, `alaska`, `greatlakes`
 

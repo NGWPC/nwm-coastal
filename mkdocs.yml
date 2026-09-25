@@ -167,6 +167,7 @@ nav:
   - Installation: getting-started/installation.md
   - Cluster Installation: getting-started/cluster-install.md
   - Quick Start: getting-started/quickstart.md
+- Concepts and Workflows: concepts/index.md
 - User Guide:
   - Configuration: user-guide/configuration.md
   - CLI Reference: user-guide/cli.md
