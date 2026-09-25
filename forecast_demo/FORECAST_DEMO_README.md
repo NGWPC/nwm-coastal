@@ -173,6 +173,13 @@ export RUN_NGEN_ROOT=/path/to/run_ngen    # usually on same level as rte
 export RUN_COASTAL_ROOT=/path/to/run_coastal    # also usually on same level as rte
 ```
 
+### 8. Check the paths in the example configs
+
+The example configs assume the recommended path structure -- please check the
+config paths before going further. They live at
+`$RUN_COASTAL_ROOT/schism_sims/example_schism_forecast_run.yaml` and
+`$RUN_COASTAL_ROOT/sfincs_sims/example_sfincs_forecast_run.yaml`.
+
 Proceed to `forecast_walkthrough.py`, either as a script:
 
 ```bash

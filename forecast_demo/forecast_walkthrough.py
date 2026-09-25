@@ -31,6 +31,11 @@
 # that cell rather than starting over. Setup steps are in
 # `FORECAST_DEMO_README.md`; this assumes setup is already done.
 #
+# The example configs assume the recommended path structure -- please check
+# the config paths prior to running this script. They live at
+# `$RUN_COASTAL_ROOT/schism_sims/example_schism_forecast_run.yaml` and
+# `$RUN_COASTAL_ROOT/sfincs_sims/example_sfincs_forecast_run.yaml`.
+#
 # Run the whole thing non-interactively with:
 # `nwm-coastal-py forecast_demo/forecast_walkthrough.py`
 #
