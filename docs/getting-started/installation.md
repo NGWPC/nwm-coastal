@@ -72,7 +72,7 @@ that uses harmonic tides.
 
 ### Without AWS credentials
 
-Most of this data has a public equivalent:
+Many of this data has a public equivalent:
 
 - **SCHISM models.** NOAA publishes the NWM coastal module parameters at
     [water.noaa.gov/about/nwm](https://water.noaa.gov/about/nwm), as
@@ -88,9 +88,6 @@ Most of this data has a public equivalent:
     registration at [tpxo.net](https://www.tpxo.net/). It is only needed for
     `boundary.source: harmonic`; `stofs` and `glofs` are public and need no
     registration.
-- **Hydrofabric.** NextGen hydrofabric geopackages are published by
-    [Lynker Spatial](https://docs.lynker-spatial.com/data-service/hydrofabric) under
-    ODbL.
 
 Retrospective and analysis runs work entirely from public data once you have a model:
 NWM forcing, STOFS, and GLOFS are all open. The ecFlow forecast demo in `forecast_demo/`
