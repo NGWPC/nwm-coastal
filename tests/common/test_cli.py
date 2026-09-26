@@ -143,21 +143,33 @@ class TestCLIPrepareSchismReaches:
 
     def test_requires_a_hydrofabric(self, runner, tmp_path):
         (tmp_path / "hgrid.gr3").write_text("stub")
+        (tmp_path / "bctides.in").write_text("stub")
         result = runner.invoke(cli, ["prepare-schism-reaches", str(tmp_path)])
         assert result.exit_code != 0
         assert "--nwm-gdb" in result.output
 
-    def test_missing_hgrid_gr3(self, runner, tmp_path):
+    def test_missing_mesh_files(self, runner, tmp_path):
         gpkg = tmp_path / "fp.gpkg"
         gpkg.write_bytes(b"stub")
         result = runner.invoke(
             cli, ["prepare-schism-reaches", str(tmp_path), "--ngen-gpkg", str(gpkg)]
         )
         assert result.exit_code != 0
-        assert "hgrid.gr3 not found" in result.output
+        assert "hgrid.gr3, bctides.in not found" in result.output
+
+    def test_missing_bctides(self, runner, tmp_path):
+        (tmp_path / "hgrid.gr3").write_text("stub")
+        gpkg = tmp_path / "fp.gpkg"
+        gpkg.write_bytes(b"stub")
+        result = runner.invoke(
+            cli, ["prepare-schism-reaches", str(tmp_path), "--ngen-gpkg", str(gpkg)]
+        )
+        assert result.exit_code != 0
+        assert "bctides.in not found" in result.output
 
     def test_refuses_existing_without_force(self, runner, tmp_path):
         (tmp_path / "hgrid.gr3").write_text("stub")
+        (tmp_path / "bctides.in").write_text("stub")
         (tmp_path / "ngenReaches.csv").write_text("0\n")
         gpkg = tmp_path / "fp.gpkg"
         gpkg.write_bytes(b"stub")
@@ -174,6 +186,7 @@ class TestCLIPrepareSchismReaches:
 
     def test_check_does_not_require_force(self, runner, tmp_path):
         (tmp_path / "hgrid.gr3").write_text("stub")
+        (tmp_path / "bctides.in").write_text("stub")
         (tmp_path / "ngenReaches.csv").write_text("0\n")
         gpkg = tmp_path / "fp.gpkg"
         gpkg.write_bytes(b"stub")

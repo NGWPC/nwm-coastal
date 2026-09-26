@@ -432,8 +432,10 @@ def prepare_schism_reaches(
         _raise_cli_error("Pass --nwm-gdb and/or --ngen-gpkg to select what to generate.")
 
     prebuilt_dir = prebuilt_dir.resolve()
-    if not (prebuilt_dir / "hgrid.gr3").exists():
-        _raise_cli_error(f"hgrid.gr3 not found in {prebuilt_dir}")
+    # The mesh and its open-boundary flags are the only model inputs needed.
+    missing = [n for n in ("hgrid.gr3", "bctides.in") if not (prebuilt_dir / n).exists()]
+    if missing:
+        _raise_cli_error(f"{', '.join(missing)} not found in {prebuilt_dir}")
 
     targets: list[tuple[Path, Path, str, str]] = []
     if nwm_gdb is not None:
