@@ -1,0 +1,68 @@
+# Lake Erie (Fairport Harbor, OH) - SFINCS model creation from AOI
+#
+# Unlike the Lavaca example, elevation does NOT come from one of the built-in
+# auto-fetched sources: none of them cover the Great Lakes lake bed. The DEM is
+# downloaded by hand and registered through ./dem_catalog.yml - see step 1 of
+# ../notebooks/lake_erie.ipynb.
+#
+# Usage:
+#   coastal-calibration create create.yaml
+#   coastal-calibration create create.yaml --dry-run
+
+aoi: ./sfincs_aoi_lake_erie.geojson   # shipped; replace to model elsewhere
+output_dir: ./sfincs_fh_lake_erie
+download_dir: ./downloads/grid    # inside the example, so a copied folder is self-contained
+
+# grid and mask values below are what step 2 of the notebook derived for the
+# 425 km2 Fairport Harbor AOI; re-derive them if the AOI changes.
+grid:
+  resolution: 256        # base resolution in meters
+  crs: utm               # auto-detect UTM zone (-> EPSG:32617 here)
+  rotated: false
+  # No refine.geojson yet - add one and uncomment to resolve the river mouths finer.
+  # refinement:
+  # - polygon: ./refine.geojson   # refine interior to 64 m (256 / 2^2)
+  #   level: 2                    # 2 refinement steps: 256->128->64 m
+
+# Registers the hand-downloaded DEM; any dataset below with a null source needs it.
+data_catalog:
+  data_libs:
+  - ./dem_catalog.yml
+
+elevation:
+  datasets:
+  - name: erie_lld                # catalog entry name in dem_catalog.yml
+    zmin: -20000
+    source:                       # no auto-fetch: read from the data catalog
+  # Optional finer land topography, shifted from absolute elevation onto LWD.
+  # - name: copdem_30m
+  #   zmin: 0.001                 # land only, in LWD (applied after the offset)
+  #   source: copdem_30m
+  #   offset: -173.5
+  buffer_cells: 1
+
+mask:
+  # Clip the active mask to the digitized AOI, otherwise the domain is the
+  # axis-aligned bounding box (915 km2) rather than the polygon (425 km2).
+  # zmin must stay unset: hydromt applies include_polygon as a UNION on top of
+  # the zmin mask, so any zmin that passes every cell makes this a no-op.
+  include_polygon: ./sfincs_aoi_lake_erie.geojson
+  boundary_zmax: -1.0     # max bed elevation (LWD) for a cell to host the boundary: submerged only
+  reset_bounds: true
+  keep_largest_only: true # drop isolated active cells
+
+subgrid:
+  nr_subgrid_pixels: 4
+  lulc_dataset: esa_worldcover
+  manning_land: 0.04
+  manning_sea: 0.02
+
+# Shipped flowpaths (Chagrin + Grand); delete this block to run without river inflow.
+river_discharge:
+  flowlines: ./discharge_nwm.geojson # GeoJSON of selected NWM flowpaths
+  nwm_id_column: ID                  # column with NWM feature IDs
+
+add_noaa_gages: true           # discover NOAA CO-OPS lake gauges in domain
+
+monitoring:
+  log_level: INFO

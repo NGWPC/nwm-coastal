@@ -838,7 +838,12 @@ class SfincsModelConfig(ModelConfig):
         ``wind10_v``) from the meteorological data catalog entry.
     include_pressure : bool
         When True, add spatially-varying atmospheric pressure forcing
-        (``press_msl``) and enable barometric correction (``baro=1``).
+        (``press_msl``) and enable the pressure-gradient force
+        (``baro=1``).  The separate *boundary* inverse-barometer
+        correction (``pavbnd``) is enabled only for tide-only
+        (``harmonic``) boundaries; ``stofs``/``glofs`` levels already
+        contain the barometric response, so it is left at SFINCS's
+        default of 0 (off) to avoid double-counting.
     meteo_res : float, optional
         Output resolution (m) for gridded meteorological forcing
         (precipitation, wind, pressure).  When *None* (default) the
@@ -1641,11 +1646,7 @@ class CoastalCalibConfig:
                     if self.paths.forecast_meteo_file
                     else {}
                 ),
-                **(
-                    {"troute_file": str(self.paths.troute_file)}
-                    if self.paths.troute_file
-                    else {}
-                ),
+                **({"troute_file": str(self.paths.troute_file)} if self.paths.troute_file else {}),
                 **({"parm_dir": str(self.paths.parm_dir)} if self.paths.parm_dir else {}),
                 **({"nwm_dir": str(self.paths.nwm_dir)} if self.paths.nwm_dir else {}),
                 **(

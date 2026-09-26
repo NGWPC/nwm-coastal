@@ -17,14 +17,21 @@ downloads/
 **/model
 **/geo_em_*.nc
 
-# SFINCS files written into working dirs
-**/sfincs_*.nc
-**/sfincs_*.inp
-**/sfincs_*.bnd
-**/sfincs_*.obs
-**/sfincs_*.src
+# SFINCS files written into working dirs. The model directory can be named
+# anything (create.yaml's output_dir), so match the file names, not the folder.
+**/sfincs*.nc
+**/sfincs*.inp
+**/sfincs*.bnd
+**/sfincs*.bzs
+**/sfincs*.obs
+**/sfincs*.src
 **/*.dis
 **/*_subgrid.nc
+
+# Status/manifest files written by `coastal-calibration create`
+**/create_progress.json
+**/create_result.json
+**/obs_station_map.json
 
 # Other transient artifacts
 *.log

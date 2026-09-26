@@ -1655,18 +1655,30 @@ class SfincsPressureStage(_SfincsStageBase):
             model.config.set("netampfile", "sfincs_netamp.nc")
             _set_forcing_filename(model.pressure, "sfincs_netamp.nc")
 
-            # Enable barometric pressure correction so SFINCS uses the forcing.
-            # pavbnd / gapres set the reference atmospheric pressure (Pa) at the
-            # open boundaries and the "gap" pressure for inverse-barometer
-            # correction.  Standard atmosphere ≈ 101 325 Pa; 101 200 Pa is the
-            # conventional SFINCS default.
+            # Enable the pressure-gradient force on the interior.
             model.config.set("baro", 1)
-            model.config.set("pavbnd", 101200)
-            model.config.set("gapres", 101200)
+
+            # ``pavbnd`` is the reference pressure at which the *boundary* water
+            # levels are treated as uncorrected: SFINCS adds
+            # ``(pavbnd - patmb) / (rho g)`` to each boundary level
+            # (sfincs_boundaries.f90).  It defaults to 0.0 in SFINCS, which
+            # disables the correction, and that is the right choice whenever the
+            # boundary already contains the barometric response.  STOFS and GLOFS
+            # are full hydrodynamic model output and do contain it, so correcting
+            # again double-counts.  Tidal predictions carry no atmosphere, so
+            # there the correction restores what the atlas omits; its reference is
+            # the long-run mean pressure the harmonics were fitted under, hence a
+            # constant.  Harmonic boundaries only ever run on ocean domains, so
+            # the conventional sea-level 101 200 Pa applies.
+            # ``tpxo`` is normalized to ``harmonic`` in BoundaryConfig.
+            tide_only = self.config.boundary.source == "harmonic"
+            if tide_only:
+                model.config.set("pavbnd", 101200)
 
             self._log(
                 f"Atmospheric pressure forcing added from {meteo_dataset} "
-                f"(baro=1, res={dst_res:.0f} m)"
+                f"(baro=1, pavbnd={'101200' if tide_only else 'off'}, "
+                f"res={dst_res:.0f} m)"
             )
 
             model.pressure.write()
