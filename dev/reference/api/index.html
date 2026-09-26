@@ -919,6 +919,8 @@
       
         
       
+        
+      
     
     
     
@@ -1016,6 +1018,34 @@
     
   
     Lavaca Bay SFINCS Tutorial
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/notebooks/lake_erie/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lake Erie SFINCS Tutorial - bring your own DEM
   
 
     
@@ -3476,12 +3506,7 @@ Variables are resolved from other config values, e.g.:</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/coastal_calibration/config/schema.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1559">1559</a></span>
-<span class="normal"><a href="#__codelineno-0-1560">1560</a></span>
-<span class="normal"><a href="#__codelineno-0-1561">1561</a></span>
-<span class="normal"><a href="#__codelineno-0-1562">1562</a></span>
-<span class="normal"><a href="#__codelineno-0-1563">1563</a></span>
-<span class="normal"><a href="#__codelineno-0-1564">1564</a></span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1564">1564</a></span>
 <span class="normal"><a href="#__codelineno-0-1565">1565</a></span>
 <span class="normal"><a href="#__codelineno-0-1566">1566</a></span>
 <span class="normal"><a href="#__codelineno-0-1567">1567</a></span>
@@ -3529,60 +3554,65 @@ Variables are resolved from other config values, e.g.:</p>
 <span class="normal"><a href="#__codelineno-0-1609">1609</a></span>
 <span class="normal"><a href="#__codelineno-0-1610">1610</a></span>
 <span class="normal"><a href="#__codelineno-0-1611">1611</a></span>
-<span class="normal"><a href="#__codelineno-0-1612">1612</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1559"><a id="__codelineno-0-1559" name="__codelineno-0-1559"></a><span class="nd">@classmethod</span>
-</span><span id="__span-0-1560"><a id="__codelineno-0-1560" name="__codelineno-0-1560"></a><span class="k">def</span><span class="w"> </span><span class="nf">from_yaml</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">config_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CoastalCalibConfig</span><span class="p">:</span>
-</span><span id="__span-0-1561"><a id="__codelineno-0-1561" name="__codelineno-0-1561"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Load configuration from YAML file with optional inheritance.</span>
-</span><span id="__span-0-1562"><a id="__codelineno-0-1562" name="__codelineno-0-1562"></a>
-</span><span id="__span-0-1563"><a id="__codelineno-0-1563" name="__codelineno-0-1563"></a><span class="sd">    Supports variable interpolation using ${section.key} syntax.</span>
-</span><span id="__span-0-1564"><a id="__codelineno-0-1564" name="__codelineno-0-1564"></a><span class="sd">    Variables are resolved from other config values, e.g.:</span>
-</span><span id="__span-0-1565"><a id="__codelineno-0-1565" name="__codelineno-0-1565"></a>
-</span><span id="__span-0-1566"><a id="__codelineno-0-1566" name="__codelineno-0-1566"></a><span class="sd">    - ``${user}`` -&gt; value of ``$USER`` environment variable</span>
-</span><span id="__span-0-1567"><a id="__codelineno-0-1567" name="__codelineno-0-1567"></a><span class="sd">    - ``${simulation.coastal_domain}`` -&gt; value of ``simulation.coastal_domain``</span>
-</span><span id="__span-0-1568"><a id="__codelineno-0-1568" name="__codelineno-0-1568"></a><span class="sd">    - ``${model}`` -&gt; the model type string (``&quot;schism&quot;`` or ``&quot;sfincs&quot;``)</span>
-</span><span id="__span-0-1569"><a id="__codelineno-0-1569" name="__codelineno-0-1569"></a>
-</span><span id="__span-0-1570"><a id="__codelineno-0-1570" name="__codelineno-0-1570"></a><span class="sd">    Parameters</span>
-</span><span id="__span-0-1571"><a id="__codelineno-0-1571" name="__codelineno-0-1571"></a><span class="sd">    ----------</span>
-</span><span id="__span-0-1572"><a id="__codelineno-0-1572" name="__codelineno-0-1572"></a><span class="sd">    config_path : Path or str</span>
-</span><span id="__span-0-1573"><a id="__codelineno-0-1573" name="__codelineno-0-1573"></a><span class="sd">        Path to YAML configuration file.</span>
+<span class="normal"><a href="#__codelineno-0-1612">1612</a></span>
+<span class="normal"><a href="#__codelineno-0-1613">1613</a></span>
+<span class="normal"><a href="#__codelineno-0-1614">1614</a></span>
+<span class="normal"><a href="#__codelineno-0-1615">1615</a></span>
+<span class="normal"><a href="#__codelineno-0-1616">1616</a></span>
+<span class="normal"><a href="#__codelineno-0-1617">1617</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1564"><a id="__codelineno-0-1564" name="__codelineno-0-1564"></a><span class="nd">@classmethod</span>
+</span><span id="__span-0-1565"><a id="__codelineno-0-1565" name="__codelineno-0-1565"></a><span class="k">def</span><span class="w"> </span><span class="nf">from_yaml</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">config_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CoastalCalibConfig</span><span class="p">:</span>
+</span><span id="__span-0-1566"><a id="__codelineno-0-1566" name="__codelineno-0-1566"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Load configuration from YAML file with optional inheritance.</span>
+</span><span id="__span-0-1567"><a id="__codelineno-0-1567" name="__codelineno-0-1567"></a>
+</span><span id="__span-0-1568"><a id="__codelineno-0-1568" name="__codelineno-0-1568"></a><span class="sd">    Supports variable interpolation using ${section.key} syntax.</span>
+</span><span id="__span-0-1569"><a id="__codelineno-0-1569" name="__codelineno-0-1569"></a><span class="sd">    Variables are resolved from other config values, e.g.:</span>
+</span><span id="__span-0-1570"><a id="__codelineno-0-1570" name="__codelineno-0-1570"></a>
+</span><span id="__span-0-1571"><a id="__codelineno-0-1571" name="__codelineno-0-1571"></a><span class="sd">    - ``${user}`` -&gt; value of ``$USER`` environment variable</span>
+</span><span id="__span-0-1572"><a id="__codelineno-0-1572" name="__codelineno-0-1572"></a><span class="sd">    - ``${simulation.coastal_domain}`` -&gt; value of ``simulation.coastal_domain``</span>
+</span><span id="__span-0-1573"><a id="__codelineno-0-1573" name="__codelineno-0-1573"></a><span class="sd">    - ``${model}`` -&gt; the model type string (``&quot;schism&quot;`` or ``&quot;sfincs&quot;``)</span>
 </span><span id="__span-0-1574"><a id="__codelineno-0-1574" name="__codelineno-0-1574"></a>
-</span><span id="__span-0-1575"><a id="__codelineno-0-1575" name="__codelineno-0-1575"></a><span class="sd">    Returns</span>
-</span><span id="__span-0-1576"><a id="__codelineno-0-1576" name="__codelineno-0-1576"></a><span class="sd">    -------</span>
-</span><span id="__span-0-1577"><a id="__codelineno-0-1577" name="__codelineno-0-1577"></a><span class="sd">    CoastalCalibConfig</span>
-</span><span id="__span-0-1578"><a id="__codelineno-0-1578" name="__codelineno-0-1578"></a><span class="sd">        Loaded configuration.</span>
+</span><span id="__span-0-1575"><a id="__codelineno-0-1575" name="__codelineno-0-1575"></a><span class="sd">    Parameters</span>
+</span><span id="__span-0-1576"><a id="__codelineno-0-1576" name="__codelineno-0-1576"></a><span class="sd">    ----------</span>
+</span><span id="__span-0-1577"><a id="__codelineno-0-1577" name="__codelineno-0-1577"></a><span class="sd">    config_path : Path or str</span>
+</span><span id="__span-0-1578"><a id="__codelineno-0-1578" name="__codelineno-0-1578"></a><span class="sd">        Path to YAML configuration file.</span>
 </span><span id="__span-0-1579"><a id="__codelineno-0-1579" name="__codelineno-0-1579"></a>
-</span><span id="__span-0-1580"><a id="__codelineno-0-1580" name="__codelineno-0-1580"></a><span class="sd">    Raises</span>
-</span><span id="__span-0-1581"><a id="__codelineno-0-1581" name="__codelineno-0-1581"></a><span class="sd">    ------</span>
-</span><span id="__span-0-1582"><a id="__codelineno-0-1582" name="__codelineno-0-1582"></a><span class="sd">    FileNotFoundError</span>
-</span><span id="__span-0-1583"><a id="__codelineno-0-1583" name="__codelineno-0-1583"></a><span class="sd">        If the configuration file does not exist.</span>
-</span><span id="__span-0-1584"><a id="__codelineno-0-1584" name="__codelineno-0-1584"></a><span class="sd">    yaml.YAMLError</span>
-</span><span id="__span-0-1585"><a id="__codelineno-0-1585" name="__codelineno-0-1585"></a><span class="sd">        If the YAML file is malformed.</span>
-</span><span id="__span-0-1586"><a id="__codelineno-0-1586" name="__codelineno-0-1586"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-1587"><a id="__codelineno-0-1587" name="__codelineno-0-1587"></a>    <span class="n">config_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">config_path</span><span class="p">)</span>
-</span><span id="__span-0-1588"><a id="__codelineno-0-1588" name="__codelineno-0-1588"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">config_path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
-</span><span id="__span-0-1589"><a id="__codelineno-0-1589" name="__codelineno-0-1589"></a>        <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Configuration file not found: </span><span class="si">{</span><span class="n">config_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span id="__span-0-1590"><a id="__codelineno-0-1590" name="__codelineno-0-1590"></a>
-</span><span id="__span-0-1591"><a id="__codelineno-0-1591" name="__codelineno-0-1591"></a>    <span class="k">try</span><span class="p">:</span>
-</span><span id="__span-0-1592"><a id="__codelineno-0-1592" name="__codelineno-0-1592"></a>        <span class="n">data</span> <span class="o">=</span> <span class="n">yaml</span><span class="o">.</span><span class="n">safe_load</span><span class="p">(</span><span class="n">config_path</span><span class="o">.</span><span class="n">read_text</span><span class="p">())</span>
-</span><span id="__span-0-1593"><a id="__codelineno-0-1593" name="__codelineno-0-1593"></a>    <span class="k">except</span> <span class="n">yaml</span><span class="o">.</span><span class="n">YAMLError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-</span><span id="__span-0-1594"><a id="__codelineno-0-1594" name="__codelineno-0-1594"></a>        <span class="k">raise</span> <span class="n">yaml</span><span class="o">.</span><span class="n">YAMLError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid YAML in </span><span class="si">{</span><span class="n">config_path</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">e</span>
+</span><span id="__span-0-1580"><a id="__codelineno-0-1580" name="__codelineno-0-1580"></a><span class="sd">    Returns</span>
+</span><span id="__span-0-1581"><a id="__codelineno-0-1581" name="__codelineno-0-1581"></a><span class="sd">    -------</span>
+</span><span id="__span-0-1582"><a id="__codelineno-0-1582" name="__codelineno-0-1582"></a><span class="sd">    CoastalCalibConfig</span>
+</span><span id="__span-0-1583"><a id="__codelineno-0-1583" name="__codelineno-0-1583"></a><span class="sd">        Loaded configuration.</span>
+</span><span id="__span-0-1584"><a id="__codelineno-0-1584" name="__codelineno-0-1584"></a>
+</span><span id="__span-0-1585"><a id="__codelineno-0-1585" name="__codelineno-0-1585"></a><span class="sd">    Raises</span>
+</span><span id="__span-0-1586"><a id="__codelineno-0-1586" name="__codelineno-0-1586"></a><span class="sd">    ------</span>
+</span><span id="__span-0-1587"><a id="__codelineno-0-1587" name="__codelineno-0-1587"></a><span class="sd">    FileNotFoundError</span>
+</span><span id="__span-0-1588"><a id="__codelineno-0-1588" name="__codelineno-0-1588"></a><span class="sd">        If the configuration file does not exist.</span>
+</span><span id="__span-0-1589"><a id="__codelineno-0-1589" name="__codelineno-0-1589"></a><span class="sd">    yaml.YAMLError</span>
+</span><span id="__span-0-1590"><a id="__codelineno-0-1590" name="__codelineno-0-1590"></a><span class="sd">        If the YAML file is malformed.</span>
+</span><span id="__span-0-1591"><a id="__codelineno-0-1591" name="__codelineno-0-1591"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-1592"><a id="__codelineno-0-1592" name="__codelineno-0-1592"></a>    <span class="n">config_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">config_path</span><span class="p">)</span>
+</span><span id="__span-0-1593"><a id="__codelineno-0-1593" name="__codelineno-0-1593"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">config_path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+</span><span id="__span-0-1594"><a id="__codelineno-0-1594" name="__codelineno-0-1594"></a>        <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Configuration file not found: </span><span class="si">{</span><span class="n">config_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </span><span id="__span-0-1595"><a id="__codelineno-0-1595" name="__codelineno-0-1595"></a>
-</span><span id="__span-0-1596"><a id="__codelineno-0-1596" name="__codelineno-0-1596"></a>    <span class="k">if</span> <span class="n">data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-1597"><a id="__codelineno-0-1597" name="__codelineno-0-1597"></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Configuration file is empty: </span><span class="si">{</span><span class="n">config_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span id="__span-0-1598"><a id="__codelineno-0-1598" name="__codelineno-0-1598"></a>
-</span><span id="__span-0-1599"><a id="__codelineno-0-1599" name="__codelineno-0-1599"></a>    <span class="k">if</span> <span class="s2">&quot;_base&quot;</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span>
-</span><span id="__span-0-1600"><a id="__codelineno-0-1600" name="__codelineno-0-1600"></a>        <span class="n">base_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;_base&quot;</span><span class="p">))</span>
-</span><span id="__span-0-1601"><a id="__codelineno-0-1601" name="__codelineno-0-1601"></a>        <span class="k">if</span> <span class="ow">not</span> <span class="n">base_path</span><span class="o">.</span><span class="n">is_absolute</span><span class="p">():</span>
-</span><span id="__span-0-1602"><a id="__codelineno-0-1602" name="__codelineno-0-1602"></a>            <span class="n">base_path</span> <span class="o">=</span> <span class="n">config_path</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="n">base_path</span>
-</span><span id="__span-0-1603"><a id="__codelineno-0-1603" name="__codelineno-0-1603"></a>        <span class="n">base_config</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">from_yaml</span><span class="p">(</span><span class="n">base_path</span><span class="p">)</span>
-</span><span id="__span-0-1604"><a id="__codelineno-0-1604" name="__codelineno-0-1604"></a>        <span class="n">data</span> <span class="o">=</span> <span class="n">_deep_merge</span><span class="p">(</span><span class="n">base_config</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span> <span class="n">data</span><span class="p">)</span>
-</span><span id="__span-0-1605"><a id="__codelineno-0-1605" name="__codelineno-0-1605"></a>
-</span><span id="__span-0-1606"><a id="__codelineno-0-1606" name="__codelineno-0-1606"></a>    <span class="c1"># Ensure model key has a default before interpolation</span>
-</span><span id="__span-0-1607"><a id="__codelineno-0-1607" name="__codelineno-0-1607"></a>    <span class="n">data</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;model&quot;</span><span class="p">,</span> <span class="s2">&quot;schism&quot;</span><span class="p">)</span>
-</span><span id="__span-0-1608"><a id="__codelineno-0-1608" name="__codelineno-0-1608"></a>
-</span><span id="__span-0-1609"><a id="__codelineno-0-1609" name="__codelineno-0-1609"></a>    <span class="c1"># Interpolate variables after merging</span>
-</span><span id="__span-0-1610"><a id="__codelineno-0-1610" name="__codelineno-0-1610"></a>    <span class="n">data</span> <span class="o">=</span> <span class="n">_interpolate_config</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
-</span><span id="__span-0-1611"><a id="__codelineno-0-1611" name="__codelineno-0-1611"></a>
-</span><span id="__span-0-1612"><a id="__codelineno-0-1612" name="__codelineno-0-1612"></a>    <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+</span><span id="__span-0-1596"><a id="__codelineno-0-1596" name="__codelineno-0-1596"></a>    <span class="k">try</span><span class="p">:</span>
+</span><span id="__span-0-1597"><a id="__codelineno-0-1597" name="__codelineno-0-1597"></a>        <span class="n">data</span> <span class="o">=</span> <span class="n">yaml</span><span class="o">.</span><span class="n">safe_load</span><span class="p">(</span><span class="n">config_path</span><span class="o">.</span><span class="n">read_text</span><span class="p">())</span>
+</span><span id="__span-0-1598"><a id="__codelineno-0-1598" name="__codelineno-0-1598"></a>    <span class="k">except</span> <span class="n">yaml</span><span class="o">.</span><span class="n">YAMLError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+</span><span id="__span-0-1599"><a id="__codelineno-0-1599" name="__codelineno-0-1599"></a>        <span class="k">raise</span> <span class="n">yaml</span><span class="o">.</span><span class="n">YAMLError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid YAML in </span><span class="si">{</span><span class="n">config_path</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">e</span>
+</span><span id="__span-0-1600"><a id="__codelineno-0-1600" name="__codelineno-0-1600"></a>
+</span><span id="__span-0-1601"><a id="__codelineno-0-1601" name="__codelineno-0-1601"></a>    <span class="k">if</span> <span class="n">data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-1602"><a id="__codelineno-0-1602" name="__codelineno-0-1602"></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Configuration file is empty: </span><span class="si">{</span><span class="n">config_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-0-1603"><a id="__codelineno-0-1603" name="__codelineno-0-1603"></a>
+</span><span id="__span-0-1604"><a id="__codelineno-0-1604" name="__codelineno-0-1604"></a>    <span class="k">if</span> <span class="s2">&quot;_base&quot;</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span>
+</span><span id="__span-0-1605"><a id="__codelineno-0-1605" name="__codelineno-0-1605"></a>        <span class="n">base_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;_base&quot;</span><span class="p">))</span>
+</span><span id="__span-0-1606"><a id="__codelineno-0-1606" name="__codelineno-0-1606"></a>        <span class="k">if</span> <span class="ow">not</span> <span class="n">base_path</span><span class="o">.</span><span class="n">is_absolute</span><span class="p">():</span>
+</span><span id="__span-0-1607"><a id="__codelineno-0-1607" name="__codelineno-0-1607"></a>            <span class="n">base_path</span> <span class="o">=</span> <span class="n">config_path</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="n">base_path</span>
+</span><span id="__span-0-1608"><a id="__codelineno-0-1608" name="__codelineno-0-1608"></a>        <span class="n">base_config</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">from_yaml</span><span class="p">(</span><span class="n">base_path</span><span class="p">)</span>
+</span><span id="__span-0-1609"><a id="__codelineno-0-1609" name="__codelineno-0-1609"></a>        <span class="n">data</span> <span class="o">=</span> <span class="n">_deep_merge</span><span class="p">(</span><span class="n">base_config</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span> <span class="n">data</span><span class="p">)</span>
+</span><span id="__span-0-1610"><a id="__codelineno-0-1610" name="__codelineno-0-1610"></a>
+</span><span id="__span-0-1611"><a id="__codelineno-0-1611" name="__codelineno-0-1611"></a>    <span class="c1"># Ensure model key has a default before interpolation</span>
+</span><span id="__span-0-1612"><a id="__codelineno-0-1612" name="__codelineno-0-1612"></a>    <span class="n">data</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;model&quot;</span><span class="p">,</span> <span class="s2">&quot;schism&quot;</span><span class="p">)</span>
+</span><span id="__span-0-1613"><a id="__codelineno-0-1613" name="__codelineno-0-1613"></a>
+</span><span id="__span-0-1614"><a id="__codelineno-0-1614" name="__codelineno-0-1614"></a>    <span class="c1"># Interpolate variables after merging</span>
+</span><span id="__span-0-1615"><a id="__codelineno-0-1615" name="__codelineno-0-1615"></a>    <span class="n">data</span> <span class="o">=</span> <span class="n">_interpolate_config</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+</span><span id="__span-0-1616"><a id="__codelineno-0-1616" name="__codelineno-0-1616"></a>
+</span><span id="__span-0-1617"><a id="__codelineno-0-1617" name="__codelineno-0-1617"></a>    <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -3670,12 +3700,7 @@ is read but not mutated.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/coastal_calibration/config/schema.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1494">1494</a></span>
-<span class="normal"><a href="#__codelineno-0-1495">1495</a></span>
-<span class="normal"><a href="#__codelineno-0-1496">1496</a></span>
-<span class="normal"><a href="#__codelineno-0-1497">1497</a></span>
-<span class="normal"><a href="#__codelineno-0-1498">1498</a></span>
-<span class="normal"><a href="#__codelineno-0-1499">1499</a></span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1499">1499</a></span>
 <span class="normal"><a href="#__codelineno-0-1500">1500</a></span>
 <span class="normal"><a href="#__codelineno-0-1501">1501</a></span>
 <span class="normal"><a href="#__codelineno-0-1502">1502</a></span>
@@ -3733,70 +3758,75 @@ is read but not mutated.</p>
 <span class="normal"><a href="#__codelineno-0-1554">1554</a></span>
 <span class="normal"><a href="#__codelineno-0-1555">1555</a></span>
 <span class="normal"><a href="#__codelineno-0-1556">1556</a></span>
-<span class="normal"><a href="#__codelineno-0-1557">1557</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1494"><a id="__codelineno-0-1494" name="__codelineno-0-1494"></a><span class="nd">@classmethod</span>
-</span><span id="__span-0-1495"><a id="__codelineno-0-1495" name="__codelineno-0-1495"></a><span class="k">def</span><span class="w"> </span><span class="nf">from_dict</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">CoastalCalibConfig</span><span class="p">:</span>
-</span><span id="__span-0-1496"><a id="__codelineno-0-1496" name="__codelineno-0-1496"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Create config from a plain dictionary.</span>
-</span><span id="__span-0-1497"><a id="__codelineno-0-1497" name="__codelineno-0-1497"></a>
-</span><span id="__span-0-1498"><a id="__codelineno-0-1498" name="__codelineno-0-1498"></a><span class="sd">    Parameters</span>
-</span><span id="__span-0-1499"><a id="__codelineno-0-1499" name="__codelineno-0-1499"></a><span class="sd">    ----------</span>
-</span><span id="__span-0-1500"><a id="__codelineno-0-1500" name="__codelineno-0-1500"></a><span class="sd">    data : dict</span>
-</span><span id="__span-0-1501"><a id="__codelineno-0-1501" name="__codelineno-0-1501"></a><span class="sd">        Configuration dictionary with the same structure as the YAML</span>
-</span><span id="__span-0-1502"><a id="__codelineno-0-1502" name="__codelineno-0-1502"></a><span class="sd">        file (see :meth:`to_dict` for the expected keys). The dict</span>
-</span><span id="__span-0-1503"><a id="__codelineno-0-1503" name="__codelineno-0-1503"></a><span class="sd">        is read but not mutated.</span>
-</span><span id="__span-0-1504"><a id="__codelineno-0-1504" name="__codelineno-0-1504"></a>
-</span><span id="__span-0-1505"><a id="__codelineno-0-1505" name="__codelineno-0-1505"></a><span class="sd">    Returns</span>
-</span><span id="__span-0-1506"><a id="__codelineno-0-1506" name="__codelineno-0-1506"></a><span class="sd">    -------</span>
-</span><span id="__span-0-1507"><a id="__codelineno-0-1507" name="__codelineno-0-1507"></a><span class="sd">    CoastalCalibConfig</span>
-</span><span id="__span-0-1508"><a id="__codelineno-0-1508" name="__codelineno-0-1508"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-1509"><a id="__codelineno-0-1509" name="__codelineno-0-1509"></a>    <span class="k">if</span> <span class="s2">&quot;model&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span>
-</span><span id="__span-0-1510"><a id="__codelineno-0-1510" name="__codelineno-0-1510"></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;&#39;model&#39; is required (e.g., model: schism or model: sfincs)&quot;</span><span class="p">)</span>
-</span><span id="__span-0-1511"><a id="__codelineno-0-1511" name="__codelineno-0-1511"></a>    <span class="n">model_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;model&quot;</span><span class="p">]</span>
-</span><span id="__span-0-1512"><a id="__codelineno-0-1512" name="__codelineno-0-1512"></a>
-</span><span id="__span-0-1513"><a id="__codelineno-0-1513" name="__codelineno-0-1513"></a>    <span class="c1"># Read but do not mutate the caller&#39;s dict.</span>
-</span><span id="__span-0-1514"><a id="__codelineno-0-1514" name="__codelineno-0-1514"></a>    <span class="n">model_config_data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;model_config&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{}</span>
-</span><span id="__span-0-1515"><a id="__codelineno-0-1515" name="__codelineno-0-1515"></a>
-</span><span id="__span-0-1516"><a id="__codelineno-0-1516" name="__codelineno-0-1516"></a>    <span class="n">sim_data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;simulation&quot;</span><span class="p">,</span> <span class="p">{})</span>
-</span><span id="__span-0-1517"><a id="__codelineno-0-1517" name="__codelineno-0-1517"></a>    <span class="k">if</span> <span class="s2">&quot;start_date&quot;</span> <span class="ow">in</span> <span class="n">sim_data</span><span class="p">:</span>
-</span><span id="__span-0-1518"><a id="__codelineno-0-1518" name="__codelineno-0-1518"></a>        <span class="n">sim_data</span><span class="p">[</span><span class="s2">&quot;start_date&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span><span class="n">sim_data</span><span class="p">[</span><span class="s2">&quot;start_date&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">to_pydatetime</span><span class="p">()</span>
-</span><span id="__span-0-1519"><a id="__codelineno-0-1519" name="__codelineno-0-1519"></a>    <span class="n">simulation</span> <span class="o">=</span> <span class="n">SimulationConfig</span><span class="p">(</span><span class="o">**</span><span class="n">sim_data</span><span class="p">)</span>
+<span class="normal"><a href="#__codelineno-0-1557">1557</a></span>
+<span class="normal"><a href="#__codelineno-0-1558">1558</a></span>
+<span class="normal"><a href="#__codelineno-0-1559">1559</a></span>
+<span class="normal"><a href="#__codelineno-0-1560">1560</a></span>
+<span class="normal"><a href="#__codelineno-0-1561">1561</a></span>
+<span class="normal"><a href="#__codelineno-0-1562">1562</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1499"><a id="__codelineno-0-1499" name="__codelineno-0-1499"></a><span class="nd">@classmethod</span>
+</span><span id="__span-0-1500"><a id="__codelineno-0-1500" name="__codelineno-0-1500"></a><span class="k">def</span><span class="w"> </span><span class="nf">from_dict</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">CoastalCalibConfig</span><span class="p">:</span>
+</span><span id="__span-0-1501"><a id="__codelineno-0-1501" name="__codelineno-0-1501"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Create config from a plain dictionary.</span>
+</span><span id="__span-0-1502"><a id="__codelineno-0-1502" name="__codelineno-0-1502"></a>
+</span><span id="__span-0-1503"><a id="__codelineno-0-1503" name="__codelineno-0-1503"></a><span class="sd">    Parameters</span>
+</span><span id="__span-0-1504"><a id="__codelineno-0-1504" name="__codelineno-0-1504"></a><span class="sd">    ----------</span>
+</span><span id="__span-0-1505"><a id="__codelineno-0-1505" name="__codelineno-0-1505"></a><span class="sd">    data : dict</span>
+</span><span id="__span-0-1506"><a id="__codelineno-0-1506" name="__codelineno-0-1506"></a><span class="sd">        Configuration dictionary with the same structure as the YAML</span>
+</span><span id="__span-0-1507"><a id="__codelineno-0-1507" name="__codelineno-0-1507"></a><span class="sd">        file (see :meth:`to_dict` for the expected keys). The dict</span>
+</span><span id="__span-0-1508"><a id="__codelineno-0-1508" name="__codelineno-0-1508"></a><span class="sd">        is read but not mutated.</span>
+</span><span id="__span-0-1509"><a id="__codelineno-0-1509" name="__codelineno-0-1509"></a>
+</span><span id="__span-0-1510"><a id="__codelineno-0-1510" name="__codelineno-0-1510"></a><span class="sd">    Returns</span>
+</span><span id="__span-0-1511"><a id="__codelineno-0-1511" name="__codelineno-0-1511"></a><span class="sd">    -------</span>
+</span><span id="__span-0-1512"><a id="__codelineno-0-1512" name="__codelineno-0-1512"></a><span class="sd">    CoastalCalibConfig</span>
+</span><span id="__span-0-1513"><a id="__codelineno-0-1513" name="__codelineno-0-1513"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-1514"><a id="__codelineno-0-1514" name="__codelineno-0-1514"></a>    <span class="k">if</span> <span class="s2">&quot;model&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span>
+</span><span id="__span-0-1515"><a id="__codelineno-0-1515" name="__codelineno-0-1515"></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;&#39;model&#39; is required (e.g., model: schism or model: sfincs)&quot;</span><span class="p">)</span>
+</span><span id="__span-0-1516"><a id="__codelineno-0-1516" name="__codelineno-0-1516"></a>    <span class="n">model_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;model&quot;</span><span class="p">]</span>
+</span><span id="__span-0-1517"><a id="__codelineno-0-1517" name="__codelineno-0-1517"></a>
+</span><span id="__span-0-1518"><a id="__codelineno-0-1518" name="__codelineno-0-1518"></a>    <span class="c1"># Read but do not mutate the caller&#39;s dict.</span>
+</span><span id="__span-0-1519"><a id="__codelineno-0-1519" name="__codelineno-0-1519"></a>    <span class="n">model_config_data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;model_config&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{}</span>
 </span><span id="__span-0-1520"><a id="__codelineno-0-1520" name="__codelineno-0-1520"></a>
-</span><span id="__span-0-1521"><a id="__codelineno-0-1521" name="__codelineno-0-1521"></a>    <span class="n">boundary_data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;boundary&quot;</span><span class="p">,</span> <span class="p">{})</span>
-</span><span id="__span-0-1522"><a id="__codelineno-0-1522" name="__codelineno-0-1522"></a>    <span class="k">if</span> <span class="n">boundary_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;stofs_file&quot;</span><span class="p">):</span>
-</span><span id="__span-0-1523"><a id="__codelineno-0-1523" name="__codelineno-0-1523"></a>        <span class="n">boundary_data</span><span class="p">[</span><span class="s2">&quot;stofs_file&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">boundary_data</span><span class="p">[</span><span class="s2">&quot;stofs_file&quot;</span><span class="p">])</span>
-</span><span id="__span-0-1524"><a id="__codelineno-0-1524" name="__codelineno-0-1524"></a>    <span class="n">boundary</span> <span class="o">=</span> <span class="n">BoundaryConfig</span><span class="p">(</span><span class="o">**</span><span class="n">boundary_data</span><span class="p">)</span>
+</span><span id="__span-0-1521"><a id="__codelineno-0-1521" name="__codelineno-0-1521"></a>    <span class="n">sim_data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;simulation&quot;</span><span class="p">,</span> <span class="p">{})</span>
+</span><span id="__span-0-1522"><a id="__codelineno-0-1522" name="__codelineno-0-1522"></a>    <span class="k">if</span> <span class="s2">&quot;start_date&quot;</span> <span class="ow">in</span> <span class="n">sim_data</span><span class="p">:</span>
+</span><span id="__span-0-1523"><a id="__codelineno-0-1523" name="__codelineno-0-1523"></a>        <span class="n">sim_data</span><span class="p">[</span><span class="s2">&quot;start_date&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span><span class="n">sim_data</span><span class="p">[</span><span class="s2">&quot;start_date&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">to_pydatetime</span><span class="p">()</span>
+</span><span id="__span-0-1524"><a id="__codelineno-0-1524" name="__codelineno-0-1524"></a>    <span class="n">simulation</span> <span class="o">=</span> <span class="n">SimulationConfig</span><span class="p">(</span><span class="o">**</span><span class="n">sim_data</span><span class="p">)</span>
 </span><span id="__span-0-1525"><a id="__codelineno-0-1525" name="__codelineno-0-1525"></a>
-</span><span id="__span-0-1526"><a id="__codelineno-0-1526" name="__codelineno-0-1526"></a>    <span class="n">paths_data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;paths&quot;</span><span class="p">,</span> <span class="p">{})</span>
-</span><span id="__span-0-1527"><a id="__codelineno-0-1527" name="__codelineno-0-1527"></a>    <span class="k">if</span> <span class="n">paths_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;forecast_meteo_file&quot;</span><span class="p">):</span>
-</span><span id="__span-0-1528"><a id="__codelineno-0-1528" name="__codelineno-0-1528"></a>        <span class="n">paths_data</span><span class="p">[</span><span class="s2">&quot;forecast_meteo_file&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">paths_data</span><span class="p">[</span><span class="s2">&quot;forecast_meteo_file&quot;</span><span class="p">])</span>
-</span><span id="__span-0-1529"><a id="__codelineno-0-1529" name="__codelineno-0-1529"></a>    <span class="k">if</span> <span class="n">paths_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;troute_file&quot;</span><span class="p">):</span>
-</span><span id="__span-0-1530"><a id="__codelineno-0-1530" name="__codelineno-0-1530"></a>        <span class="n">paths_data</span><span class="p">[</span><span class="s2">&quot;troute_file&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">paths_data</span><span class="p">[</span><span class="s2">&quot;troute_file&quot;</span><span class="p">])</span>
-</span><span id="__span-0-1531"><a id="__codelineno-0-1531" name="__codelineno-0-1531"></a>    <span class="n">paths</span> <span class="o">=</span> <span class="n">PathConfig</span><span class="p">(</span><span class="o">**</span><span class="n">paths_data</span><span class="p">)</span>
-</span><span id="__span-0-1532"><a id="__codelineno-0-1532" name="__codelineno-0-1532"></a>
-</span><span id="__span-0-1533"><a id="__codelineno-0-1533" name="__codelineno-0-1533"></a>    <span class="n">monitoring_data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;monitoring&quot;</span><span class="p">,</span> <span class="p">{})</span>
-</span><span id="__span-0-1534"><a id="__codelineno-0-1534" name="__codelineno-0-1534"></a>    <span class="k">if</span> <span class="n">monitoring_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;log_file&quot;</span><span class="p">):</span>
-</span><span id="__span-0-1535"><a id="__codelineno-0-1535" name="__codelineno-0-1535"></a>        <span class="n">monitoring_data</span><span class="p">[</span><span class="s2">&quot;log_file&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">monitoring_data</span><span class="p">[</span><span class="s2">&quot;log_file&quot;</span><span class="p">])</span>
-</span><span id="__span-0-1536"><a id="__codelineno-0-1536" name="__codelineno-0-1536"></a>    <span class="n">monitoring</span> <span class="o">=</span> <span class="n">MonitoringConfig</span><span class="p">(</span><span class="o">**</span><span class="n">monitoring_data</span><span class="p">)</span>
+</span><span id="__span-0-1526"><a id="__codelineno-0-1526" name="__codelineno-0-1526"></a>    <span class="n">boundary_data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;boundary&quot;</span><span class="p">,</span> <span class="p">{})</span>
+</span><span id="__span-0-1527"><a id="__codelineno-0-1527" name="__codelineno-0-1527"></a>    <span class="k">if</span> <span class="n">boundary_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;stofs_file&quot;</span><span class="p">):</span>
+</span><span id="__span-0-1528"><a id="__codelineno-0-1528" name="__codelineno-0-1528"></a>        <span class="n">boundary_data</span><span class="p">[</span><span class="s2">&quot;stofs_file&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">boundary_data</span><span class="p">[</span><span class="s2">&quot;stofs_file&quot;</span><span class="p">])</span>
+</span><span id="__span-0-1529"><a id="__codelineno-0-1529" name="__codelineno-0-1529"></a>    <span class="n">boundary</span> <span class="o">=</span> <span class="n">BoundaryConfig</span><span class="p">(</span><span class="o">**</span><span class="n">boundary_data</span><span class="p">)</span>
+</span><span id="__span-0-1530"><a id="__codelineno-0-1530" name="__codelineno-0-1530"></a>
+</span><span id="__span-0-1531"><a id="__codelineno-0-1531" name="__codelineno-0-1531"></a>    <span class="n">paths_data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;paths&quot;</span><span class="p">,</span> <span class="p">{})</span>
+</span><span id="__span-0-1532"><a id="__codelineno-0-1532" name="__codelineno-0-1532"></a>    <span class="k">if</span> <span class="n">paths_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;forecast_meteo_file&quot;</span><span class="p">):</span>
+</span><span id="__span-0-1533"><a id="__codelineno-0-1533" name="__codelineno-0-1533"></a>        <span class="n">paths_data</span><span class="p">[</span><span class="s2">&quot;forecast_meteo_file&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">paths_data</span><span class="p">[</span><span class="s2">&quot;forecast_meteo_file&quot;</span><span class="p">])</span>
+</span><span id="__span-0-1534"><a id="__codelineno-0-1534" name="__codelineno-0-1534"></a>    <span class="k">if</span> <span class="n">paths_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;troute_file&quot;</span><span class="p">):</span>
+</span><span id="__span-0-1535"><a id="__codelineno-0-1535" name="__codelineno-0-1535"></a>        <span class="n">paths_data</span><span class="p">[</span><span class="s2">&quot;troute_file&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">paths_data</span><span class="p">[</span><span class="s2">&quot;troute_file&quot;</span><span class="p">])</span>
+</span><span id="__span-0-1536"><a id="__codelineno-0-1536" name="__codelineno-0-1536"></a>    <span class="n">paths</span> <span class="o">=</span> <span class="n">PathConfig</span><span class="p">(</span><span class="o">**</span><span class="n">paths_data</span><span class="p">)</span>
 </span><span id="__span-0-1537"><a id="__codelineno-0-1537" name="__codelineno-0-1537"></a>
-</span><span id="__span-0-1538"><a id="__codelineno-0-1538" name="__codelineno-0-1538"></a>    <span class="n">download_data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;download&quot;</span><span class="p">,</span> <span class="p">{})</span>
-</span><span id="__span-0-1539"><a id="__codelineno-0-1539" name="__codelineno-0-1539"></a>    <span class="n">download</span> <span class="o">=</span> <span class="n">DownloadConfig</span><span class="p">(</span><span class="o">**</span><span class="n">download_data</span><span class="p">)</span>
-</span><span id="__span-0-1540"><a id="__codelineno-0-1540" name="__codelineno-0-1540"></a>
-</span><span id="__span-0-1541"><a id="__codelineno-0-1541" name="__codelineno-0-1541"></a>    <span class="k">if</span> <span class="n">model_type</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">MODEL_REGISTRY</span><span class="p">:</span>
-</span><span id="__span-0-1542"><a id="__codelineno-0-1542" name="__codelineno-0-1542"></a>        <span class="n">msg</span> <span class="o">=</span> <span class="p">(</span>
-</span><span id="__span-0-1543"><a id="__codelineno-0-1543" name="__codelineno-0-1543"></a>            <span class="sa">f</span><span class="s2">&quot;Unknown model type: </span><span class="si">{</span><span class="n">model_type</span><span class="si">!r}</span><span class="s2">. Supported models: </span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">MODEL_REGISTRY</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
-</span><span id="__span-0-1544"><a id="__codelineno-0-1544" name="__codelineno-0-1544"></a>        <span class="p">)</span>
-</span><span id="__span-0-1545"><a id="__codelineno-0-1545" name="__codelineno-0-1545"></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
-</span><span id="__span-0-1546"><a id="__codelineno-0-1546" name="__codelineno-0-1546"></a>
-</span><span id="__span-0-1547"><a id="__codelineno-0-1547" name="__codelineno-0-1547"></a>    <span class="n">model_cls</span> <span class="o">=</span> <span class="n">MODEL_REGISTRY</span><span class="p">[</span><span class="n">model_type</span><span class="p">]</span>
-</span><span id="__span-0-1548"><a id="__codelineno-0-1548" name="__codelineno-0-1548"></a>    <span class="n">model_config</span> <span class="o">=</span> <span class="n">model_cls</span><span class="p">(</span><span class="o">**</span><span class="n">model_config_data</span><span class="p">)</span>
-</span><span id="__span-0-1549"><a id="__codelineno-0-1549" name="__codelineno-0-1549"></a>
-</span><span id="__span-0-1550"><a id="__codelineno-0-1550" name="__codelineno-0-1550"></a>    <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
-</span><span id="__span-0-1551"><a id="__codelineno-0-1551" name="__codelineno-0-1551"></a>        <span class="n">simulation</span><span class="o">=</span><span class="n">simulation</span><span class="p">,</span>
-</span><span id="__span-0-1552"><a id="__codelineno-0-1552" name="__codelineno-0-1552"></a>        <span class="n">boundary</span><span class="o">=</span><span class="n">boundary</span><span class="p">,</span>
-</span><span id="__span-0-1553"><a id="__codelineno-0-1553" name="__codelineno-0-1553"></a>        <span class="n">paths</span><span class="o">=</span><span class="n">paths</span><span class="p">,</span>
-</span><span id="__span-0-1554"><a id="__codelineno-0-1554" name="__codelineno-0-1554"></a>        <span class="n">model_config</span><span class="o">=</span><span class="n">model_config</span><span class="p">,</span>  <span class="c1"># pyright: ignore[reportArgumentType]</span>
-</span><span id="__span-0-1555"><a id="__codelineno-0-1555" name="__codelineno-0-1555"></a>        <span class="n">monitoring</span><span class="o">=</span><span class="n">monitoring</span><span class="p">,</span>
-</span><span id="__span-0-1556"><a id="__codelineno-0-1556" name="__codelineno-0-1556"></a>        <span class="n">download</span><span class="o">=</span><span class="n">download</span><span class="p">,</span>
-</span><span id="__span-0-1557"><a id="__codelineno-0-1557" name="__codelineno-0-1557"></a>    <span class="p">)</span>
+</span><span id="__span-0-1538"><a id="__codelineno-0-1538" name="__codelineno-0-1538"></a>    <span class="n">monitoring_data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;monitoring&quot;</span><span class="p">,</span> <span class="p">{})</span>
+</span><span id="__span-0-1539"><a id="__codelineno-0-1539" name="__codelineno-0-1539"></a>    <span class="k">if</span> <span class="n">monitoring_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;log_file&quot;</span><span class="p">):</span>
+</span><span id="__span-0-1540"><a id="__codelineno-0-1540" name="__codelineno-0-1540"></a>        <span class="n">monitoring_data</span><span class="p">[</span><span class="s2">&quot;log_file&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">monitoring_data</span><span class="p">[</span><span class="s2">&quot;log_file&quot;</span><span class="p">])</span>
+</span><span id="__span-0-1541"><a id="__codelineno-0-1541" name="__codelineno-0-1541"></a>    <span class="n">monitoring</span> <span class="o">=</span> <span class="n">MonitoringConfig</span><span class="p">(</span><span class="o">**</span><span class="n">monitoring_data</span><span class="p">)</span>
+</span><span id="__span-0-1542"><a id="__codelineno-0-1542" name="__codelineno-0-1542"></a>
+</span><span id="__span-0-1543"><a id="__codelineno-0-1543" name="__codelineno-0-1543"></a>    <span class="n">download_data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;download&quot;</span><span class="p">,</span> <span class="p">{})</span>
+</span><span id="__span-0-1544"><a id="__codelineno-0-1544" name="__codelineno-0-1544"></a>    <span class="n">download</span> <span class="o">=</span> <span class="n">DownloadConfig</span><span class="p">(</span><span class="o">**</span><span class="n">download_data</span><span class="p">)</span>
+</span><span id="__span-0-1545"><a id="__codelineno-0-1545" name="__codelineno-0-1545"></a>
+</span><span id="__span-0-1546"><a id="__codelineno-0-1546" name="__codelineno-0-1546"></a>    <span class="k">if</span> <span class="n">model_type</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">MODEL_REGISTRY</span><span class="p">:</span>
+</span><span id="__span-0-1547"><a id="__codelineno-0-1547" name="__codelineno-0-1547"></a>        <span class="n">msg</span> <span class="o">=</span> <span class="p">(</span>
+</span><span id="__span-0-1548"><a id="__codelineno-0-1548" name="__codelineno-0-1548"></a>            <span class="sa">f</span><span class="s2">&quot;Unknown model type: </span><span class="si">{</span><span class="n">model_type</span><span class="si">!r}</span><span class="s2">. Supported models: </span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">MODEL_REGISTRY</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+</span><span id="__span-0-1549"><a id="__codelineno-0-1549" name="__codelineno-0-1549"></a>        <span class="p">)</span>
+</span><span id="__span-0-1550"><a id="__codelineno-0-1550" name="__codelineno-0-1550"></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+</span><span id="__span-0-1551"><a id="__codelineno-0-1551" name="__codelineno-0-1551"></a>
+</span><span id="__span-0-1552"><a id="__codelineno-0-1552" name="__codelineno-0-1552"></a>    <span class="n">model_cls</span> <span class="o">=</span> <span class="n">MODEL_REGISTRY</span><span class="p">[</span><span class="n">model_type</span><span class="p">]</span>
+</span><span id="__span-0-1553"><a id="__codelineno-0-1553" name="__codelineno-0-1553"></a>    <span class="n">model_config</span> <span class="o">=</span> <span class="n">model_cls</span><span class="p">(</span><span class="o">**</span><span class="n">model_config_data</span><span class="p">)</span>
+</span><span id="__span-0-1554"><a id="__codelineno-0-1554" name="__codelineno-0-1554"></a>
+</span><span id="__span-0-1555"><a id="__codelineno-0-1555" name="__codelineno-0-1555"></a>    <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
+</span><span id="__span-0-1556"><a id="__codelineno-0-1556" name="__codelineno-0-1556"></a>        <span class="n">simulation</span><span class="o">=</span><span class="n">simulation</span><span class="p">,</span>
+</span><span id="__span-0-1557"><a id="__codelineno-0-1557" name="__codelineno-0-1557"></a>        <span class="n">boundary</span><span class="o">=</span><span class="n">boundary</span><span class="p">,</span>
+</span><span id="__span-0-1558"><a id="__codelineno-0-1558" name="__codelineno-0-1558"></a>        <span class="n">paths</span><span class="o">=</span><span class="n">paths</span><span class="p">,</span>
+</span><span id="__span-0-1559"><a id="__codelineno-0-1559" name="__codelineno-0-1559"></a>        <span class="n">model_config</span><span class="o">=</span><span class="n">model_config</span><span class="p">,</span>  <span class="c1"># pyright: ignore[reportArgumentType]</span>
+</span><span id="__span-0-1560"><a id="__codelineno-0-1560" name="__codelineno-0-1560"></a>        <span class="n">monitoring</span><span class="o">=</span><span class="n">monitoring</span><span class="p">,</span>
+</span><span id="__span-0-1561"><a id="__codelineno-0-1561" name="__codelineno-0-1561"></a>        <span class="n">download</span><span class="o">=</span><span class="n">download</span><span class="p">,</span>
+</span><span id="__span-0-1562"><a id="__codelineno-0-1562" name="__codelineno-0-1562"></a>    <span class="p">)</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -3850,8 +3880,7 @@ if they don't exist.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/coastal_calibration/config/schema.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1672">1672</a></span>
-<span class="normal"><a href="#__codelineno-0-1673">1673</a></span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1673">1673</a></span>
 <span class="normal"><a href="#__codelineno-0-1674">1674</a></span>
 <span class="normal"><a href="#__codelineno-0-1675">1675</a></span>
 <span class="normal"><a href="#__codelineno-0-1676">1676</a></span>
@@ -3861,18 +3890,19 @@ if they don't exist.</p>
 <span class="normal"><a href="#__codelineno-0-1680">1680</a></span>
 <span class="normal"><a href="#__codelineno-0-1681">1681</a></span>
 <span class="normal"><a href="#__codelineno-0-1682">1682</a></span>
-<span class="normal"><a href="#__codelineno-0-1683">1683</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1672"><a id="__codelineno-0-1672" name="__codelineno-0-1672"></a><span class="k">def</span><span class="w"> </span><span class="nf">to_yaml</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-1673"><a id="__codelineno-0-1673" name="__codelineno-0-1673"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Write configuration to YAML file.</span>
-</span><span id="__span-0-1674"><a id="__codelineno-0-1674" name="__codelineno-0-1674"></a>
-</span><span id="__span-0-1675"><a id="__codelineno-0-1675" name="__codelineno-0-1675"></a><span class="sd">    Parameters</span>
-</span><span id="__span-0-1676"><a id="__codelineno-0-1676" name="__codelineno-0-1676"></a><span class="sd">    ----------</span>
-</span><span id="__span-0-1677"><a id="__codelineno-0-1677" name="__codelineno-0-1677"></a><span class="sd">    path : Path or str</span>
-</span><span id="__span-0-1678"><a id="__codelineno-0-1678" name="__codelineno-0-1678"></a><span class="sd">        Path to YAML output file. Parent directories will be created</span>
-</span><span id="__span-0-1679"><a id="__codelineno-0-1679" name="__codelineno-0-1679"></a><span class="sd">        if they don&#39;t exist.</span>
-</span><span id="__span-0-1680"><a id="__codelineno-0-1680" name="__codelineno-0-1680"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-1681"><a id="__codelineno-0-1681" name="__codelineno-0-1681"></a>    <span class="n">path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
-</span><span id="__span-0-1682"><a id="__codelineno-0-1682" name="__codelineno-0-1682"></a>    <span class="n">path</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-</span><span id="__span-0-1683"><a id="__codelineno-0-1683" name="__codelineno-0-1683"></a>    <span class="n">path</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span><span class="n">yaml</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span> <span class="n">default_flow_style</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
+<span class="normal"><a href="#__codelineno-0-1683">1683</a></span>
+<span class="normal"><a href="#__codelineno-0-1684">1684</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1673"><a id="__codelineno-0-1673" name="__codelineno-0-1673"></a><span class="k">def</span><span class="w"> </span><span class="nf">to_yaml</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-1674"><a id="__codelineno-0-1674" name="__codelineno-0-1674"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Write configuration to YAML file.</span>
+</span><span id="__span-0-1675"><a id="__codelineno-0-1675" name="__codelineno-0-1675"></a>
+</span><span id="__span-0-1676"><a id="__codelineno-0-1676" name="__codelineno-0-1676"></a><span class="sd">    Parameters</span>
+</span><span id="__span-0-1677"><a id="__codelineno-0-1677" name="__codelineno-0-1677"></a><span class="sd">    ----------</span>
+</span><span id="__span-0-1678"><a id="__codelineno-0-1678" name="__codelineno-0-1678"></a><span class="sd">    path : Path or str</span>
+</span><span id="__span-0-1679"><a id="__codelineno-0-1679" name="__codelineno-0-1679"></a><span class="sd">        Path to YAML output file. Parent directories will be created</span>
+</span><span id="__span-0-1680"><a id="__codelineno-0-1680" name="__codelineno-0-1680"></a><span class="sd">        if they don&#39;t exist.</span>
+</span><span id="__span-0-1681"><a id="__codelineno-0-1681" name="__codelineno-0-1681"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-1682"><a id="__codelineno-0-1682" name="__codelineno-0-1682"></a>    <span class="n">path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+</span><span id="__span-0-1683"><a id="__codelineno-0-1683" name="__codelineno-0-1683"></a>    <span class="n">path</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="__span-0-1684"><a id="__codelineno-0-1684" name="__codelineno-0-1684"></a>    <span class="n">path</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span><span class="n">yaml</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span> <span class="n">default_flow_style</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -3897,12 +3927,7 @@ if they don't exist.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/coastal_calibration/config/schema.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1614">1614</a></span>
-<span class="normal"><a href="#__codelineno-0-1615">1615</a></span>
-<span class="normal"><a href="#__codelineno-0-1616">1616</a></span>
-<span class="normal"><a href="#__codelineno-0-1617">1617</a></span>
-<span class="normal"><a href="#__codelineno-0-1618">1618</a></span>
-<span class="normal"><a href="#__codelineno-0-1619">1619</a></span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1619">1619</a></span>
 <span class="normal"><a href="#__codelineno-0-1620">1620</a></span>
 <span class="normal"><a href="#__codelineno-0-1621">1621</a></span>
 <span class="normal"><a href="#__codelineno-0-1622">1622</a></span>
@@ -3953,63 +3978,60 @@ if they don't exist.</p>
 <span class="normal"><a href="#__codelineno-0-1667">1667</a></span>
 <span class="normal"><a href="#__codelineno-0-1668">1668</a></span>
 <span class="normal"><a href="#__codelineno-0-1669">1669</a></span>
-<span class="normal"><a href="#__codelineno-0-1670">1670</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1614"><a id="__codelineno-0-1614" name="__codelineno-0-1614"></a><span class="k">def</span><span class="w"> </span><span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-</span><span id="__span-0-1615"><a id="__codelineno-0-1615" name="__codelineno-0-1615"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert config to dictionary.&quot;&quot;&quot;</span>
-</span><span id="__span-0-1616"><a id="__codelineno-0-1616" name="__codelineno-0-1616"></a>    <span class="k">return</span> <span class="p">{</span>
-</span><span id="__span-0-1617"><a id="__codelineno-0-1617" name="__codelineno-0-1617"></a>        <span class="s2">&quot;model&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">,</span>
-</span><span id="__span-0-1618"><a id="__codelineno-0-1618" name="__codelineno-0-1618"></a>        <span class="s2">&quot;simulation&quot;</span><span class="p">:</span> <span class="p">{</span>
-</span><span id="__span-0-1619"><a id="__codelineno-0-1619" name="__codelineno-0-1619"></a>            <span class="s2">&quot;start_date&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">simulation</span><span class="o">.</span><span class="n">start_date</span><span class="o">.</span><span class="n">isoformat</span><span class="p">(),</span>
-</span><span id="__span-0-1620"><a id="__codelineno-0-1620" name="__codelineno-0-1620"></a>            <span class="s2">&quot;duration_hours&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">simulation</span><span class="o">.</span><span class="n">duration_hours</span><span class="p">,</span>
-</span><span id="__span-0-1621"><a id="__codelineno-0-1621" name="__codelineno-0-1621"></a>            <span class="s2">&quot;coastal_domain&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">simulation</span><span class="o">.</span><span class="n">coastal_domain</span><span class="p">,</span>
-</span><span id="__span-0-1622"><a id="__codelineno-0-1622" name="__codelineno-0-1622"></a>            <span class="s2">&quot;meteo_source&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">simulation</span><span class="o">.</span><span class="n">meteo_source</span><span class="p">,</span>
-</span><span id="__span-0-1623"><a id="__codelineno-0-1623" name="__codelineno-0-1623"></a>            <span class="s2">&quot;timestep_seconds&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">simulation</span><span class="o">.</span><span class="n">timestep_seconds</span><span class="p">,</span>
-</span><span id="__span-0-1624"><a id="__codelineno-0-1624" name="__codelineno-0-1624"></a>        <span class="p">},</span>
-</span><span id="__span-0-1625"><a id="__codelineno-0-1625" name="__codelineno-0-1625"></a>        <span class="s2">&quot;boundary&quot;</span><span class="p">:</span> <span class="p">{</span>
-</span><span id="__span-0-1626"><a id="__codelineno-0-1626" name="__codelineno-0-1626"></a>            <span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">boundary</span><span class="o">.</span><span class="n">source</span><span class="p">,</span>
-</span><span id="__span-0-1627"><a id="__codelineno-0-1627" name="__codelineno-0-1627"></a>            <span class="s2">&quot;stofs_file&quot;</span><span class="p">:</span> <span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">boundary</span><span class="o">.</span><span class="n">stofs_file</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">boundary</span><span class="o">.</span><span class="n">stofs_file</span> <span class="k">else</span> <span class="kc">None</span><span class="p">),</span>
-</span><span id="__span-0-1628"><a id="__codelineno-0-1628" name="__codelineno-0-1628"></a>            <span class="s2">&quot;glofs_model&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">boundary</span><span class="o">.</span><span class="n">glofs_model</span><span class="p">,</span>
-</span><span id="__span-0-1629"><a id="__codelineno-0-1629" name="__codelineno-0-1629"></a>            <span class="s2">&quot;tidal_model&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">boundary</span><span class="o">.</span><span class="n">tidal_model</span><span class="p">,</span>
-</span><span id="__span-0-1630"><a id="__codelineno-0-1630" name="__codelineno-0-1630"></a>        <span class="p">},</span>
-</span><span id="__span-0-1631"><a id="__codelineno-0-1631" name="__codelineno-0-1631"></a>        <span class="s2">&quot;paths&quot;</span><span class="p">:</span> <span class="p">{</span>
-</span><span id="__span-0-1632"><a id="__codelineno-0-1632" name="__codelineno-0-1632"></a>            <span class="s2">&quot;work_dir&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">work_dir</span><span class="p">),</span>
-</span><span id="__span-0-1633"><a id="__codelineno-0-1633" name="__codelineno-0-1633"></a>            <span class="s2">&quot;raw_download_dir&quot;</span><span class="p">:</span> <span class="p">(</span>
-</span><span id="__span-0-1634"><a id="__codelineno-0-1634" name="__codelineno-0-1634"></a>                <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">raw_download_dir</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">raw_download_dir</span> <span class="k">else</span> <span class="kc">None</span>
-</span><span id="__span-0-1635"><a id="__codelineno-0-1635" name="__codelineno-0-1635"></a>            <span class="p">),</span>
-</span><span id="__span-0-1636"><a id="__codelineno-0-1636" name="__codelineno-0-1636"></a>            <span class="s2">&quot;hot_start_file&quot;</span><span class="p">:</span> <span class="p">(</span>
-</span><span id="__span-0-1637"><a id="__codelineno-0-1637" name="__codelineno-0-1637"></a>                <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">hot_start_file</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">hot_start_file</span> <span class="k">else</span> <span class="kc">None</span>
-</span><span id="__span-0-1638"><a id="__codelineno-0-1638" name="__codelineno-0-1638"></a>            <span class="p">),</span>
-</span><span id="__span-0-1639"><a id="__codelineno-0-1639" name="__codelineno-0-1639"></a>            <span class="o">**</span><span class="p">(</span>
-</span><span id="__span-0-1640"><a id="__codelineno-0-1640" name="__codelineno-0-1640"></a>                <span class="p">{</span><span class="s2">&quot;forecast_meteo_file&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">forecast_meteo_file</span><span class="p">)}</span>
-</span><span id="__span-0-1641"><a id="__codelineno-0-1641" name="__codelineno-0-1641"></a>                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">forecast_meteo_file</span>
-</span><span id="__span-0-1642"><a id="__codelineno-0-1642" name="__codelineno-0-1642"></a>                <span class="k">else</span> <span class="p">{}</span>
+<span class="normal"><a href="#__codelineno-0-1670">1670</a></span>
+<span class="normal"><a href="#__codelineno-0-1671">1671</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1619"><a id="__codelineno-0-1619" name="__codelineno-0-1619"></a><span class="k">def</span><span class="w"> </span><span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+</span><span id="__span-0-1620"><a id="__codelineno-0-1620" name="__codelineno-0-1620"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert config to dictionary.&quot;&quot;&quot;</span>
+</span><span id="__span-0-1621"><a id="__codelineno-0-1621" name="__codelineno-0-1621"></a>    <span class="k">return</span> <span class="p">{</span>
+</span><span id="__span-0-1622"><a id="__codelineno-0-1622" name="__codelineno-0-1622"></a>        <span class="s2">&quot;model&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">,</span>
+</span><span id="__span-0-1623"><a id="__codelineno-0-1623" name="__codelineno-0-1623"></a>        <span class="s2">&quot;simulation&quot;</span><span class="p">:</span> <span class="p">{</span>
+</span><span id="__span-0-1624"><a id="__codelineno-0-1624" name="__codelineno-0-1624"></a>            <span class="s2">&quot;start_date&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">simulation</span><span class="o">.</span><span class="n">start_date</span><span class="o">.</span><span class="n">isoformat</span><span class="p">(),</span>
+</span><span id="__span-0-1625"><a id="__codelineno-0-1625" name="__codelineno-0-1625"></a>            <span class="s2">&quot;duration_hours&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">simulation</span><span class="o">.</span><span class="n">duration_hours</span><span class="p">,</span>
+</span><span id="__span-0-1626"><a id="__codelineno-0-1626" name="__codelineno-0-1626"></a>            <span class="s2">&quot;coastal_domain&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">simulation</span><span class="o">.</span><span class="n">coastal_domain</span><span class="p">,</span>
+</span><span id="__span-0-1627"><a id="__codelineno-0-1627" name="__codelineno-0-1627"></a>            <span class="s2">&quot;meteo_source&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">simulation</span><span class="o">.</span><span class="n">meteo_source</span><span class="p">,</span>
+</span><span id="__span-0-1628"><a id="__codelineno-0-1628" name="__codelineno-0-1628"></a>            <span class="s2">&quot;timestep_seconds&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">simulation</span><span class="o">.</span><span class="n">timestep_seconds</span><span class="p">,</span>
+</span><span id="__span-0-1629"><a id="__codelineno-0-1629" name="__codelineno-0-1629"></a>        <span class="p">},</span>
+</span><span id="__span-0-1630"><a id="__codelineno-0-1630" name="__codelineno-0-1630"></a>        <span class="s2">&quot;boundary&quot;</span><span class="p">:</span> <span class="p">{</span>
+</span><span id="__span-0-1631"><a id="__codelineno-0-1631" name="__codelineno-0-1631"></a>            <span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">boundary</span><span class="o">.</span><span class="n">source</span><span class="p">,</span>
+</span><span id="__span-0-1632"><a id="__codelineno-0-1632" name="__codelineno-0-1632"></a>            <span class="s2">&quot;stofs_file&quot;</span><span class="p">:</span> <span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">boundary</span><span class="o">.</span><span class="n">stofs_file</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">boundary</span><span class="o">.</span><span class="n">stofs_file</span> <span class="k">else</span> <span class="kc">None</span><span class="p">),</span>
+</span><span id="__span-0-1633"><a id="__codelineno-0-1633" name="__codelineno-0-1633"></a>            <span class="s2">&quot;glofs_model&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">boundary</span><span class="o">.</span><span class="n">glofs_model</span><span class="p">,</span>
+</span><span id="__span-0-1634"><a id="__codelineno-0-1634" name="__codelineno-0-1634"></a>            <span class="s2">&quot;tidal_model&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">boundary</span><span class="o">.</span><span class="n">tidal_model</span><span class="p">,</span>
+</span><span id="__span-0-1635"><a id="__codelineno-0-1635" name="__codelineno-0-1635"></a>        <span class="p">},</span>
+</span><span id="__span-0-1636"><a id="__codelineno-0-1636" name="__codelineno-0-1636"></a>        <span class="s2">&quot;paths&quot;</span><span class="p">:</span> <span class="p">{</span>
+</span><span id="__span-0-1637"><a id="__codelineno-0-1637" name="__codelineno-0-1637"></a>            <span class="s2">&quot;work_dir&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">work_dir</span><span class="p">),</span>
+</span><span id="__span-0-1638"><a id="__codelineno-0-1638" name="__codelineno-0-1638"></a>            <span class="s2">&quot;raw_download_dir&quot;</span><span class="p">:</span> <span class="p">(</span>
+</span><span id="__span-0-1639"><a id="__codelineno-0-1639" name="__codelineno-0-1639"></a>                <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">raw_download_dir</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">raw_download_dir</span> <span class="k">else</span> <span class="kc">None</span>
+</span><span id="__span-0-1640"><a id="__codelineno-0-1640" name="__codelineno-0-1640"></a>            <span class="p">),</span>
+</span><span id="__span-0-1641"><a id="__codelineno-0-1641" name="__codelineno-0-1641"></a>            <span class="s2">&quot;hot_start_file&quot;</span><span class="p">:</span> <span class="p">(</span>
+</span><span id="__span-0-1642"><a id="__codelineno-0-1642" name="__codelineno-0-1642"></a>                <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">hot_start_file</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">hot_start_file</span> <span class="k">else</span> <span class="kc">None</span>
 </span><span id="__span-0-1643"><a id="__codelineno-0-1643" name="__codelineno-0-1643"></a>            <span class="p">),</span>
 </span><span id="__span-0-1644"><a id="__codelineno-0-1644" name="__codelineno-0-1644"></a>            <span class="o">**</span><span class="p">(</span>
-</span><span id="__span-0-1645"><a id="__codelineno-0-1645" name="__codelineno-0-1645"></a>                <span class="p">{</span><span class="s2">&quot;troute_file&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">troute_file</span><span class="p">)}</span>
-</span><span id="__span-0-1646"><a id="__codelineno-0-1646" name="__codelineno-0-1646"></a>                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">troute_file</span>
+</span><span id="__span-0-1645"><a id="__codelineno-0-1645" name="__codelineno-0-1645"></a>                <span class="p">{</span><span class="s2">&quot;forecast_meteo_file&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">forecast_meteo_file</span><span class="p">)}</span>
+</span><span id="__span-0-1646"><a id="__codelineno-0-1646" name="__codelineno-0-1646"></a>                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">forecast_meteo_file</span>
 </span><span id="__span-0-1647"><a id="__codelineno-0-1647" name="__codelineno-0-1647"></a>                <span class="k">else</span> <span class="p">{}</span>
 </span><span id="__span-0-1648"><a id="__codelineno-0-1648" name="__codelineno-0-1648"></a>            <span class="p">),</span>
-</span><span id="__span-0-1649"><a id="__codelineno-0-1649" name="__codelineno-0-1649"></a>            <span class="o">**</span><span class="p">({</span><span class="s2">&quot;parm_dir&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">parm_dir</span><span class="p">)}</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">parm_dir</span> <span class="k">else</span> <span class="p">{}),</span>
-</span><span id="__span-0-1650"><a id="__codelineno-0-1650" name="__codelineno-0-1650"></a>            <span class="o">**</span><span class="p">({</span><span class="s2">&quot;nwm_dir&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">nwm_dir</span><span class="p">)}</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">nwm_dir</span> <span class="k">else</span> <span class="p">{}),</span>
-</span><span id="__span-0-1651"><a id="__codelineno-0-1651" name="__codelineno-0-1651"></a>            <span class="o">**</span><span class="p">(</span>
-</span><span id="__span-0-1652"><a id="__codelineno-0-1652" name="__codelineno-0-1652"></a>                <span class="p">{</span><span class="s2">&quot;tidal_atlas_dir&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">tidal_atlas_dir</span><span class="p">)}</span>
-</span><span id="__span-0-1653"><a id="__codelineno-0-1653" name="__codelineno-0-1653"></a>                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">tidal_atlas_dir</span>
-</span><span id="__span-0-1654"><a id="__codelineno-0-1654" name="__codelineno-0-1654"></a>                <span class="k">else</span> <span class="p">{}</span>
-</span><span id="__span-0-1655"><a id="__codelineno-0-1655" name="__codelineno-0-1655"></a>            <span class="p">),</span>
-</span><span id="__span-0-1656"><a id="__codelineno-0-1656" name="__codelineno-0-1656"></a>        <span class="p">},</span>
-</span><span id="__span-0-1657"><a id="__codelineno-0-1657" name="__codelineno-0-1657"></a>        <span class="s2">&quot;model_config&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_config</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span>
-</span><span id="__span-0-1658"><a id="__codelineno-0-1658" name="__codelineno-0-1658"></a>        <span class="s2">&quot;monitoring&quot;</span><span class="p">:</span> <span class="p">{</span>
-</span><span id="__span-0-1659"><a id="__codelineno-0-1659" name="__codelineno-0-1659"></a>            <span class="s2">&quot;log_level&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">monitoring</span><span class="o">.</span><span class="n">log_level</span><span class="p">,</span>
-</span><span id="__span-0-1660"><a id="__codelineno-0-1660" name="__codelineno-0-1660"></a>            <span class="s2">&quot;log_file&quot;</span><span class="p">:</span> <span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">monitoring</span><span class="o">.</span><span class="n">log_file</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">monitoring</span><span class="o">.</span><span class="n">log_file</span> <span class="k">else</span> <span class="kc">None</span><span class="p">),</span>
-</span><span id="__span-0-1661"><a id="__codelineno-0-1661" name="__codelineno-0-1661"></a>            <span class="s2">&quot;enable_progress_tracking&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">monitoring</span><span class="o">.</span><span class="n">enable_progress_tracking</span><span class="p">,</span>
-</span><span id="__span-0-1662"><a id="__codelineno-0-1662" name="__codelineno-0-1662"></a>            <span class="s2">&quot;enable_timing&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">monitoring</span><span class="o">.</span><span class="n">enable_timing</span><span class="p">,</span>
-</span><span id="__span-0-1663"><a id="__codelineno-0-1663" name="__codelineno-0-1663"></a>        <span class="p">},</span>
-</span><span id="__span-0-1664"><a id="__codelineno-0-1664" name="__codelineno-0-1664"></a>        <span class="s2">&quot;download&quot;</span><span class="p">:</span> <span class="p">{</span>
-</span><span id="__span-0-1665"><a id="__codelineno-0-1665" name="__codelineno-0-1665"></a>            <span class="s2">&quot;enabled&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">download</span><span class="o">.</span><span class="n">enabled</span><span class="p">,</span>
-</span><span id="__span-0-1666"><a id="__codelineno-0-1666" name="__codelineno-0-1666"></a>            <span class="s2">&quot;timeout&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">download</span><span class="o">.</span><span class="n">timeout</span><span class="p">,</span>
-</span><span id="__span-0-1667"><a id="__codelineno-0-1667" name="__codelineno-0-1667"></a>            <span class="s2">&quot;raise_on_error&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">download</span><span class="o">.</span><span class="n">raise_on_error</span><span class="p">,</span>
-</span><span id="__span-0-1668"><a id="__codelineno-0-1668" name="__codelineno-0-1668"></a>            <span class="s2">&quot;limit_per_host&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">download</span><span class="o">.</span><span class="n">limit_per_host</span><span class="p">,</span>
-</span><span id="__span-0-1669"><a id="__codelineno-0-1669" name="__codelineno-0-1669"></a>        <span class="p">},</span>
-</span><span id="__span-0-1670"><a id="__codelineno-0-1670" name="__codelineno-0-1670"></a>    <span class="p">}</span>
+</span><span id="__span-0-1649"><a id="__codelineno-0-1649" name="__codelineno-0-1649"></a>            <span class="o">**</span><span class="p">({</span><span class="s2">&quot;troute_file&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">troute_file</span><span class="p">)}</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">troute_file</span> <span class="k">else</span> <span class="p">{}),</span>
+</span><span id="__span-0-1650"><a id="__codelineno-0-1650" name="__codelineno-0-1650"></a>            <span class="o">**</span><span class="p">({</span><span class="s2">&quot;parm_dir&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">parm_dir</span><span class="p">)}</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">parm_dir</span> <span class="k">else</span> <span class="p">{}),</span>
+</span><span id="__span-0-1651"><a id="__codelineno-0-1651" name="__codelineno-0-1651"></a>            <span class="o">**</span><span class="p">({</span><span class="s2">&quot;nwm_dir&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">nwm_dir</span><span class="p">)}</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">nwm_dir</span> <span class="k">else</span> <span class="p">{}),</span>
+</span><span id="__span-0-1652"><a id="__codelineno-0-1652" name="__codelineno-0-1652"></a>            <span class="o">**</span><span class="p">(</span>
+</span><span id="__span-0-1653"><a id="__codelineno-0-1653" name="__codelineno-0-1653"></a>                <span class="p">{</span><span class="s2">&quot;tidal_atlas_dir&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">tidal_atlas_dir</span><span class="p">)}</span>
+</span><span id="__span-0-1654"><a id="__codelineno-0-1654" name="__codelineno-0-1654"></a>                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">tidal_atlas_dir</span>
+</span><span id="__span-0-1655"><a id="__codelineno-0-1655" name="__codelineno-0-1655"></a>                <span class="k">else</span> <span class="p">{}</span>
+</span><span id="__span-0-1656"><a id="__codelineno-0-1656" name="__codelineno-0-1656"></a>            <span class="p">),</span>
+</span><span id="__span-0-1657"><a id="__codelineno-0-1657" name="__codelineno-0-1657"></a>        <span class="p">},</span>
+</span><span id="__span-0-1658"><a id="__codelineno-0-1658" name="__codelineno-0-1658"></a>        <span class="s2">&quot;model_config&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_config</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span>
+</span><span id="__span-0-1659"><a id="__codelineno-0-1659" name="__codelineno-0-1659"></a>        <span class="s2">&quot;monitoring&quot;</span><span class="p">:</span> <span class="p">{</span>
+</span><span id="__span-0-1660"><a id="__codelineno-0-1660" name="__codelineno-0-1660"></a>            <span class="s2">&quot;log_level&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">monitoring</span><span class="o">.</span><span class="n">log_level</span><span class="p">,</span>
+</span><span id="__span-0-1661"><a id="__codelineno-0-1661" name="__codelineno-0-1661"></a>            <span class="s2">&quot;log_file&quot;</span><span class="p">:</span> <span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">monitoring</span><span class="o">.</span><span class="n">log_file</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">monitoring</span><span class="o">.</span><span class="n">log_file</span> <span class="k">else</span> <span class="kc">None</span><span class="p">),</span>
+</span><span id="__span-0-1662"><a id="__codelineno-0-1662" name="__codelineno-0-1662"></a>            <span class="s2">&quot;enable_progress_tracking&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">monitoring</span><span class="o">.</span><span class="n">enable_progress_tracking</span><span class="p">,</span>
+</span><span id="__span-0-1663"><a id="__codelineno-0-1663" name="__codelineno-0-1663"></a>            <span class="s2">&quot;enable_timing&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">monitoring</span><span class="o">.</span><span class="n">enable_timing</span><span class="p">,</span>
+</span><span id="__span-0-1664"><a id="__codelineno-0-1664" name="__codelineno-0-1664"></a>        <span class="p">},</span>
+</span><span id="__span-0-1665"><a id="__codelineno-0-1665" name="__codelineno-0-1665"></a>        <span class="s2">&quot;download&quot;</span><span class="p">:</span> <span class="p">{</span>
+</span><span id="__span-0-1666"><a id="__codelineno-0-1666" name="__codelineno-0-1666"></a>            <span class="s2">&quot;enabled&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">download</span><span class="o">.</span><span class="n">enabled</span><span class="p">,</span>
+</span><span id="__span-0-1667"><a id="__codelineno-0-1667" name="__codelineno-0-1667"></a>            <span class="s2">&quot;timeout&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">download</span><span class="o">.</span><span class="n">timeout</span><span class="p">,</span>
+</span><span id="__span-0-1668"><a id="__codelineno-0-1668" name="__codelineno-0-1668"></a>            <span class="s2">&quot;raise_on_error&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">download</span><span class="o">.</span><span class="n">raise_on_error</span><span class="p">,</span>
+</span><span id="__span-0-1669"><a id="__codelineno-0-1669" name="__codelineno-0-1669"></a>            <span class="s2">&quot;limit_per_host&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">download</span><span class="o">.</span><span class="n">limit_per_host</span><span class="p">,</span>
+</span><span id="__span-0-1670"><a id="__codelineno-0-1670" name="__codelineno-0-1670"></a>        <span class="p">},</span>
+</span><span id="__span-0-1671"><a id="__codelineno-0-1671" name="__codelineno-0-1671"></a>    <span class="p">}</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -4034,8 +4056,7 @@ if they don't exist.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/coastal_calibration/config/schema.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1732">1732</a></span>
-<span class="normal"><a href="#__codelineno-0-1733">1733</a></span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1733">1733</a></span>
 <span class="normal"><a href="#__codelineno-0-1734">1734</a></span>
 <span class="normal"><a href="#__codelineno-0-1735">1735</a></span>
 <span class="normal"><a href="#__codelineno-0-1736">1736</a></span>
@@ -4081,54 +4102,55 @@ if they don't exist.</p>
 <span class="normal"><a href="#__codelineno-0-1776">1776</a></span>
 <span class="normal"><a href="#__codelineno-0-1777">1777</a></span>
 <span class="normal"><a href="#__codelineno-0-1778">1778</a></span>
-<span class="normal"><a href="#__codelineno-0-1779">1779</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1732"><a id="__codelineno-0-1732" name="__codelineno-0-1732"></a><span class="k">def</span><span class="w"> </span><span class="nf">validate</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
-</span><span id="__span-0-1733"><a id="__codelineno-0-1733" name="__codelineno-0-1733"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Validate configuration and return list of errors.&quot;&quot;&quot;</span>
-</span><span id="__span-0-1734"><a id="__codelineno-0-1734" name="__codelineno-0-1734"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">coastal_calibration.data.downloader</span><span class="w"> </span><span class="kn">import</span> <span class="n">validate_date_ranges</span>
-</span><span id="__span-0-1735"><a id="__codelineno-0-1735" name="__codelineno-0-1735"></a>
-</span><span id="__span-0-1736"><a id="__codelineno-0-1736" name="__codelineno-0-1736"></a>    <span class="n">errors</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
-</span><span id="__span-0-1737"><a id="__codelineno-0-1737" name="__codelineno-0-1737"></a>
-</span><span id="__span-0-1738"><a id="__codelineno-0-1738" name="__codelineno-0-1738"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">simulation</span><span class="o">.</span><span class="n">duration_hours</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
-</span><span id="__span-0-1739"><a id="__codelineno-0-1739" name="__codelineno-0-1739"></a>        <span class="n">errors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;simulation.duration_hours must be positive&quot;</span><span class="p">)</span>
-</span><span id="__span-0-1740"><a id="__codelineno-0-1740" name="__codelineno-0-1740"></a>
-</span><span id="__span-0-1741"><a id="__codelineno-0-1741" name="__codelineno-0-1741"></a>    <span class="c1"># ngen forecast forcing is read from a pre-generated file on disk</span>
-</span><span id="__span-0-1742"><a id="__codelineno-0-1742" name="__codelineno-0-1742"></a>    <span class="c1"># rather than downloaded. Whether it&#39;s actually *required* depends</span>
-</span><span id="__span-0-1743"><a id="__codelineno-0-1743" name="__codelineno-0-1743"></a>    <span class="c1"># on which forcing types the model config has enabled (e.g. a</span>
-</span><span id="__span-0-1744"><a id="__codelineno-0-1744" name="__codelineno-0-1744"></a>    <span class="c1"># boundary-only spin-up run needs neither) -- that&#39;s model-specific,</span>
-</span><span id="__span-0-1745"><a id="__codelineno-0-1745" name="__codelineno-0-1745"></a>    <span class="c1"># so each model&#39;s own validate() below enforces the &quot;must be set&quot;</span>
-</span><span id="__span-0-1746"><a id="__codelineno-0-1746" name="__codelineno-0-1746"></a>    <span class="c1"># half of this; here we only check &quot;if given, it must exist&quot;,</span>
-</span><span id="__span-0-1747"><a id="__codelineno-0-1747" name="__codelineno-0-1747"></a>    <span class="c1"># exactly like troute_file (optional -- only needed when discharge</span>
-</span><span id="__span-0-1748"><a id="__codelineno-0-1748" name="__codelineno-0-1748"></a>    <span class="c1"># is wired).</span>
-</span><span id="__span-0-1749"><a id="__codelineno-0-1749" name="__codelineno-0-1749"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">simulation</span><span class="o">.</span><span class="n">meteo_source</span> <span class="o">==</span> <span class="s2">&quot;ngen_forecast&quot;</span><span class="p">:</span>
-</span><span id="__span-0-1750"><a id="__codelineno-0-1750" name="__codelineno-0-1750"></a>        <span class="n">fcst</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">forecast_meteo_file</span>
-</span><span id="__span-0-1751"><a id="__codelineno-0-1751" name="__codelineno-0-1751"></a>        <span class="k">if</span> <span class="n">fcst</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">fcst</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
-</span><span id="__span-0-1752"><a id="__codelineno-0-1752" name="__codelineno-0-1752"></a>            <span class="n">errors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Forecast meteo file not found: </span><span class="si">{</span><span class="n">fcst</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span id="__span-0-1753"><a id="__codelineno-0-1753" name="__codelineno-0-1753"></a>
-</span><span id="__span-0-1754"><a id="__codelineno-0-1754" name="__codelineno-0-1754"></a>        <span class="n">troute</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">troute_file</span>
-</span><span id="__span-0-1755"><a id="__codelineno-0-1755" name="__codelineno-0-1755"></a>        <span class="k">if</span> <span class="n">troute</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">troute</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
-</span><span id="__span-0-1756"><a id="__codelineno-0-1756" name="__codelineno-0-1756"></a>            <span class="n">errors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;t-route file not found: </span><span class="si">{</span><span class="n">troute</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span id="__span-0-1757"><a id="__codelineno-0-1757" name="__codelineno-0-1757"></a>
-</span><span id="__span-0-1758"><a id="__codelineno-0-1758" name="__codelineno-0-1758"></a>    <span class="c1"># Model-specific validation</span>
-</span><span id="__span-0-1759"><a id="__codelineno-0-1759" name="__codelineno-0-1759"></a>    <span class="n">errors</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model_config</span><span class="o">.</span><span class="n">validate</span><span class="p">(</span><span class="bp">self</span><span class="p">))</span>
-</span><span id="__span-0-1760"><a id="__codelineno-0-1760" name="__codelineno-0-1760"></a>
-</span><span id="__span-0-1761"><a id="__codelineno-0-1761" name="__codelineno-0-1761"></a>    <span class="c1"># Shared boundary validation</span>
-</span><span id="__span-0-1762"><a id="__codelineno-0-1762" name="__codelineno-0-1762"></a>    <span class="n">errors</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_validate_boundary_source</span><span class="p">())</span>
-</span><span id="__span-0-1763"><a id="__codelineno-0-1763" name="__codelineno-0-1763"></a>
-</span><span id="__span-0-1764"><a id="__codelineno-0-1764" name="__codelineno-0-1764"></a>    <span class="c1"># Date range validation</span>
-</span><span id="__span-0-1765"><a id="__codelineno-0-1765" name="__codelineno-0-1765"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">download</span><span class="o">.</span><span class="n">enabled</span><span class="p">:</span>
-</span><span id="__span-0-1766"><a id="__codelineno-0-1766" name="__codelineno-0-1766"></a>        <span class="n">sim</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">simulation</span>
-</span><span id="__span-0-1767"><a id="__codelineno-0-1767" name="__codelineno-0-1767"></a>        <span class="n">start_time</span> <span class="o">=</span> <span class="n">sim</span><span class="o">.</span><span class="n">start_date</span>
-</span><span id="__span-0-1768"><a id="__codelineno-0-1768" name="__codelineno-0-1768"></a>        <span class="n">end_time</span> <span class="o">=</span> <span class="n">start_time</span> <span class="o">+</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">hours</span><span class="o">=</span><span class="n">sim</span><span class="o">.</span><span class="n">duration_hours</span><span class="p">)</span>
-</span><span id="__span-0-1769"><a id="__codelineno-0-1769" name="__codelineno-0-1769"></a>        <span class="n">date_errors</span> <span class="o">=</span> <span class="n">validate_date_ranges</span><span class="p">(</span>
-</span><span id="__span-0-1770"><a id="__codelineno-0-1770" name="__codelineno-0-1770"></a>            <span class="n">start_time</span><span class="p">,</span>
-</span><span id="__span-0-1771"><a id="__codelineno-0-1771" name="__codelineno-0-1771"></a>            <span class="n">end_time</span><span class="p">,</span>
-</span><span id="__span-0-1772"><a id="__codelineno-0-1772" name="__codelineno-0-1772"></a>            <span class="n">sim</span><span class="o">.</span><span class="n">meteo_source</span><span class="p">,</span>
-</span><span id="__span-0-1773"><a id="__codelineno-0-1773" name="__codelineno-0-1773"></a>            <span class="bp">self</span><span class="o">.</span><span class="n">boundary</span><span class="o">.</span><span class="n">source</span><span class="p">,</span>
-</span><span id="__span-0-1774"><a id="__codelineno-0-1774" name="__codelineno-0-1774"></a>            <span class="n">sim</span><span class="o">.</span><span class="n">coastal_domain</span><span class="p">,</span>
-</span><span id="__span-0-1775"><a id="__codelineno-0-1775" name="__codelineno-0-1775"></a>            <span class="n">glofs_model</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">boundary</span><span class="o">.</span><span class="n">glofs_model</span><span class="p">,</span>
-</span><span id="__span-0-1776"><a id="__codelineno-0-1776" name="__codelineno-0-1776"></a>        <span class="p">)</span>
-</span><span id="__span-0-1777"><a id="__codelineno-0-1777" name="__codelineno-0-1777"></a>        <span class="n">errors</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">date_errors</span><span class="p">)</span>
-</span><span id="__span-0-1778"><a id="__codelineno-0-1778" name="__codelineno-0-1778"></a>
-</span><span id="__span-0-1779"><a id="__codelineno-0-1779" name="__codelineno-0-1779"></a>    <span class="k">return</span> <span class="n">errors</span>
+<span class="normal"><a href="#__codelineno-0-1779">1779</a></span>
+<span class="normal"><a href="#__codelineno-0-1780">1780</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1733"><a id="__codelineno-0-1733" name="__codelineno-0-1733"></a><span class="k">def</span><span class="w"> </span><span class="nf">validate</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+</span><span id="__span-0-1734"><a id="__codelineno-0-1734" name="__codelineno-0-1734"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Validate configuration and return list of errors.&quot;&quot;&quot;</span>
+</span><span id="__span-0-1735"><a id="__codelineno-0-1735" name="__codelineno-0-1735"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">coastal_calibration.data.downloader</span><span class="w"> </span><span class="kn">import</span> <span class="n">validate_date_ranges</span>
+</span><span id="__span-0-1736"><a id="__codelineno-0-1736" name="__codelineno-0-1736"></a>
+</span><span id="__span-0-1737"><a id="__codelineno-0-1737" name="__codelineno-0-1737"></a>    <span class="n">errors</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+</span><span id="__span-0-1738"><a id="__codelineno-0-1738" name="__codelineno-0-1738"></a>
+</span><span id="__span-0-1739"><a id="__codelineno-0-1739" name="__codelineno-0-1739"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">simulation</span><span class="o">.</span><span class="n">duration_hours</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+</span><span id="__span-0-1740"><a id="__codelineno-0-1740" name="__codelineno-0-1740"></a>        <span class="n">errors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;simulation.duration_hours must be positive&quot;</span><span class="p">)</span>
+</span><span id="__span-0-1741"><a id="__codelineno-0-1741" name="__codelineno-0-1741"></a>
+</span><span id="__span-0-1742"><a id="__codelineno-0-1742" name="__codelineno-0-1742"></a>    <span class="c1"># ngen forecast forcing is read from a pre-generated file on disk</span>
+</span><span id="__span-0-1743"><a id="__codelineno-0-1743" name="__codelineno-0-1743"></a>    <span class="c1"># rather than downloaded. Whether it&#39;s actually *required* depends</span>
+</span><span id="__span-0-1744"><a id="__codelineno-0-1744" name="__codelineno-0-1744"></a>    <span class="c1"># on which forcing types the model config has enabled (e.g. a</span>
+</span><span id="__span-0-1745"><a id="__codelineno-0-1745" name="__codelineno-0-1745"></a>    <span class="c1"># boundary-only spin-up run needs neither) -- that&#39;s model-specific,</span>
+</span><span id="__span-0-1746"><a id="__codelineno-0-1746" name="__codelineno-0-1746"></a>    <span class="c1"># so each model&#39;s own validate() below enforces the &quot;must be set&quot;</span>
+</span><span id="__span-0-1747"><a id="__codelineno-0-1747" name="__codelineno-0-1747"></a>    <span class="c1"># half of this; here we only check &quot;if given, it must exist&quot;,</span>
+</span><span id="__span-0-1748"><a id="__codelineno-0-1748" name="__codelineno-0-1748"></a>    <span class="c1"># exactly like troute_file (optional -- only needed when discharge</span>
+</span><span id="__span-0-1749"><a id="__codelineno-0-1749" name="__codelineno-0-1749"></a>    <span class="c1"># is wired).</span>
+</span><span id="__span-0-1750"><a id="__codelineno-0-1750" name="__codelineno-0-1750"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">simulation</span><span class="o">.</span><span class="n">meteo_source</span> <span class="o">==</span> <span class="s2">&quot;ngen_forecast&quot;</span><span class="p">:</span>
+</span><span id="__span-0-1751"><a id="__codelineno-0-1751" name="__codelineno-0-1751"></a>        <span class="n">fcst</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">forecast_meteo_file</span>
+</span><span id="__span-0-1752"><a id="__codelineno-0-1752" name="__codelineno-0-1752"></a>        <span class="k">if</span> <span class="n">fcst</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">fcst</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+</span><span id="__span-0-1753"><a id="__codelineno-0-1753" name="__codelineno-0-1753"></a>            <span class="n">errors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Forecast meteo file not found: </span><span class="si">{</span><span class="n">fcst</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-0-1754"><a id="__codelineno-0-1754" name="__codelineno-0-1754"></a>
+</span><span id="__span-0-1755"><a id="__codelineno-0-1755" name="__codelineno-0-1755"></a>        <span class="n">troute</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">troute_file</span>
+</span><span id="__span-0-1756"><a id="__codelineno-0-1756" name="__codelineno-0-1756"></a>        <span class="k">if</span> <span class="n">troute</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">troute</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+</span><span id="__span-0-1757"><a id="__codelineno-0-1757" name="__codelineno-0-1757"></a>            <span class="n">errors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;t-route file not found: </span><span class="si">{</span><span class="n">troute</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-0-1758"><a id="__codelineno-0-1758" name="__codelineno-0-1758"></a>
+</span><span id="__span-0-1759"><a id="__codelineno-0-1759" name="__codelineno-0-1759"></a>    <span class="c1"># Model-specific validation</span>
+</span><span id="__span-0-1760"><a id="__codelineno-0-1760" name="__codelineno-0-1760"></a>    <span class="n">errors</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model_config</span><span class="o">.</span><span class="n">validate</span><span class="p">(</span><span class="bp">self</span><span class="p">))</span>
+</span><span id="__span-0-1761"><a id="__codelineno-0-1761" name="__codelineno-0-1761"></a>
+</span><span id="__span-0-1762"><a id="__codelineno-0-1762" name="__codelineno-0-1762"></a>    <span class="c1"># Shared boundary validation</span>
+</span><span id="__span-0-1763"><a id="__codelineno-0-1763" name="__codelineno-0-1763"></a>    <span class="n">errors</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_validate_boundary_source</span><span class="p">())</span>
+</span><span id="__span-0-1764"><a id="__codelineno-0-1764" name="__codelineno-0-1764"></a>
+</span><span id="__span-0-1765"><a id="__codelineno-0-1765" name="__codelineno-0-1765"></a>    <span class="c1"># Date range validation</span>
+</span><span id="__span-0-1766"><a id="__codelineno-0-1766" name="__codelineno-0-1766"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">download</span><span class="o">.</span><span class="n">enabled</span><span class="p">:</span>
+</span><span id="__span-0-1767"><a id="__codelineno-0-1767" name="__codelineno-0-1767"></a>        <span class="n">sim</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">simulation</span>
+</span><span id="__span-0-1768"><a id="__codelineno-0-1768" name="__codelineno-0-1768"></a>        <span class="n">start_time</span> <span class="o">=</span> <span class="n">sim</span><span class="o">.</span><span class="n">start_date</span>
+</span><span id="__span-0-1769"><a id="__codelineno-0-1769" name="__codelineno-0-1769"></a>        <span class="n">end_time</span> <span class="o">=</span> <span class="n">start_time</span> <span class="o">+</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">hours</span><span class="o">=</span><span class="n">sim</span><span class="o">.</span><span class="n">duration_hours</span><span class="p">)</span>
+</span><span id="__span-0-1770"><a id="__codelineno-0-1770" name="__codelineno-0-1770"></a>        <span class="n">date_errors</span> <span class="o">=</span> <span class="n">validate_date_ranges</span><span class="p">(</span>
+</span><span id="__span-0-1771"><a id="__codelineno-0-1771" name="__codelineno-0-1771"></a>            <span class="n">start_time</span><span class="p">,</span>
+</span><span id="__span-0-1772"><a id="__codelineno-0-1772" name="__codelineno-0-1772"></a>            <span class="n">end_time</span><span class="p">,</span>
+</span><span id="__span-0-1773"><a id="__codelineno-0-1773" name="__codelineno-0-1773"></a>            <span class="n">sim</span><span class="o">.</span><span class="n">meteo_source</span><span class="p">,</span>
+</span><span id="__span-0-1774"><a id="__codelineno-0-1774" name="__codelineno-0-1774"></a>            <span class="bp">self</span><span class="o">.</span><span class="n">boundary</span><span class="o">.</span><span class="n">source</span><span class="p">,</span>
+</span><span id="__span-0-1775"><a id="__codelineno-0-1775" name="__codelineno-0-1775"></a>            <span class="n">sim</span><span class="o">.</span><span class="n">coastal_domain</span><span class="p">,</span>
+</span><span id="__span-0-1776"><a id="__codelineno-0-1776" name="__codelineno-0-1776"></a>            <span class="n">glofs_model</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">boundary</span><span class="o">.</span><span class="n">glofs_model</span><span class="p">,</span>
+</span><span id="__span-0-1777"><a id="__codelineno-0-1777" name="__codelineno-0-1777"></a>        <span class="p">)</span>
+</span><span id="__span-0-1778"><a id="__codelineno-0-1778" name="__codelineno-0-1778"></a>        <span class="n">errors</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">date_errors</span><span class="p">)</span>
+</span><span id="__span-0-1779"><a id="__codelineno-0-1779" name="__codelineno-0-1779"></a>
+</span><span id="__span-0-1780"><a id="__codelineno-0-1780" name="__codelineno-0-1780"></a>    <span class="k">return</span> <span class="n">errors</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -6173,7 +6195,12 @@ data catalog entry (derived from <code>simulation.meteo_source</code>).</p>
             <td class="doc-param-details">
               <div class="doc-md-description">
                 <p>When True, add spatially-varying atmospheric pressure forcing
-(<code>press_msl</code>) and enable barometric correction (<code>baro=1</code>).</p>
+(<code>press_msl</code>) and enable the pressure-gradient force
+(<code>baro=1</code>).  The separate <em>boundary</em> inverse-barometer
+correction (<code>pavbnd</code>) is enabled only for tide-only
+(<code>harmonic</code>) boundaries; <code>stofs</code>/<code>glofs</code> levels already
+contain the barometric response, so it is left at SFINCS's
+default of 0 (off) to avoid double-counting.</p>
               </div>
               <p>
                   <span class="doc-param-annotation">
@@ -6495,12 +6522,7 @@ matching sibling exists — :meth:<code>validate</code> flags a hard mismatch.</
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/coastal_calibration/config/schema.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1188">1188</a></span>
-<span class="normal"><a href="#__codelineno-0-1189">1189</a></span>
-<span class="normal"><a href="#__codelineno-0-1190">1190</a></span>
-<span class="normal"><a href="#__codelineno-0-1191">1191</a></span>
-<span class="normal"><a href="#__codelineno-0-1192">1192</a></span>
-<span class="normal"><a href="#__codelineno-0-1193">1193</a></span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1193">1193</a></span>
 <span class="normal"><a href="#__codelineno-0-1194">1194</a></span>
 <span class="normal"><a href="#__codelineno-0-1195">1195</a></span>
 <span class="normal"><a href="#__codelineno-0-1196">1196</a></span>
@@ -6520,32 +6542,37 @@ matching sibling exists — :meth:<code>validate</code> flags a hard mismatch.</
 <span class="normal"><a href="#__codelineno-0-1210">1210</a></span>
 <span class="normal"><a href="#__codelineno-0-1211">1211</a></span>
 <span class="normal"><a href="#__codelineno-0-1212">1212</a></span>
-<span class="normal"><a href="#__codelineno-0-1213">1213</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1188"><a id="__codelineno-0-1188" name="__codelineno-0-1188"></a><span class="k">def</span><span class="w"> </span><span class="nf">resolved_discharge_locations_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">meteo_source</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;nwm_ana&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-1189"><a id="__codelineno-0-1189" name="__codelineno-0-1189"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Resolve the discharge-points file for *meteo_source*.</span>
-</span><span id="__span-0-1190"><a id="__codelineno-0-1190" name="__codelineno-0-1190"></a>
-</span><span id="__span-0-1191"><a id="__codelineno-0-1191" name="__codelineno-0-1191"></a><span class="sd">    Discharge-point files carry the reach IDs in each point&#39;s ``name``:</span>
-</span><span id="__span-0-1192"><a id="__codelineno-0-1192" name="__codelineno-0-1192"></a><span class="sd">    NWM COMIDs for ``nwm_retro`` / ``nwm_ana`` runs, NextGen</span>
-</span><span id="__span-0-1193"><a id="__codelineno-0-1193" name="__codelineno-0-1193"></a><span class="sd">    hydrofabric IDs for ``ngen_forecast`` runs.  By convention the</span>
-</span><span id="__span-0-1194"><a id="__codelineno-0-1194" name="__codelineno-0-1194"></a><span class="sd">    files are suffixed ``_nwm`` / ``_ngen`` so both can coexist.</span>
+<span class="normal"><a href="#__codelineno-0-1213">1213</a></span>
+<span class="normal"><a href="#__codelineno-0-1214">1214</a></span>
+<span class="normal"><a href="#__codelineno-0-1215">1215</a></span>
+<span class="normal"><a href="#__codelineno-0-1216">1216</a></span>
+<span class="normal"><a href="#__codelineno-0-1217">1217</a></span>
+<span class="normal"><a href="#__codelineno-0-1218">1218</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1193"><a id="__codelineno-0-1193" name="__codelineno-0-1193"></a><span class="k">def</span><span class="w"> </span><span class="nf">resolved_discharge_locations_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">meteo_source</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;nwm_ana&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-1194"><a id="__codelineno-0-1194" name="__codelineno-0-1194"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Resolve the discharge-points file for *meteo_source*.</span>
 </span><span id="__span-0-1195"><a id="__codelineno-0-1195" name="__codelineno-0-1195"></a>
-</span><span id="__span-0-1196"><a id="__codelineno-0-1196" name="__codelineno-0-1196"></a><span class="sd">    Resolution: if ``discharge_locations_file`` already matches the</span>
-</span><span id="__span-0-1197"><a id="__codelineno-0-1197" name="__codelineno-0-1197"></a><span class="sd">    meteo-appropriate token it is used as-is; otherwise the sibling</span>
-</span><span id="__span-0-1198"><a id="__codelineno-0-1198" name="__codelineno-0-1198"></a><span class="sd">    carrying that token is preferred **when it exists** (so a user can</span>
-</span><span id="__span-0-1199"><a id="__codelineno-0-1199" name="__codelineno-0-1199"></a><span class="sd">    drop both ``*_nwm`` and ``*_ngen`` files and the correct one is</span>
-</span><span id="__span-0-1200"><a id="__codelineno-0-1200" name="__codelineno-0-1200"></a><span class="sd">    chosen automatically).  Falls back to the configured file when no</span>
-</span><span id="__span-0-1201"><a id="__codelineno-0-1201" name="__codelineno-0-1201"></a><span class="sd">    matching sibling exists — :meth:`validate` flags a hard mismatch.</span>
-</span><span id="__span-0-1202"><a id="__codelineno-0-1202" name="__codelineno-0-1202"></a>
-</span><span id="__span-0-1203"><a id="__codelineno-0-1203" name="__codelineno-0-1203"></a><span class="sd">    Returns ``None`` when ``discharge_locations_file`` is unset</span>
-</span><span id="__span-0-1204"><a id="__codelineno-0-1204" name="__codelineno-0-1204"></a><span class="sd">    (discharge is skipped).</span>
-</span><span id="__span-0-1205"><a id="__codelineno-0-1205" name="__codelineno-0-1205"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-1206"><a id="__codelineno-0-1206" name="__codelineno-0-1206"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">discharge_locations_file</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-1207"><a id="__codelineno-0-1207" name="__codelineno-0-1207"></a>        <span class="k">return</span> <span class="kc">None</span>
-</span><span id="__span-0-1208"><a id="__codelineno-0-1208" name="__codelineno-0-1208"></a>    <span class="n">token</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_discharge_token</span><span class="p">(</span><span class="n">meteo_source</span><span class="p">)</span>
-</span><span id="__span-0-1209"><a id="__codelineno-0-1209" name="__codelineno-0-1209"></a>    <span class="n">path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">discharge_locations_file</span>
-</span><span id="__span-0-1210"><a id="__codelineno-0-1210" name="__codelineno-0-1210"></a>    <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">stem</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;_</span><span class="si">{</span><span class="n">token</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">):</span>
-</span><span id="__span-0-1211"><a id="__codelineno-0-1211" name="__codelineno-0-1211"></a>        <span class="k">return</span> <span class="n">path</span>
-</span><span id="__span-0-1212"><a id="__codelineno-0-1212" name="__codelineno-0-1212"></a>    <span class="n">sibling</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sibling_with_token</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">token</span><span class="p">)</span>
-</span><span id="__span-0-1213"><a id="__codelineno-0-1213" name="__codelineno-0-1213"></a>    <span class="k">return</span> <span class="n">sibling</span> <span class="k">if</span> <span class="n">sibling</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span> <span class="k">else</span> <span class="n">path</span>
+</span><span id="__span-0-1196"><a id="__codelineno-0-1196" name="__codelineno-0-1196"></a><span class="sd">    Discharge-point files carry the reach IDs in each point&#39;s ``name``:</span>
+</span><span id="__span-0-1197"><a id="__codelineno-0-1197" name="__codelineno-0-1197"></a><span class="sd">    NWM COMIDs for ``nwm_retro`` / ``nwm_ana`` runs, NextGen</span>
+</span><span id="__span-0-1198"><a id="__codelineno-0-1198" name="__codelineno-0-1198"></a><span class="sd">    hydrofabric IDs for ``ngen_forecast`` runs.  By convention the</span>
+</span><span id="__span-0-1199"><a id="__codelineno-0-1199" name="__codelineno-0-1199"></a><span class="sd">    files are suffixed ``_nwm`` / ``_ngen`` so both can coexist.</span>
+</span><span id="__span-0-1200"><a id="__codelineno-0-1200" name="__codelineno-0-1200"></a>
+</span><span id="__span-0-1201"><a id="__codelineno-0-1201" name="__codelineno-0-1201"></a><span class="sd">    Resolution: if ``discharge_locations_file`` already matches the</span>
+</span><span id="__span-0-1202"><a id="__codelineno-0-1202" name="__codelineno-0-1202"></a><span class="sd">    meteo-appropriate token it is used as-is; otherwise the sibling</span>
+</span><span id="__span-0-1203"><a id="__codelineno-0-1203" name="__codelineno-0-1203"></a><span class="sd">    carrying that token is preferred **when it exists** (so a user can</span>
+</span><span id="__span-0-1204"><a id="__codelineno-0-1204" name="__codelineno-0-1204"></a><span class="sd">    drop both ``*_nwm`` and ``*_ngen`` files and the correct one is</span>
+</span><span id="__span-0-1205"><a id="__codelineno-0-1205" name="__codelineno-0-1205"></a><span class="sd">    chosen automatically).  Falls back to the configured file when no</span>
+</span><span id="__span-0-1206"><a id="__codelineno-0-1206" name="__codelineno-0-1206"></a><span class="sd">    matching sibling exists — :meth:`validate` flags a hard mismatch.</span>
+</span><span id="__span-0-1207"><a id="__codelineno-0-1207" name="__codelineno-0-1207"></a>
+</span><span id="__span-0-1208"><a id="__codelineno-0-1208" name="__codelineno-0-1208"></a><span class="sd">    Returns ``None`` when ``discharge_locations_file`` is unset</span>
+</span><span id="__span-0-1209"><a id="__codelineno-0-1209" name="__codelineno-0-1209"></a><span class="sd">    (discharge is skipped).</span>
+</span><span id="__span-0-1210"><a id="__codelineno-0-1210" name="__codelineno-0-1210"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-1211"><a id="__codelineno-0-1211" name="__codelineno-0-1211"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">discharge_locations_file</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-1212"><a id="__codelineno-0-1212" name="__codelineno-0-1212"></a>        <span class="k">return</span> <span class="kc">None</span>
+</span><span id="__span-0-1213"><a id="__codelineno-0-1213" name="__codelineno-0-1213"></a>    <span class="n">token</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_discharge_token</span><span class="p">(</span><span class="n">meteo_source</span><span class="p">)</span>
+</span><span id="__span-0-1214"><a id="__codelineno-0-1214" name="__codelineno-0-1214"></a>    <span class="n">path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">discharge_locations_file</span>
+</span><span id="__span-0-1215"><a id="__codelineno-0-1215" name="__codelineno-0-1215"></a>    <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">stem</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;_</span><span class="si">{</span><span class="n">token</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">):</span>
+</span><span id="__span-0-1216"><a id="__codelineno-0-1216" name="__codelineno-0-1216"></a>        <span class="k">return</span> <span class="n">path</span>
+</span><span id="__span-0-1217"><a id="__codelineno-0-1217" name="__codelineno-0-1217"></a>    <span class="n">sibling</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sibling_with_token</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">token</span><span class="p">)</span>
+</span><span id="__span-0-1218"><a id="__codelineno-0-1218" name="__codelineno-0-1218"></a>    <span class="k">return</span> <span class="n">sibling</span> <span class="k">if</span> <span class="n">sibling</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span> <span class="k">else</span> <span class="n">path</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>

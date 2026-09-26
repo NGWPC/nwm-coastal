@@ -921,6 +921,8 @@
       
         
       
+        
+      
     
     
     
@@ -1019,6 +1021,34 @@
     
   
     Lavaca Bay SFINCS Tutorial
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="notebooks/lake_erie/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lake Erie SFINCS Tutorial - bring your own DEM
   
 
     
@@ -1524,7 +1554,7 @@
 
 
 <h1 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">#</a></h1>
-<p>Three notebooks cover the client-facing surface of the library:</p>
+<p>Four notebooks cover the client-facing surface of the library:</p>
 <ul>
 <li><strong>Mendocino Walkthrough</strong> is the headliner — extract a SCHISM subdomain from the
     Pacific mesh, drive it through the 12-stage SCHISM pipeline, derive the SFINCS AOI
@@ -1536,6 +1566,11 @@
     drives the post-processing plotting API directly (mesh inspection, flood depth map,
     water-surface/depth/anomaly snapshots, satellite basemap overlay, animation, and
     time series at user-specified observation points).</li>
+<li><strong>Lake Erie</strong> is the Great Lakes counterpart to Lavaca: boundary forcing from NOAA's
+    Lake Erie OFS (<code>leofs</code>, the FVCOM model behind GLOFS) instead of STOFS, and a DEM
+    you download and register in your own HydroMT data catalog instead of one of the
+    built-in auto-fetched sources, none of which carry Great Lakes bathymetry. It also
+    documents the elevated-domain settings a lake 174 m above sea level needs.</li>
 <li><strong>Forecast Walkthrough</strong> is the operational pipeline rather than a single model run —
     one spinup, one analysis-and-assimilation hour, and one short-range cycle, driving
     the nwm-rte forcing engine and t-route regionalization alongside SCHISM and SFINCS.
@@ -1543,16 +1578,16 @@
 </ul>
 <div class="admonition note">
 <p class="admonition-title">Prerequisites</p>
-<p>The Mendocino and Lavaca notebooks need a compiled SFINCS executable; Mendocino also
-needs SCHISM. Both binaries are built automatically when activating a pixi
-environment with the corresponding feature (<code>schism</code> or <code>sfincs</code>), so no manual build
-is needed in the standard workflow. See
-<a href="../dev/sfincs_compilation/">Compiling SFINCS</a> for build instructions when not
-using pixi.</p>
+<p>The Mendocino, Lavaca and Lake Erie notebooks need a compiled SFINCS executable;
+Mendocino also needs SCHISM. Both binaries are built automatically when activating a
+pixi environment with the corresponding feature (<code>schism</code> or <code>sfincs</code>), so no manual
+build is needed in the standard workflow. See
+<a href="../dev/sfincs_compilation/">Compiling SFINCS</a> for build instructions when not using
+pixi.</p>
 </div>
 <div class="admonition warning">
 <p class="admonition-title">Forecast Walkthrough is not self-contained</p>
-<p>Unlike the other two, it drives external infrastructure: a built <code>nwm-rte</code> Docker
+<p>Unlike the other three, it drives external infrastructure: a built <code>nwm-rte</code> Docker
 image, <code>sudo docker</code> access, staged forcing data, and the four <code>NWM_COASTAL_ROOT</code> /
 <code>NWM_RTE_ROOT</code> / <code>RUN_NGEN_ROOT</code> / <code>RUN_COASTAL_ROOT</code> environment variables. Several
 cells may take a long time to run, so start Jupyter under <code>tmux</code>/<code>screen</code>. Setup is in
@@ -1580,6 +1615,16 @@ elevation, subgrid, and discharge sources from a single AOI polygon, then
 Drives the post-processing plotting API directly to produce mesh and flood-map
 inspections, water-surface/depth/anomaly snapshots, a satellite-basemap overlay, an
 animation, and time series at three user-specified observation points.</p>
+</li>
+<li>
+<p><a href="notebooks/lake_erie/"><strong>Lake Erie (SFINCS + LEOFS)</strong></a></p>
+<p>Great Lakes build-from-AOI workflow on the Ohio shore of Lake Erie (Fairport Harbor).
+Walks through downloading a Great Lakes topobathy DEM, checking its CRS, NoData and
+vertical datum, and registering it in a HydroMT data catalog.
+Then runs SFINCS with <code>boundary.source: glofs</code> /
+<code>glofs_model: leofs</code> FVCOM forcing, validated against CO-OPS Fairport Harbor
+(9063053), on a mesh referenced to Lake Erie Low Water Datum, with the <code>zsini</code>
+and <code>latitude</code> settings an elevated domain needs.</p>
 </li>
 <li>
 <p><a href="notebooks/forecast_walkthrough/"><strong>Forecast Walkthrough (hourly cycle)</strong></a></p>
