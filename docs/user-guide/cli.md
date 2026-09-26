@@ -298,6 +298,36 @@ coastal-calibration prepare-topobathy aoi.geojson --domain atlgulf
 coastal-calibration prepare-topobathy aoi.geojson --domain prvi --output-dir ./dem_data
 ```
 
+### prepare-schism-manning
+
+Generates a missing `manning.gr3` with values based on ESA WorldCover; overwrite an
+existing file with `--force`.
+
+```bash
+coastal-calibration prepare-schism-manning <prebuilt_dir> [OPTIONS]
+```
+
+**Arguments:**
+
+| Argument       | Description                              |
+| -------------- | ---------------------------------------- |
+| `prebuilt_dir` | SCHISM model directory containing hgrid.gr3 |
+
+**Options:**
+
+| Option                | Description                                        | Default                              |
+| --------------------- | -------------------------------------------------- | ------------------------------------ |
+| `-f`, `--force`       | Overwrite an existing manning.gr3                  | Off                                  |
+| `--cache-dir`         | Directory for downloaded WorldCover tiles          | `PREBUILT_DIR/.esa_worldcover_cache` |
+| `--fallback-manning`  | Value for nodes with no land-cover class           | 0.02                                 |
+| `--mapping-csv`       | Override the class-to-n table (`esa_worldcover,N`) | Built-in table                       |
+
+**Example:**
+
+```bash
+coastal-calibration prepare-schism-manning ../schism_models/lake_erie
+```
+
 ### update-dem-index
 
 Rebuild the NOAA DEM spatial index from S3 STAC metadata.

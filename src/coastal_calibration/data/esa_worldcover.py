@@ -115,6 +115,83 @@ def _write_catalog(
 # ------------------------------------------------------------------
 
 
+def fetch_esa_worldcover_vrt(
+    bbox: tuple[float, float, float, float],
+    cache_dir: Path | str,
+    *,
+    buffer_deg: float = 0.05,
+    log: Callable[[str], None] | None = None,
+) -> tuple[Path, list[tuple[int, int]], list[tuple[int, int]]]:
+    """Download the WorldCover tiles covering *bbox* and mosaic them into a VRT.
+
+    Unlike :func:`fetch_esa_worldcover` this does not clip to a polygon, so it
+    suits point sampling over a large mesh.  Tiles already in *cache_dir* are
+    reused.  Tiles that 404 are open ocean, which ESA does not publish; they are
+    returned in the missing list rather than raising.
+
+    Parameters
+    ----------
+    bbox
+        ``(west, south, east, north)`` in EPSG:4326.
+    cache_dir
+        Directory holding the downloaded tiles and the VRT.
+    buffer_deg
+        Bounding-box buffer in degrees.
+    log
+        Optional logging callback.
+
+    Returns
+    -------
+    tuple[Path, list[tuple[int, int]], list[tuple[int, int]]]
+        ``(vrt_path, tiles_found, tiles_missing)``.
+    """
+    from pathlib import Path
+
+    from tiny_retriever import download
+
+    from coastal_calibration.data.transformation import build_vrt
+
+    _log = log if log is not None else logger.info
+
+    cache_dir = Path(cache_dir)
+    cache_dir.mkdir(parents=True, exist_ok=True)
+
+    west, south, east, north = bbox
+    buffered = (west - buffer_deg, south - buffer_deg, east + buffer_deg, north + buffer_deg)
+
+    tiles = _tile_indices(buffered)
+    paths = {(lat, lon): cache_dir / f"esa_wc_{lat}_{lon}.tif" for lat, lon in tiles}
+
+    pending = [t for t in tiles if not (paths[t].exists() and paths[t].stat().st_size > 0)]
+    if pending:
+        _log(f"ESA WorldCover: downloading {len(pending)} of {len(tiles)} tile(s)")
+        download(
+            [_tile_url(lat, lon) for lat, lon in pending],
+            [paths[t] for t in pending],
+            timeout=300,
+            raise_status=False,
+        )
+    else:
+        _log(f"ESA WorldCover: all {len(tiles)} tile(s) already cached")
+
+    found = [t for t in tiles if paths[t].exists() and paths[t].stat().st_size > 0]
+    missing = [t for t in tiles if t not in found]
+    for tile in missing:
+        paths[tile].unlink(missing_ok=True)
+
+    if not found:
+        raise ValueError(
+            f"No ESA WorldCover tiles found for bbox {buffered}. "
+            f"Check that it is within ESA WorldCover coverage (60°S to 84°N)."
+        )
+    if missing:
+        _log(f"{len(missing)} tile(s) not published (open ocean); those nodes use the fallback")
+
+    vrt_path = cache_dir / "esa_wc_mosaic.vrt"
+    build_vrt(vrt_path, [paths[t] for t in found])
+    return vrt_path, found, missing
+
+
 def fetch_esa_worldcover(
     aoi: Path | str,
     output_dir: Path | str,
