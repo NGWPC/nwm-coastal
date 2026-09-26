@@ -22,9 +22,8 @@
 # the open boundary by NOAA's **Lake Erie Operational Forecast System
 # (LEOFS)** - the FVCOM model behind GLOFS.
 #
-# It follows the same three phases as the
-# [Lavaca Bay notebook](lavaca.ipynb), create, run, visualize, and differs
-# from it in three ways that matter:
+# It follows the same create and run phases as the
+# [Lavaca Bay notebook](lavaca.ipynb), and differs from it in three key ways:
 #
 # | | Lavaca Bay | Lake Erie |
 # | --- | --- | --- |
@@ -32,11 +31,8 @@
 # | Elevation | auto-fetched `noaa_3m` + `gebco_15arcs` | **hand-downloaded DEM + your own data catalog** |
 # | Vertical datum | NAVD88, tides about MSL | Lake Erie **Low Water Datum** (173.5 m IGLD85) |
 #
-# None of the built-in elevation sources (`noaa_3m`, `noaa_crm`, `nws_30m`,
-# `copdem_30m`, `gebco_15arcs`) carry Great Lakes bathymetry, so **step 1 is
-# the part you cannot skip**: download a DEM and register it with HydroMT
-# yourself. The rest of the pipeline then behaves exactly as it does on the
-# coast.
+# Rather than using the build-in topobathy options, this tutorial shows how
+# to use your own data in the model building process.
 #
 # ## The domain files
 #
@@ -54,8 +50,7 @@
 # from section 2, which measures whatever geometry it finds against the DEM and
 # prints the `grid` and `mask` settings to paste into `create.yaml` - so those
 # numbers come from your domain rather than from the shipped one. Any CRS is
-# fine; everything is reprojected. Section 1 needs no geometry at all, since the
-# DEM covers the whole lake.
+# fine; everything is reprojected.
 #
 # The two sections below show how the shipped files were made, which is also the
 # recipe for making your own.
@@ -71,8 +66,8 @@
 # LAKE_ERIE_DIR=~/my_erie_run jupyter lab docs/examples/notebooks/lake_erie.ipynb
 # ```
 #
-# Three things land under `downloads/`, all disposable: `dem/` (~70 MB, step
-# 1b), `grid/` (ESA WorldCover clips written by `create`), and `forcing/`
+# Three things land under `downloads/`: `dem/` (~70 MB, step 1b,)
+#  `grid/` (ESA WorldCover clips written by `create`), and `forcing/`
 # (GB-scale GLOFS and NWM data written by `run`). If you already have a shared
 # forcing cache, point `paths.raw_download_dir` at it and leave the other two
 # alone.
@@ -96,12 +91,15 @@
 #   against later. Cleveland (9063063) sits just west of the box - if you want a
 #   particular gauge in the comparison, make sure the polygon covers it.
 #
+# After drawing the polygon, make sure to select "Union with NHF Divides" and then
+# save.
+#
 # ### Selecting the flowpaths
 #
 # The plugin loads the National Hydrofabric, so the flowpaths (blue), their
 # nexus points (green) and the catchment divides can be seen while selecting.
 # Because this notebook runs a historical case, the flowpaths override option
-# was chosen when loading the basemap. The NWM_v3_hydrofabric.gdb was chosen
+# was chosen when loading the map. The NWM_v3_hydrofabric.gdb was chosen
 # as the override, with nwm_reaches_conus as the name. After selecting the
 # flowpaths entering the domain, they are exported to `discharge_nwm.geojson`.
 #
@@ -151,16 +149,14 @@ print(f"working in {example_dir}")
 # We use NCEI's
 # [Bathymetry of Lake Erie and Lake Saint Clair](https://www.ncei.noaa.gov/products/great-lakes-bathymetry)
 # - a seamless 3 arc-second (~70 x 90 m) topobathy grid covering the whole
-# lake, distributed as a 22 MB tarball. Good properties for this tutorial:
-# one small file, real bathymetry, and a documented datum.
+# lake, distributed as a 22 MB tarball.
 #
 # Its ~70 m resolution is the ceiling on what the model can resolve on land,
 # which is why `create.yaml` uses a uniform 256 m grid: refining below the DEM
 # pixel would invent detail the data does not have. Add a `refine.geojson` and
-# re-enable `grid.refinement` if you bring a finer DEM. For a production run,
-# merge in a finer topographic source - see 1e.
+# re-enable `grid.refinement` if you bring a finer DEM.
 #
-# Other candidates, if you need more detail:
+# Other candidates, if you want more detail:
 #
 # - **NOAA OCM Coastal DEM: Lake Erie** - ~3 m lidar + sonar topobathy,
 #   NAVD88, via the [Data Access Viewer](https://coast.noaa.gov/dataviewer/).
@@ -226,14 +222,9 @@ with rasterio.open(dem_path) as src:
 
 values = band[band > -9000]
 print(f"\nelevation  : {values.min():+.1f} .. {values.max():+.1f} m")
-print(f"median     : {np.median(values):+.1f} m")
-print(f"below zero : {(values < 0).mean():.0%} of the lake-wide grid")
 
 # %% [markdown]
-# The datum is the interesting one. The lake bed reads **negative**, bottoming
-# out near -62 m, which matches Lake Erie's true ~64 m maximum depth. The lake
-# surface sits at ~174 m IGLD85, so these cannot be absolute elevations - they
-# are heights relative to the lake's **Low Water Datum (173.5 m IGLD85)**,
+# The datum is the lake's **Low Water Datum (173.5 m IGLD85)**,
 # which is what the NCEI product description says and, conveniently, the same
 # datum GLOFS publishes water levels in. That is why `run.yaml` can leave
 # `forcing_to_mesh_offset_m` at `0.0`.
@@ -281,11 +272,10 @@ print(f"below zero : {(values < 0).mean():.0%} of the lake-wide grid")
 # - **`data_adapter.rename`** must map the variable HydroMT reads to
 #   **`elevtn`**, which is the name HydroMT-SFINCS looks for. For a
 #   single-band GeoTIFF, HydroMT names the variable after the *catalog entry
-#   key* - `erie_lld` here - so the mapping is `erie_lld: elevtn`. Get this
-#   wrong and the elevation stage will fail with a missing-variable error.
+#   key* - `erie_lld` here - so the mapping is `erie_lld: elevtn`. If this is
+#   wrong the elevation stage will fail with a missing-variable error.
 #
-# The cell below is the check that saves you a failed `create` run: it reads
-# the dataset through the catalog exactly as the pipeline will.
+# The cell below reads the dataset through the catalog exactly as the pipeline will.
 
 # %%
 from hydromt import DataCatalog
@@ -299,9 +289,9 @@ print(da)
 # ## 2. Measure your AOI against the DEM
 #
 # This reads the AOI in the example folder and reports what the DEM says
-# about it. Nothing here is a pass/fail check - it is the measurement that
-# tells you what `grid.resolution`, `grid.refinement` and the `mask`
-# thresholds should be, in the LWD datum the DEM turned out to use.
+# about it: how big the domain is, which UTM zone it lands in, and how deep
+# the bed goes in the LWD datum the DEM turned out to use. Nothing here is a
+# pass/fail check, it is a look before you build.
 
 # %%
 import geopandas as gpd
@@ -358,65 +348,18 @@ else:
     print("\nno submerged cells - this AOI is entirely above low water, which cannot be")
     print("right for a lake model; extend it lakeward before going on")
 
-# %% [markdown]
-# ### Settings derived from the above
-#
-# `mask.zmin` is the floor for active cells, so it goes below the deepest bed
-# in the domain. `mask.boundary_zmax` selects which cells can carry the LEOFS
-# water-level boundary: deep enough to pick open water rather than shoreline,
-# shallow enough that a usable band of cells qualifies. Taking the depth that
-# a quarter of the submerged cells are deeper than is a reasonable first cut.
-#
-# For resolution, the DEM is the ceiling - refining below its ~70 m pixel
-# invents detail. This targets a finest cell near the pixel size and backs out
-# the base resolution from the refinement level.
-
-# %%
-deepest = float(np.floor(inside.min()))
-boundary_zmax = float(np.round(np.percentile(wet, 25), 1)) if wet.size else None
-dem_res_m = float(clipped.raster.res[0]) * 111e3 * 0.74
-level = 2
-finest = 2 ** int(np.round(np.log2(dem_res_m)))
-base = finest * 2**level
-
-print("# paste into create.yaml")
-print("grid:")
-print(f"  resolution: {base}")
-print("  refinement:")
-print("  - polygon: ./refine.geojson")
-print(
-    f"    level: {level}                # {base} -> {finest} m, vs a ~{dem_res_m:.0f} m DEM pixel"
-)
-print("mask:")
-print(f"  zmin: {deepest - 5}")
-print(f"  boundary_zmax: {boundary_zmax}")
-print("  reset_bounds: true")
-print("  keep_largest_only: true")
-print(
-    f"\n# cells that would qualify as boundary: {(inside < boundary_zmax).mean():.1%} of the bbox"
-)
-
-# %% [markdown]
-# Sanity-check that against the map below: the boundary cells should form a
-# band along the open-water edge of the AOI, not a patch in the middle. Raise
-# `boundary_zmax` toward zero if too few cells qualify, lower it if the band
-# reaches inshore.
-
 # %%
 import matplotlib.pyplot as plt
 
-fig, axes = plt.subplots(1, 2, figsize=(15, 6))
-clipped.plot(ax=axes[0], cmap="terrain", cbar_kwargs={"label": "elevation (m, LWD)"})
-axes[0].set_title("DEM over the AOI bounding box")
-(clipped < boundary_zmax).plot(ax=axes[1], cmap="Blues", add_colorbar=False)
-axes[1].set_title(f"cells below boundary_zmax = {boundary_zmax} m")
-for ax in axes:
-    aoi.boundary.plot(ax=ax, color="red", linewidth=1.5, label="AOI")
-    if refine is not None:
-        refine.boundary.plot(ax=ax, color="magenta", linewidth=1.2, label="refine")
-    if flowlines is not None and len(flowlines):
-        flowlines.to_crs(4326).plot(ax=ax, color="black", linewidth=0.8, label="NWM flowpaths")
-    ax.legend(loc="upper right", fontsize=8)
+fig, ax = plt.subplots(figsize=(9, 7))
+clipped.plot(ax=ax, cmap="terrain", vmin=-15, vmax=15, cbar_kwargs={"label": "elevation (m, LWD)"})
+aoi.boundary.plot(ax=ax, color="red", linewidth=1.5, label="AOI")
+if refine is not None:
+    refine.boundary.plot(ax=ax, color="magenta", linewidth=1.2, label="refine")
+if flowlines is not None and len(flowlines):
+    flowlines.to_crs(4326).plot(ax=ax, color="black", linewidth=0.8, label="NWM flowpaths")
+ax.legend(loc="upper right", fontsize=8)
+ax.set_title("DEM over the AOI bounding box")
 
 # %% [markdown]
 # ## 3. Create the SFINCS model
@@ -454,8 +397,9 @@ create_config = SfincsCreateConfig.from_dict(
             "buffer_cells": 1,
         },
         "mask": {
-            "zmin": -27.0,
-            "boundary_zmax": -19.1,
+            # Clip to the AOI.
+            "include_polygon": "./sfincs_aoi_lake_erie.geojson",
+            "boundary_zmax": -1.0,
             "reset_bounds": True,
             "keep_largest_only": True,
         },
@@ -496,6 +440,61 @@ for f in sorted(output.iterdir()):
     size = f.stat().st_size
     label = f"{size / 1e6:.1f} MB" if size > 1e6 else f"{size / 1e3:.1f} KB"
     print(f"  {f.name:<30s} {label}")
+
+# %% [markdown]
+# ### Where the boundary and source points landed
+#
+# These are the points SFINCS will actually force: the LEOFS water-level
+# boundary, the river inflows snapped from your flowpaths, and the CO-OPS gauge
+# used for validation. Read straight out of the model directory, in the model's
+# own CRS.
+#
+# The boundary points should sit along the lakeward edge, the discharge points
+# where the rivers cross into the domain, and the gauge in open water.
+
+# %%
+from pyproj import Transformer
+
+
+def _read_points(path: Path) -> tuple[list[float], list[float]]:
+    """Read the leading x, y columns of a SFINCS .bnd / .src / .obs file."""
+    if not path.exists():
+        return [], []
+    xs, ys = [], []
+    for line in path.read_text().splitlines():
+        parts = line.split()
+        if len(parts) >= 2:
+            xs.append(float(parts[0]))
+            ys.append(float(parts[1]))
+    return xs, ys
+
+
+model_epsg = next(
+    (
+        int(ln.split("=")[1])
+        for ln in (output / "sfincs.inp").read_text().splitlines()
+        if ln.strip().startswith("epsg")
+    ),
+    32617,
+)
+to_wgs = Transformer.from_crs(model_epsg, 4326, always_xy=True)
+
+fig, ax = plt.subplots(figsize=(9, 7))
+clipped.plot(ax=ax, cmap="terrain", vmin=-15, vmax=15, cbar_kwargs={"label": "elevation (m, LWD)"})
+aoi.boundary.plot(ax=ax, color="red", linewidth=1.2, label="AOI")
+
+for fname, colour, marker, label in [
+    ("sfincs.bnd", "tab:blue", "o", "water-level boundary"),
+    ("sfincs_nwm.src", "black", "^", "discharge sources"),
+    ("sfincs.obs", "tab:orange", "*", "CO-OPS gauge"),
+]:
+    xs, ys = _read_points(output / fname)
+    if xs:
+        lon, lat = to_wgs.transform(xs, ys)
+        ax.scatter(lon, lat, c=colour, marker=marker, s=90, zorder=5, label=f"{label} ({len(xs)})")
+
+ax.legend(loc="upper right", fontsize=8)
+ax.set_title(f"forcing points written by create (EPSG:{model_epsg})")
 
 # %% [markdown]
 # ## 4. Run the simulation pipeline
@@ -590,129 +589,37 @@ print(result)
 # ## 5. Gauge comparison
 #
 # With `add_noaa_gages: true` the pipeline compares against NOAA CO-OPS lake
-# gauges - Fairport Harbor (9063053) and its neighbours for this AOI. Lake gauges publish observations but no tide
+# gauges - just Fairport Harbor (9063053) for this AOI. Lake gauges publish
+# observations but no tide
 # predictions and no MSL or MLLW, so observations are fetched in the lake's
 # low-water datum and shifted by `forcing_to_mesh_offset_m`: the comparison
 # is made in the **mesh datum**, not MSL as on the coast.
 
 # %%
-from IPython.display import Image, display
-
 figs_dir = Path("run/sfincs_model/figs")
-assert figs_dir.exists(), f"Results not found: {figs_dir.resolve()} - run the pipeline first."
+plots = sorted(figs_dir.glob("stations_comparison_*.png")) if figs_dir.exists() else []
 
-for png in sorted(figs_dir.glob("stations_comparison_*.png")):
-    display(Image(filename=str(png), width=800))
 
-# %% [markdown]
-# ## 6. Mesh and flood depth map
+def _in_notebook() -> bool:
+    """Return True only under IPython, so this cell also works as a script."""
+    try:
+        from IPython import get_ipython
+    except ImportError:
+        return False
+    return get_ipython() is not None
 
-# %%
-from coastal_calibration.plotting import SfincsGridInfo, plot_floodmap, plot_mesh
 
-info = SfincsGridInfo.from_model_root("run/sfincs_model")
-print(info)
+if not plots:
+    print(f"No comparison plots in {figs_dir} - run the pipeline first.")
+elif _in_notebook():
+    from IPython.display import Image, display
 
-# %%
-fig, ax = plot_mesh(info, title="Lake Erie (Fairport Harbor) SFINCS mesh")
-
-# %%
-fig, ax = plot_floodmap(
-    "run/sfincs_model/floodmap_hmax.tif",
-    title="Max water depth, Fairport Harbor, Lake Erie",
-)
-fig.savefig("../images/lake_erie_thumb.png", dpi=150, bbox_inches="tight")
-
-# %% [markdown]
-# ## 7. Water-level field
-#
-# Identical to Lavaca from here - the post-processing API does not care which
-# boundary source drove the run. One reading difference: `zs` is in the mesh
-# datum, so on this model the numbers are metres **above Lake Erie LWD**, not
-# above MSL.
-
-# %%
-from coastal_calibration.sfincs.outputs import load_sfincs_water_level
-
-run_dir = Path("run/sfincs_model")
-ds = load_sfincs_water_level(run_dir)
-print(f"mesh_type     : {ds.attrs['mesh_type']}")
-print(f"crs           : {ds.attrs.get('crs', '(not detected)')}")
-print(f"dims          : {dict(ds.sizes)}")
-print(f"zs range (m)  : {float(ds['zs'].min()):+.3f} .. {float(ds['zs'].max()):+.3f}")
-
-# %%
-from coastal_calibration.plotting import animate_water_level, plot_water_level
-
-DRY_THRESHOLD = 0.05  # m - same default as plot_water_level
-wet = ds["h"] > DRY_THRESHOLD
-vmin, vmax = (float(v) for v in ds["zs"].where(wet).quantile([0.02, 0.98]).values)
-
-fig, ax = plt.subplots(figsize=(11, 8))
-plot_water_level(
-    ds,
-    time=ds.sizes["time"] // 2,
-    variable="zs",
-    ax=ax,
-    cmap="viridis",
-    vmin=vmin,
-    vmax=vmax,
-    colorbar=True,
-    basemap=True,
-    title="Fairport Harbor water level (m above LWD)",
-)
-snapshot_png = figs_dir / "water_level_snapshot.png"
-fig.savefig(snapshot_png, dpi=150, bbox_inches="tight")
-plt.close(fig)
-display(Image(filename=str(snapshot_png), width=800))
-
-# %% [markdown]
-# ### Anomaly from the time-mean
-#
-# The wind-driven seiche is the signal worth looking at on Lake Erie: a
-# strong southwesterly piles water into the eastern basin and draws down
-# Fairport Harbor, and the basin then rocks back. Subtracting each cell's
-# time-mean isolates that from the static bed elevation.
-
-# %%
-zs_anom = ds["zs"] - ds["zs"].mean("time")
-ds_anom = ds.assign(zs_anom=zs_anom)
-ds_anom["zs_anom"].attrs.update({"long_name": "water-level anomaly from time-mean", "units": "m"})
-amp = float(abs(zs_anom.where(wet)).quantile(0.98).values)
-
-fig, ax = plt.subplots(figsize=(11, 8))
-plot_water_level(
-    ds_anom,
-    time=ds.sizes["time"] // 2,
-    variable="zs_anom",
-    ax=ax,
-    cmap="RdBu_r",
-    vmin=-amp,
-    vmax=+amp,
-    colorbar=True,
-    title="Fairport Harbor water-level anomaly",
-)
-anomaly_png = figs_dir / "water_level_anomaly.png"
-fig.savefig(anomaly_png, dpi=150, bbox_inches="tight")
-plt.close(fig)
-display(Image(filename=str(anomaly_png), width=800))
-
-# %%
-from IPython.display import Video
-
-anim_path = animate_water_level(
-    ds,
-    figs_dir / "water_level_animation.mp4",
-    variable="zs",
-    fps=10,
-    cmap="viridis",
-    vmin=vmin,
-    vmax=vmax,
-    title_prefix="Fairport Harbor",
-    mask_dry=True,
-    dry_threshold=DRY_THRESHOLD,
-)
-Video(str(anim_path), embed=True, width=800)
+    for png in plots:
+        display(Image(filename=str(png), width=800))
+else:
+    print("comparison plots written:")
+    for png in plots:
+        print(f"  {png}")
 
 # %% [markdown]
 # ## Summary
@@ -720,15 +627,18 @@ Video(str(anim_path), embed=True, width=800)
 # 1. Downloaded a Great Lakes topobathy DEM by hand, checked its CRS, NoData
 #    and vertical datum, and registered it in `dem_catalog.yml` - the step
 #    the coastal examples get for free from the built-in fetchers.
-# 2. Validated AOI, refinement polygon and flowpaths against that DEM before
-#    building anything.
+# 2. Measured the AOI and flowpaths against that DEM to derive the grid and
+#    mask settings, rather than guessing them.
 # 3. Built the quadtree mesh with `SfincsCreator`, elevations on Lake Erie
 #    Low Water Datum.
-# 4. Ran the pipeline with LEOFS (FVCOM) boundary forcing and the four
-#    elevated-domain `run_param_overrides`, then compared against CO-OPS lake
-#    gauges in the mesh datum.
-# 5. Plotted the mesh, flood depth map, water-level snapshot, seiche anomaly
-#    and animation.
+# 4. Ran the pipeline with LEOFS (FVCOM) boundary forcing and the
+#    elevated-domain `run_param_overrides` (`zsini`, `latitude`), then compared
+#    against CO-OPS lake gauges in the mesh datum.
+#
+# The run also writes a downscaled flood depth map to
+# `run/sfincs_model/floodmap_hmax.tif`. Post-processing - mesh plots, water-level
+# snapshots, anomalies and animations - is identical to the coast and is covered
+# in the [Lavaca Bay notebook](lavaca.ipynb).
 #
 # ### Adapting this to another lake
 #

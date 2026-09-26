@@ -67,11 +67,11 @@ Four notebooks cover the client-facing surface of the library:
 
     Great Lakes build-from-AOI workflow on the Ohio shore of Lake Erie (Fairport Harbor).
     Walks through downloading a Great Lakes topobathy DEM, checking its CRS, NoData and
-    vertical datum, and registering it in a HydroMT data catalog — the step the coastal
-    examples get for free. Then runs SFINCS with `boundary.source: glofs` /
+    vertical datum, and registering it in a HydroMT data catalog.
+    Then runs SFINCS with `boundary.source: glofs` /
     `glofs_model: leofs` FVCOM forcing, validated against CO-OPS Fairport Harbor
-    (9063053), on a mesh referenced to Lake Erie Low Water Datum, with the `zsini` /
-    `zsini` / `latitude` / `coriolis` settings an elevated domain needs.
+    (9063053), on a mesh referenced to Lake Erie Low Water Datum, with the `zsini`
+    and `latitude` settings an elevated domain needs.
 
 - [**Forecast Walkthrough (hourly cycle)**](notebooks/forecast_walkthrough.ipynb)
 

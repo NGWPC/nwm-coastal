@@ -29,7 +29,7 @@ meshes, the proprietary mesh symlinks, etc.) are gitignored.
 | Domain         | Notebook                     | Tracked input files                                                                                                                  |
 | -------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | `lavaca-tx/`   | `lavaca.ipynb`               | `aoi.geojson`, `refine.geojson`, `discharge_nwm.geojson`, `create.yaml`, `run.yaml`                                                  |
-| `lake-erie/`   | `lake_erie.ipynb`            | `dem_catalog.yml`, `create.yaml`, `run.yaml` — the AOI, refine and flowpath GeoJSONs are user-supplied |
+| `lake-erie/`   | `lake_erie.ipynb`            | `dem_catalog.yml`, `create.yaml`, `run.yaml`, `sfincs_aoi_lake_erie.geojson`, `discharge_nwm.geojson` — a working Fairport Harbor domain ships with the example |
 | `walkthrough/` | `walkthrough.ipynb`          | `extract_poly.geojson`, `aoi.geojson`, `refine_poly.geojson`, `discharge_nwm.geojson`                                                |
 | _(none)_       | `forecast_walkthrough.ipynb` | none — inputs come from `RUN_NGEN_ROOT`/`RUN_COASTAL_ROOT`, not this tree                                                            |
 

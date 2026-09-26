@@ -42,8 +42,12 @@ elevation:
   buffer_cells: 1
 
 mask:
-  zmin: -27.0             # min elevation for active cells (LWD); bed reaches -21.5 m
-  boundary_zmax: -19.1    # max elevation for waterlevel boundary cells (LWD); 12.5% of bbox
+  # Clip the active mask to the digitized AOI, otherwise the domain is the
+  # axis-aligned bounding box (915 km2) rather than the polygon (425 km2).
+  # zmin must stay unset: hydromt applies include_polygon as a UNION on top of
+  # the zmin mask, so any zmin that passes every cell makes this a no-op.
+  include_polygon: ./sfincs_aoi_lake_erie.geojson
+  boundary_zmax: -1.0     # max bed elevation (LWD) for a cell to host the boundary: submerged only
   reset_bounds: true
   keep_largest_only: true # drop isolated active cells
 

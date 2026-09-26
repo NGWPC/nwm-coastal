@@ -43,7 +43,7 @@ model_config:
   include_precip: true
   include_wind: true
   include_pressure: true
-  # Flood depth map DEM; at 3 arc-second this is coarser than the refined mesh.
+  # Flood depth map DEM; at ~70 m it is finer than the 256 m mesh, so hmax downscales.
   floodmap_dem: ./downloads/dem/erie_lld.tif
   run_param_overrides:
     tspinup: 10800                  # 3 h spin-up
