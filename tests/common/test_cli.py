@@ -134,6 +134,56 @@ class TestCLIPrepareSchismMesh:
         assert result.exit_code != 0
 
 
+class TestCLIPrepareSchismReaches:
+    def test_command_registered(self, runner):
+        result = runner.invoke(cli, ["prepare-schism-reaches", "--help"])
+        assert result.exit_code == 0
+        assert "nwmReaches.csv" in result.output
+        assert "ngenReaches.csv" in result.output
+
+    def test_requires_a_hydrofabric(self, runner, tmp_path):
+        (tmp_path / "hgrid.gr3").write_text("stub")
+        result = runner.invoke(cli, ["prepare-schism-reaches", str(tmp_path)])
+        assert result.exit_code != 0
+        assert "--nwm-gdb" in result.output
+
+    def test_missing_hgrid_gr3(self, runner, tmp_path):
+        gpkg = tmp_path / "fp.gpkg"
+        gpkg.write_bytes(b"stub")
+        result = runner.invoke(
+            cli, ["prepare-schism-reaches", str(tmp_path), "--ngen-gpkg", str(gpkg)]
+        )
+        assert result.exit_code != 0
+        assert "hgrid.gr3 not found" in result.output
+
+    def test_refuses_existing_without_force(self, runner, tmp_path):
+        (tmp_path / "hgrid.gr3").write_text("stub")
+        (tmp_path / "ngenReaches.csv").write_text("0\n")
+        gpkg = tmp_path / "fp.gpkg"
+        gpkg.write_bytes(b"stub")
+        result = runner.invoke(
+            cli, ["prepare-schism-reaches", str(tmp_path), "--ngen-gpkg", str(gpkg)]
+        )
+        assert result.exit_code != 0
+        assert "already exist" in result.output
+        assert "--force" in result.output
+
+    def test_nonexistent_dir(self, runner, tmp_path):
+        result = runner.invoke(cli, ["prepare-schism-reaches", str(tmp_path / "nope")])
+        assert result.exit_code != 0
+
+    def test_check_does_not_require_force(self, runner, tmp_path):
+        (tmp_path / "hgrid.gr3").write_text("stub")
+        (tmp_path / "ngenReaches.csv").write_text("0\n")
+        gpkg = tmp_path / "fp.gpkg"
+        gpkg.write_bytes(b"stub")
+        result = runner.invoke(
+            cli,
+            ["prepare-schism-reaches", str(tmp_path), "--ngen-gpkg", str(gpkg), "--check"],
+        )
+        assert "already exist" not in result.output
+
+
 class TestCLILogLevelOption:
     """--log-level sets the log FILE level; the console is always INFO."""
 
@@ -144,7 +194,12 @@ class TestCLILogLevelOption:
             assert "--log-level" in result.output
 
     def test_absent_where_no_log_file_is_written(self, runner):
-        for command in ("prepare-topobathy", "prepare-schism-mesh", "update-dem-index"):
+        for command in (
+            "prepare-topobathy",
+            "prepare-schism-mesh",
+            "prepare-schism-reaches",
+            "update-dem-index",
+        ):
             result = runner.invoke(cli, [command, "--help"])
             assert result.exit_code == 0
             assert "--log-level" not in result.output
