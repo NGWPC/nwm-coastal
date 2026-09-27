@@ -940,6 +940,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#prepare-schism-reaches" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        prepare-schism-reaches
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#update-dem-index" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2193,9 +2204,69 @@ existing file with <code>--force</code>.</p>
 <p><strong>Example:</strong></p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>coastal-calibration<span class="w"> </span>prepare-schism-manning<span class="w"> </span>../schism_models/lake_erie
 </span></code></pre></div>
+<h3 id="prepare-schism-reaches">prepare-schism-reaches<a class="headerlink" href="#prepare-schism-reaches" title="Permanent link">#</a></h3>
+<p>Generate missing <code>nwmReaches.csv</code> and <code>ngenReaches.csv</code> by intersecting the SCHISM mesh
+boundary with a hydrofabric; overwrite existing files with <code>--force</code>.</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>coastal-calibration<span class="w"> </span>prepare-schism-reaches<span class="w"> </span>PREBUILT_DIR<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+</span></code></pre></div>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--nwm-gdb</code></td>
+<td>NWM v3 hydrofabric geodatabase; writes <code>nwmReaches.csv</code></td>
+<td>None</td>
+</tr>
+<tr>
+<td><code>--ngen-gpkg</code></td>
+<td>NextGen hydrofabric GeoPackage; writes <code>ngenReaches.csv</code></td>
+<td>None</td>
+</tr>
+<tr>
+<td><code>--domain</code></td>
+<td>Coastal domain, selecting the NWM reach layer</td>
+<td>Inferred from the mesh</td>
+</tr>
+<tr>
+<td><code>-f, --force</code></td>
+<td>Overwrite existing files</td>
+<td><code>False</code></td>
+</tr>
+<tr>
+<td><code>--check</code></td>
+<td>Report what would be generated, comparing to any existing file, without writing</td>
+<td><code>False</code></td>
+</tr>
+</tbody>
+</table>
+<p>One row is written per boundary crossing: a flowline entering the mesh is a source and
+one leaving it is a sink, each at the element holding the crossing, so a river
+transiting the mesh is both. Each file is derived directly in its own identifier space,
+so neither depends on a COMID crosswalk.</p>
+<p><strong>Examples:</strong></p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1"># Both crosswalks for a Great Lakes mesh</span>
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>coastal-calibration<span class="w"> </span>prepare-schism-reaches<span class="w"> </span>./schism_models/lake_erie<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="w">  </span>--nwm-gdb<span class="w"> </span>./hydrofabric_copies/nwmv3/NWM_v3_hydrofabric.gdb<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="w">  </span>--ngen-gpkg<span class="w"> </span>./hydrofabric_copies/ngen/nhf_1.2.2.gpkg
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>
+</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="c1"># Alaska needs the Alaska NextGen GeoPackage</span>
+</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>coastal-calibration<span class="w"> </span>prepare-schism-reaches<span class="w"> </span>./schism_models/alaska<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-17-8"><a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a><span class="w">  </span>--ngen-gpkg<span class="w"> </span>./hydrofabric_copies/ngen/ak_nhf_1.2.2.gpkg
+</span><span id="__span-17-9"><a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a>
+</span><span id="__span-17-10"><a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a><span class="c1"># Compare against a model&#39;s existing file without overwriting it</span>
+</span><span id="__span-17-11"><a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a>coastal-calibration<span class="w"> </span>prepare-schism-reaches<span class="w"> </span>./schism_models/atlgulf<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-17-12"><a id="__codelineno-17-12" name="__codelineno-17-12" href="#__codelineno-17-12"></a><span class="w">  </span>--nwm-gdb<span class="w"> </span>./hydrofabric_copies/nwmv3/NWM_v3_hydrofabric.gdb<span class="w"> </span>--check
+</span></code></pre></div>
 <h3 id="update-dem-index">update-dem-index<a class="headerlink" href="#update-dem-index" title="Permanent link">#</a></h3>
 <p>Rebuild the NOAA DEM spatial index from S3 STAC metadata.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>coastal-calibration<span class="w"> </span>update-dem-index<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>coastal-calibration<span class="w"> </span>update-dem-index<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </span></code></pre></div>
 <p><strong>Options:</strong></p>
 <table>
@@ -2220,15 +2291,15 @@ existing file with <code>--force</code>.</p>
 </tbody>
 </table>
 <p><strong>Examples:</strong></p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1"># Rebuild the packaged index</span>
-</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>coastal-calibration<span class="w"> </span>update-dem-index
-</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>
-</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="c1"># Write to a custom path</span>
-</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>coastal-calibration<span class="w"> </span>update-dem-index<span class="w"> </span>--output<span class="w"> </span>./my_index.json
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="c1"># Rebuild the packaged index</span>
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>coastal-calibration<span class="w"> </span>update-dem-index
+</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>
+</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="c1"># Write to a custom path</span>
+</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>coastal-calibration<span class="w"> </span>update-dem-index<span class="w"> </span>--output<span class="w"> </span>./my_index.json
 </span></code></pre></div>
 <h3 id="stages">stages<a class="headerlink" href="#stages" title="Permanent link">#</a></h3>
 <p>List all available workflow stages.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>coastal-calibration<span class="w"> </span>stages<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>coastal-calibration<span class="w"> </span>stages<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </span></code></pre></div>
 <p><strong>Options:</strong></p>
 <table>
@@ -2249,59 +2320,59 @@ existing file with <code>--force</code>.</p>
 </table>
 <p>Valid <code>--model</code> values: <code>schism</code>, <code>sfincs</code>, <code>create</code>.</p>
 <p><strong>Examples:</strong></p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="c1"># List all stages for all workflows</span>
-</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>coastal-calibration<span class="w"> </span>stages
-</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>
-</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="c1"># List only SCHISM stages</span>
-</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>coastal-calibration<span class="w"> </span>stages<span class="w"> </span>--model<span class="w"> </span>schism
-</span><span id="__span-19-6"><a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>
-</span><span id="__span-19-7"><a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a><span class="c1"># List only SFINCS stages</span>
-</span><span id="__span-19-8"><a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a>coastal-calibration<span class="w"> </span>stages<span class="w"> </span>--model<span class="w"> </span>sfincs
-</span><span id="__span-19-9"><a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a>
-</span><span id="__span-19-10"><a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a><span class="c1"># List only creation stages</span>
-</span><span id="__span-19-11"><a id="__codelineno-19-11" name="__codelineno-19-11" href="#__codelineno-19-11"></a>coastal-calibration<span class="w"> </span>stages<span class="w"> </span>--model<span class="w"> </span>create
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="c1"># List all stages for all workflows</span>
+</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>coastal-calibration<span class="w"> </span>stages
+</span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>
+</span><span id="__span-21-4"><a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="c1"># List only SCHISM stages</span>
+</span><span id="__span-21-5"><a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>coastal-calibration<span class="w"> </span>stages<span class="w"> </span>--model<span class="w"> </span>schism
+</span><span id="__span-21-6"><a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a>
+</span><span id="__span-21-7"><a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a><span class="c1"># List only SFINCS stages</span>
+</span><span id="__span-21-8"><a id="__codelineno-21-8" name="__codelineno-21-8" href="#__codelineno-21-8"></a>coastal-calibration<span class="w"> </span>stages<span class="w"> </span>--model<span class="w"> </span>sfincs
+</span><span id="__span-21-9"><a id="__codelineno-21-9" name="__codelineno-21-9" href="#__codelineno-21-9"></a>
+</span><span id="__span-21-10"><a id="__codelineno-21-10" name="__codelineno-21-10" href="#__codelineno-21-10"></a><span class="c1"># List only creation stages</span>
+</span><span id="__span-21-11"><a id="__codelineno-21-11" name="__codelineno-21-11" href="#__codelineno-21-11"></a>coastal-calibration<span class="w"> </span>stages<span class="w"> </span>--model<span class="w"> </span>create
 </span></code></pre></div>
 <p><strong>Output (all):</strong></p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="go">SCHISM workflow stages:</span>
-</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="go">  1. download: Download NWM/STOFS data (optional)</span>
-</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="go">  2. schism_forcing_prep: Prepare NWM forcing data</span>
-</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="go">  3. schism_forcing: Generate atmospheric forcing (MPI)</span>
-</span><span id="__span-20-5"><a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a><span class="go">  4. schism_sflux: Generate sflux atmospheric files</span>
-</span><span id="__span-20-6"><a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a><span class="go">  5. schism_params: Create SCHISM param.nml</span>
-</span><span id="__span-20-7"><a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a><span class="go">  6. schism_obs: Add NOAA observation stations</span>
-</span><span id="__span-20-8"><a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a><span class="go">  7. schism_boundary: Generate boundary conditions (TPXO/STOFS)</span>
-</span><span id="__span-20-9"><a id="__codelineno-20-9" name="__codelineno-20-9" href="#__codelineno-20-9"></a><span class="go">  8. schism_discharge: Generate river discharge forcing</span>
-</span><span id="__span-20-10"><a id="__codelineno-20-10" name="__codelineno-20-10" href="#__codelineno-20-10"></a><span class="go">  9. schism_prep: Partition mesh and finalize inputs</span>
-</span><span id="__span-20-11"><a id="__codelineno-20-11" name="__codelineno-20-11" href="#__codelineno-20-11"></a><span class="go">  10. schism_run: Run SCHISM model (MPI)</span>
-</span><span id="__span-20-12"><a id="__codelineno-20-12" name="__codelineno-20-12" href="#__codelineno-20-12"></a><span class="go">  11. schism_postprocess: Post-process SCHISM outputs</span>
-</span><span id="__span-20-13"><a id="__codelineno-20-13" name="__codelineno-20-13" href="#__codelineno-20-13"></a><span class="go">  12. schism_plot: Plot simulated vs observed water levels</span>
-</span><span id="__span-20-14"><a id="__codelineno-20-14" name="__codelineno-20-14" href="#__codelineno-20-14"></a>
-</span><span id="__span-20-15"><a id="__codelineno-20-15" name="__codelineno-20-15" href="#__codelineno-20-15"></a><span class="go">SFINCS workflow stages:</span>
-</span><span id="__span-20-16"><a id="__codelineno-20-16" name="__codelineno-20-16" href="#__codelineno-20-16"></a><span class="go">  1. download: Download NWM/STOFS data (optional)</span>
-</span><span id="__span-20-17"><a id="__codelineno-20-17" name="__codelineno-20-17" href="#__codelineno-20-17"></a><span class="go">  2. sfincs_symlinks: Create .nc symlinks for NWM data</span>
-</span><span id="__span-20-18"><a id="__codelineno-20-18" name="__codelineno-20-18" href="#__codelineno-20-18"></a><span class="go">  3. sfincs_data_catalog: Generate HydroMT data catalog</span>
-</span><span id="__span-20-19"><a id="__codelineno-20-19" name="__codelineno-20-19" href="#__codelineno-20-19"></a><span class="go">  4. sfincs_init: Initialize SFINCS model (pre-built)</span>
-</span><span id="__span-20-20"><a id="__codelineno-20-20" name="__codelineno-20-20" href="#__codelineno-20-20"></a><span class="go">  5. sfincs_timing: Set SFINCS timing</span>
-</span><span id="__span-20-21"><a id="__codelineno-20-21" name="__codelineno-20-21" href="#__codelineno-20-21"></a><span class="go">  6. sfincs_forcing: Add water level forcing</span>
-</span><span id="__span-20-22"><a id="__codelineno-20-22" name="__codelineno-20-22" href="#__codelineno-20-22"></a><span class="go">  7. sfincs_discharge: Add discharge sources</span>
-</span><span id="__span-20-23"><a id="__codelineno-20-23" name="__codelineno-20-23" href="#__codelineno-20-23"></a><span class="go">  8. sfincs_precip: Add precipitation forcing</span>
-</span><span id="__span-20-24"><a id="__codelineno-20-24" name="__codelineno-20-24" href="#__codelineno-20-24"></a><span class="go">  9. sfincs_wind: Add wind forcing</span>
-</span><span id="__span-20-25"><a id="__codelineno-20-25" name="__codelineno-20-25" href="#__codelineno-20-25"></a><span class="go">  10. sfincs_pressure: Add atmospheric pressure forcing</span>
-</span><span id="__span-20-26"><a id="__codelineno-20-26" name="__codelineno-20-26" href="#__codelineno-20-26"></a><span class="go">  11. sfincs_write: Write SFINCS model</span>
-</span><span id="__span-20-27"><a id="__codelineno-20-27" name="__codelineno-20-27" href="#__codelineno-20-27"></a><span class="go">  12. sfincs_run: Run SFINCS model (OpenMP)</span>
-</span><span id="__span-20-28"><a id="__codelineno-20-28" name="__codelineno-20-28" href="#__codelineno-20-28"></a><span class="go">  13. sfincs_floodmap: Downscale flood depth map</span>
-</span><span id="__span-20-29"><a id="__codelineno-20-29" name="__codelineno-20-29" href="#__codelineno-20-29"></a><span class="go">  14. sfincs_plot: Plot simulated vs observed water levels</span>
-</span><span id="__span-20-30"><a id="__codelineno-20-30" name="__codelineno-20-30" href="#__codelineno-20-30"></a>
-</span><span id="__span-20-31"><a id="__codelineno-20-31" name="__codelineno-20-31" href="#__codelineno-20-31"></a><span class="go">SFINCS creation stages (create subcommand):</span>
-</span><span id="__span-20-32"><a id="__codelineno-20-32" name="__codelineno-20-32" href="#__codelineno-20-32"></a><span class="go">  1. create_grid: Create SFINCS grid from AOI polygon</span>
-</span><span id="__span-20-33"><a id="__codelineno-20-33" name="__codelineno-20-33" href="#__codelineno-20-33"></a><span class="go">  2. create_fetch_data: Fetch elevation and land cover data for AOI</span>
-</span><span id="__span-20-34"><a id="__codelineno-20-34" name="__codelineno-20-34" href="#__codelineno-20-34"></a><span class="go">  3. create_elevation: Add elevation and bathymetry data</span>
-</span><span id="__span-20-35"><a id="__codelineno-20-35" name="__codelineno-20-35" href="#__codelineno-20-35"></a><span class="go">  4. create_mask: Create active cell mask</span>
-</span><span id="__span-20-36"><a id="__codelineno-20-36" name="__codelineno-20-36" href="#__codelineno-20-36"></a><span class="go">  5. create_boundary: Create water level boundary cells</span>
-</span><span id="__span-20-37"><a id="__codelineno-20-37" name="__codelineno-20-37" href="#__codelineno-20-37"></a><span class="go">  6. create_discharge: Add NWM discharge source points</span>
-</span><span id="__span-20-38"><a id="__codelineno-20-38" name="__codelineno-20-38" href="#__codelineno-20-38"></a><span class="go">  7. create_subgrid: Create subgrid tables</span>
-</span><span id="__span-20-39"><a id="__codelineno-20-39" name="__codelineno-20-39" href="#__codelineno-20-39"></a><span class="go">  8. create_obs: Add observation points (NOAA CO-OPS, file, inline)</span>
-</span><span id="__span-20-40"><a id="__codelineno-20-40" name="__codelineno-20-40" href="#__codelineno-20-40"></a><span class="go">  9. create_write: Write SFINCS model to disk</span>
+<div class="language-console highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="go">SCHISM workflow stages:</span>
+</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="go">  1. download: Download NWM/STOFS data (optional)</span>
+</span><span id="__span-22-3"><a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a><span class="go">  2. schism_forcing_prep: Prepare NWM forcing data</span>
+</span><span id="__span-22-4"><a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a><span class="go">  3. schism_forcing: Generate atmospheric forcing (MPI)</span>
+</span><span id="__span-22-5"><a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a><span class="go">  4. schism_sflux: Generate sflux atmospheric files</span>
+</span><span id="__span-22-6"><a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a><span class="go">  5. schism_params: Create SCHISM param.nml</span>
+</span><span id="__span-22-7"><a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a><span class="go">  6. schism_obs: Add NOAA observation stations</span>
+</span><span id="__span-22-8"><a id="__codelineno-22-8" name="__codelineno-22-8" href="#__codelineno-22-8"></a><span class="go">  7. schism_boundary: Generate boundary conditions (TPXO/STOFS)</span>
+</span><span id="__span-22-9"><a id="__codelineno-22-9" name="__codelineno-22-9" href="#__codelineno-22-9"></a><span class="go">  8. schism_discharge: Generate river discharge forcing</span>
+</span><span id="__span-22-10"><a id="__codelineno-22-10" name="__codelineno-22-10" href="#__codelineno-22-10"></a><span class="go">  9. schism_prep: Partition mesh and finalize inputs</span>
+</span><span id="__span-22-11"><a id="__codelineno-22-11" name="__codelineno-22-11" href="#__codelineno-22-11"></a><span class="go">  10. schism_run: Run SCHISM model (MPI)</span>
+</span><span id="__span-22-12"><a id="__codelineno-22-12" name="__codelineno-22-12" href="#__codelineno-22-12"></a><span class="go">  11. schism_postprocess: Post-process SCHISM outputs</span>
+</span><span id="__span-22-13"><a id="__codelineno-22-13" name="__codelineno-22-13" href="#__codelineno-22-13"></a><span class="go">  12. schism_plot: Plot simulated vs observed water levels</span>
+</span><span id="__span-22-14"><a id="__codelineno-22-14" name="__codelineno-22-14" href="#__codelineno-22-14"></a>
+</span><span id="__span-22-15"><a id="__codelineno-22-15" name="__codelineno-22-15" href="#__codelineno-22-15"></a><span class="go">SFINCS workflow stages:</span>
+</span><span id="__span-22-16"><a id="__codelineno-22-16" name="__codelineno-22-16" href="#__codelineno-22-16"></a><span class="go">  1. download: Download NWM/STOFS data (optional)</span>
+</span><span id="__span-22-17"><a id="__codelineno-22-17" name="__codelineno-22-17" href="#__codelineno-22-17"></a><span class="go">  2. sfincs_symlinks: Create .nc symlinks for NWM data</span>
+</span><span id="__span-22-18"><a id="__codelineno-22-18" name="__codelineno-22-18" href="#__codelineno-22-18"></a><span class="go">  3. sfincs_data_catalog: Generate HydroMT data catalog</span>
+</span><span id="__span-22-19"><a id="__codelineno-22-19" name="__codelineno-22-19" href="#__codelineno-22-19"></a><span class="go">  4. sfincs_init: Initialize SFINCS model (pre-built)</span>
+</span><span id="__span-22-20"><a id="__codelineno-22-20" name="__codelineno-22-20" href="#__codelineno-22-20"></a><span class="go">  5. sfincs_timing: Set SFINCS timing</span>
+</span><span id="__span-22-21"><a id="__codelineno-22-21" name="__codelineno-22-21" href="#__codelineno-22-21"></a><span class="go">  6. sfincs_forcing: Add water level forcing</span>
+</span><span id="__span-22-22"><a id="__codelineno-22-22" name="__codelineno-22-22" href="#__codelineno-22-22"></a><span class="go">  7. sfincs_discharge: Add discharge sources</span>
+</span><span id="__span-22-23"><a id="__codelineno-22-23" name="__codelineno-22-23" href="#__codelineno-22-23"></a><span class="go">  8. sfincs_precip: Add precipitation forcing</span>
+</span><span id="__span-22-24"><a id="__codelineno-22-24" name="__codelineno-22-24" href="#__codelineno-22-24"></a><span class="go">  9. sfincs_wind: Add wind forcing</span>
+</span><span id="__span-22-25"><a id="__codelineno-22-25" name="__codelineno-22-25" href="#__codelineno-22-25"></a><span class="go">  10. sfincs_pressure: Add atmospheric pressure forcing</span>
+</span><span id="__span-22-26"><a id="__codelineno-22-26" name="__codelineno-22-26" href="#__codelineno-22-26"></a><span class="go">  11. sfincs_write: Write SFINCS model</span>
+</span><span id="__span-22-27"><a id="__codelineno-22-27" name="__codelineno-22-27" href="#__codelineno-22-27"></a><span class="go">  12. sfincs_run: Run SFINCS model (OpenMP)</span>
+</span><span id="__span-22-28"><a id="__codelineno-22-28" name="__codelineno-22-28" href="#__codelineno-22-28"></a><span class="go">  13. sfincs_floodmap: Downscale flood depth map</span>
+</span><span id="__span-22-29"><a id="__codelineno-22-29" name="__codelineno-22-29" href="#__codelineno-22-29"></a><span class="go">  14. sfincs_plot: Plot simulated vs observed water levels</span>
+</span><span id="__span-22-30"><a id="__codelineno-22-30" name="__codelineno-22-30" href="#__codelineno-22-30"></a>
+</span><span id="__span-22-31"><a id="__codelineno-22-31" name="__codelineno-22-31" href="#__codelineno-22-31"></a><span class="go">SFINCS creation stages (create subcommand):</span>
+</span><span id="__span-22-32"><a id="__codelineno-22-32" name="__codelineno-22-32" href="#__codelineno-22-32"></a><span class="go">  1. create_grid: Create SFINCS grid from AOI polygon</span>
+</span><span id="__span-22-33"><a id="__codelineno-22-33" name="__codelineno-22-33" href="#__codelineno-22-33"></a><span class="go">  2. create_fetch_data: Fetch elevation and land cover data for AOI</span>
+</span><span id="__span-22-34"><a id="__codelineno-22-34" name="__codelineno-22-34" href="#__codelineno-22-34"></a><span class="go">  3. create_elevation: Add elevation and bathymetry data</span>
+</span><span id="__span-22-35"><a id="__codelineno-22-35" name="__codelineno-22-35" href="#__codelineno-22-35"></a><span class="go">  4. create_mask: Create active cell mask</span>
+</span><span id="__span-22-36"><a id="__codelineno-22-36" name="__codelineno-22-36" href="#__codelineno-22-36"></a><span class="go">  5. create_boundary: Create water level boundary cells</span>
+</span><span id="__span-22-37"><a id="__codelineno-22-37" name="__codelineno-22-37" href="#__codelineno-22-37"></a><span class="go">  6. create_discharge: Add NWM discharge source points</span>
+</span><span id="__span-22-38"><a id="__codelineno-22-38" name="__codelineno-22-38" href="#__codelineno-22-38"></a><span class="go">  7. create_subgrid: Create subgrid tables</span>
+</span><span id="__span-22-39"><a id="__codelineno-22-39" name="__codelineno-22-39" href="#__codelineno-22-39"></a><span class="go">  8. create_obs: Add observation points (NOAA CO-OPS, file, inline)</span>
+</span><span id="__span-22-40"><a id="__codelineno-22-40" name="__codelineno-22-40" href="#__codelineno-22-40"></a><span class="go">  9. create_write: Write SFINCS model to disk</span>
 </span></code></pre></div>
 <h2 id="exit-codes">Exit Codes<a class="headerlink" href="#exit-codes" title="Permanent link">#</a></h2>
 <table>
@@ -2358,11 +2429,12 @@ resolved in this order, first match winning:</p>
 <li><code>monitoring.log_level</code> in the config file</li>
 <li><code>DEBUG</code></li>
 </ol>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="c1"># Keep the log file small on a slow filesystem</span>
-</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>coastal-calibration<span class="w"> </span>run<span class="w"> </span>config.yaml<span class="w"> </span>--log-level<span class="w"> </span>INFO
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="c1"># Keep the log file small on a slow filesystem</span>
+</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>coastal-calibration<span class="w"> </span>run<span class="w"> </span>config.yaml<span class="w"> </span>--log-level<span class="w"> </span>INFO
 </span></code></pre></div>
 <p>Commands that write no log file (<code>prepare-topobathy</code>, <code>prepare-schism-mesh</code>,
-<code>update-dem-index</code>) have no <code>--log-level</code> option; they only print to the console.</p>
+<code>prepare-schism-manning</code>, <code>prepare-schism-reaches</code>, <code>update-dem-index</code>) have no
+<code>--log-level</code> option; they only print to the console.</p>
 <h2 id="environment-variables">Environment Variables<a class="headerlink" href="#environment-variables" title="Permanent link">#</a></h2>
 <p>The CLI respects these environment variables:</p>
 <table>
@@ -2385,11 +2457,11 @@ resolved in this order, first match winning:</p>
 </table>
 <h2 id="shell-completion">Shell Completion<a class="headerlink" href="#shell-completion" title="Permanent link">#</a></h2>
 <p>To enable shell completion (bash/zsh):</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="c1"># Bash</span>
-</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="nb">eval</span><span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span><span class="nv">_COASTAL_CALIBRATION_COMPLETE</span><span class="o">=</span>bash_source<span class="w"> </span>coastal-calibration<span class="k">)</span><span class="s2">&quot;</span>
-</span><span id="__span-22-3"><a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>
-</span><span id="__span-22-4"><a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a><span class="c1"># Zsh</span>
-</span><span id="__span-22-5"><a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a><span class="nb">eval</span><span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span><span class="nv">_COASTAL_CALIBRATION_COMPLETE</span><span class="o">=</span>zsh_source<span class="w"> </span>coastal-calibration<span class="k">)</span><span class="s2">&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="c1"># Bash</span>
+</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="nb">eval</span><span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span><span class="nv">_COASTAL_CALIBRATION_COMPLETE</span><span class="o">=</span>bash_source<span class="w"> </span>coastal-calibration<span class="k">)</span><span class="s2">&quot;</span>
+</span><span id="__span-24-3"><a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>
+</span><span id="__span-24-4"><a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="c1"># Zsh</span>
+</span><span id="__span-24-5"><a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a><span class="nb">eval</span><span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span><span class="nv">_COASTAL_CALIBRATION_COMPLETE</span><span class="o">=</span>zsh_source<span class="w"> </span>coastal-calibration<span class="k">)</span><span class="s2">&quot;</span>
 </span></code></pre></div>
 <p>Add this to your shell profile for persistent completion.</p>
 

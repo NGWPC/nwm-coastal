@@ -1786,6 +1786,10 @@ on <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a>, and this
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">#</a></h3>
 <ul>
+<li><strong>schism</strong>: <code>prepare-schism-reaches</code> generates missing <code>nwmReaches.csv</code> and
+  <code>ngenReaches.csv</code> by intersecting the mesh boundary with a hydrofabric, writing one row
+  per crossing so a river entering is a source and one leaving is a sink. Overwrite
+  existing files with <code>--force</code>, or compare against them with <code>--check</code></li>
 <li><strong>schism</strong>: <code>prepare-schism-manning</code> generates a missing <code>manning.gr3</code> with values
   based on ESA WorldCover; <code>--force</code> overwrites an existing file</li>
 <li><strong>glofs</strong>: Great Lakes boundary forcing for SCHISM and SFINCS from NOAA GLOFS
