@@ -1,5 +1,3 @@
-# `docs/examples/` — what's where
-
 This directory contains every notebook and input file needed to reproduce the published
 tutorials. The rendered landing page (`index.md`) is for end-users; this README is for
 maintainers and the next dev.
