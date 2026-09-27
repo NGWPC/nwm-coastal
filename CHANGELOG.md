@@ -8,6 +8,10 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project ad
 
 ### Added
 
+- **schism**: `prepare-schism-reaches` generates missing `nwmReaches.csv` and
+  `ngenReaches.csv` by intersecting the mesh boundary with a hydrofabric, writing one row
+  per crossing so a river entering is a source and one leaving is a sink. Overwrite
+  existing files with `--force`, or compare against them with `--check`
 - **schism**: `prepare-schism-manning` generates a missing `manning.gr3` with values
   based on ESA WorldCover; `--force` overwrites an existing file
 - **glofs**: Great Lakes boundary forcing for SCHISM and SFINCS from NOAA GLOFS

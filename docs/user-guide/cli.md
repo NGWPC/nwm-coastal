@@ -328,6 +328,47 @@ coastal-calibration prepare-schism-manning <prebuilt_dir> [OPTIONS]
 coastal-calibration prepare-schism-manning ../schism_models/lake_erie
 ```
 
+### prepare-schism-reaches
+
+Generate missing `nwmReaches.csv` and `ngenReaches.csv` by intersecting the SCHISM mesh
+boundary with a hydrofabric; overwrite existing files with `--force`.
+
+```bash
+coastal-calibration prepare-schism-reaches PREBUILT_DIR [OPTIONS]
+```
+
+**Options:**
+
+| Option        | Description                                             | Default                 |
+| ------------- | ------------------------------------------------------- | ----------------------- |
+| `--nwm-gdb`   | NWM v3 hydrofabric geodatabase; writes `nwmReaches.csv` | None                    |
+| `--ngen-gpkg` | NextGen hydrofabric GeoPackage; writes `ngenReaches.csv`| None                    |
+| `--domain`    | Coastal domain, selecting the NWM reach layer            | Inferred from the mesh  |
+| `-f, --force` | Overwrite existing files                                 | `False`                 |
+| `--check`     | Report what would be generated, comparing to any existing file, without writing | `False` |
+
+One row is written per boundary crossing: a flowline entering the mesh is a source and
+one leaving it is a sink, each at the element holding the crossing, so a river
+transiting the mesh is both. Each file is derived directly in its own identifier space,
+so neither depends on a COMID crosswalk.
+
+**Examples:**
+
+```bash
+# Both crosswalks for a Great Lakes mesh
+coastal-calibration prepare-schism-reaches ./schism_models/lake_erie \
+  --nwm-gdb ./hydrofabric_copies/nwmv3/NWM_v3_hydrofabric.gdb \
+  --ngen-gpkg ./hydrofabric_copies/ngen/nhf_1.2.2.gpkg
+
+# Alaska needs the Alaska NextGen GeoPackage
+coastal-calibration prepare-schism-reaches ./schism_models/alaska \
+  --ngen-gpkg ./hydrofabric_copies/ngen/ak_nhf_1.2.2.gpkg
+
+# Compare against a model's existing file without overwriting it
+coastal-calibration prepare-schism-reaches ./schism_models/atlgulf \
+  --nwm-gdb ./hydrofabric_copies/nwmv3/NWM_v3_hydrofabric.gdb --check
+```
+
 ### update-dem-index
 
 Rebuild the NOAA DEM spatial index from S3 STAC metadata.
@@ -466,7 +507,8 @@ coastal-calibration run config.yaml --log-level INFO
 ```
 
 Commands that write no log file (`prepare-topobathy`, `prepare-schism-mesh`,
-`update-dem-index`) have no `--log-level` option; they only print to the console.
+`prepare-schism-manning`, `prepare-schism-reaches`, `update-dem-index`) have no
+`--log-level` option; they only print to the console.
 
 ## Environment Variables
 

@@ -459,6 +459,134 @@ def prepare_schism_manning(
     )
 
 
+@cli.command("prepare-schism-reaches")
+@click.argument(
+    "prebuilt_dir",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+)
+@click.option(
+    "--nwm-gdb",
+    type=click.Path(exists=True, path_type=Path),
+    help="NWM v3 hydrofabric geodatabase; writes nwmReaches.csv.",
+)
+@click.option(
+    "--ngen-gpkg",
+    type=click.Path(exists=True, path_type=Path),
+    help="NextGen hydrofabric GeoPackage; writes ngenReaches.csv.",
+)
+@click.option(
+    "--domain",
+    type=click.Choice(["prvi", "hawaii", "atlgulf", "pacific", "alaska", "greatlakes"]),
+    help="Coastal domain (default: inferred from the mesh bounds).",
+)
+@click.option(
+    "-f",
+    "--force",
+    is_flag=True,
+    help="Overwrite existing nwmReaches.csv / ngenReaches.csv.",
+)
+@click.option(
+    "--check",
+    is_flag=True,
+    help="Report what would be generated, and how it compares to any existing file,"
+    " without writing.",
+)
+def prepare_schism_reaches(
+    prebuilt_dir: Path,
+    nwm_gdb: Path | None,
+    ngen_gpkg: Path | None,
+    domain: str | None,
+    force: bool,
+    check: bool,
+) -> None:
+    """Generate missing reach crosswalks from a hydrofabric.
+
+    Flowlines entering the SCHISM mesh become discharge sources, written to
+    PREBUILT_DIR as ``nwmReaches.csv`` (from --nwm-gdb) and ``ngenReaches.csv``
+    (from --ngen-gpkg).  A flowline carrying that water back out again, such as
+    a lake's outlet, becomes a sink.  Each file is derived directly in its own
+    identifier space, so neither depends on a COMID crosswalk.  Overwrite
+    existing files with --force.
+    """
+    from coastal_calibration.logging import configure_logger
+    from coastal_calibration.schism import reaches as reaches_mod
+    from coastal_calibration.schism.project_reader import NWMSCHISMProject
+
+    configure_logger(level="INFO")
+
+    if nwm_gdb is None and ngen_gpkg is None:
+        _raise_cli_error("Pass --nwm-gdb and/or --ngen-gpkg to select what to generate.")
+
+    prebuilt_dir = prebuilt_dir.resolve()
+    # The mesh and its open-boundary flags are the only model inputs needed.
+    missing = [n for n in ("hgrid.gr3", "bctides.in") if not (prebuilt_dir / n).exists()]
+    if missing:
+        _raise_cli_error(f"{', '.join(missing)} not found in {prebuilt_dir}")
+
+    targets: list[tuple[Path, Path, str, str]] = []
+    if nwm_gdb is not None:
+        targets.append((prebuilt_dir / "nwmReaches.csv", nwm_gdb, "", "ID"))
+    if ngen_gpkg is not None:
+        targets.append((prebuilt_dir / "ngenReaches.csv", ngen_gpkg, "flowpaths", "fp_id"))
+
+    existing = [out.name for out, *_ in targets if out.exists()]
+    if existing and not force and not check:
+        _raise_cli_error(
+            f"{', '.join(existing)} already exist in {prebuilt_dir}. Pass --force to overwrite."
+        )
+
+    try:
+        project = NWMSCHISMProject(prebuilt_dir, validate=False)
+        resolved = domain or reaches_mod.infer_region(reaches_mod.domain_polygon(project).bounds)
+        if domain is None:
+            click.echo(f"Inferred hydrofabric region: {resolved}")
+
+        results = []
+        for output, source, layer, id_column in targets:
+            results.append(
+                reaches_mod.generate_reaches(
+                    project,
+                    source,
+                    output,
+                    layer=layer or reaches_mod.resolve_nwm_layer(resolved),
+                    id_column=id_column,
+                    dry_run=check,
+                )
+            )
+    except Exception as e:
+        _raise_cli_error(str(e))
+        return  # unreachable, but helps type-checkers
+
+    for stats in results:
+        verb = "Would write" if check else "Wrote:  "
+        click.echo(
+            f"\n{verb} {stats['output_file']}"
+            f"\n  layer:                 {stats['layer']}"
+            f"\n  flowlines in bbox:     {stats['in_bbox']:,}"
+            f"\n  crossing the boundary: {stats['crossing']:,}"
+            f"\n  inbound crossings:     {stats['inbound']:,}"
+            f"\n  outbound crossings:    {stats['outbound']:,}"
+            f"\n  merged into an element:{stats['merged']:,}"
+            f"\n  resolved by element:   {stats['resolved_by_containment']:,}"
+            f"\n  resolved by nearest:   {stats['resolved_by_nearest']:,}"
+            f"\n  source rows:           {stats['sources']:,}"
+            f" ({stats['distinct_source_reaches']:,} distinct reaches)"
+            f"\n  sink rows:             {stats['sinks']:,}"
+            f" ({stats['distinct_sink_reaches']:,} distinct reaches)"
+        )
+        if "existing_sources" in stats:
+            click.echo(
+                f"  existing file:         {stats['existing_sources']:,} source"
+                f" / {stats['existing_sinks']:,} sink rows"
+                f"\n  reaches in common:     {stats['shared_source_reaches']:,} source"
+                f" / {stats['shared_sink_reaches']:,} sink"
+                f"\n  identical rows:        {stats['shared_source_rows']:,} source"
+                f" / {stats['shared_sink_rows']:,} sink"
+            )
+    if check:
+        click.echo("\nNothing was written (--check).")
+
+
 @cli.command()
 @click.argument(
     "output",

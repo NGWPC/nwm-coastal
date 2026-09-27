@@ -51,7 +51,7 @@ class TranslateStats:
         return (self.sources_in - self.sources_out) + (self.sinks_in - self.sinks_out)
 
 
-def _read_reaches_blocks(path: Path) -> tuple[list[ReachPair], list[ReachPair]]:
+def read_reaches_blocks(path: Path) -> tuple[list[ReachPair], list[ReachPair]]:
     """Parse ``nwmReaches.csv`` into (sources, sinks) ``(element, comid)`` lists.
 
     The file is two count-prefixed blocks separated by a blank line: the
@@ -86,7 +86,7 @@ def _read_reaches_blocks(path: Path) -> tuple[list[ReachPair], list[ReachPair]]:
     return sources, sinks
 
 
-def load_comid_to_fpid(gpkg: Path) -> dict[int, int]:
+def load_comid_to_fpid(gpkg: Path | str) -> dict[int, int]:
     """Build a ``COMID -> 16-digit fp_id`` map from a NextGen hydrofabric.
 
     Uses a two-hop bridge that works across CONUS and oCONUS domains:
@@ -109,6 +109,7 @@ def load_comid_to_fpid(gpkg: Path) -> dict[int, int]:
     """
     import geopandas as gpd
 
+    gpkg = Path(gpkg)
     nhd = gpd.read_file(gpkg, layer="nhd", columns=["nhd_feature_id", "ref_id"]).dropna(
         subset=["nhd_feature_id", "ref_id"]
     )
@@ -150,7 +151,7 @@ def _translate_block(
     return out
 
 
-def _write_reaches_blocks(
+def write_reaches_blocks(
     path: Path, sources: Sequence[ReachPair], sinks: Sequence[ReachPair]
 ) -> None:
     """Write the source/sink blocks in ``nwmReaches.csv`` format."""
@@ -190,7 +191,7 @@ def translate_nwm_to_ngen_reaches(
         Counts of sources/sinks in and out, and the dropped (virtual/
         unmapped) COMIDs.
     """
-    sources, sinks = _read_reaches_blocks(nwm_reaches)
+    sources, sinks = read_reaches_blocks(nwm_reaches)
     comid2fp = load_comid_to_fpid(gpkg)
 
     stats = TranslateStats(sources_in=len(sources), sinks_in=len(sinks))
@@ -199,7 +200,7 @@ def translate_nwm_to_ngen_reaches(
     stats.sources_out = len(new_sources)
     stats.sinks_out = len(new_sinks)
 
-    _write_reaches_blocks(output, new_sources, new_sinks)
+    write_reaches_blocks(output, new_sources, new_sinks)
 
     logger.info(
         "Wrote %s: sources %d/%d, sinks %d/%d (dropped %d rows, %d unique COMIDs "
