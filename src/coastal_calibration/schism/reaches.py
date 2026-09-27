@@ -2,8 +2,7 @@
 
 A SCHISM model needs a reaches crosswalk (``nwmReaches.csv`` or
 ``ngenReaches.csv``) mapping mesh element IDs to the routed reaches that
-discharge into them.  Meshes that are hand-assembled or copied without
-going through the ``create`` workflow ship without one, which silently
+discharge into them.  Meshes that are hand-assembled won't have one, which
 disables river inflow (``if_source = 0``).
 
 This module rebuilds the file from the mesh boundary, emitting one row per
