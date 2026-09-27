@@ -373,6 +373,92 @@ def prepare_schism_mesh(prebuilt_dir: Path, force: bool) -> None:
     )
 
 
+@cli.command("prepare-schism-manning")
+@click.argument(
+    "prebuilt_dir",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+)
+@click.option("-f", "--force", is_flag=True, help="Overwrite an existing manning.gr3.")
+@click.option(
+    "--cache-dir",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Directory for downloaded WorldCover tiles (default: PREBUILT_DIR/.esa_worldcover_cache).",
+)
+@click.option(
+    "--fallback-manning",
+    type=float,
+    default=0.02,
+    show_default=True,
+    help="Manning's n for nodes with no land-cover class (open water and no-data).",
+)
+@click.option(
+    "--mapping-csv",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="Override the class-to-n table (columns: esa_worldcover,N).",
+)
+def prepare_schism_manning(
+    prebuilt_dir: Path,
+    force: bool,
+    cache_dir: Path | None,
+    fallback_manning: float,
+    mapping_csv: Path | None,
+) -> None:
+    """Generate a missing manning.gr3 with values based on ESA WorldCover.
+
+    Writes ``manning.gr3`` into PREBUILT_DIR by sampling ESA WorldCover at each
+    hgrid.gr3 node.  Required when a SCHISM model directory is hand-assembled
+    without one: ``param.nml``'s ``nchi = -1`` makes SCHISM read the file at
+    startup and abort if it is absent.  Pass ``--force`` to overwrite.
+    """
+    from coastal_calibration.logging import configure_logger
+    from coastal_calibration.schism.manning import (
+        generate_manning_from_landcover,
+        load_manning_mapping,
+    )
+    from coastal_calibration.schism.project_reader import NWMSCHISMProject
+
+    configure_logger(level="INFO")
+
+    prebuilt_dir = prebuilt_dir.resolve()
+    hgrid_gr3 = prebuilt_dir / "hgrid.gr3"
+    manning_gr3 = prebuilt_dir / "manning.gr3"
+
+    if not hgrid_gr3.exists():
+        _raise_cli_error(f"hgrid.gr3 not found in {prebuilt_dir}")
+
+    if manning_gr3.exists() and not force:
+        _raise_cli_error(
+            f"manning.gr3 already exists in {prebuilt_dir}. Pass --force to overwrite."
+        )
+
+    try:
+        project = NWMSCHISMProject(prebuilt_dir, validate=False)
+        stats = generate_manning_from_landcover(
+            project,
+            manning_gr3,
+            cache_dir=cache_dir,
+            fallback_manning=fallback_manning,
+            mapping=load_manning_mapping(mapping_csv),
+        )
+    except Exception as e:
+        _raise_cli_error(str(e))
+        return  # unreachable, but helps type-checkers
+
+    pct = 100.0 * stats["n_fallback"] / stats["n_nodes"] if stats["n_nodes"] else 0.0
+    click.echo(f"\nWrote:   {manning_gr3}")
+    click.echo(
+        f"\n  nodes:            {stats['n_nodes']:,}"
+        f"\n  elements:         {stats['n_elements']:,}"
+        f"\n  WorldCover tiles: {stats['n_tiles']} ({stats['n_tiles_missing']} missing)"
+        f"\n  fallback nodes:   {stats['n_fallback']:,} ({pct:.2f}%)"
+        f"\n  manning n:        min {stats['min']:.3f}  mean {stats['mean']:.3f}"
+        f"  max {stats['max']:.3f}"
+        f"\n  distinct values:  {len(stats['value_counts'])}"
+    )
+
+
 @cli.command("prepare-schism-reaches")
 @click.argument(
     "prebuilt_dir",

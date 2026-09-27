@@ -156,6 +156,10 @@ Prebuilt SCHISM models that the setup script downloads include:
 
 The `atlgulf_extract_03S` model is an example of what the subsetting workflow produces from a full domain.
 
+Some prebuilt models arrive without a `manning.gr3`, which SCHISM requires when `param.nml` sets
+`nchi = -1`. Generate one with
+[`prepare-schism-manning`](../user-guide/cli.md#prepare-schism-manning).
+
 A run points at a base model with `model_config.prebuilt_dir`. The config also needs to know which
 geogrid to map meteo forcing from:
 

@@ -134,6 +134,31 @@ class TestCLIPrepareSchismMesh:
         assert result.exit_code != 0
 
 
+class TestCLIPrepareSchismManning:
+    def test_command_registered(self, runner):
+        result = runner.invoke(cli, ["prepare-schism-manning", "--help"])
+        assert result.exit_code == 0
+        assert "manning.gr3" in result.output
+        assert "ESA WorldCover" in result.output
+
+    def test_missing_hgrid_gr3(self, runner, tmp_path):
+        result = runner.invoke(cli, ["prepare-schism-manning", str(tmp_path)])
+        assert result.exit_code != 0
+        assert "hgrid.gr3 not found" in result.output
+
+    def test_refuses_existing_without_force(self, runner, tmp_path):
+        (tmp_path / "hgrid.gr3").write_text("stub")
+        (tmp_path / "manning.gr3").write_text("stub")
+        result = runner.invoke(cli, ["prepare-schism-manning", str(tmp_path)])
+        assert result.exit_code != 0
+        assert "already exists" in result.output
+        assert "--force" in result.output
+
+    def test_nonexistent_dir(self, runner, tmp_path):
+        result = runner.invoke(cli, ["prepare-schism-manning", str(tmp_path / "nope")])
+        assert result.exit_code != 0
+
+
 class TestCLIPrepareSchismReaches:
     def test_command_registered(self, runner):
         result = runner.invoke(cli, ["prepare-schism-reaches", "--help"])
@@ -210,6 +235,7 @@ class TestCLILogLevelOption:
         for command in (
             "prepare-topobathy",
             "prepare-schism-mesh",
+            "prepare-schism-manning",
             "prepare-schism-reaches",
             "update-dem-index",
         ):

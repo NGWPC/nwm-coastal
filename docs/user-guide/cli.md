@@ -298,29 +298,34 @@ coastal-calibration prepare-topobathy aoi.geojson --domain atlgulf
 coastal-calibration prepare-topobathy aoi.geojson --domain prvi --output-dir ./dem_data
 ```
 
-### update-dem-index
+### prepare-schism-manning
 
-Rebuild the NOAA DEM spatial index from S3 STAC metadata.
+Generates a missing `manning.gr3` with values based on ESA WorldCover; overwrite an
+existing file with `--force`.
 
 ```bash
-coastal-calibration update-dem-index [OPTIONS]
+coastal-calibration prepare-schism-manning <prebuilt_dir> [OPTIONS]
 ```
+
+**Arguments:**
+
+| Argument       | Description                              |
+| -------------- | ---------------------------------------- |
+| `prebuilt_dir` | SCHISM model directory containing hgrid.gr3 |
 
 **Options:**
 
-| Option           | Description                                               | Default           |
-| ---------------- | --------------------------------------------------------- | ----------------- |
-| `--output`       | Write index to this path instead of the packaged location | Packaged location |
-| `--max-datasets` | Limit S3 scan to N datasets (for testing)                 | All               |
+| Option                | Description                                        | Default                              |
+| --------------------- | -------------------------------------------------- | ------------------------------------ |
+| `-f`, `--force`       | Overwrite an existing manning.gr3                  | Off                                  |
+| `--cache-dir`         | Directory for downloaded WorldCover tiles          | `PREBUILT_DIR/.esa_worldcover_cache` |
+| `--fallback-manning`  | Value for nodes with no land-cover class           | 0.02                                 |
+| `--mapping-csv`       | Override the class-to-n table (`esa_worldcover,N`) | Built-in table                       |
 
-**Examples:**
+**Example:**
 
 ```bash
-# Rebuild the packaged index
-coastal-calibration update-dem-index
-
-# Write to a custom path
-coastal-calibration update-dem-index --output ./my_index.json
+coastal-calibration prepare-schism-manning ../schism_models/lake_erie
 ```
 
 ### prepare-schism-reaches
@@ -362,6 +367,31 @@ coastal-calibration prepare-schism-reaches ./schism_models/alaska \
 # Compare against a model's existing file without overwriting it
 coastal-calibration prepare-schism-reaches ./schism_models/atlgulf \
   --nwm-gdb ./hydrofabric_copies/nwmv3/NWM_v3_hydrofabric.gdb --check
+```
+
+### update-dem-index
+
+Rebuild the NOAA DEM spatial index from S3 STAC metadata.
+
+```bash
+coastal-calibration update-dem-index [OPTIONS]
+```
+
+**Options:**
+
+| Option           | Description                                               | Default           |
+| ---------------- | --------------------------------------------------------- | ----------------- |
+| `--output`       | Write index to this path instead of the packaged location | Packaged location |
+| `--max-datasets` | Limit S3 scan to N datasets (for testing)                 | All               |
+
+**Examples:**
+
+```bash
+# Rebuild the packaged index
+coastal-calibration update-dem-index
+
+# Write to a custom path
+coastal-calibration update-dem-index --output ./my_index.json
 ```
 
 ### stages
@@ -477,8 +507,8 @@ coastal-calibration run config.yaml --log-level INFO
 ```
 
 Commands that write no log file (`prepare-topobathy`, `prepare-schism-mesh`,
-`prepare-schism-reaches`,
-`update-dem-index`) have no `--log-level` option; they only print to the console.
+`prepare-schism-manning`, `prepare-schism-reaches`, `update-dem-index`) have no
+`--log-level` option; they only print to the console.
 
 ## Environment Variables
 
