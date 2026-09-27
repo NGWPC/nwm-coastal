@@ -1928,6 +1928,9 @@ for where you can obtain some of this data publicly.</p>
 </tbody>
 </table>
 <p>The <code>atlgulf_extract_03S</code> model is an example of what the subsetting workflow produces from a full domain.</p>
+<p>Some prebuilt models arrive without a <code>manning.gr3</code>, which SCHISM requires when <code>param.nml</code> sets
+<code>nchi = -1</code>. Generate one with
+<a href="../user-guide/cli/#prepare-schism-manning"><code>prepare-schism-manning</code></a>.</p>
 <p>A run points at a base model with <code>model_config.prebuilt_dir</code>. The config also needs to know which
 geogrid to map meteo forcing from:</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">model_config</span><span class="p">:</span>
