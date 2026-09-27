@@ -38,7 +38,7 @@
 #
 # This example runs end to end as shipped - a working Fairport Harbor domain is
 # included, so you can execute every cell before changing anything. The geometry
-# lives in `docs/examples/lake-erie/` next to the configs:
+# lives in `docs/examples/lake-erie_sfincs/` next to the configs:
 #
 # | File | Shipped? | What it is |
 # | --- | --- | --- |
@@ -62,7 +62,7 @@
 # `downloads/` inside it, so the folder can be copied and run anywhere:
 #
 # ```bash
-# cp -r docs/examples/lake-erie ~/my_erie_run
+# cp -r docs/examples/lake-erie_sfincs ~/my_erie_run
 # LAKE_ERIE_DIR=~/my_erie_run jupyter lab docs/examples/notebooks/lake_erie.ipynb
 # ```
 #
@@ -113,7 +113,7 @@
 #
 # Every path below is relative to the example folder, so the notebook starts by
 # moving into it. It looks in three places, in order: `$LAKE_ERIE_DIR`, the
-# current directory, then a `lake-erie` sibling. That covers running from
+# current directory, then a `lake-erie_sfincs` sibling. That covers running from
 # `docs/examples/notebooks/` as shipped, and running from inside a copy of the
 # folder you made somewhere else.
 
@@ -123,7 +123,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-candidates = [Path.cwd(), Path.cwd().parent / "lake-erie"]
+candidates = [Path.cwd(), Path.cwd().parent / "lake-erie_sfincs"]
 if os.environ.get("LAKE_ERIE_DIR"):
     candidates.insert(0, Path(os.environ["LAKE_ERIE_DIR"]))
 
@@ -527,7 +527,7 @@ ax.set_title(f"forcing points written by create (EPSG:{model_epsg})")
 #
 # | Override | Default | Why it is wrong here |
 # | --- | --- | --- |
-# | `zsini` = `0.89` | `0` | Initial water level, in mesh datum. On LWD, 0 means "exactly at low water" - usable, but Erie typically sits a few decimetres above LWD. Set it from the CO-OPS Fairport Harbor (9063053) record at your start time. On an *absolute* IGLD85 mesh the default would start the model dry. |
+# | `zsini` = `0.90` | `0` | Initial water level, in mesh datum. On LWD, 0 means "exactly at low water" - usable, but Erie typically sits a few decimetres above LWD. Set it from the CO-OPS Fairport Harbor (9063053) record at your start time. On an *absolute* IGLD85 mesh the default would start the model dry. |
 # | `latitude` = `41.75` | `0` | A projected grid carries no latitude, so Coriolis would be computed at the equator. |
 #
 # `forcing_to_mesh_offset_m: 0.0` is correct because the mesh and GLOFS
@@ -542,8 +542,8 @@ run_config = CoastalCalibConfig.from_dict(
     {
         "model": "sfincs",
         "simulation": {
-            "start_date": "2026-09-21 12:00:00",
-            "duration_hours": 24,
+            "start_date": "2026-08-15 00:00:00",
+            "duration_hours": 12,
             "coastal_domain": "greatlakes",
             "meteo_source": "nwm_ana",
         },
@@ -571,7 +571,7 @@ run_config = CoastalCalibConfig.from_dict(
                 "cdnrb": 3,
                 "cdwnd": [0.0, 28.0, 50.0],
                 "cdval": [0.001, 0.0025, 0.0025],
-                "zsini": 0.89,
+                "zsini": 0.90,
                 "latitude": 41.75,
             },
         },

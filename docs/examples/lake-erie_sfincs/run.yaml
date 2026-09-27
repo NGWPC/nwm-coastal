@@ -14,8 +14,8 @@
 model: sfincs
 
 simulation:
-  start_date: 2026-09-21 12:00:00   # GLOFS nowcasts run 2016 -> present
-  duration_hours: 24
+  start_date: 2026-08-15 00:00:00   # GLOFS nowcasts run 2016 -> present
+  duration_hours: 12
   coastal_domain: greatlakes  # required by boundary.source glofs, and vice versa
   meteo_source: nwm_ana       # CONUS NWM forcing covers the lakes
 
@@ -54,6 +54,6 @@ model_config:
     cdwnd: [0.0, 28.0, 50.0]        # wind speed breakpoints (m/s)
     cdval: [0.001, 0.0025, 0.0025]  # drag coefficient at each breakpoint
     # --- Great Lakes specific; see the notebook's "Why these overrides" note ---
-    zsini: 0.89                     # observed lake level at 9063053, 2026-09-21 12:00 UTC
+    zsini: 0.90                     # observed lake level at 9063053, 2026-08-15 00:00 UTC
     latitude: 41.75                 # projected grid carries no latitude; SFINCS's
                                     # coriolis defaults on, so this is the real switch

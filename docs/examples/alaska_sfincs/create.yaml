@@ -1,0 +1,77 @@
+# Cook Inlet, Alaska - SFINCS model creation from AOI
+#
+# Elevation is not auto-fetched: no built-in source covers Alaska. The NCEI
+# Cook Inlet DEMs are downloaded by ../notebooks/alaska_sfincs.ipynb and
+# registered through ./dem_catalog.yml.
+#
+# Usage:
+#   coastal-calibration create create.yaml
+#   coastal-calibration create create.yaml --dry-run
+
+aoi: ./sfincs_alaska_cookinlet.geojson
+output_dir: ./sfincs_cookinlet
+download_dir: ./downloads/grid   # inside the example, so a copied folder is self-contained
+
+grid:
+  resolution: 1024       # base resolution in meters
+  crs: utm               # auto-detect UTM zone (-> EPSG:32605 here)
+  rotated: false
+  refinement:
+  - polygon: ./sfincs_refine_1.geojson
+    level: 2             # 2 refinement steps: 1024->512->256 m
+  - polygon: ./sfincs_refine_2.geojson
+    level: 2
+  - polygon: ./sfincs_refine_3.geojson
+    level: 2
+  - polygon: ./sfincs_refine_4.geojson
+    level: 2
+  - polygon: ./sfincs_refine_5.geojson
+    level: 2
+  - polygon: ./sfincs_refine_6.geojson
+    level: 2
+  - polygon: ./sfincs_refine_7.geojson
+    level: 2
+
+data_catalog:
+  data_libs:
+  - ./dem_catalog.yml
+
+elevation:
+  # Finest first. Both NCEI DEMs are on MHHW; the offset lifts them onto MSL so
+  # they merge with GEBCO and match the STOFS forcing datum. 3.87 m is
+  # MHHW-MSL at Anchorage (9455920); it is 2.59 m at Seldovia (9455500), so
+  # this single number is a local approximation - see the notebook.
+  datasets:
+  - name: cook_inlet_ak_3         # ~90 m, upper inlet
+    zmin: -20000
+    source:                       # no auto-fetch: read from the data catalog
+    offset: 3.87
+  - name: cook_inlet_ak_8         # ~240 m, spans the AOI
+    zmin: -20000
+    source:
+    offset: 3.87
+  - name: gebco_15arcs            # global fill past the NCEI footprints
+    zmin: -20000
+    source: gebco_15arcs
+  buffer_cells: 1
+
+mask:
+  include_polygon: ./sfincs_alaska_cookinlet.geojson
+  boundary_zmax: -1.0     # max bed elevation for a cell to host the boundary
+  reset_bounds: true
+  keep_largest_only: true
+
+subgrid:
+  nr_subgrid_pixels: 10
+  lulc_dataset: esa_worldcover
+  manning_land: 0.04
+  manning_sea: 0.02
+
+river_discharge:
+  flowlines: ./sfincs_alaska_flowpaths_nwm.geojson  # swap for the _ngen file to key on fp_id
+  nwm_id_column: ID
+
+add_noaa_gages: true
+
+monitoring:
+  log_level: INFO
