@@ -1,0 +1,17 @@
+meta:
+  version: v1.0.0
+  name: cook_inlet_lulc
+  hydromt_version: '>1.0a,<2'
+
+# ESA WorldCover resampled from its native 10 m to 100 m by the notebook.
+# At 1024 m cells with 4 subgrid pixels the subgrid pixel is 256 m, so 10 m is
+# far finer than anything the subgrid tables consume, and over this AOI it is
+# a 2.7-billion-pixel raster that exhausts memory during create_subgrid.
+esa_worldcover:
+  data_type: RasterDataset
+  uri: downloads/lulc/esa_worldcover.tif
+  driver:
+    name: rasterio
+  metadata:
+    category: landuse
+    crs: 4326

@@ -212,6 +212,24 @@ for name in ("nwmReaches.csv", "ngenReaches.csv"):
         print(f"{name}: subset {len(sources)}/{len(sinks)} vs full {len(full_s)}/{len(full_k)}")
 
 # %% [markdown]
+# ### hgrid.cpp
+#
+# This mesh did not ship an `hgrid.cpp`. SCHISM's own solver never reads one, but the
+# `combine_sink_source` utility it runs during the discharge stage opens it
+# unconditionally, and aborts when it is absent.
+#
+# In the mode that utility is called with it uses the element connectivity and the
+# boundary block, both of which `hgrid.gr3` already carries, so a link to that file
+# satisfies it. Note this writes into the linked mesh directory, not into the example.
+
+# %%
+for d in (Path("model"), Path("extracted/cookinlet")):
+    cpp = d / "hgrid.cpp"
+    if not cpp.is_symlink() and not cpp.exists():
+        cpp.symlink_to("hgrid.gr3")
+    print(f"{cpp}: -> {cpp.readlink() if cpp.is_symlink() else 'existing file'}")
+
+# %% [markdown]
 # ## 5. Run
 #
 # Both configs are validated first. The subset is much smaller, so run it

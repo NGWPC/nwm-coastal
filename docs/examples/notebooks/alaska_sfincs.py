@@ -244,9 +244,66 @@ for name in ("cook_inlet_ak_3_mhhw_2020.nc", "cook_inlet_ak_8_mhhw_2020.nc"):
     ds.close()
 
 # %% [markdown]
+# ### Land cover
+#
+# Roughness comes from ESA WorldCover, which ships at 10 m. Over this AOI that
+# is a 73,500 x 36,830 raster - 2.7 billion pixels - and building the subgrid
+# tables from it needs about 30 GB of memory.
+#
+# Resampling to 100 m cuts the raster 100x,
+# to 27 million pixels, and the class distribution is unchanged. `mode` is the
+# resampling here because the classes are categorical.
+
+# %%
+import subprocess as _sp
+
+from coastal_calibration.data.esa_worldcover import fetch_esa_worldcover
+
+lulc_dir = Path("./downloads/lulc")
+lulc_tif = lulc_dir / "esa_worldcover.tif"
+
+if lulc_tif.exists():
+    print(f"already present: {lulc_tif} ({lulc_tif.stat().st_size / 1e6:.1f} MB)")
+else:
+    lulc_dir.mkdir(parents=True, exist_ok=True)
+    native, _, _ = fetch_esa_worldcover(
+        aoi=Path("./sfincs_alaska_cookinlet.geojson"),
+        output_dir=lulc_dir,
+        catalog_name="esa_worldcover_10m",
+    )
+    _sp.run(
+        [
+            "gdalwarp",
+            "-tr",
+            "0.000833",
+            "0.000833",
+            "-r",
+            "mode",
+            "-ot",
+            "Byte",
+            "-dstnodata",
+            "0",
+            "-co",
+            "COMPRESS=DEFLATE",
+            str(native),
+            str(lulc_tif),
+        ],
+        check=True,
+        capture_output=True,
+    )
+    native.unlink()
+    print(f"resampled to 100 m: {lulc_tif} ({lulc_tif.stat().st_size / 1e6:.1f} MB)")
+
+# %%
+import rasterio
+
+with rasterio.open(lulc_tif) as r:
+    print(f"{r.width} x {r.height} = {r.width * r.height / 1e6:.1f} Mpx, dtype={r.dtypes[0]}")
+
+# %% [markdown]
 # ## 5. Create the model
 #
-# 1024 m base cells, refined to 256 m inside the seven zones, with 2 subgrid
+# 1024 m base cells, refined to 256 m inside the seven zones, with 4 subgrid
 # pixels per cell.
 
 # %%
@@ -279,7 +336,3 @@ cli("run", "run.yaml")
 #
 # The build inputs were drawn in QGIS, the elevation came from NCEI over plain
 # HTTPS through a data catalog, and `create` plus `run` did the rest.
-#
-# The thing to carry to another Alaska domain is the datum: an MHHW DEM paired
-# with MSL forcing and no offset is wrong by metres in this part of the world,
-# and nothing in the pipeline will warn about it.

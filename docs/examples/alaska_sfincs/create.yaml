@@ -35,6 +35,7 @@ grid:
 data_catalog:
   data_libs:
   - ./dem_catalog.yml
+  - ./lulc_catalog.yml
 
 elevation:
   # Finest first. Both NCEI DEMs are on MHHW; the offset lifts them onto MSL so
@@ -64,6 +65,7 @@ mask:
 subgrid:
   nr_subgrid_pixels: 4
   lulc_dataset: esa_worldcover
+  lulc_source:                    # no auto-fetch: read the 100 m clip from the catalog
   manning_land: 0.04
   manning_sea: 0.02
 
