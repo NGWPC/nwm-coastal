@@ -51,6 +51,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -166,8 +167,7 @@ def run_nwm_rte(module: str, args: list[str]) -> subprocess.CompletedProcess:
 # the coastal models)
 def run_gen_cycle_config(model: str, run_type: str, **kwargs) -> subprocess.CompletedProcess:
     gen_script = NWM_COASTAL_ROOT / "forecast_demo" / "bin" / "gen_cycle_config.py"
-    nwm_coastal_py = NWM_COASTAL_ROOT / "nwm-coastal-py"
-    args = [str(nwm_coastal_py), str(gen_script), "--model", model, "--run-type", run_type]
+    args = [sys.executable, str(gen_script), "--model", model, "--run-type", run_type]
     for key, value in kwargs.items():
         if value is None:
             continue
@@ -185,9 +185,8 @@ def find_troute_output(region_dir: Path) -> Path:
 
 # Helper function for using the nwm-coastal cli
 def nwm_coastal_cli(args: list[str]) -> subprocess.CompletedProcess:
-    cli = NWM_COASTAL_ROOT / "nwm-coastal-cli"
-    print(f"--- nwm-coastal-cli {' '.join(args)} ---")
-    return run_streamed([str(cli), *args])
+    print(f"--- coastal-calibration {' '.join(args)} ---")
+    return run_streamed([sys.executable, "-m", "coastal_calibration.cli", *args])
 
 # %% [markdown]
 # ## 2. Crosswalking troute and coastal models
@@ -257,7 +256,7 @@ if all(p.exists() for p in esmf_domain_outputs):
     print("VPU ESMF mesh already exists, skipping extract_esmf_domain.py")
 else:
     esmf_extract_args = [
-        str(NWM_COASTAL_ROOT / "nwm-coastal-py"),
+        sys.executable,
         str(NWM_COASTAL_ROOT / "forecast_demo" / "bin" / "extract_esmf_domain.py"),
         "--source-domain", "CONUS",
         "--extract-geojson", str(RUN_NGEN_ROOT / "data" / "esmf_mesh" / "esmf_domain_extract" / "esmf_conus_03s_extract.geojson"),
