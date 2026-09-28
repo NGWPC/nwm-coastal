@@ -1260,7 +1260,8 @@ class MeshSubsetter:
 
         # Cut-line boundaries inherit the most common flag from original boundaries.
         # In STOFS setups this is (4,0,0,0); in simple test cases (1,0,0,0).
-        cut_flag = Counter(open_flags).most_common(1)[0][0] if open_flags else (1, 0, 0, 0)
+        inherited = open_flags or list(boundary_set.open_boundary_flags)
+        cut_flag = Counter(inherited).most_common(1)[0][0] if inherited else (1, 0, 0, 0)
         for cb in cut_bnds:
             open_bnds.append(cb)
             open_flags.append(cut_flag)
@@ -2311,7 +2312,8 @@ def extract_mesh(
 
     cut_bnds = _build_cut_boundaries(unique_terminals, shared_adjacency, side_a_data.mapping)
     n_cut = len(cut_bnds)
-    cut_flag = Counter(open_flags).most_common(1)[0][0] if open_flags else (1, 0, 0, 0)
+    inherited = open_flags or list(boundary_set.open_boundary_flags)
+    cut_flag = Counter(inherited).most_common(1)[0][0] if inherited else (1, 0, 0, 0)
     for cb in cut_bnds:
         open_bnds.append(cb)
         open_flags.append(cut_flag)
