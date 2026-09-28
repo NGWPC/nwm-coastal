@@ -47,9 +47,9 @@ SCHISM Hawaii run) needs to be demoed again.
 
 ## Proprietary inputs (set up post-clone)
 
-The SCHISM meshes and the WRF geogrids are not redistributable. Three directories expect
-them as **gitignored symlinks** that you create once after cloning, pointing at wherever
-the data lives on your machine.
+The SCHISM meshes, the WRF geogrids and the hydrofabric are not redistributable. Three
+directories expect them as **gitignored symlinks** that you create once after cloning,
+pointing at wherever the data lives on your machine.
 
 ```bash
 ln -s /path/to/schism_models/pacific          docs/examples/walkthrough/model
@@ -57,14 +57,22 @@ ln -s /path/to/schism_models/geo_em_CONUS.nc  docs/examples/walkthrough/geo_em_C
 
 ln -s /path/to/schism_models/lake_erie        docs/examples/lake-erie_schism/model
 ln -s /path/to/geo_em_CONUS.nc                docs/examples/lake-erie_schism/geo_em_CONUS.nc
+ln -s /path/to/NWM_v3_hydrofabric.gdb         docs/examples/lake-erie_schism/hydrofabric.gdb
+ln -s /path/to/nhf_1.2.2.gpkg                 docs/examples/lake-erie_schism/hydrofabric.gpkg
 
 ln -s /path/to/schism_models/alaska           docs/examples/alaska_schism/model
 ln -s /path/to/geo_em_Alaska.nc               docs/examples/alaska_schism/geo_em_Alaska.nc
+ln -s /path/to/NWM_v3_hydrofabric.gdb         docs/examples/alaska_schism/hydrofabric.gdb
+ln -s /path/to/ak_nhf_1.2.2.gpkg              docs/examples/alaska_schism/hydrofabric.gpkg
 ```
 
-Each notebook fails with a clear error if its symlinks are missing. The `model`
-symlink is matched by the `**/model` pattern in `.gitignore`; the geogrids by
-`**/geo_em_*.nc`.
+The two `prepare-schism-reaches` links point at the gdb and GeoPackage themselves rather
+than at a hydrofabric root, so any directory layout works. Alaska takes the `ak_` prefixed
+GeoPackage; the `.gdb` is shared and is a directory, not a file.
+
+Each notebook fails with a clear error if its symlinks are missing. `model` is matched by
+the `**/model` pattern in `.gitignore`, the geogrids by `**/geo_em_*.nc`, and the
+hydrofabric by `**/hydrofabric.gdb` / `**/hydrofabric.gpkg`.
 
 ## Runtime products (gitignored, fine to delete)
 

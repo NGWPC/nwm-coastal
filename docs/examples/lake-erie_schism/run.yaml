@@ -33,8 +33,8 @@ model_config:
   prebuilt_dir: ./model
   geogrid_file: ./geo_em_CONUS.nc
   # GLOFS is on the lake's low water datum; this mesh carries absolute IGLD85
-  # elevations (elev.ic = 174.73), so shift the forcing up by the LWD offset.
-  forcing_to_mesh_offset_m: 173.5
+  # elevations (elev.ic = 174.73). 173.5 LWD offset less 0.1 LEOFS high bias.
+  forcing_to_mesh_offset_m: 173.4
   nodes: 1
   ntasks_per_node: 16
   include_noaa_gages: true

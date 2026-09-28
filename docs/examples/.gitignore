@@ -16,6 +16,8 @@ downloads/
 # Per-domain symlinks to proprietary data (set up post-clone — see README)
 **/model
 **/geo_em_*.nc
+**/hydrofabric.gdb
+**/hydrofabric.gpkg
 
 # SFINCS files written into working dirs. The model directory can be named
 # anything (create.yaml's output_dir), so match the file names, not the folder.

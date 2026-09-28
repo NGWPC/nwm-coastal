@@ -36,8 +36,8 @@ model_config:
   prebuilt_dir: ./sfincs_fh_lake_erie   # created by: coastal-calibration create create.yaml
   discharge_locations_file: ./sfincs_fh_lake_erie/sfincs_nwm.src
   merge_discharge: true
-  # GLOFS and the erie_lld mesh are both on LWD, so no shift; 173.5 for an IGLD85 mesh.
-  forcing_to_mesh_offset_m: 0.0
+  # GLOFS and the erie_lld mesh are both on LWD; -0.1 corrects the LEOFS high bias.
+  forcing_to_mesh_offset_m: -0.1
   # Unused on the lakes: gauge comparisons stay in the mesh datum, not MSL.
   vdatum_mesh_to_msl_m: 0.0
   include_precip: true

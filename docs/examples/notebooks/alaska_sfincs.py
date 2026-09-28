@@ -246,7 +246,7 @@ for name in ("cook_inlet_ak_3_mhhw_2020.nc", "cook_inlet_ak_8_mhhw_2020.nc"):
 # %% [markdown]
 # ## 5. Create the model
 #
-# 1024 m base cells, refined to 256 m inside the seven zones, with 10 subgrid
+# 1024 m base cells, refined to 256 m inside the seven zones, with 2 subgrid
 # pixels per cell.
 
 # %%

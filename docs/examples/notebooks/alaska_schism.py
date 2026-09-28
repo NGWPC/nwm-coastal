@@ -29,12 +29,20 @@
 #
 # ## Setup
 #
-# The mesh is not in the repo. Create the symlinks once:
+# The mesh, geogrid and hydrofabric are not in the repo. Create the symlinks
+# once, pointing at wherever yours live:
 #
 # ```bash
-# ln -s /path/to/schism_models/alaska   docs/examples/alaska_schism/model
-# ln -s /path/to/geo_em_Alaska.nc       docs/examples/alaska_schism/geo_em_Alaska.nc
+# cd docs/examples/alaska_schism
+# ln -s /path/to/schism_models/alaska           model
+# ln -s /path/to/geo_em_Alaska.nc               geo_em_Alaska.nc
+# ln -s /path/to/NWM_v3_hydrofabric.gdb         hydrofabric.gdb
+# ln -s /path/to/ak_nhf_1.2.2.gpkg              hydrofabric.gpkg
 # ```
+#
+# Note the Alaska NextGen hydrofabric is the `ak_` prefixed GeoPackage. The
+# links point at the files themselves, so it does not matter how your copies
+# are organised.
 
 # %%
 from __future__ import annotations
@@ -48,7 +56,14 @@ notebook_dir = Path.cwd()  # assumes run from docs/examples/notebooks/
 example_dir = (notebook_dir.parent / "alaska_schism").resolve()
 os.chdir(example_dir)
 
-required = ("model", "geo_em_Alaska.nc", "run_full.yaml", "run_subset.yaml")
+required = (
+    "model",
+    "geo_em_Alaska.nc",
+    "hydrofabric.gdb",
+    "hydrofabric.gpkg",
+    "run_full.yaml",
+    "run_subset.yaml",
+)
 missing = [n for n in required if not Path(n).exists()]
 if missing:
     raise FileNotFoundError(f"Missing in {example_dir}: {missing}. See ../README.md.")
@@ -125,17 +140,13 @@ print("manning.gr3 present:", Path("model/manning.gr3").exists())
 # NextGen hydrofabric, both picked automatically from the mesh bounds.
 
 # %%
-HYDROFABRIC = Path("/home/laurscham/ngwpc/coastal_data/hydrofabric_copies")
-NWM_GDB = HYDROFABRIC / "nwmv3" / "NWM_v3_hydrofabric.gdb"
-NGEN_GPKG = HYDROFABRIC / "ngen" / "ak_nhf_1.2.2.gpkg"
-
 cli(
     "prepare-schism-reaches",
     "./model",
     "--nwm-gdb",
-    str(NWM_GDB),
+    "./hydrofabric.gdb",
     "--ngen-gpkg",
-    str(NGEN_GPKG),
+    "./hydrofabric.gpkg",
     "--force",
 )
 

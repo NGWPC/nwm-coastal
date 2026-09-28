@@ -62,7 +62,7 @@ mask:
   keep_largest_only: true
 
 subgrid:
-  nr_subgrid_pixels: 10
+  nr_subgrid_pixels: 4
   lulc_dataset: esa_worldcover
   manning_land: 0.04
   manning_sea: 0.02

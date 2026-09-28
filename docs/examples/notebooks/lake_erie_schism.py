@@ -39,13 +39,19 @@
 #
 # ## Setup
 #
-# The mesh is not in the repo. Create the symlink once, pointing at wherever
-# yours lives:
+# The mesh, geogrid and hydrofabric are not in the repo. Create the symlinks
+# once, pointing at wherever yours live:
 #
 # ```bash
-# ln -s /path/to/schism_models/lake_erie  docs/examples/lake-erie_schism/model
-# ln -s /path/to/geo_em_CONUS.nc          docs/examples/lake-erie_schism/geo_em_CONUS.nc
+# cd docs/examples/lake-erie_schism
+# ln -s /path/to/schism_models/lake_erie        model
+# ln -s /path/to/geo_em_CONUS.nc                geo_em_CONUS.nc
+# ln -s /path/to/NWM_v3_hydrofabric.gdb         hydrofabric.gdb
+# ln -s /path/to/nhf_1.2.2.gpkg                 hydrofabric.gpkg
 # ```
+#
+# The hydrofabric links point at the files themselves, so it does not matter how
+# your copies are organised.
 
 # %%
 from __future__ import annotations
@@ -59,7 +65,13 @@ notebook_dir = Path.cwd()  # assumes run from docs/examples/notebooks/
 example_dir = (notebook_dir.parent / "lake-erie_schism").resolve()
 os.chdir(example_dir)
 
-required = ("model", "geo_em_CONUS.nc", "run.yaml")
+required = (
+    "model",
+    "geo_em_CONUS.nc",
+    "hydrofabric.gdb",
+    "hydrofabric.gpkg",
+    "run.yaml",
+)
 missing = [n for n in required if not Path(n).exists()]
 if missing:
     raise FileNotFoundError(f"Missing in {example_dir}: {missing}. See ../README.md.")
@@ -111,21 +123,15 @@ else:
 # becomes a sink. `nwmReaches.csv` keys on NWM COMIDs and is what `nwm_ana`
 # and `nwm_retro` runs use; `ngenReaches.csv` keys on NextGen `fp_id` for
 # `ngen_forecast` runs.
-#
-# Point these at your own hydrofabric copies.
 
 # %%
-HYDROFABRIC = Path("/home/laurscham/ngwpc/coastal_data/hydrofabric_copies")
-NWM_GDB = HYDROFABRIC / "nwmv3" / "NWM_v3_hydrofabric.gdb"
-NGEN_GPKG = HYDROFABRIC / "ngen" / "nhf_1.2.2.gpkg"
-
 cli(
     "prepare-schism-reaches",
     "./model",
     "--nwm-gdb",
-    str(NWM_GDB),
+    "./hydrofabric.gdb",
     "--ngen-gpkg",
-    str(NGEN_GPKG),
+    "./hydrofabric.gpkg",
     "--force",
 )
 
