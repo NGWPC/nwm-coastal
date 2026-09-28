@@ -84,7 +84,6 @@ def cli(*args: str) -> None:
 
 
 print(f"Working directory: {example_dir}")
-print(f"Mesh: {Path('model').resolve()}")
 print("Mesh contents:", sorted(p.name for p in Path("model").iterdir()))
 
 # %% [markdown]
