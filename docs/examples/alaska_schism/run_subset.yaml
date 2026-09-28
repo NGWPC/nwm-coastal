@@ -31,3 +31,5 @@ model_config:
   nodes: 1
   ntasks_per_node: 16
   include_noaa_gages: true
+  run_param_overrides:
+    ic_elev: 0 # prebuilt schism model did not come with elev.ic file, turning off

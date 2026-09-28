@@ -22,9 +22,7 @@ boundary:
 
 paths:
   work_dir: ./run
-  # Shared cache. Point this at ../lake-erie_sfincs/downloads/forcing to reuse
-  # the GLOFS and NWM files that example already downloaded for this date.
-  raw_download_dir: ../downloads
+  raw_download_dir: ./downloads
 
 download:
   enabled: true
