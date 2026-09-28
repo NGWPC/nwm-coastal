@@ -14,7 +14,7 @@
 model: sfincs
 
 simulation:
-  start_date: 2026-08-15 00:00:00   # GLOFS nowcasts run 2016 -> present
+  start_date: 2026-09-21 12:00:00   # GLOFS nowcasts run 2016 -> present
   duration_hours: 12
   coastal_domain: greatlakes  # required by boundary.source glofs, and vice versa
   meteo_source: nwm_ana       # CONUS NWM forcing covers the lakes
@@ -38,8 +38,9 @@ model_config:
   merge_discharge: true
   # GLOFS and the erie_lld mesh are both on LWD; -0.1 corrects the LEOFS high bias.
   forcing_to_mesh_offset_m: -0.1
-  # Unused on the lakes: gauge comparisons stay in the mesh datum, not MSL.
-  vdatum_mesh_to_msl_m: 0.0
+  # Gauge observations are fetched in IGLD; this shifts them onto the mesh's
+  # low water datum for comparison.
+  vdatum_mesh_to_msl_m: 173.5
   include_precip: true
   include_wind: true
   include_pressure: true

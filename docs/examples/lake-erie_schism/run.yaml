@@ -35,6 +35,9 @@ model_config:
   # GLOFS is on the lake's low water datum; this mesh carries absolute IGLD85
   # elevations (elev.ic = 174.73). 173.5 LWD offset less 0.1 LEOFS high bias.
   forcing_to_mesh_offset_m: 173.4
+  # This mesh is already absolute IGLD85, the datum gauge observations are
+  # fetched in, so they need no shift.
+  vdatum_mesh_to_msl_m: 0.0
   nodes: 1
   ntasks_per_node: 16
   include_noaa_gages: true

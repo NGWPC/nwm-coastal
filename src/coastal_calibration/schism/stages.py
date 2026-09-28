@@ -1008,7 +1008,7 @@ class SchismPlotStage(WorkflowStage):
             from coastal_calibration.data.coops_api import query_great_lakes_in_mesh_datum
 
             obs_ds = query_great_lakes_in_mesh_datum(
-                station_ids, begin_date, end_date, self.model.forcing_to_mesh_offset_m
+                station_ids, begin_date, end_date, self.model.vdatum_mesh_to_msl_m
             )
         else:
             obs_ds = self._fetch_observations_msl(station_ids, begin_date, end_date)

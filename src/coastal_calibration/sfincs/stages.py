@@ -2293,7 +2293,7 @@ class SfincsPlotStage(_SfincsStageBase):
             from coastal_calibration.data.coops_api import query_great_lakes_in_mesh_datum
 
             obs_ds = query_great_lakes_in_mesh_datum(
-                noaa_station_ids, begin_date, end_date, self.sfincs.forcing_to_mesh_offset_m
+                noaa_station_ids, begin_date, end_date, self.sfincs.vdatum_mesh_to_msl_m
             )
         else:
             obs_ds = self._fetch_observations_msl(noaa_station_ids, begin_date, end_date)

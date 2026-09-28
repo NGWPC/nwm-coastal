@@ -532,6 +532,7 @@ class SchismModelConfig(ModelConfig):
     include_noaa_gages: bool = False
     discharge_file: Path | None = None
     forcing_to_mesh_offset_m: float = 0.0
+    vdatum_mesh_to_msl_m: float = 0.0
     include_wind: bool = True
     create_water_level_animation: bool = False
     animation_fps: int = 10

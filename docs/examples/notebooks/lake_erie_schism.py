@@ -166,10 +166,12 @@ print(Path("run.yaml").read_text())
 # %% [markdown]
 # Two settings are specific to a Great Lakes mesh:
 #
-# - `forcing_to_mesh_offset_m: 173.5` - GLOFS reports water levels on the
+# - `forcing_to_mesh_offset_m: 173.4` - GLOFS reports water levels on the
 #   lake's low water datum while this mesh carries absolute IGLD85 elevations
-#   (`elev.ic` starts at 174.73). The offset is added to the boundary forcing
-#   and to the gauge observations, so both land in the mesh datum.
+#   (`elev.ic` starts at 174.73), so the forcing is shifted up by 173.5, less
+#   0.1 for a LEOFS high bias of about that size. Gauge observations are
+#   separate: they come in IGLD and are shifted by `vdatum_mesh_to_msl_m`,
+#   which is `0.0` because this mesh is already IGLD.
 # - `coastal_domain: greatlakes` and `boundary.source: glofs` are required
 #   together; either alone fails validation.
 #
