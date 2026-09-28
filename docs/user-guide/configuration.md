@@ -180,66 +180,6 @@ boundary:
 | `stofs_file`  | path   | null       | -                                       | Override STOFS file path     |
 | `glofs_model` | string | null       | `leofs`, `lmhofs`, `loofs`, `lsofs`     | Great Lakes OFS lake         |
 
-#### Great Lakes (GLOFS)
-
-`source: glofs` forces the open boundary with water levels from NOAA's Great Lakes
-Operational Forecast System (GLOFS) nowcasts. It requires
-`simulation.coastal_domain: greatlakes`, and that domain requires it, since STOFS and
-the tidal atlases don't cover the lakes. Pick the lake with `glofs_model`:
-
-```yaml
-simulation:
-  coastal_domain: greatlakes
-  meteo_source: nwm_ana
-
-boundary:
-  source: glofs
-  glofs_model: leofs            # leofs, lmhofs, loofs, or lsofs
-
-model_config:
-  forcing_to_mesh_offset_m: 173.5   # see "Vertical datum" below
-```
-
-| `glofs_model` | Lake           | Data from  | Model behind the archived data                                  |
-| ------------- | -------------- | ---------- | --------------------------------------------------------------- |
-| `leofs`       | Erie           | 2016-03-10 | FVCOM, 6,106 nodes, throughout                                  |
-| `lmhofs`      | Michigan-Huron | 2019-09-17 | FVCOM, 90,806 nodes, throughout                                 |
-| `loofs`       | Ontario        | 2016-03-01 | POM (~750 water cells) until 2022-10-19; FVCOM (34,395 nodes) from 2022-10-20 |
-| `lsofs`       | Superior       | 2016-03-01 | POM (~800 water cells) until 2022-10-19; FVCOM (90,964 nodes) from 2022-10-20 |
-
-**Two models, two eras.** NOAA originally ran its Great Lakes forecasts on POM (the
-Princeton Ocean Model), which uses a coarse rectangular grid, about 5 km between
-points. It has since moved each lake to FVCOM, which uses a much finer triangular mesh
-that follows the shoreline. For Ontario and Superior the switch came on 20 October
-2022, so boundaries for earlier dates are interpolated from the coarse POM grid. That
-is adequate for lake-wide water level but smooths out local detail near the boundary.
-
-A single run can't span the Ontario or Superior switch, because the two models share
-no grid points: the download stage stops with "GLOFS … changed grids at … Split the
-simulation at that time." Run the two sides separately.
-
-Only nowcast data is used; GLOFS forecast files aren't read.
-
-**Vertical datum.** GLOFS water levels are relative to the lake's **low-water datum**,
-not an absolute elevation. Set the model's `forcing_to_mesh_offset_m` to move them
-onto the mesh datum: for example `173.5` (Lake Erie's low-water datum, IGLD85) for a
-mesh in absolute IGLD85 elevations, or `0.0` if the mesh is referenced to low-water
-datum. Check the mesh's `elev.ic` or depths to tell which it uses.
-
-**Downloads.** The download stage reads only the water-level field from each hourly
-NOAA file rather than downloading it whole (the files run up to ~180 MB an hour),
-caching the result under `coastal/glofs/<lake>/` in the download directory. Data comes
-from NCEI's archive at
-`https://www.ncei.noaa.gov/oa/prod-model/operational-nowcast-and-forecast-hydrodynamic-model-systems-co-ops/`.
-
-**Gauge comparison.** With `include_noaa_gages: true`, Great Lakes runs compare
-against NOAA CO-OPS lake gauges, which record observations but publish no tide
-predictions. Lake gauges have no MSL or MLLW, so observations are fetched in the
-lake's low-water datum and shifted by the same `forcing_to_mesh_offset_m` as the
-boundary, and the comparison is made in the mesh datum. 49 of the 52 CO-OPS Great
-Lakes gauges qualify; the three Niagara River gauges (Ashland Ave, American Falls,
-Niagara Intake) publish no low-water datum and are skipped.
-
 ### Path Settings
 
 Configure file system paths:
