@@ -1,0 +1,42 @@
+meta:
+  version: v1.0.0
+  name: cook_inlet_dem
+  hydromt_version: '>1.0a,<2'
+
+# NCEI regional topobathy for Cook Inlet, read straight from the NetCDF the
+# notebook downloads from
+# https://www.ngdc.noaa.gov/thredds/fileServer/regional/<name>.nc
+#
+# Both are EPSG:4326 with a single Float32 variable "z", and both are on
+# MHHW - not MSL. The create config shifts them onto MSL with an offset.
+# The uris are relative to this file, so the whole example folder is copyable.
+
+# 3 arc-second (~90 m), upper inlet only: 60.20-61.70 N, -152.60 to -148.80.
+cook_inlet_ak_3:
+  data_type: RasterDataset
+  uri: downloads/dem/cook_inlet_ak_3_mhhw_2020.nc
+  driver:
+    name: raster_xarray
+  metadata:
+    category: topography
+    crs: 4326
+    source_url: https://www.ncei.noaa.gov/products/coastal-relief-model
+    notes: vertical datum is MHHW
+  data_adapter:
+    rename:
+      z: elevtn
+
+# 8 arc-second (~240 m), spans the AOI: 58.40-61.75 N, -154.50 to -148.75.
+cook_inlet_ak_8:
+  data_type: RasterDataset
+  uri: downloads/dem/cook_inlet_ak_8_mhhw_2020.nc
+  driver:
+    name: raster_xarray
+  metadata:
+    category: topography
+    crs: 4326
+    source_url: https://www.ncei.noaa.gov/products/coastal-relief-model
+    notes: vertical datum is MHHW
+  data_adapter:
+    rename:
+      z: elevtn

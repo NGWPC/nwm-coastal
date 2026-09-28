@@ -15,7 +15,7 @@
         <link rel="canonical" href="https://NGWPC.github.io/nwm-coastal/stable/examples/notebooks/forecast_walkthrough/">
       
       
-        <link rel="prev" href="../lake_erie/">
+        <link rel="prev" href="../alaska_sfincs/">
       
       
         <link rel="next" href="../../../dev/sfincs_compilation/">
@@ -923,6 +923,12 @@
       
         
       
+        
+      
+        
+      
+        
+      
     
     
     
@@ -1041,7 +1047,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../lake_erie/" class="md-nav__link">
+      <a href="../lake_erie_sfincs/" class="md-nav__link">
         
   
   
@@ -1049,6 +1055,90 @@
     
   
     Lake Erie SFINCS Tutorial - bring your own DEM
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../lake_erie_schism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lake Erie SCHISM - preparing a mesh for the pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../alaska_schism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Alaska SCHISM - full domain and a Cook Inlet subset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../alaska_sfincs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cook Inlet SFINCS - building a model in Alaska
   
 
     
@@ -2447,6 +2537,7 @@ from the failure, not backward.</p>
 <span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">shutil</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">subprocess</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">timedelta</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 
@@ -2469,6 +2560,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -2713,8 +2805,7 @@ HYDROFAB_FILE_CONTAINER = f"/ngwpc/run_ngen/data/hydrofabric/vpu_{VPU}.gpkg"</di
 <span class="c1"># the coastal models)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">run_gen_cycle_config</span><span class="p">(</span><span class="n">model</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">run_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">CompletedProcess</span><span class="p">:</span>
     <span class="n">gen_script</span> <span class="o">=</span> <span class="n">NWM_COASTAL_ROOT</span> <span class="o">/</span> <span class="s2">"forecast_demo"</span> <span class="o">/</span> <span class="s2">"bin"</span> <span class="o">/</span> <span class="s2">"gen_cycle_config.py"</span>
-    <span class="n">nwm_coastal_py</span> <span class="o">=</span> <span class="n">NWM_COASTAL_ROOT</span> <span class="o">/</span> <span class="s2">"nwm-coastal-py"</span>
-    <span class="n">args</span> <span class="o">=</span> <span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">nwm_coastal_py</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">gen_script</span><span class="p">),</span> <span class="s2">"--model"</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="s2">"--run-type"</span><span class="p">,</span> <span class="n">run_type</span><span class="p">]</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="p">[</span><span class="n">sys</span><span class="o">.</span><span class="n">executable</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">gen_script</span><span class="p">),</span> <span class="s2">"--model"</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="s2">"--run-type"</span><span class="p">,</span> <span class="n">run_type</span><span class="p">]</span>
     <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
         <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">continue</span>
@@ -2732,9 +2823,8 @@ HYDROFAB_FILE_CONTAINER = f"/ngwpc/run_ngen/data/hydrofabric/vpu_{VPU}.gpkg"</di
 
 <span class="c1"># Helper function for using the nwm-coastal cli</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">nwm_coastal_cli</span><span class="p">(</span><span class="n">args</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">CompletedProcess</span><span class="p">:</span>
-    <span class="n">cli</span> <span class="o">=</span> <span class="n">NWM_COASTAL_ROOT</span> <span class="o">/</span> <span class="s2">"nwm-coastal-cli"</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"--- nwm-coastal-cli </span><span class="si">{</span><span class="s1">' '</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">args</span><span class="p">)</span><span class="si">}</span><span class="s2"> ---"</span><span class="p">)</span>
-    <span class="k">return</span> <span class="n">run_streamed</span><span class="p">([</span><span class="nb">str</span><span class="p">(</span><span class="n">cli</span><span class="p">),</span> <span class="o">*</span><span class="n">args</span><span class="p">])</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"--- coastal-calibration </span><span class="si">{</span><span class="s1">' '</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">args</span><span class="p">)</span><span class="si">}</span><span class="s2"> ---"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">run_streamed</span><span class="p">([</span><span class="n">sys</span><span class="o">.</span><span class="n">executable</span><span class="p">,</span> <span class="s2">"-m"</span><span class="p">,</span> <span class="s2">"coastal_calibration.cli"</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">])</span>
 </pre></div>
 <div class="clipboard-copy-txt" id="cell-4"># Subprocesses write straight to fd 1, which bypasses the notebook's stdout
 # capture -- pipe it back through print() so output appears in the cell.
@@ -2771,8 +2861,7 @@ def run_nwm_rte(module: str, args: list[str]) -&gt; subprocess.CompletedProcess:
 # the coastal models)
 def run_gen_cycle_config(model: str, run_type: str, **kwargs) -&gt; subprocess.CompletedProcess:
     gen_script = NWM_COASTAL_ROOT / "forecast_demo" / "bin" / "gen_cycle_config.py"
-    nwm_coastal_py = NWM_COASTAL_ROOT / "nwm-coastal-py"
-    args = [str(nwm_coastal_py), str(gen_script), "--model", model, "--run-type", run_type]
+    args = [sys.executable, str(gen_script), "--model", model, "--run-type", run_type]
     for key, value in kwargs.items():
         if value is None:
             continue
@@ -2790,9 +2879,8 @@ def find_troute_output(region_dir: Path) -&gt; Path:
 
 # Helper function for using the nwm-coastal cli
 def nwm_coastal_cli(args: list[str]) -&gt; subprocess.CompletedProcess:
-    cli = NWM_COASTAL_ROOT / "nwm-coastal-cli"
-    print(f"--- nwm-coastal-cli {' '.join(args)} ---")
-    return run_streamed([str(cli), *args])</div>
+    print(f"--- coastal-calibration {' '.join(args)} ---")
+    return run_streamed([sys.executable, "-m", "coastal_calibration.cli", *args])</div>
 </div>
 </div>
 </div>
@@ -2927,7 +3015,7 @@ This step may be removed if the API call is available for you.</p>
     <span class="nb">print</span><span class="p">(</span><span class="s2">"VPU ESMF mesh already exists, skipping extract_esmf_domain.py"</span><span class="p">)</span>
 <span class="k">else</span><span class="p">:</span>
     <span class="n">esmf_extract_args</span> <span class="o">=</span> <span class="p">[</span>
-        <span class="nb">str</span><span class="p">(</span><span class="n">NWM_COASTAL_ROOT</span> <span class="o">/</span> <span class="s2">"nwm-coastal-py"</span><span class="p">),</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">executable</span><span class="p">,</span>
         <span class="nb">str</span><span class="p">(</span><span class="n">NWM_COASTAL_ROOT</span> <span class="o">/</span> <span class="s2">"forecast_demo"</span> <span class="o">/</span> <span class="s2">"bin"</span> <span class="o">/</span> <span class="s2">"extract_esmf_domain.py"</span><span class="p">),</span>
         <span class="s2">"--source-domain"</span><span class="p">,</span> <span class="s2">"CONUS"</span><span class="p">,</span>
         <span class="s2">"--extract-geojson"</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">RUN_NGEN_ROOT</span> <span class="o">/</span> <span class="s2">"data"</span> <span class="o">/</span> <span class="s2">"esmf_mesh"</span> <span class="o">/</span> <span class="s2">"esmf_domain_extract"</span> <span class="o">/</span> <span class="s2">"esmf_conus_03s_extract.geojson"</span><span class="p">),</span>
@@ -2968,7 +3056,7 @@ if all(p.exists() for p in esmf_domain_outputs):
     print("VPU ESMF mesh already exists, skipping extract_esmf_domain.py")
 else:
     esmf_extract_args = [
-        str(NWM_COASTAL_ROOT / "nwm-coastal-py"),
+        sys.executable,
         str(NWM_COASTAL_ROOT / "forecast_demo" / "bin" / "extract_esmf_domain.py"),
         "--source-domain", "CONUS",
         "--extract-geojson", str(RUN_NGEN_ROOT / "data" / "esmf_mesh" / "esmf_domain_extract" / "esmf_conus_03s_extract.geojson"),
@@ -3982,7 +4070,7 @@ print(" ", sr_cycle_dir["sfincs"])</div>
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../lake_erie/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Lake Erie SFINCS Tutorial - bring your own DEM">
+          <a href="../alaska_sfincs/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Cook Inlet SFINCS - building a model in Alaska">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -3992,7 +4080,7 @@ print(" ", sr_cycle_dir["sfincs"])</div>
                 Previous
               </span>
               <div class="md-ellipsis">
-                Lake Erie SFINCS Tutorial - bring your own DEM
+                Cook Inlet SFINCS - building a model in Alaska
               </div>
             </div>
           </a>

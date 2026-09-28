@@ -1107,6 +1107,12 @@
       
         
       
+        
+      
+        
+      
+        
+      
     
     
     
@@ -1224,7 +1230,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../examples/notebooks/lake_erie/" class="md-nav__link">
+      <a href="../examples/notebooks/lake_erie_sfincs/" class="md-nav__link">
         
   
   
@@ -1232,6 +1238,90 @@
     
   
     Lake Erie SFINCS Tutorial - bring your own DEM
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/notebooks/lake_erie_schism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lake Erie SCHISM - preparing a mesh for the pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/notebooks/alaska_schism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Alaska SCHISM - full domain and a Cook Inlet subset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/notebooks/alaska_sfincs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cook Inlet SFINCS - building a model in Alaska
   
 
     
@@ -1987,9 +2077,9 @@ model output. Any parameter set in the base parameter file can be overridden in 
 config, which is useful when testing different parameter values.</p>
 <h3 id="running-a-nwmv3-schism-domain">Running a NWMv3 SCHISM domain<a class="headerlink" href="#running-a-nwmv3-schism-domain" title="Permanent link">#</a></h3>
 <p>To run one of the original NWMv3 domains you simply 
-point <code>prebuilt_dir</code> at the full mesh instead of a subset. An example retrospective
-configuration is at
-<a href="../examples/schism_retro_full_domain.yaml"><code>schism_retro_full_domain.yaml</code></a>.</p>
+point <code>prebuilt_dir</code> at the full mesh instead of a subset. The
+<a href="../examples/notebooks/alaska_schism/">Alaska SCHISM example</a> does exactly that, and
+also cuts a Cook Inlet subset from the same mesh for comparison.</p>
 <p>Some of these domains are extremely large. The Atlantic/Gulf mesh is roughly 10.5 million nodes and 2.7
 million elements, so it needs a genuine multi-node MPI allocation rather than a
 workstation — see the <a href="../user-guide/cli/#using-run-inside-a-slurm-job-heredoc-recommended">sbatch pattern</a>.

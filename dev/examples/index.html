@@ -923,6 +923,12 @@
       
         
       
+        
+      
+        
+      
+        
+      
     
     
     
@@ -1041,7 +1047,7 @@
   
   
     <li class="md-nav__item">
-      <a href="notebooks/lake_erie/" class="md-nav__link">
+      <a href="notebooks/lake_erie_sfincs/" class="md-nav__link">
         
   
   
@@ -1049,6 +1055,90 @@
     
   
     Lake Erie SFINCS Tutorial - bring your own DEM
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="notebooks/lake_erie_schism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lake Erie SCHISM - preparing a mesh for the pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="notebooks/alaska_schism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Alaska SCHISM - full domain and a Cook Inlet subset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="notebooks/alaska_sfincs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cook Inlet SFINCS - building a model in Alaska
   
 
     
@@ -1554,7 +1644,7 @@
 
 
 <h1 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">#</a></h1>
-<p>Four notebooks cover the client-facing surface of the library:</p>
+<p>Seven notebooks cover the client-facing surface of the library:</p>
 <ul>
 <li><strong>Mendocino Walkthrough</strong> is the headliner — extract a SCHISM subdomain from the
     Pacific mesh, drive it through the 12-stage SCHISM pipeline, derive the SFINCS AOI
@@ -1571,6 +1661,15 @@
     you download and register in your own HydroMT data catalog instead of one of the
     built-in auto-fetched sources, none of which carry Great Lakes bathymetry. It also
     documents the elevated-domain settings a lake 174 m above sea level needs.</li>
+<li><strong>Lake Erie SCHISM</strong> is the mesh-preparation counterpart: a SCHISM mesh arrives without
+    the derived files the pipeline needs, and the three <code>prepare-schism-*</code> commands
+    generate them before a 12-hour LEOFS-forced run on the same window as the SFINCS
+    Lake Erie example.</li>
+<li><strong>Alaska SCHISM</strong> prepares the full Alaska mesh, cuts a Cook Inlet subdomain from the
+    prepared mesh — so no preparation step repeats — and runs both against STOFS.</li>
+<li><strong>Cook Inlet SFINCS</strong> builds a SFINCS model in a region no auto-fetched elevation source
+    covers, using NCEI's regional topobathy through a data catalog, and shows the QGIS
+    steps behind the AOI, the flowpath selection and the quadtree refinement zones.</li>
 <li><strong>Forecast Walkthrough</strong> is the operational pipeline rather than a single model run —
     one spinup, one analysis-and-assimilation hour, and one short-range cycle, driving
     the nwm-rte forcing engine and t-route regionalization alongside SCHISM and SFINCS.
@@ -1578,8 +1677,10 @@
 </ul>
 <div class="admonition note">
 <p class="admonition-title">Prerequisites</p>
-<p>The Mendocino, Lavaca and Lake Erie notebooks need a compiled SFINCS executable;
-Mendocino also needs SCHISM. Both binaries are built automatically when activating a
+<p>The Mendocino, Lavaca, Lake Erie SFINCS and Cook Inlet notebooks need a compiled
+SFINCS executable; Mendocino, Lake Erie SCHISM and Alaska SCHISM need SCHISM. The
+three SCHISM notebooks also need a <code>model</code> symlink pointing at a mesh — see
+<a href="https://github.com/NGWPC/nwm-coastal/blob/development/docs/examples/README.md"><code>docs/examples/README.md</code></a>. Both binaries are built automatically when activating a
 pixi environment with the corresponding feature (<code>schism</code> or <code>sfincs</code>), so no manual
 build is needed in the standard workflow. See
 <a href="../dev/sfincs_compilation/">Compiling SFINCS</a> for build instructions when not using
@@ -1617,7 +1718,7 @@ inspections, water-surface/depth/anomaly snapshots, a satellite-basemap overlay,
 animation, and time series at three user-specified observation points.</p>
 </li>
 <li>
-<p><a href="notebooks/lake_erie/"><strong>Lake Erie (SFINCS + LEOFS)</strong></a></p>
+<p><a href="notebooks/lake_erie_sfincs/"><strong>Lake Erie (SFINCS + LEOFS)</strong></a></p>
 <p>Great Lakes build-from-AOI workflow on the Ohio shore of Lake Erie (Fairport Harbor).
 Walks through downloading a Great Lakes topobathy DEM, checking its CRS, NoData and
 vertical datum, and registering it in a HydroMT data catalog.
@@ -1625,6 +1726,29 @@ Then runs SFINCS with <code>boundary.source: glofs</code> /
 <code>glofs_model: leofs</code> FVCOM forcing, validated against CO-OPS Fairport Harbor
 (9063053), on a mesh referenced to Lake Erie Low Water Datum, with the <code>zsini</code>
 and <code>latitude</code> settings an elevated domain needs.</p>
+</li>
+<li>
+<p><a href="notebooks/lake_erie_schism/"><strong>Lake Erie (SCHISM + LEOFS)</strong></a></p>
+<p>Turning a shipped SCHISM mesh into a runnable model. <code>prepare-schism-mesh</code> writes the
+ESMF NetCDF grid, <code>prepare-schism-manning</code> derives roughness from ESA WorldCover, and
+<code>prepare-schism-reaches</code> builds the source/sink crosswalk by intersecting the mesh
+boundary with a hydrofabric — the Detroit River in, the Niagara out. Then a 12-hour
+GLOFS-forced run with the absolute-IGLD85 datum offset an elevated mesh needs.</p>
+</li>
+<li>
+<p><a href="notebooks/alaska_schism/"><strong>Alaska (SCHISM, full + subset)</strong></a></p>
+<p>Full Alaska domain and a Cook Inlet subdomain in one notebook. The full mesh is
+prepared first and the subset cut from it with <code>extract_mesh</code>, which re-keys and
+carries over Manning, wind rotation and both reach crosswalks, so nothing is prepared
+twice. QGIS screenshots cover orienting the mesh and cutting a clean subset edge.</p>
+</li>
+<li>
+<p><a href="notebooks/alaska_sfincs/"><strong>Cook Inlet (SFINCS, Alaska)</strong></a></p>
+<p>Building a SFINCS model where nothing auto-fetched reaches: NOAA's 3 m topobathy stops
+at CONUS/HI/PR, the CRM mosaic at 49 N. Uses NCEI's Cook Inlet regional DEMs through a
+HydroMT catalog, with the MHHW-to-MSL shift a 9 m tide range makes unavoidable. 1024 m
+quadtree refined to 256 m over seven zones, plus the QGIS workflow for the AOI,
+flowpaths and refinement polygons.</p>
 </li>
 <li>
 <p><a href="notebooks/forecast_walkthrough/"><strong>Forecast Walkthrough (hourly cycle)</strong></a></p>
