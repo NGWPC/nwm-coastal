@@ -961,24 +961,26 @@ def query_great_lakes_in_mesh_datum(
     station_ids: list[str],
     begin_date: str,
     end_date: str,
-    offset_m: float,
+    mesh_to_msl_m: float,
 ) -> xr.Dataset:
     """Fetch Great Lakes gauge water levels on the model mesh's datum.
 
     Great Lakes gauges have no MSL or MLLW, so observations are fetched in
-    the lake's low-water datum (LWD) -- the same datum as GLOFS boundary
-    forcing -- and shifted by *offset_m*, the model's
-    ``forcing_to_mesh_offset_m``. Model output then compares directly.
+    IGLD -- an absolute elevation, independent of any boundary forcing --
+    and moved onto the mesh datum by subtracting *mesh_to_msl_m*, the
+    model's ``vdatum_mesh_to_msl_m``. For a mesh already in absolute IGLD
+    that value is 0.0; for one referenced to a lake's low-water datum it is
+    the datum's IGLD elevation (173.5 for Erie).
     """
     obs_ds = query_coops_byids(
         station_ids,
         begin_date,
         end_date,
         product="water_level",
-        datum="LWD",
+        datum="IGLD",
         units="metric",
         time_zone="gmt",
     )
-    obs_ds["water_level"] = obs_ds["water_level"] + offset_m
+    obs_ds["water_level"] = obs_ds["water_level"] - mesh_to_msl_m
     obs_ds.attrs["datum"] = "mesh datum"
     return obs_ds

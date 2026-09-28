@@ -15,7 +15,7 @@ model: sfincs
 
 simulation:
   start_date: 2026-09-21 12:00:00   # GLOFS nowcasts run 2016 -> present
-  duration_hours: 24
+  duration_hours: 12
   coastal_domain: greatlakes  # required by boundary.source glofs, and vice versa
   meteo_source: nwm_ana       # CONUS NWM forcing covers the lakes
 
@@ -36,10 +36,11 @@ model_config:
   prebuilt_dir: ./sfincs_fh_lake_erie   # created by: coastal-calibration create create.yaml
   discharge_locations_file: ./sfincs_fh_lake_erie/sfincs_nwm.src
   merge_discharge: true
-  # GLOFS and the erie_lld mesh are both on LWD, so no shift; 173.5 for an IGLD85 mesh.
-  forcing_to_mesh_offset_m: 0.0
-  # Unused on the lakes: gauge comparisons stay in the mesh datum, not MSL.
-  vdatum_mesh_to_msl_m: 0.0
+  # GLOFS and the erie_lld mesh are both on LWD; -0.1 corrects the LEOFS high bias.
+  forcing_to_mesh_offset_m: -0.1
+  # Gauge observations are fetched in IGLD; this shifts them onto the mesh's
+  # low water datum for comparison.
+  vdatum_mesh_to_msl_m: 173.5
   include_precip: true
   include_wind: true
   include_pressure: true
@@ -54,6 +55,6 @@ model_config:
     cdwnd: [0.0, 28.0, 50.0]        # wind speed breakpoints (m/s)
     cdval: [0.001, 0.0025, 0.0025]  # drag coefficient at each breakpoint
     # --- Great Lakes specific; see the notebook's "Why these overrides" note ---
-    zsini: 0.89                     # observed lake level at 9063053, 2026-09-21 12:00 UTC
+    zsini: 0.90                     # observed lake level at 9063053, 2026-08-15 00:00 UTC
     latitude: 41.75                 # projected grid carries no latitude; SFINCS's
                                     # coriolis defaults on, so this is the real switch

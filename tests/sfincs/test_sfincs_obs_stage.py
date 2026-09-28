@@ -5,6 +5,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import geopandas as gpd
+import numpy as np
 import pytest
 import shapely
 
@@ -29,6 +30,19 @@ def create_config(tmp_path):
     )
 
 
+def _set_quadtree(model, face_x, face_y, mask):
+    """Give a mock model the quadtree API that active-cell snapping reads."""
+    grid = model.quadtree_grid.data.ugrid.grid
+    grid.crs = "EPSG:32615"
+    grid.face_x = np.asarray(face_x, dtype=float)
+    grid.face_y = np.asarray(face_y, dtype=float)
+    mask_mock = MagicMock()
+    mask_mock.to_numpy.return_value = np.asarray(mask, dtype=int)
+    model.quadtree_grid.data.__getitem__ = lambda _self, key: (
+        mask_mock if key == "mask" else MagicMock()
+    )
+
+
 @pytest.fixture
 def mock_model():
     """Create a mock SfincsModel with a UTM region and CRS."""
@@ -45,6 +59,10 @@ def mock_model():
     # Track add_point calls
     model.observation_points = MagicMock()
     model.observation_points.nr_points = 0
+
+    # NOAA gauges are snapped onto active cells, so the grid must be mocked.
+    # One active cell ~1.1 km from the Galveston station (325841, 3243666).
+    _set_quadtree(model, [325000.0], [3243000.0], [1])
     return model
 
 

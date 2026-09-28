@@ -1,0 +1,35 @@
+# Alaska SCHISM - subset domain run configuration
+#
+# Mesh reached through the ./model symlink; see ../README.md. The subset domain is
+# prepared in ../notebooks/alaska_schism.ipynb before this config is used.
+#
+# Usage:
+#   coastal-calibration run run_subset.yaml --dry-run
+#   coastal-calibration run run_subset.yaml
+
+model: schism
+
+simulation:
+  start_date: 2026-08-15 00:00:00
+  duration_hours: 12
+  coastal_domain: alaska
+  meteo_source: nwm_ana
+
+boundary:
+  source: stofs        # STOFS 2D Global covers Alaska
+
+paths:
+  work_dir: ./run_subset
+  raw_download_dir: ../downloads
+
+download:
+  enabled: true
+
+model_config:
+  prebuilt_dir: ./extracted/cookinlet
+  geogrid_file: ./geo_em_Alaska.nc
+  nodes: 1
+  ntasks_per_node: 16
+  include_noaa_gages: true
+  run_param_overrides:
+    ic_elev: 0 # prebuilt schism model did not come with elev.ic file, turning off

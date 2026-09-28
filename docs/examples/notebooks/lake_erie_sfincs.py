@@ -38,7 +38,7 @@
 #
 # This example runs end to end as shipped - a working Fairport Harbor domain is
 # included, so you can execute every cell before changing anything. The geometry
-# lives in `docs/examples/lake-erie/` next to the configs:
+# lives in `docs/examples/lake-erie_sfincs/` next to the configs:
 #
 # | File | Shipped? | What it is |
 # | --- | --- | --- |
@@ -62,7 +62,7 @@
 # `downloads/` inside it, so the folder can be copied and run anywhere:
 #
 # ```bash
-# cp -r docs/examples/lake-erie ~/my_erie_run
+# cp -r docs/examples/lake-erie_sfincs ~/my_erie_run
 # LAKE_ERIE_DIR=~/my_erie_run jupyter lab docs/examples/notebooks/lake_erie.ipynb
 # ```
 #
@@ -113,7 +113,7 @@
 #
 # Every path below is relative to the example folder, so the notebook starts by
 # moving into it. It looks in three places, in order: `$LAKE_ERIE_DIR`, the
-# current directory, then a `lake-erie` sibling. That covers running from
+# current directory, then a `lake-erie_sfincs` sibling. That covers running from
 # `docs/examples/notebooks/` as shipped, and running from inside a copy of the
 # folder you made somewhere else.
 
@@ -123,7 +123,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-candidates = [Path.cwd(), Path.cwd().parent / "lake-erie"]
+candidates = [Path.cwd(), Path.cwd().parent / "lake-erie_sfincs"]
 if os.environ.get("LAKE_ERIE_DIR"):
     candidates.insert(0, Path(os.environ["LAKE_ERIE_DIR"]))
 
@@ -226,8 +226,7 @@ print(f"\nelevation  : {values.min():+.1f} .. {values.max():+.1f} m")
 # %% [markdown]
 # The datum is the lake's **Low Water Datum (173.5 m IGLD85)**,
 # which is what the NCEI product description says and, conveniently, the same
-# datum GLOFS publishes water levels in. That is why `run.yaml` can leave
-# `forcing_to_mesh_offset_m` at `0.0`.
+# datum GLOFS publishes water levels in, so the forcing needs no datum shift.
 
 # %% [markdown]
 # Rendered, the seamless topobathy looks like this - lake bed in blues, land in
@@ -527,13 +526,13 @@ ax.set_title(f"forcing points written by create (EPSG:{model_epsg})")
 #
 # | Override | Default | Why it is wrong here |
 # | --- | --- | --- |
-# | `zsini` = `0.89` | `0` | Initial water level, in mesh datum. On LWD, 0 means "exactly at low water" - usable, but Erie typically sits a few decimetres above LWD. Set it from the CO-OPS Fairport Harbor (9063053) record at your start time. On an *absolute* IGLD85 mesh the default would start the model dry. |
+# | `zsini` = `0.90` | `0` | Initial water level, in mesh datum. On LWD, 0 means "exactly at low water" - usable, but Erie typically sits a few decimetres above LWD. Set it from the CO-OPS Fairport Harbor (9063053) record at your start time. On an *absolute* IGLD85 mesh the default would start the model dry. |
 # | `latitude` = `41.75` | `0` | A projected grid carries no latitude, so Coriolis would be computed at the equator. |
 #
-# `forcing_to_mesh_offset_m: 0.0` is correct because the mesh and GLOFS
-# share the LWD datum. If you rebuild the mesh from an absolute-elevation DEM
-# (the NOAA OCM 3 m product, say), set it to `173.5` and raise `zsini`
-# accordingly.
+# The mesh and GLOFS share the LWD datum, so `forcing_to_mesh_offset_m` carries
+# no datum shift; it is `-0.1` purely to correct a LEOFS high bias of about
+# that size. If you rebuild the mesh from an absolute-elevation DEM (the NOAA
+# OCM 3 m product, say), add `173.5` to it and raise `zsini` accordingly.
 
 # %%
 from coastal_calibration import CoastalCalibConfig, CoastalCalibRunner
@@ -542,8 +541,8 @@ run_config = CoastalCalibConfig.from_dict(
     {
         "model": "sfincs",
         "simulation": {
-            "start_date": "2026-09-21 12:00:00",
-            "duration_hours": 24,
+            "start_date": "2026-08-15 00:00:00",
+            "duration_hours": 12,
             "coastal_domain": "greatlakes",
             "meteo_source": "nwm_ana",
         },
@@ -557,8 +556,8 @@ run_config = CoastalCalibConfig.from_dict(
             "prebuilt_dir": "./sfincs_fh_lake_erie",
             "discharge_locations_file": "./sfincs_fh_lake_erie/sfincs_nwm.src",
             "merge_discharge": True,
-            "forcing_to_mesh_offset_m": 0.0,  # GLOFS and the mesh are both on LWD
-            "vdatum_mesh_to_msl_m": 0.0,  # unused on the lakes
+            "forcing_to_mesh_offset_m": -0.1,  # LEOFS reads ~0.1 m high
+            "vdatum_mesh_to_msl_m": 173.5,  # IGLD observations -> the LWD mesh
             "include_precip": True,
             "include_wind": True,
             "include_pressure": True,
@@ -571,7 +570,7 @@ run_config = CoastalCalibConfig.from_dict(
                 "cdnrb": 3,
                 "cdwnd": [0.0, 28.0, 50.0],
                 "cdval": [0.001, 0.0025, 0.0025],
-                "zsini": 0.89,
+                "zsini": 0.90,
                 "latitude": 41.75,
             },
         },
@@ -591,9 +590,9 @@ print(result)
 # With `add_noaa_gages: true` the pipeline compares against NOAA CO-OPS lake
 # gauges - just Fairport Harbor (9063053) for this AOI. Lake gauges publish
 # observations but no tide
-# predictions and no MSL or MLLW, so observations are fetched in the lake's
-# low-water datum and shifted by `forcing_to_mesh_offset_m`: the comparison
-# is made in the **mesh datum**, not MSL as on the coast.
+# predictions and no MSL or MLLW, so observations are fetched in **IGLD** and
+# shifted onto the mesh datum by `vdatum_mesh_to_msl_m`: the comparison is
+# made in the mesh datum, not MSL as on the coast.
 
 # %%
 figs_dir = Path("run/sfincs_model/figs")

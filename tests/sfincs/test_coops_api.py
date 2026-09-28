@@ -544,15 +544,36 @@ class TestGreatLakesGauges:
         assert comparison_datums("atlgulf") == ("MSL", "MLLW")
 
     def test_lake_observations_shifted_to_mesh_datum(self):
-        lwd = xr.Dataset(
-            {"water_level": (("station", "time"), [[1.0, 0.949]])},
-            coords={"station": ["9063063"], "time": pd.date_range("2025-06-10", periods=2, freq="h")},
+        """IGLD observations are moved onto a low-water-datum mesh."""
+        igld = xr.Dataset(
+            {"water_level": (("station", "time"), [[174.5, 174.449]])},
+            coords={
+                "station": ["9063063"],
+                "time": pd.date_range("2025-06-10", periods=2, freq="h"),
+            },
         )
-        with patch("coastal_calibration.data.coops_api.query_coops_byids", return_value=lwd) as q:
-            obs = query_great_lakes_in_mesh_datum(["9063063"], "20250610 00:00", "20250610 01:00", 173.5)
-        assert q.call_args.kwargs["datum"] == "LWD"
-        np.testing.assert_allclose(obs.water_level.values, [[174.5, 174.449]])
+        with patch("coastal_calibration.data.coops_api.query_coops_byids", return_value=igld) as q:
+            obs = query_great_lakes_in_mesh_datum(
+                ["9063063"], "20250610 00:00", "20250610 01:00", 173.5
+            )
+        assert q.call_args.kwargs["datum"] == "IGLD"
+        np.testing.assert_allclose(obs.water_level.values, [[1.0, 0.949]])
         assert obs.attrs["datum"] == "mesh datum"
+
+    def test_lake_observations_unshifted_on_an_igld_mesh(self):
+        """A mesh already in absolute IGLD needs no shift."""
+        igld = xr.Dataset(
+            {"water_level": (("station", "time"), [[174.5, 174.449]])},
+            coords={
+                "station": ["9063053"],
+                "time": pd.date_range("2025-06-10", periods=2, freq="h"),
+            },
+        )
+        with patch("coastal_calibration.data.coops_api.query_coops_byids", return_value=igld):
+            obs = query_great_lakes_in_mesh_datum(
+                ["9063053"], "20250610 00:00", "20250610 01:00", 0.0
+            )
+        np.testing.assert_allclose(obs.water_level.values, [[174.5, 174.449]])
 
 
 class TestGetStationsMetadata:

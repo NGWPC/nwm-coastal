@@ -202,9 +202,9 @@ config, which is useful when testing different parameter values.
 ### Running a NWMv3 SCHISM domain
 
 To run one of the original NWMv3 domains you simply 
-point `prebuilt_dir` at the full mesh instead of a subset. An example retrospective
-configuration is at
-[`schism_retro_full_domain.yaml`](../examples/schism_retro_full_domain.yaml).
+point `prebuilt_dir` at the full mesh instead of a subset. The
+[Alaska SCHISM example](../examples/notebooks/alaska_schism.ipynb) does exactly that, and
+also cuts a Cook Inlet subset from the same mesh for comparison.
 
 Some of these domains are extremely large. The Atlantic/Gulf mesh is roughly 10.5 million nodes and 2.7
 million elements, so it needs a genuine multi-node MPI allocation rather than a

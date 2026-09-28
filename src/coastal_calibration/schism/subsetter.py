@@ -983,15 +983,21 @@ def subset_nongrid_file(
 
                 nodes_read += current_chunk
 
-            # Read and write elements in chunks
+            # Read and write elements in chunks. Some GR3 files carry only
+            # nodal values and stop after the node block even though the header
+            # declares an element count, so stop at EOF rather than reading on.
             elem_id_new = 1
             elements_read = 0
-            while elements_read < n_elements:
+            exhausted = False
+            while elements_read < n_elements and not exhausted:
                 current_chunk = min(chunk_size, n_elements - elements_read)
 
                 for _ in range(current_chunk):
                     line = f_in.readline()
                     parts = line.split()
+                    if not parts:
+                        exhausted = True
+                        break
                     original_elem_id = int(parts[0])
 
                     if original_elem_id in element_mapping:
@@ -1009,11 +1015,21 @@ def subset_nongrid_file(
 
                 elements_read += current_chunk
 
+    elements_written = elem_id_new - 1
+    if exhausted:
+        logger.info(
+            "%s ended after its node block (header declares %d elements); "
+            "wrote %d nodes and no element block.",
+            input_file.name,
+            n_elements,
+            nodes_out,
+        )
+
     stats = {
         "nodes_in": n_nodes,
         "nodes_out": nodes_out,
         "elements_in": n_elements,
-        "elements_out": elements_out,
+        "elements_out": elements_written,
     }
 
     logger.info(
@@ -1244,7 +1260,8 @@ class MeshSubsetter:
 
         # Cut-line boundaries inherit the most common flag from original boundaries.
         # In STOFS setups this is (4,0,0,0); in simple test cases (1,0,0,0).
-        cut_flag = Counter(open_flags).most_common(1)[0][0] if open_flags else (1, 0, 0, 0)
+        inherited = open_flags or list(boundary_set.open_boundary_flags)
+        cut_flag = Counter(inherited).most_common(1)[0][0] if inherited else (1, 0, 0, 0)
         for cb in cut_bnds:
             open_bnds.append(cb)
             open_flags.append(cut_flag)
@@ -1860,41 +1877,52 @@ def split_mesh(
         write_netcdf=write_netcdf,
     )
 
-    logger.info("Subsetting hgrid.cpp...")
-    subsetter_cpp = MeshSubsetter(
-        project,
-        classification.side_a,
-        classification.side_b,
-        chunk_size,
-        input_file_override=project.hgrid_cpp_file,
-    )
+    if project.hgrid_cpp_file.exists():
+        logger.info("Subsetting hgrid.cpp...")
+        subsetter_cpp = MeshSubsetter(
+            project,
+            classification.side_a,
+            classification.side_b,
+            chunk_size,
+            input_file_override=project.hgrid_cpp_file,
+        )
 
-    subsetter_cpp.subset_mesh(
-        output_dir_a,
-        output_dir_b,
-        classification.shared,
-        elements_a,
-        elements_b,
-        output_filename=SCHISMFiles.HGRID_CPP,
-        write_bctides=False,  # Don't write bctides for cpp file
-        write_hgrid_ll=False,  # Don't write hgrid.ll for cpp file
-        write_netcdf=False,  # Don't write NetCDF for cpp file
-    )
+        subsetter_cpp.subset_mesh(
+            output_dir_a,
+            output_dir_b,
+            classification.shared,
+            elements_a,
+            elements_b,
+            output_filename=SCHISMFiles.HGRID_CPP,
+            write_bctides=False,  # Don't write bctides for cpp file
+            write_hgrid_ll=False,  # Don't write hgrid.ll for cpp file
+            write_netcdf=False,  # Don't write NetCDF for cpp file
+        )
+    else:
+        logger.info("hgrid.cpp not in project (%s); skipping it.", project.project_dir)
 
     element_mapping_a = {int(elem[0]): new_id for new_id, elem in enumerate(elements_a, 1)}
     element_mapping_b = {int(elem[0]): new_id for new_id, elem in enumerate(elements_b, 1)}
 
-    logger.info("Subsetting NWM reaches files...")
-    _ = subset_nwm_reaches_file(
-        project.nwm_reaches_file,
-        output_dir_a / SCHISMFiles.NWM_REACHES,
-        element_mapping_a,
-    )
-    _ = subset_nwm_reaches_file(
-        project.nwm_reaches_file,
-        output_dir_b / SCHISMFiles.NWM_REACHES,
-        element_mapping_b,
-    )
+    if project.nwm_reaches_file.exists():
+        logger.info("Subsetting NWM reaches files...")
+        _ = subset_nwm_reaches_file(
+            project.nwm_reaches_file,
+            output_dir_a / SCHISMFiles.NWM_REACHES,
+            element_mapping_a,
+        )
+        _ = subset_nwm_reaches_file(
+            project.nwm_reaches_file,
+            output_dir_b / SCHISMFiles.NWM_REACHES,
+            element_mapping_b,
+        )
+    else:
+        logger.warning(
+            "nwmReaches.csv not found in project (%s); skipping its subset. "
+            "nwm_retro and nwm_ana runs with river discharge require it in the "
+            "subset model directory.",
+            project.nwm_reaches_file,
+        )
 
     # ngenReaches.csv (NextGen hydrofabric feature_ids) is the discharge
     # crosswalk for ngen_forecast runs.  It has the same block format as
@@ -1940,25 +1968,28 @@ def split_mesh(
         chunk_size,
     )
 
-    logger.info("Subsetting wind rotation files...")
-    _ = subset_nongrid_file(
-        project,
-        project.windrot_file,
-        output_dir_a / SCHISMFiles.WINDROT,
-        subset_result.side_a.mapping,
-        element_mapping_a,
-        chunk_size,
-    )
-    _ = subset_nongrid_file(
-        project,
-        project.windrot_file,
-        output_dir_b / SCHISMFiles.WINDROT,
-        subset_result.side_b.mapping,
-        element_mapping_b,
-        chunk_size,
-    )
+    if project.windrot_file.exists():
+        logger.info("Subsetting wind rotation files...")
+        _ = subset_nongrid_file(
+            project,
+            project.windrot_file,
+            output_dir_a / SCHISMFiles.WINDROT,
+            subset_result.side_a.mapping,
+            element_mapping_a,
+            chunk_size,
+        )
+        _ = subset_nongrid_file(
+            project,
+            project.windrot_file,
+            output_dir_b / SCHISMFiles.WINDROT,
+            subset_result.side_b.mapping,
+            element_mapping_b,
+            chunk_size,
+        )
+    else:
+        logger.info("windrot_geo2proj.gr3 not in project (%s); skipping it.", project.project_dir)
 
-    if re_calc_area:
+    if re_calc_area or not project.elem_area_file.exists():
         logger.info("Recalculating element areas...")
         areas = project.element_areas
     else:
@@ -1969,23 +2000,26 @@ def split_mesh(
     np.savetxt(output_dir_a / SCHISMFiles.ELEM_AREA, areas[elements_a[:, 0] - 1], fmt="%.3f")
     np.savetxt(output_dir_b / SCHISMFiles.ELEM_AREA, areas[elements_b[:, 0] - 1], fmt="%.3f")
 
-    logger.info("Subsetting elevation initial condition files...")
-    _ = subset_nongrid_file(
-        project,
-        project.elev_ic_file,
-        output_dir_a / SCHISMFiles.ELEV_IC,
-        subset_result.side_a.mapping,
-        element_mapping_a,
-        chunk_size,
-    )
-    _ = subset_nongrid_file(
-        project,
-        project.elev_ic_file,
-        output_dir_b / SCHISMFiles.ELEV_IC,
-        subset_result.side_b.mapping,
-        element_mapping_b,
-        chunk_size,
-    )
+    if project.elev_ic_file.exists():
+        logger.info("Subsetting elevation initial condition files...")
+        _ = subset_nongrid_file(
+            project,
+            project.elev_ic_file,
+            output_dir_a / SCHISMFiles.ELEV_IC,
+            subset_result.side_a.mapping,
+            element_mapping_a,
+            chunk_size,
+        )
+        _ = subset_nongrid_file(
+            project,
+            project.elev_ic_file,
+            output_dir_b / SCHISMFiles.ELEV_IC,
+            subset_result.side_b.mapping,
+            element_mapping_b,
+            chunk_size,
+        )
+    else:
+        logger.info("elev.ic not in project (%s); skipping it.", project.project_dir)
 
     if project.elev_corr_file.exists():
         logger.info("Subsetting elevation correction files...")
@@ -2278,7 +2312,8 @@ def extract_mesh(
 
     cut_bnds = _build_cut_boundaries(unique_terminals, shared_adjacency, side_a_data.mapping)
     n_cut = len(cut_bnds)
-    cut_flag = Counter(open_flags).most_common(1)[0][0] if open_flags else (1, 0, 0, 0)
+    inherited = open_flags or list(boundary_set.open_boundary_flags)
+    cut_flag = Counter(inherited).most_common(1)[0][0] if inherited else (1, 0, 0, 0)
     for cb in cut_bnds:
         open_bnds.append(cb)
         open_flags.append(cut_flag)
@@ -2328,25 +2363,36 @@ def extract_mesh(
     element_mapping = {int(elem[0]): new_id for new_id, elem in enumerate(elements_kept, 1)}
     node_mapping = subset_result.side_a.mapping
 
-    logger.info("Subsetting hgrid.cpp...")
-    _ = subset_nongrid_file(
-        project,
-        project.hgrid_cpp_file,
-        out / SCHISMFiles.HGRID_CPP,
-        node_mapping,
-        element_mapping,
-        chunk_size,
-    )
-    # Append boundaries (combine_sink_source reads the full file)
-    with (out / SCHISMFiles.HGRID_CPP).open("a", buffering=project.buffer_size) as f:
-        boundaries.write_to_file(f)
+    if project.hgrid_cpp_file.exists():
+        logger.info("Subsetting hgrid.cpp...")
+        _ = subset_nongrid_file(
+            project,
+            project.hgrid_cpp_file,
+            out / SCHISMFiles.HGRID_CPP,
+            node_mapping,
+            element_mapping,
+            chunk_size,
+        )
+        # Append boundaries (combine_sink_source reads the full file)
+        with (out / SCHISMFiles.HGRID_CPP).open("a", buffering=project.buffer_size) as f:
+            boundaries.write_to_file(f)
+    else:
+        logger.info("hgrid.cpp not in project (%s); skipping it.", project.project_dir)
 
-    logger.info("Subsetting NWM reaches files...")
-    _ = subset_nwm_reaches_file(
-        project.nwm_reaches_file,
-        out / SCHISMFiles.NWM_REACHES,
-        element_mapping,
-    )
+    if project.nwm_reaches_file.exists():
+        logger.info("Subsetting NWM reaches files...")
+        _ = subset_nwm_reaches_file(
+            project.nwm_reaches_file,
+            out / SCHISMFiles.NWM_REACHES,
+            element_mapping,
+        )
+    else:
+        logger.warning(
+            "nwmReaches.csv not found in project (%s); skipping its subset. "
+            "nwm_retro and nwm_ana runs with river discharge require it in the "
+            "subset model directory.",
+            project.nwm_reaches_file,
+        )
 
     # ngenReaches.csv (NextGen hydrofabric feature_ids) is the discharge
     # crosswalk for ngen_forecast runs.  It has the same block format as
@@ -2379,17 +2425,20 @@ def extract_mesh(
         chunk_size,
     )
 
-    logger.info("Subsetting wind rotation files...")
-    _ = subset_nongrid_file(
-        project,
-        project.windrot_file,
-        out / SCHISMFiles.WINDROT,
-        subset_result.side_a.mapping,
-        element_mapping,
-        chunk_size,
-    )
+    if project.windrot_file.exists():
+        logger.info("Subsetting wind rotation files...")
+        _ = subset_nongrid_file(
+            project,
+            project.windrot_file,
+            out / SCHISMFiles.WINDROT,
+            subset_result.side_a.mapping,
+            element_mapping,
+            chunk_size,
+        )
+    else:
+        logger.info("windrot_geo2proj.gr3 not in project (%s); skipping it.", project.project_dir)
 
-    if re_calc_area:
+    if re_calc_area or not project.elem_area_file.exists():
         areas = project.element_areas
     else:
         areas = np.loadtxt(project.elem_area_file, dtype=np.float64)
@@ -2397,15 +2446,18 @@ def extract_mesh(
     logger.info("Subsetting element area...")
     np.savetxt(out / SCHISMFiles.ELEM_AREA, areas[elements_kept[:, 0] - 1], fmt="%.3f")
 
-    logger.info("Subsetting elevation initial condition files...")
-    _ = subset_nongrid_file(
-        project,
-        project.elev_ic_file,
-        out / SCHISMFiles.ELEV_IC,
-        subset_result.side_a.mapping,
-        element_mapping,
-        chunk_size,
-    )
+    if project.elev_ic_file.exists():
+        logger.info("Subsetting elevation initial condition files...")
+        _ = subset_nongrid_file(
+            project,
+            project.elev_ic_file,
+            out / SCHISMFiles.ELEV_IC,
+            subset_result.side_a.mapping,
+            element_mapping,
+            chunk_size,
+        )
+    else:
+        logger.info("elev.ic not in project (%s); skipping it.", project.project_dir)
 
     if project.elev_corr_file.exists():
         logger.info("Subsetting elevation correction files...")

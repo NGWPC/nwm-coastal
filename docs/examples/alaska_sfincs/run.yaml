@@ -1,0 +1,38 @@
+# Cook Inlet, Alaska - SFINCS run pipeline configuration
+#
+# Uses the model created via:
+#   coastal-calibration create create.yaml
+#
+# Usage:
+#   coastal-calibration run run.yaml --dry-run
+#   coastal-calibration run run.yaml
+
+model: sfincs
+
+simulation:
+  start_date: 2026-08-15 00:00:00
+  duration_hours: 12
+  coastal_domain: alaska
+  meteo_source: nwm_ana
+
+boundary:
+  source: stofs          # STOFS 2D Global covers Alaska
+
+paths:
+  work_dir: ./run
+  raw_download_dir: ./downloads/forcing
+
+download:
+  enabled: true
+
+model_config:
+  prebuilt_dir: ./sfincs_cookinlet
+  discharge_locations_file: ./sfincs_cookinlet/sfincs_nwm.src
+  merge_discharge: true
+  # The DEM was shifted onto MSL in create.yaml, so the mesh datum is MSL and
+  # the STOFS forcing needs no further shift.
+  forcing_to_mesh_offset_m: 0.0
+  vdatum_mesh_to_msl_m: 0.0
+  include_precip: true
+  include_wind: true
+  include_pressure: true

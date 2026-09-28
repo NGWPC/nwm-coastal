@@ -1,5 +1,3 @@
-# `docs/examples/` — what's where
-
 This directory contains every notebook and input file needed to reproduce the published
 tutorials. The rendered landing page (`index.md`) is for end-users; this README is for
 maintainers and the next dev.
@@ -16,7 +14,10 @@ docs/examples/
 │                            is paired to forecast_demo/forecast_walkthrough.py instead
 │
 ├── lavaca-tx/             ← SFINCS Lavaca Bay tutorial inputs
-├── lake-erie/             ← SFINCS Lake Erie (LEOFS boundary, BYO DEM) tutorial inputs
+├── lake-erie_sfincs/      ← SFINCS Lake Erie (LEOFS boundary, BYO DEM) tutorial inputs
+├── lake-erie_schism/      ← SCHISM Lake Erie (mesh preparation + LEOFS run) inputs
+├── alaska_schism/         ← SCHISM Alaska full domain + Cook Inlet subset inputs
+├── alaska_sfincs/         ← SFINCS Cook Inlet (BYO NCEI DEM) tutorial inputs
 └── walkthrough/           ← SCHISM + SFINCS Mendocino comparison inputs
 ```
 
@@ -29,7 +30,10 @@ meshes, the proprietary mesh symlinks, etc.) are gitignored.
 | Domain         | Notebook                     | Tracked input files                                                                                                                  |
 | -------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | `lavaca-tx/`   | `lavaca.ipynb`               | `aoi.geojson`, `refine.geojson`, `discharge_nwm.geojson`, `create.yaml`, `run.yaml`                                                  |
-| `lake-erie/`   | `lake_erie.ipynb`            | `dem_catalog.yml`, `create.yaml`, `run.yaml`, `sfincs_aoi_lake_erie.geojson`, `discharge_nwm.geojson` — a working Fairport Harbor domain ships with the example |
+| `lake-erie_sfincs/` | `lake_erie_sfincs.ipynb`            | `dem_catalog.yml`, `create.yaml`, `run.yaml`, `sfincs_aoi_lake_erie.geojson`, `discharge_nwm.geojson` — a working Fairport Harbor domain ships with the example |
+| `lake-erie_schism/` | `lake_erie_schism.ipynb` | `run.yaml` — the mesh arrives via the `model` symlink |
+| `alaska_schism/` | `alaska_schism.ipynb`   | `run_full.yaml`, `run_subset.yaml`, `schism_alaska_full_boundary.geojson`, `schism_alaska_subset_cookinlet.geojson` |
+| `alaska_sfincs/` | `alaska_sfincs.ipynb`   | `create.yaml`, `run.yaml`, `dem_catalog.yml`, `sfincs_alaska_cookinlet.geojson`, `sfincs_alaska_flowpaths_{nwm,ngen}.geojson`, `sfincs_refine_1..7.geojson` |
 | `walkthrough/` | `walkthrough.ipynb`          | `extract_poly.geojson`, `aoi.geojson`, `refine_poly.geojson`, `discharge_nwm.geojson`                                                |
 | _(none)_       | `forecast_walkthrough.ipynb` | none — inputs come from `RUN_NGEN_ROOT`/`RUN_COASTAL_ROOT`, not this tree                                                            |
 
@@ -43,18 +47,32 @@ SCHISM Hawaii run) needs to be demoed again.
 
 ## Proprietary inputs (set up post-clone)
 
-The full Pacific SCHISM mesh and the WRF geogrid are not redistributable. The
-`walkthrough/` directory expects them as **gitignored symlinks** that you create once
-after cloning, pointing at wherever the data lives on your machine.
+The SCHISM meshes, the WRF geogrids and the hydrofabric are not redistributable. Three
+directories expect them as **gitignored symlinks** that you create once after cloning,
+pointing at wherever the data lives on your machine.
 
 ```bash
 ln -s /path/to/schism_models/pacific          docs/examples/walkthrough/model
 ln -s /path/to/schism_models/geo_em_CONUS.nc  docs/examples/walkthrough/geo_em_CONUS.nc
+
+ln -s /path/to/schism_models/lake_erie        docs/examples/lake-erie_schism/model
+ln -s /path/to/geo_em_CONUS.nc                docs/examples/lake-erie_schism/geo_em_CONUS.nc
+ln -s /path/to/NWM_v3_hydrofabric.gdb         docs/examples/lake-erie_schism/hydrofabric.gdb
+ln -s /path/to/nhf_1.2.2.gpkg                 docs/examples/lake-erie_schism/hydrofabric.gpkg
+
+ln -s /path/to/schism_models/alaska           docs/examples/alaska_schism/model
+ln -s /path/to/geo_em_Alaska.nc               docs/examples/alaska_schism/geo_em_Alaska.nc
+ln -s /path/to/NWM_v3_hydrofabric.gdb         docs/examples/alaska_schism/hydrofabric.gdb
+ln -s /path/to/ak_nhf_1.2.2.gpkg              docs/examples/alaska_schism/hydrofabric.gpkg
 ```
 
-The walkthrough fails with a clear error if the symlinks are missing. The `model`
-symlink is matched by the `**/model` pattern in `.gitignore`; the geogrid by
-`**/geo_em_*.nc`.
+The two `prepare-schism-reaches` links point at the gdb and GeoPackage themselves rather
+than at a hydrofabric root, so any directory layout works. Alaska takes the `ak_` prefixed
+GeoPackage; the `.gdb` is shared and is a directory, not a file.
+
+Each notebook fails with a clear error if its symlinks are missing. `model` is matched by
+the `**/model` pattern in `.gitignore`, the geogrids by `**/geo_em_*.nc`, and the
+hydrofabric by `**/hydrofabric.gdb` / `**/hydrofabric.gpkg`.
 
 ## Runtime products (gitignored, fine to delete)
 
@@ -70,7 +88,7 @@ the `.gitignore` keeps untracked:
 | `figs/`                | per-run plotting output                                                                                        | yes                                |
 | `sfincs_model/`        | HydroMT-SFINCS model root                                                                                      | yes                                |
 | `downloads/`           | shared NWM/STOFS forcing cache (top-level, ~83 GB)                                                             | only if you're OK re-downloading   |
-| `lake-erie/downloads/` | that example's own DEM, grid clips and forcing — it is deliberately self-contained so the folder can be copied | yes (re-downloads)                 |
+| `lake-erie_sfincs/downloads/` | that example's own DEM, grid clips and forcing — it is deliberately self-contained so the folder can be copied | yes (re-downloads)                 |
 
 ## Notebooks
 
@@ -78,7 +96,8 @@ Every notebook is paired with a `.py` source via `jupytext`. Edit the `.py` and 
 `pixi run nb-sync` to regenerate the `.ipynb`. Both files must be staged together —
 `pre-commit` enforces this.
 
-`lavaca`, `lake_erie` and `walkthrough` keep their `.py` beside the `.ipynb` in this
+`lavaca`, `lake_erie_sfincs`, `lake_erie_schism`, `alaska_schism`, `alaska_sfincs` and
+`walkthrough` keep their `.py` beside the `.ipynb` in this
 directory, and each starts with `os.chdir(notebook_dir.parent / "<domain>")`, then
 references inputs as plain `./<file>.geojson` relative to that working directory.
 

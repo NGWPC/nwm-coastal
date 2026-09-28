@@ -581,6 +581,34 @@ class TestExtractMeshBoundaryChain:
         )
 
 
+class TestCutBoundaryFlags:
+    def test_cut_inherits_parent_flags_when_no_open_boundary_survives(self, tmp_path):
+        """A subset that keeps none of the parent's open boundaries still gets its flags.
+
+        The shore case puts its only open boundary at y >= 3, so a subset below
+        that inherits nothing directly; the cut boundary must still carry the
+        parent's elevation type rather than falling back to 1 (elev.th).
+        """
+        d = _make_project(tmp_path, "shore")
+        bctides = d / "bctides.in"
+        bctides.write_text(bctides.read_text().replace(" 1 0 0 0", " 4 0 0 0"))
+
+        res = extract_mesh(
+            d,
+            shapely.box(1.5, -0.5, 6.5, 2.5),
+            tmp_path / "out",
+            output_name="sub",
+            write_netcdf=False,
+        )
+
+        lines = [
+            ln for ln in (res.output_dir_a / "bctides.in").read_text().splitlines() if ln.strip()
+        ]
+        bnd = [ln for ln in lines if ln.strip().endswith("0 0 0")]
+        assert bnd, "subset has no open boundary"
+        assert all(ln.split()[1] == "4" for ln in bnd), bnd
+
+
 class TestSubsetLogFile:
     """extract_mesh and split_mesh persist their log output to disk."""
 
@@ -617,13 +645,7 @@ class TestSubsetReachesFile:
 
         # One block of 3 element->hf_id pairs (NextGen 16-digit feature_ids).
         src = tmp_path / "ngenReaches.csv"
-        src.write_text(
-            "3\n"
-            "10 1072639236903480\n"
-            "20 1073115932546594\n"
-            "30 1075116176753856\n"
-            "\n"
-        )
+        src.write_text("3\n10 1072639236903480\n20 1073115932546594\n30 1075116176753856\n\n")
         out = tmp_path / "sub" / "ngenReaches.csv"
         # Keep elements 10 and 30, remapped to new ids 1 and 2; drop 20.
         stats = subset_nwm_reaches_file(src, out, {10: 1, 30: 2})

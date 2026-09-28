@@ -112,6 +112,10 @@ _STAGE_CONFIG_DEPS: dict[str, tuple[str, ...]] = {
 #: The only stage that puts the model on disk.
 _WRITE_STAGE = "create_write"
 
+# Max distance a NOAA gauge may be snapped onto an active cell before it is
+# dropped; matches the river_discharge default.
+NOAA_MAX_SNAP_DISTANCE_M = 2000.0
+
 
 def _canonical(value: Any) -> Any:
     """Represent *value* so that equal configs hash equally.
@@ -272,12 +276,87 @@ class _CreateStageBase(CreateStage):
         return _get_model(self.config)
 
     @abstractmethod
-    def run(self) -> dict[str, Any]: ...
+    def run(self) -> dict[str, Any]:
+        ...
 
+        # ---------------------------------------------------------------------------
+        # Concrete stages
+        # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Concrete stages
-# ---------------------------------------------------------------------------
+    @staticmethod
+    def _crs_unit_to_meter(model_crs: Any) -> float:
+        """Return the conversion factor from CRS linear units to meters.
+
+        Raises ``ValueError`` for geographic (degree-based) CRS because
+        Euclidean KDTree distances in degrees are not meaningful for
+        metric comparisons.
+        """
+        from pyproj import CRS
+
+        crs = CRS(model_crs)
+        if crs.is_geographic:
+            raise ValueError(
+                f"Model CRS {crs.to_epsg() or crs} is geographic (degree-based). "
+                "Snapping requires a projected CRS so that distances "
+                "are in linear units (meters or feet)."
+            )
+        # axis_info[0].unit_conversion_factor converts CRS units → meters
+        # (e.g. 1.0 for meters, ~0.3048 for US survey feet).
+        return float(crs.axis_info[0].unit_conversion_factor)
+
+    def _snap_to_active_cells(
+        self,
+        points: list[tuple[float, float, str]],
+        model: Any,
+        max_snap_distance_m: float,
+    ) -> list[tuple[float, float, str]]:
+        """Snap points to the nearest active grid cell.
+
+        Each point is relocated to the face center of the nearest active
+        cell.  The KDTree distance (in CRS units) is converted to meters
+        before comparing with *max_snap_distance_m*.  Points whose
+        nearest active cell is farther than the threshold are dropped
+        with a warning.
+
+        Used for both discharge sources and NOAA observation points.
+
+        Returns the list of (x, y, name) tuples on active cells.
+        """
+        import numpy as np
+        from scipy.spatial import KDTree
+
+        grid_ds = model.quadtree_grid.data
+        ugrid = grid_ds.ugrid.grid
+        face_xy = np.column_stack([ugrid.face_x, ugrid.face_y])
+        mask = grid_ds["mask"].to_numpy()
+        unit_to_m = self._crs_unit_to_meter(ugrid.crs)
+
+        active_idx = np.where(mask == 1)[0]
+        if len(active_idx) == 0:
+            self._log("No active cells in grid, cannot place points", level="warning")
+            return []
+        tree_active = KDTree(face_xy[active_idx])
+
+        snapped: list[tuple[float, float, str]] = []
+        for x, y, name in points:
+            dist_crs_raw, active_pos_raw = tree_active.query([x, y])
+            dist_crs = float(dist_crs_raw)
+            active_pos = int(active_pos_raw)
+            dist_m = dist_crs * unit_to_m
+            if dist_m > max_snap_distance_m:
+                self._log(
+                    f"  {name}: DROPPED, nearest active cell is {dist_m:.0f} m away "
+                    f"(exceeds max_snap_distance_m={max_snap_distance_m:.0f})",
+                    level="warning",
+                )
+                continue
+            real_idx = active_idx[active_pos]
+            cx, cy = float(face_xy[real_idx, 0]), float(face_xy[real_idx, 1])
+            if dist_m > 0:
+                self._log(f"  {name}: snapped to active cell ({dist_m:.0f} m away)")
+            snapped.append((cx, cy, name))
+
+        return snapped
 
 
 class CreateGridStage(CreateStage):
@@ -804,9 +883,13 @@ class CreateBoundaryStage(_CreateStageBase):
         gdf_bnd = self.sfincs.water_level.gdf
         if len(gdf_bnd):
             bnd_path = cfg.output_dir / "sfincs.bnd"
-            lines = [f"    {row.geometry.x:.1f}   {row.geometry.y:.1f}" for _, row in gdf_bnd.iterrows()]
+            lines = [
+                f"    {row.geometry.x:.1f}   {row.geometry.y:.1f}" for _, row in gdf_bnd.iterrows()
+            ]
             bnd_path.write_text("\n".join(lines) + "\n")
-            self._log(f"Wrote {len(gdf_bnd)} boundary point(s) to {bnd_path.name} (bnd_dist={cfg.mask.bnd_dist})")
+            self._log(
+                f"Wrote {len(gdf_bnd)} boundary point(s) to {bnd_path.name} (bnd_dist={cfg.mask.bnd_dist})"
+            )
 
         self._log("Boundary cells created successfully")
         return {"status": "completed"}
@@ -869,79 +952,6 @@ class CreateDischargeStage(_CreateStageBase):
             )
 
         return errors
-
-    @staticmethod
-    def _crs_unit_to_meter(model_crs: Any) -> float:
-        """Return the conversion factor from CRS linear units to meters.
-
-        Raises ``ValueError`` for geographic (degree-based) CRS because
-        Euclidean KDTree distances in degrees are not meaningful for
-        metric comparisons.
-        """
-        from pyproj import CRS
-
-        crs = CRS(model_crs)
-        if crs.is_geographic:
-            raise ValueError(
-                f"Model CRS {crs.to_epsg() or crs} is geographic (degree-based). "
-                "Discharge snapping requires a projected CRS so that distances "
-                "are in linear units (meters or feet)."
-            )
-        # axis_info[0].unit_conversion_factor converts CRS units → meters
-        # (e.g. 1.0 for meters, ~0.3048 for US survey feet).
-        return float(crs.axis_info[0].unit_conversion_factor)
-
-    def _snap_to_active_cells(
-        self,
-        points: list[tuple[float, float, str]],
-        model: Any,
-        max_snap_distance_m: float,
-    ) -> list[tuple[float, float, str]]:
-        """Snap discharge points to the nearest active grid cell.
-
-        Each point is relocated to the face center of the nearest active
-        cell.  The KDTree distance (in CRS units) is converted to meters
-        before comparing with *max_snap_distance_m*.  Points whose
-        nearest active cell is farther than the threshold are dropped
-        with a warning.
-
-        Returns the list of (x, y, name) tuples on active cells.
-        """
-        import numpy as np
-        from scipy.spatial import KDTree
-
-        grid_ds = model.quadtree_grid.data
-        ugrid = grid_ds.ugrid.grid
-        face_xy = np.column_stack([ugrid.face_x, ugrid.face_y])
-        mask = grid_ds["mask"].to_numpy()
-        unit_to_m = self._crs_unit_to_meter(ugrid.crs)
-
-        active_idx = np.where(mask == 1)[0]
-        if len(active_idx) == 0:
-            self._log("No active cells in grid, cannot place discharge points", level="warning")
-            return []
-        tree_active = KDTree(face_xy[active_idx])
-
-        snapped: list[tuple[float, float, str]] = []
-        for x, y, name in points:
-            dist_crs_raw, active_pos_raw = tree_active.query([x, y])
-            dist_crs = float(dist_crs_raw)
-            active_pos = int(active_pos_raw)
-            dist_m = dist_crs * unit_to_m
-            if dist_m > max_snap_distance_m:
-                self._log(
-                    f"  {name}: DROPPED, nearest active cell is {dist_m:.0f} m away "
-                    f"(exceeds max_snap_distance_m={max_snap_distance_m:.0f})",
-                    level="warning",
-                )
-                continue
-            real_idx = active_idx[active_pos]
-            cx, cy = float(face_xy[real_idx, 0]), float(face_xy[real_idx, 1])
-            if dist_m > 0:
-                self._log(f"  {name}: snapped to active cell ({dist_m:.0f} m away)")
-            snapped.append((cx, cy, name))
-
-        return snapped
 
     @staticmethod
     def _line_extreme_endpoints(geom: Any) -> tuple[Any, Any]:
@@ -1246,13 +1256,22 @@ class CreateObservationPointsStage(_CreateStageBase):
 
         selected_projected = selected.to_crs(model_crs)
 
+        # model.region is the whole quadtree footprint, inactive cells included, so
+        # a station can sit inside it and still be nowhere near the modelled water.
+        candidates = [
+            (row.geometry.x, row.geometry.y, f"noaa_{row['station_id']}")
+            for _, row in selected_projected.iterrows()
+        ]
+        snapped = self._snap_to_active_cells(candidates, model, NOAA_MAX_SNAP_DISTANCE_M)
+        if not snapped:
+            self._log("No NOAA CO-OPS stations on active cells", "warning")
+            return 0
+
         added = 0
-        for _, row in selected_projected.iterrows():
-            cx, cy = row.geometry.x, row.geometry.y
+        for cx, cy, name in snapped:
             if any(math.hypot(cx - ex, cy - ey) < dedup_distance_m for ex, ey in existing_points):
                 continue
-            sid = row["station_id"]
-            model.observation_points.add_point(x=cx, y=cy, name=f"noaa_{sid}")
+            model.observation_points.add_point(x=cx, y=cy, name=name)
             existing_points.append((cx, cy))
             added += 1
 
