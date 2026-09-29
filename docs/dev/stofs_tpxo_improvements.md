@@ -109,6 +109,28 @@ config-supplied** correction uniformly across one segment's series, so neither i
 correction as written — but both already do the "add an offset to a water-level series
 before it is consumed" mechanics.
 
+### SCHISM's own ramp parameters
+
+For the forecast handoff specifically, SCHISM's `dramp` and `nramp_elev` look like the
+obvious candidates and are worth investigating before anything is built on our side.
+Thorough investigation and testing have not been done yet, so what follows is a starting
+point rather than a recommendation.
+
+With `nramp_elev=1` the solver blends the open-boundary elevation from the hotstart
+value onto the imposed forcing over `dramp` days, rather than applying the new forcing
+at full strength from the first step (`schism_step.F90`, elevation b.c. block; the ramp
+weight is a `tanh` over `dramp` and the blend target is the post-hotstart elevation
+field). That is the same idea as the blending option above, but inside the solver and
+limited to a segment start — it would not help a mid-run stitch.
+
+Note the failure mode if only half of this is applied: setting `dramp > 0` on a
+hotstarted segment *without* `nramp_elev = 1` ramps the boundary up from zero rather
+than from the hotstart elevation, which would be a much larger artificial transient than
+the step it was meant to remove. Both keys can be passed through
+`model_config.run_param_overrides` — `gen_cycle_config.py` already uses
+`{"dramp": 0.25, "nramp_elev": 1}` as its documented example — so this can be tested on
+a forecast cycle without a code change.
+
 ### Download-side changes still required
 
 - `_build_stofs_urls` accepts a start *and* end, and generates one URL per 6-hourly
