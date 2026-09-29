@@ -137,6 +137,44 @@ This page provides detailed documentation for the NWM Coastal Python API.
 
 ::: coastal_calibration.plotting.animate.animate_water_level
 
+## SCHISM Mesh Subsetting
+
+Cut a regional subdomain out of a larger SCHISM mesh, or split one along a dividing
+line. Used by the [Mendocino](../examples/notebooks/walkthrough.ipynb),
+[Alaska](../examples/notebooks/alaska_schism.ipynb) and
+[Lake Erie](../examples/notebooks/lake_erie_schism.ipynb) examples, and by the QGIS
+plugin.
+
+### extract_mesh
+
+::: coastal_calibration.schism.subsetter.extract_mesh
+
+### split_mesh
+
+::: coastal_calibration.schism.subsetter.split_mesh
+
+### MeshSubsetter
+
+::: coastal_calibration.schism.subsetter.MeshSubsetter
+
+## Tidal Prediction
+
+Tidal boundary conditions via [pyTMD](https://pytmd.readthedocs.io/), against the TPXO10
+atlas by default and any netCDF model in `pyTMD.io.load_database()` with an elevation
+group.
+
+### predict_tide_at_points
+
+::: coastal_calibration.data.tides.predict_tide_at_points
+
+### write_schism_boundary
+
+::: coastal_calibration.data.tides.write_schism_boundary
+
+### extend_schism_boundary
+
+::: coastal_calibration.data.tides.extend_schism_boundary
+
 ## Output Readers
 
 ### load_schism_elevation

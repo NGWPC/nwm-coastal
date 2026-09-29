@@ -1,5 +1,21 @@
 # coastal-calibration: Design Documentation
 
+!!! warning "Historical document"
+
+    This records the original design rationale for replacing the bash-based SCHISM
+    calibration workflow with a Python package, as of March 2026. It is **not** a current
+    architecture reference: the package layout, the workflow stage names and the deployment
+    model have all moved on since it was written, and the sections describing them have been
+    removed rather than left to mislead.
+
+    For how the system works today, see [Concepts and Workflows](docs/concepts/index.md),
+    [Workflow Stages](docs/user-guide/workflow-stages.md) and the
+    [API Reference](docs/reference/api.md). For what is planned, see the Roadmap on the
+    project home page.
+
+    What is kept here is the part that does not go stale: what the original bash workflow
+    looked like, why it was replaced, and the design decisions taken at the time.
+
 ## Overview
 
 The `coastal-calibration` Python package is a complete redesign and rewrite of the
@@ -17,7 +33,6 @@ ______________________________________________________________________
 1. [Key Design Decisions](#key-design-decisions)
 1. [Substantial Improvements](#substantial-improvements)
 1. [API Reference](#api-reference)
-1. [Potential Future Developments](#potential-future-developments)
 
 ______________________________________________________________________
 
@@ -191,46 +206,6 @@ ${MPICOMMAND3} singularity exec -B $BINDINGS \
 ______________________________________________________________________
 
 ## New Architecture
-
-### Package Structure
-
-```console
-src/coastal_calibration/
-├── __init__.py                  # Package exports
-├── cli.py                       # Command-line interface
-├── runner.py                    # Main workflow orchestrator
-├── downloader.py                # Async data downloading
-│
-├── config/
-│   ├── __init__.py
-│   ├── schema.py                # YAML config dataclasses + ModelConfig ABC
-│   └── create_schema.py         # SFINCS creation config schema
-│
-├── stages/                      # Workflow stages
-│   ├── __init__.py
-│   ├── base.py                  # Abstract WorkflowStage base class
-│   ├── download.py              # Data download stage
-│   ├── forcing.py               # NWM forcing stages
-│   ├── boundary.py              # Boundary condition stages
-│   ├── schism.py                # SCHISM execution stages
-│   ├── sfincs.py                # SFINCS data catalog & symlinks
-│   ├── sfincs_build.py          # SFINCS model build stages (HydroMT)
-│   ├── sfincs_create.py         # SFINCS model creation stages
-│   └── _hydromt_compat.py       # Compatibility patches for hydromt bugs
-│
-├── schism_prep.py               # Pure-Python SCHISM preparation functions
-├── sflux.py                     # Atmospheric forcing generation
-├── tides/                       # TPXO boundary utilities + pytides
-├── regridding/                  # ESMF-based regridding (STOFS, NWM forcing)
-│
-└── utils/
-    ├── __init__.py
-    ├── logging.py               # Workflow monitoring
-    ├── time.py                  # Datetime utilities
-    ├── streamflow.py            # NWM streamflow read utilities
-    ├── floodmap.py              # Flood depth map generation
-    └── workflow.py              # Workflow helper functions
-```
 
 ### Core Components
 
@@ -914,7 +889,7 @@ ______________________________________________________________________
 | -------------------- | ---------------------------------------------- |
 | `CoastalCalibConfig` | Root configuration container                   |
 | `SimulationConfig`   | Time, domain, and source settings              |
-| `BoundaryConfig`     | TPXO vs STOFS selection                        |
+| `BoundaryConfig`     | Boundary source selection                      |
 | `PathConfig`         | All file and directory paths                   |
 | `ModelConfig`        | ABC for model-specific configuration           |
 | `SchismModelConfig`  | SCHISM compute, MPI, and stage settings        |
@@ -922,272 +897,10 @@ ______________________________________________________________________
 | `MonitoringConfig`   | Logging and progress tracking                  |
 | `DownloadConfig`     | Data download settings                         |
 
-### SCHISM Workflow Stages
-
-| Stage                 | Class                    | Description                                                     |
-| --------------------- | ------------------------ | --------------------------------------------------------------- |
-| `download`            | `DownloadStage`          | Download NWM/STOFS/GLOFS data                                   |
-| `pre_forcing`         | `PreForcingStage`        | Prepare forcing directories and symlinks                        |
-| `nwm_forcing`         | `NWMForcingStage`        | Run WRF-Hydro forcing engine (MPI)                              |
-| `post_forcing`        | `PostForcingStage`       | Post-process forcing files                                      |
-| `update_params`       | `UpdateParamsStage`      | Generate SCHISM `param.nml`                                     |
-| `schism_obs`          | `SchismObsStage`         | Discover NOAA stations and write `station.in`                   |
-| `boundary_conditions` | `BoundaryConditionStage` | TPXO or STOFS boundary generation                               |
-| `pre_schism`          | `PreSCHISMStage`         | Prepare SCHISM inputs                                           |
-| `schism_run`          | `SCHISMRunStage`         | Execute `pschism` binary (MPI)                                  |
-| `post_schism`         | `PostSCHISMStage`        | Validate and post-process outputs                               |
-| `schism_plot`         | `SchismPlotStage`        | Plot simulated vs observed water levels (with datum conversion) |
-
-### SFINCS Workflow Stages
-
-| Stage                 | Class                      | Description                                                     |
-| --------------------- | -------------------------- | --------------------------------------------------------------- |
-| `download`            | `DownloadStage`            | Download NWM/STOFS data                                         |
-| `sfincs_symlinks`     | `SFINCSSymlinksStage`      | Create `.nc` symlinks for NWM data                              |
-| `sfincs_data_catalog` | `SFINCSDataCatalogStage`   | Generate HydroMT data catalog                                   |
-| `sfincs_init`         | `SfincsInitStage`          | Initialize SFINCS model + clean stale files                     |
-| `sfincs_timing`       | `SfincsTimingStage`        | Set SFINCS timing                                               |
-| `sfincs_forcing`      | `SfincsForcingStage`       | Add water level forcing (IDW interpolation)                     |
-| `sfincs_obs`          | `SfincsObsStage`           | Add observation points                                          |
-| `sfincs_discharge`    | `SfincsDischargeStage`     | Add discharge sources (active-cell filter)                      |
-| `sfincs_precip`       | `SfincsPrecipitationStage` | Add precipitation forcing + clip meteo grid                     |
-| `sfincs_wind`         | `SfincsWindStage`          | Add wind forcing + clip meteo grid                              |
-| `sfincs_pressure`     | `SfincsPressureStage`      | Add pressure forcing + clip meteo grid                          |
-| `sfincs_write`        | `SfincsWriteStage`         | Write SFINCS model                                              |
-| `sfincs_run`          | `SfincsRunStage`           | Run SFINCS (native binary, OpenMP)                              |
-| `sfincs_plot`         | `SfincsPlotStage`          | Plot simulated vs observed water levels (with datum conversion) |
-
-______________________________________________________________________
-
-## Potential Future Developments
-
-### Vision: Unified Workflow Architecture
-
-The overarching goal is to make the SCHISM and SFINCS workflows architecturally
-consistent. Every coastal model workflow is conceptually the same four-phase pipeline:
-
-```console
-Model Creation ──► Model Preparation ──► Model Execution ──► Evaluation
-(mesh, config)   (forcing, boundaries)   (run the solver)   (obs vs sim)
-```
-
-The SFINCS workflow already follows this pattern cleanly: users provide a pre-built
-model (`prebuilt_dir`), the Python pipeline adds forcing/boundaries/observations, then a
-single native binary call runs the solver. The SCHISM workflow, by contrast, conflates
-model creation and preparation inside monolithic bash scripts with hardcoded paths to a
-pre-built model on the cluster. The future direction is to bring SCHISM in line with
-SFINCS.
-
-The end state is two purpose-built containers (SCHISM, ESMF) plus a natively compiled
-SFINCS binary:
-
-| Component           | Purpose                                                      | Invocation                        |
-| ------------------- | ------------------------------------------------------------ | --------------------------------- |
-| **SFINCS**          | SFINCS solver (OpenMP, single-node)                          | Native binary (compiled via pixi) |
-| **SCHISM**          | SCHISM solver + mesh partitioning (MPI, multi-node)          | `singularity exec` (single call)  |
-| **ESMF regridding** | NWM forcing + STOFS boundary regridding (MPI Python + ESMPy) | `singularity exec` (single call)  |
-
-### Current State: SCHISM vs SFINCS Architectural Gap
-
-| Aspect                  | SFINCS (target pattern)             | SCHISM (current)                              |
-| ----------------------- | ----------------------------------- | --------------------------------------------- |
-| **Model input**         | `prebuilt_dir` (user-provided)      | Hardcoded paths in `/ngwpc-coastal/parm/`     |
-| **Model manipulation**  | Python (HydroMT-SFINCS library)     | Bash scripts inside Singularity               |
-| **Forcing generation**  | Pure Python (`xarray`, `rasterio`)  | MPI Python + bash wrappers (container)        |
-| **Boundary conditions** | Pure Python (IDW interpolation)     | Fortran binary (`predict_tide`) or MPI Python |
-| **Configuration**       | `sfincs.inp` read/written by Python | `param.nml` generated by 230-line bash        |
-| **Execution**           | Single native binary call           | 9 separate `singularity exec` calls           |
-| **Pre-run stages**      | 12 stages, 11 pure Python           | 9 stages, only 2 pure Python                  |
-| **Bash dependency**     | 0 bash scripts                      | 15 bash scripts (~1,000 lines)                |
-| **Embedded Python**     | 0 (all in package proper)           | 6 scripts (~1,100 lines) in `scripts/`        |
-
-**What the current monolithic Singularity container bundles:**
-
-- `pschism` binary (the SCHISM solver, compiled with MPI + ParMETIS)
-- `metis_prep` and `gpmetis` binaries (mesh partitioning for parallel execution)
-- `combine_hotstart7` binary (hot-start file post-processing)
-- `predict_tide` (OTPS Fortran binary for TPXO tidal prediction)
-- Conda environments with ESMF-based Python scripts
-- All of the above run via 9 separate `singularity exec` calls per workflow
-
-### Phase 1: Pre-Built SCHISM Model (`prebuilt_dir`)
-
-**Goal**: Accept a pre-built SCHISM model directory, just like SFINCS.
-
-A pre-built SCHISM model directory would contain the mesh and static configuration:
-
-```console
-prebuilt_dir/
-  hgrid.gr3           # Unstructured mesh (required)
-  hgrid.nc            # Same mesh in NetCDF (required for ESMF regridding)
-  vgrid.in            # Vertical grid specification
-  param.nml.template  # Namelist template (dates/paths filled at runtime)
-  bctides.in          # Tidal boundary setup (optional, for TPXO)
-  station.in          # Observation stations (optional, auto-generated if absent)
-```
-
-Currently, these files live at hardcoded cluster paths
-(`${parm_dir}/parm/coastal/{domain}/`) and are symlinked into the work directory by
-`update_param.bash`. The refactoring moves them into a user-provided directory:
-
-**Changes required:**
-
-1. Add `prebuilt_dir: Path` to `SchismModelConfig` (mirrors `SfincsModelConfig`)
-1. Add validation that `prebuilt_dir` contains required files
-1. Replace the symlink logic in `update_params` bash with a Python init stage that
-    copies/symlinks from `prebuilt_dir` to `work_dir`
-1. Replace `param.nml` generation (currently 230 lines of bash in `update_param.bash`)
-    with Python using `f90nml` to read the template and fill runtime values
-1. Remove the `parm_dir` and `nwm_dir` path dependencies from `PathConfig`
-
-**Backward compatibility**: The current `parm_dir`-based paths can be preserved as a
-fallback: if `prebuilt_dir` is not set, construct it from
-`${parm_dir}/parm/coastal/{domain}/` to maintain cluster compatibility during
-transition.
-
-### Phase 2: Pure-Python Model Preparation
-
-**Goal**: Rewrite all pre-run SCHISM stages in pure Python, eliminating the bash scripts
-and the need to run preparation stages inside the Singularity container.
-
-**Stage-by-stage rewrite plan:**
-
-| Stage             | Current                        | Replacement                       |
-| ----------------- | ------------------------------ | --------------------------------- |
-| `update_params`   | `update_param.bash` (230 LOC)  | `f90nml` template fill            |
-| `pre_forcing`     | `pre_nwm_forcing_coastal.bash` | `pathlib` + `shutil` (symlinks)   |
-| `post_forcing`    | `makeAtmo.py` (232 LOC)        | Absorb into package as module     |
-| `boundary (TPXO)` | `predict_tide` Fortran binary  | pure Python TPXO                  |
-| `pre_schism`      | `pre_schism.bash` (56 LOC)     | `makeDischarge.py` already Python |
-| `post_schism`     | `post_schism.bash` (37 LOC)    | `pathlib` + NetCDF4 checks        |
-
-**Scripts that can be absorbed immediately** (already Python, just need to move out of
-`scripts/` into proper package modules):
-
-- `makeAtmo.py` (232 LOC) - atmospheric post-processing
-- `makeDischarge.py` (139 LOC) - discharge source generation
-- `merge_source_sink.py` (166 LOC) - source/sink merging
-- `correct_elevation.py` (32 LOC) - elevation correction
-- `otps_to_open_bnds_hgrid.py` (108 LOC) - TPXO output parsing
-
-These 5 Python files total ~677 lines and are already functional Python code that just
-needs to be brought under the package's type checking, testing, and import system.
-
-### Phase 3: Three Purpose-Built Containers
-
-**Goal**: Replace the current monolithic container with three focused containers, each
-with a single responsibility.
-
-#### SFINCS Binary (done)
-
-SFINCS no longer uses a container. The solver is compiled natively from source (via pixi
-activation script or manual build) and runs directly as a native binary with OpenMP
-parallelism.
-
-#### SCHISM Container (new, solver only)
-
-A minimal container with only the binaries needed to run and partition a SCHISM model:
-
-- `pschism` (the SCHISM solver, compiled with MPI + NetCDF)
-- `metis_prep` + `gpmetis` (mesh partitioning for parallel execution)
-- `combine_hotstart7` (combines distributed hot-start files after a run)
-- OpenMPI runtime and InfiniBand/network libraries for multi-node MPI
-- HDF5/NetCDF4 Fortran libraries
-
-This container is invoked twice: once for mesh partitioning (`metis_prep` + `gpmetis`)
-and once for the solver (`mpiexec pschism`). Both are simple `singularity exec` calls.
-
-**Removed from container** (moved to host-side Python):
-
-- All bash wrapper scripts
-- Conda environments
-- `predict_tide` (replaced by pure Python TPXO)
-- NWM USH/EXEC scripts
-
-#### ESMF Regridding Container (new, MPI Python + ESMPy)
-
-The NWM forcing engine (`workflow_driver.py`) and STOFS boundary regridding
-(`regrid_estofs.py`) both depend on ESMPy (`import ESMF`), which is the Python interface
-to the ESMF (Earth System Modeling Framework) regridding library. ESMPy itself requires
-MPI and performs parallel regridding of NWM meteorological fields (wind, pressure,
-precipitation) and STOFS water levels onto the SCHISM unstructured mesh.
-
-These ESMF dependencies are heavyweight (MPI-aware C/Fortran libraries + Python
-bindings) and do not belong in either the SCHISM solver container or the host Python
-environment. A dedicated ESMF container isolates this concern:
-
-- ESMPy (`ESMF` Python module) with MPI support
-- `workflow_driver.py` - regrids NWM forcing fields to SCHISM mesh via ESMF
-- `regrid_estofs.py` - regrids STOFS water levels to SCHISM open boundaries via ESMF
-- Python scientific stack (`numpy`, `netCDF4`, `xarray`)
-- OpenMPI runtime matching the cluster
-
-This container is invoked via `singularity exec` with `mpiexec` for the two ESMF-based
-stages (`nwm_forcing` and STOFS `boundary_conditions`). This is the last container to
-address since both scripts are already functional MPI Python programs.
-
-#### Target Architecture
-
-```console
-Host (Python)                    Containers
-──────────────                   ──────────
-download          ─── pure Python (no container)
-pre_forcing       ─── pure Python (no container)
-nwm_forcing       ─── ESMF container (mpiexec + workflow_driver.py)
-post_forcing      ─── pure Python (no container)
-update_params     ─── pure Python (no container)
-schism_obs        ─── pure Python (no container)
-boundary (TPXO)   ─── pure Python (no container)
-boundary (STOFS)  ─── ESMF container (mpiexec + regrid_estofs.py)
-pre_schism        ─── SCHISM container (metis_prep + gpmetis)
-schism_run        ─── SCHISM container (mpiexec + pschism)
-post_schism       ─── pure Python (no container)
-schism_plot       ─── pure Python (no container)
-```
-
-**Bind mounts** simplified from 15+ to 2-3 per container (work_dir + MPI libs).
-
-### Phase 4: Evaluation and Visualization
-
-**Goal**: Expand the existing `schism_plot` and `sfincs_plot` stages into a unified
-evaluation framework.
-
-Both `SchismPlotStage` and `SfincsPlotStage` are already pure Python, query NOAA CO-OPS
-observations, and generate comparison plots. Future enhancements:
-
-1. Unified `EvaluationStage` base class for both models
-1. Statistical metrics (RMSE, bias, correlation, skill scores)
-1. Multi-station summary dashboards
-1. Time series export (CSV/Parquet) for downstream analysis
-
-### Near-Term Priorities
-
-1. **Pure-Python TPXO** - Replaces the `predict_tide` Fortran binary (currently run
-    inside the SCHISM Singularity container) with a pure-Python implementation.
-
-1. **Absorb embedded Python scripts** - The 5 Python files in `scripts/` (677 LOC) are
-    already functional Python. Moving them into the package proper brings them under
-    type checking, testing, and import hygiene with minimal risk.
-
-1. **`f90nml`-based `param.nml` generation** - Replaces the largest bash script
-    (`update_param.bash`, 230 LOC) and unblocks the `prebuilt_dir` pattern.
-
-### Feature Expansion
-
-1. **Hot Start Chain Automation**
-
-    - Automatic hot-start file discovery
-    - Multi-run chaining for long simulations
-
-1. **Ensemble Runs**
-
-    - Multiple configurations from single base
-    - Parallel SLURM array jobs
-
-1. **Cloud-Native Deployment**
-
-    - AWS Batch support
-    - Container-native execution (no Singularity)
+The workflow stage tables that used to follow have been removed: the stage names changed
+after this document was written. See
+[Workflow Stages](docs/user-guide/workflow-stages.md) for the current SCHISM, SFINCS and
+creation pipelines, or run `coastal-calibration stages`.
 
 ______________________________________________________________________
 
