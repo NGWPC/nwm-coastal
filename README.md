@@ -206,11 +206,12 @@ is not configured separately — selecting `nwm_retro` already uses it.
     existing crosswalk generation is correct for the meshes we run and does not change.
 - **Multi-cycle STOFS stitching**: download and stitch multiple STOFS forecast cycles to
     cover simulations of any duration, removing the current 180-hour single-cycle limit.
-    This is not just a download change: consecutive STOFS cycles disagree at the same
-    valid time, and in forecast testing that step propagated into the domain. The
-    forecast pipeline already spans cycles today — its spinup, analysis and short-range
-    segments each resolve their own — so a continuity step (offset matching, blending,
-    or rejection above a tolerance) is a prerequisite rather than a refinement. See
+    This is not just a download change: consecutive STOFS cycles can disagree at the
+    same valid time, and where that difference is large the step propagates into both
+    coastal models as a small wave. The forecast pipeline already spans cycles today —
+    its spinup, analysis and short-range segments each resolve their own — so a
+    continuity step (offset matching, blending, or rejection above a tolerance) is a
+    prerequisite rather than a refinement. See
     [docs/dev/stofs_tpxo_improvements.md](docs/dev/stofs_tpxo_improvements.md) Phase 2.
 - **Great Lakes SFINCS sinks**: a Great Lakes domain may contain a true outlet, such as
     the Niagara or the St. Clair. SFINCS supports sinks, but this package has no way to

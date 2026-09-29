@@ -66,9 +66,16 @@ boundary series simply restarts from whatever cycle the new segment resolved.
 
 ![STOFS raw versus SFINCS boundary water level at stations 0001 and 0047. At the spinup-to-analysis handoff (dashed line) the t00z and t18z cycles disagree by roughly 5-8 cm at the same valid time, and the SFINCS boundary inherits the step.](images/stofs_cycle_seam.png)
 
-At the handoff the t18z analysis cycle sits ~5–8 cm below the t00z spinup cycle at the
-same valid time, at both stations. The SFINCS boundary inherits the step, and that step
-enters the domain. We have seen this in forecast test cases.
+In this example the t18z analysis cycle sits ~5–8 cm below the t00z spinup cycle at the
+same valid time, at both stations. The SFINCS boundary inherits that step, which enters
+the domain as a small wave.
+
+How much this matters depends entirely on how well the two cycles agree. When
+consecutive STOFS forecasts are close there is no issue and the handoff is invisible.
+When they differ substantially, the step propagates inward — and nothing about this is
+specific to SFINCS: the figure happens to show a SFINCS boundary, but SCHISM takes its
+boundary from the same cycles in the same way, so both coastal models are affected
+alike. We have seen this in forecast test cases.
 
 So this is **a live forecast issue today**, not only a hazard for some future >180 h
 stitching feature. Any work here has to address both.
