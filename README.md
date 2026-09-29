@@ -161,10 +161,11 @@ The AOI polygon and discharge points can be created interactively using the QGIS
 | `glofs`     | 2016 to present, by lake                    | [NOAA NCEI](https://www.ncei.noaa.gov/oa/prod-model/)                                                                                                     | water level                                                        |
 | `harmonic`  | N/A (local atlas)                           | TPXO10 atlas, installed locally ([registration required](https://www.tpxo.net/))                                                                          | tidal constituents                                                 |
 
-SCHISM reads `T2D`, `Q2D`, `PSFC`, `U2D`, and `V2D` when building `sflux` files. SFINCS
-forces on `RAINRATE` (precipitation), `U2D`/`V2D` (wind) and `PSFC` (pressure). The
-remaining LDASIN fields are renamed into HydroMT conventions when the data catalog is
-written, but no SFINCS stage consumes them.
+SCHISM reads `RAINRATE` (precipitation), `T2D` (2 m air temperature), `Q2D` (2 m
+specific humidity), `PSFC` (surface pressure), and `U2D`/`V2D` (10 m eastward and
+northward wind) when preparing inputs. SFINCS uses `RAINRATE`, `U2D`/`V2D`, and `PSFC`.
+The remaining LDASIN fields are renamed into HydroMT conventions when the SFINCS data
+catalog is written, but no stage consumes them.
 
 The NWM Retrospective forcing is AORC-derived (verified for CONUS and Alaska), so AORC
 is not configured separately — selecting `nwm_retro` already uses it.
