@@ -218,10 +218,12 @@ is not configured separately — selecting `nwm_retro` already uses it.
     timeseries overwritten with positive streamflow because there is no sign handling in
     the SFINCS discharge path. Needs both a way to mark a point as a sink and a signed
     series carried through to the model.
-- **Regional STOFS subsetting**: spatially crop STOFS output to the model domain. The
-    original motivation — avoiding a ~12 GB download per cycle — is already handled by
-    reading only the needed time window over HTTP range requests, so this is now a
-    low-priority optimization rather than a blocker. See
+- **Crop STOFS at download time**: the regridder already subsets the global STOFS mesh
+    to the model region before interpolating, and only the needed time window is fetched
+    over HTTP range requests, so the original motivation — avoiding a ~12 GB download
+    per cycle — is handled. Cropping spatially *before* the download would further
+    shrink the on-disk file, but this is now a low-priority optimization rather than a
+    blocker. See
     [docs/dev/stofs_tpxo_improvements.md](docs/dev/stofs_tpxo_improvements.md) Phase 3.
 - **Re-evaluate `hydromt-sfincs` / `hydromt` patches**: 14 upstream bugs are documented
     in [docs/dev/hydromt_sfincs_issues.md](docs/dev/hydromt_sfincs_issues.md) and worked

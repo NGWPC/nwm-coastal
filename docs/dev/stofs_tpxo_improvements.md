@@ -5,12 +5,12 @@ improvement plan written in May 2026; two of those phases have since been delive
 was solved by different means, and the remaining one turned out to be harder than
 described. This revision records where each stands and what is actually left.
 
-| Phase                                  | Status                                                                  |
-| -------------------------------------- | ----------------------------------------------------------------------- |
-| 1. STOFS-aware tidal fallback          | Premise was wrong; the real issue is folded into phase 2                |
-| 2. Multi-cycle STOFS stitching         | **Open**, and blocked on cycle-to-cycle continuity — see below          |
-| 3. Regional (spatial) STOFS subsetting | Objective met by time subsetting; spatial crop unimplemented, low value |
-| 4. Pure-Python tidal prediction        | **Delivered** via pyTMD                                                 |
+| Phase                                  | Status                                                                     |
+| -------------------------------------- | -------------------------------------------------------------------------- |
+| 1. STOFS-aware tidal fallback          | Premise was wrong; the real issue is folded into phase 2                   |
+| 2. Multi-cycle STOFS stitching         | **Open**, and blocked on cycle-to-cycle continuity — see below             |
+| 3. Regional (spatial) STOFS subsetting | Done at regrid time; a download-side crop remains unimplemented, low value |
+| 4. Pure-Python tidal prediction        | **Delivered** via pyTMD                                                    |
 
 ______________________________________________________________________
 
@@ -61,11 +61,29 @@ Two related fixes landed alongside it:
     check let the narrower file satisfy the wider caller. This was confirmed live as the
     cause of a short-range run losing all real boundary forcing after its first hour.
 
-Spatial cropping of the unstructured mesh is still unimplemented. With time subsetting
-in place the remaining payoff is small, so this is retained as a low-priority idea
-rather than a plan. If it is ever revisited: crop by selecting nodes inside the model
-bounding box, keeping only triangles with all three vertices inside, and remapping the
-connectivity to the new numbering. [Thalassa](https://github.com/ec-jrc/Thalassa)
+Spatial cropping already happens, but **at regrid time rather than at download time**.
+`regrid_estofs` derives a bounding box from the destination open-boundary node
+coordinates and passes it to `build_unstructured_mesh`, which keeps only the STOFS nodes
+inside that box plus a 2° buffer (`bbox_node_indices` in `regridding/esmf_utils.py`).
+The reduction is logged as `STOFS source mesh: N/M nodes kept after bbox filter`. This
+is what keeps ESMF mesh construction tractable against the global grid.
+
+The SFINCS side does the same thing by a different route: `_load_geodataset_for_bnd`
+requests the catalog entry with `geom` set to the boundary points and a 50 km buffer, so
+only nearby source nodes are ever materialised before the IDW interpolation. Both
+consumers therefore see a regional subset; neither reads the global mesh into memory.
+
+What is *not* implemented is cropping before the bytes cross the network.
+`_download_stofs_time_subset` copies `x`, `y` and `element` whole and slices only `zeta`
+in time, so the local file still holds the global mesh for the hours it covers. Doing
+the crop upstream of the download would shrink the on-disk file and the regridder's
+input, but the transfer cost is already dominated by the time slice, so the remaining
+payoff is small — this is a low-priority idea rather than a plan.
+
+If it is ever revisited, note that the node-selection half already exists in
+`bbox_node_indices`; what a download-side crop additionally needs is the connectivity
+remap — keep only triangles with all three vertices inside, then renumber `element` to
+the new sequential node indices. [Thalassa](https://github.com/ec-jrc/Thalassa)
 implements this pattern, but it is EUPL-1.2 (copyleft) and unmaintained for two years,
 so write an independent implementation rather than extracting its code.
 
