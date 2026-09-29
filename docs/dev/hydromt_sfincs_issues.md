@@ -85,7 +85,7 @@ This applies identically to `SfincsPrecipitation.create()` (line 411),
 **Current workaround**:
 
 In our pipeline we bypass the upstream `component.create()` entirely via
-`_create_meteo_forcing()` (in `sfincs_build.py`), which clips the source data in its
+`_create_meteo_forcing()` (in `sfincs/stages.py`), which clips the source data in its
 **native CRS** before reprojecting, so the CONUS-scale grid is never allocated. The
 destination grid is also constrained to the model domain bounds. This replaces the
 earlier post-hoc `_clip_meteo_to_domain()` approach that still triggered the full CONUS
@@ -321,7 +321,7 @@ nodes) and write only those interpolated time-series, matching the `.bnd` point 
 
 **Current workaround**:
 
-`SfincsForcingStage._create_geodataset_forcing()` in `sfincs_build.py` bypasses
+`SfincsForcingStage._create_geodataset_forcing()` in `sfincs/stages.py` bypasses
 `model.water_level.create(geodataset=...)` entirely. It reads the `.bnd` file, loads the
 `geodataset`, spatially interpolates to each boundary point using inverse-distance
 weighting (IDW) from the nearest source nodes, then injects the result via
@@ -351,7 +351,7 @@ infragravity data is available, it should be zero-filled with the same shape as 
 
 **Current workaround**:
 
-`SfincsForcingStage._inject_water_level()` in `sfincs_build.py` manually adds a
+`SfincsForcingStage._inject_water_level()` in `sfincs/stages.py` manually adds a
 zero-filled `bzi` variable after calling `model.water_level.set()`:
 
 ```python
@@ -388,7 +388,7 @@ are added and either:
 
 **Current workaround**:
 
-`SfincsDischargeStage._filter_active_cells()` in `sfincs_build.py` uses
+`SfincsDischargeStage._filter_active_cells()` in `sfincs/stages.py` uses
 `scipy.spatial.cKDTree` to map each source point to its nearest quadtree face, checks
 the face mask value, and drops points on inactive cells. The names of dropped points are
 logged as a warning.
@@ -722,3 +722,31 @@ replaces `make_index_cog` with a corrected version that fixes all three bugs: re
 the correct grid component, uses the saved `transform` variable, and adds a
 `pyproj.Transformer` to reproject DEM coordinates to the model CRS before calling
 `get_indices_at_points`.
+
+______________________________________________________________________
+
+## 15. NGEN forecast forcing is not readable as a hydromt raster dataset
+
+**Summary**:
+
+Not an upstream bug, but a compatibility shim in the same file, recorded here so the
+inventory in `_hydromt_compat.py` matches this document.
+
+The ngen forecast forcing engine writes a single multi-timestep file whose datetime axis
+lives in a `Time` *variable* rather than a `time` coordinate, and whose projected `x` /
+`y` carry the same sub-metre float noise as NWM LDASIN. hydromt's raster reader needs a
+`time` dimension coordinate — `_create_meteo_forcing()` selects on `data.coords["time"]`
+— and a regular grid, so the file is rejected as an irregular dataset (the same class of
+failure as issue 6).
+
+**Current workaround**:
+
+`register_forecast_meteo_preprocessor()` in `_hydromt_compat.py` (called from
+`apply_all_patches()`) registers a `forecast_meteo_coords` preprocessor in hydromt's
+`PREPROCESSORS` registry. It promotes `Time` to the `time` dimension coordinate, rounds
+`x` / `y` to the nearest integer for grid regularity, and drops the leftover `Time` and
+`crs` variables. The CRS itself comes from the catalog entry, which reads it from the
+file's `crs` variable at catalog-generation time.
+
+This is selected per data-catalog entry, so it only applies to forecast forcing; NWM
+LDASIN continues to use `round_coords` from issue 6.

@@ -195,9 +195,9 @@ nav:
 - Developer Notes:
   - SFINCS Compilation: dev/sfincs_compilation.md
   - HydroMT-SFINCS Issues: dev/hydromt_sfincs_issues.md
-  - SCHISM Sink/Source Issue: dev/schism_sink_source_issue.md
-  - STOFS/TPXO Improvements: dev/stofs_tpxo_improvements.md
-- Design: DESIGN.md
+  - SCHISM Source/Sink Design: dev/schism_source_sink_design.md
+  - STOFS Boundary Pipeline: dev/stofs_tpxo_improvements.md
+- Design History: DESIGN.md
 - Reference:
   - API Reference: reference/api.md
 - Contributing: CONTRIBUTING.md

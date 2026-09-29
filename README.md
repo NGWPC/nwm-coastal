@@ -152,17 +152,19 @@ The AOI polygon and discharge points can be created interactively using the QGIS
 
 ## Supported Data Sources
 
-| Source      | Date Range                                  | Retrieved from                                                                                                              | Fields used                                            |
-| ----------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| Source      | Date Range                                  | Retrieved from                                                                                                                                            | Fields used                                                        |
+| ----------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
 | `nwm_retro` | 1979-02-01 to 2023-01-31 (CONUS), by domain | [`noaa-nwm-retrospective-3-0-pds`](https://noaa-nwm-retrospective-3-0-pds.s3.amazonaws.com/index.html), `{DOMAIN}/netcdf/FORCING/{year}/*.LDASIN_DOMAIN1` | `T2D`, `Q2D`, `PSFC`, `U2D`, `V2D`, `RAINRATE`, `SWDOWN`, `LWDOWN` |
-| `nwm_ana`   | 2018-10-01 to present, by domain            | [`national-water-model`](https://console.cloud.google.com/storage/browser/national-water-model) on Google Cloud (public)      | same LDASIN fields as above                            |
-| Streamflow  | with the meteo source above                 | NWM Retrospective Zarr store (read directly, not downloaded) or NWM Analysis CHRTOUT files                                   | `streamflow`                                           |
-| `stofs`     | 2020-12-30 to present                       | [`noaa-gestofs-pds`](https://noaa-gestofs-pds.s3.amazonaws.com/index.html)                                                    | water level                                            |
-| `glofs`     | 2016 to present, by lake                    | [NOAA NCEI](https://www.ncei.noaa.gov/oa/prod-model/)                                                                         | water level                                            |
-| `harmonic`  | N/A (local atlas)                           | TPXO10 atlas, installed locally ([registration required](https://www.tpxo.net/))                                             | tidal constituents                                     |
+| `nwm_ana`   | 2018-10-01 to present, by domain            | [`national-water-model`](https://console.cloud.google.com/storage/browser/national-water-model) on Google Cloud (public)                                  | same LDASIN fields as above                                        |
+| Streamflow  | with the meteo source above                 | NWM Retrospective Zarr store (read directly, not downloaded) or NWM Analysis CHRTOUT files                                                                | `streamflow`                                                       |
+| `stofs`     | 2020-12-30 to present                       | [`noaa-gestofs-pds`](https://noaa-gestofs-pds.s3.amazonaws.com/index.html)                                                                                | water level                                                        |
+| `glofs`     | 2016 to present, by lake                    | [NOAA NCEI](https://www.ncei.noaa.gov/oa/prod-model/)                                                                                                     | water level                                                        |
+| `harmonic`  | N/A (local atlas)                           | TPXO10 atlas, installed locally ([registration required](https://www.tpxo.net/))                                                                          | tidal constituents                                                 |
 
-SCHISM reads `T2D`, `Q2D`, `PSFC`, `U2D`, and `V2D` when building `sflux` files; SFINCS
-maps `RAINRATE`, `T2D`, `U2D`/`V2D`, `SWDOWN`, and `LWDOWN` into its own forcing.
+SCHISM reads `T2D`, `Q2D`, `PSFC`, `U2D`, and `V2D` when building `sflux` files. SFINCS
+forces on `RAINRATE` (precipitation), `U2D`/`V2D` (wind) and `PSFC` (pressure). The
+remaining LDASIN fields are renamed into HydroMT conventions when the data catalog is
+written, but no SFINCS stage consumes them.
 
 The NWM Retrospective forcing is AORC-derived (verified for CONUS and Alaska), so AORC
 is not configured separately — selecting `nwm_retro` already uses it.
@@ -191,38 +193,34 @@ is not configured separately — selecting `nwm_retro` already uses it.
 
 ## Roadmap
 
-- **SCHISM model creation**: integrate the existing SCHISM mesh subsetting capability
-    into the package, providing an automated create workflow for SCHISM similar to what
-    SFINCS already has. This will allow users to extract a regional subdomain from a
-    larger SCHISM mesh using the same QGIS plugin and API. When this lands, the
-    discharge source/sink generation step needs to use the upstream-crossing strategy
-    described in
-    [docs/dev/schism_sink_source_issue.md](docs/dev/schism_sink_source_issue.md) rather
-    than the per-crossing classification used to build the current pre-built
-    Pacific/Hawaii meshes (which produces multiple spurious source/sink points along
-    each river inside the domain).
-- **STOFS-aware TPXO fallback**: the boundary pipeline currently overwrites STOFS data
-    with TPXO tidal predictions whenever the simulation exceeds 180 hours, which
-    silently loses storm surge / wind setup / pressure effects on retrospective runs
-    where STOFS data is available for the full window. Replace the unconditional
-    `>180h → TPXO` switch in `make_stofs_boundary` with a data-availability check; only
-    fall back when STOFS doesn't cover the requested window (i.e. prospective forecasts
-    beyond the latest available cycle). Smaller, lower-risk fix that should land before
-    the larger multi-cycle/Python-TPXO work below. See
-    [docs/dev/stofs_tpxo_improvements.md](docs/dev/stofs_tpxo_improvements.md) Phase 1.
-- **Improved tidal boundary conditions**: replace the current 8-constituent TPXO
-    implementation with a pure-Python module supporting all 32+ constituents and minor
-    constituent inference, removing the dependency on an external Fortran binary. See
-    [docs/dev/stofs_tpxo_improvements.md](docs/dev/stofs_tpxo_improvements.md) Phase 4
-    for the detailed plan and the suspected nodal-correction bugs in the OTPS Fortran
-    code.
+- **SCHISM model creation**: the package can already subset an existing mesh
+    (`extract_mesh`, `split_mesh`) and generate the files a hand-assembled model is
+    missing (`prepare-schism-mesh`, `prepare-schism-manning`, `prepare-schism-reaches`).
+    What is missing is a config-driven `create` workflow for SCHISM equivalent to the
+    SFINCS one, building a domain from scratch rather than cutting one out. A
+    from-scratch workflow should place the domain boundary so that NWM flowpaths cross
+    it once, which avoids the source/sink pairs the contour-following NWMv3 meshes
+    produce; see
+    [docs/dev/schism_source_sink_design.md](docs/dev/schism_source_sink_design.md). The
+    existing crosswalk generation is correct for the meshes we run and does not change.
 - **Multi-cycle STOFS stitching**: download and stitch multiple STOFS forecast cycles to
-    cover simulations of any duration, eliminating the current 180-hour single-cycle
-    limit. See
+    cover simulations of any duration, removing the current 180-hour single-cycle limit.
+    This is not just a download change: consecutive STOFS cycles disagree at the same
+    valid time, and in forecast testing that step propagated into the domain. The
+    forecast pipeline already spans cycles today — its spinup, analysis and short-range
+    segments each resolve their own — so a continuity step (offset matching, blending,
+    or rejection above a tolerance) is a prerequisite rather than a refinement. See
     [docs/dev/stofs_tpxo_improvements.md](docs/dev/stofs_tpxo_improvements.md) Phase 2.
-- **Regional STOFS subsetting**: spatially subset the global STOFS output to the model
-    domain before download, reducing data transfer from ~12 GB per cycle to a few
-    hundred MB. See
+- **Great Lakes SFINCS sinks**: a Great Lakes domain may contain a true outlet, such as
+    the Niagara or the St. Clair. SFINCS supports sinks, but this package has no way to
+    produce one: nothing derives an outflow point, and a hand-placed point has its
+    timeseries overwritten with positive streamflow because there is no sign handling in
+    the SFINCS discharge path. Needs both a way to mark a point as a sink and a signed
+    series carried through to the model.
+- **Regional STOFS subsetting**: spatially crop STOFS output to the model domain. The
+    original motivation — avoiding a ~12 GB download per cycle — is already handled by
+    reading only the needed time window over HTTP range requests, so this is now a
+    low-priority optimization rather than a blocker. See
     [docs/dev/stofs_tpxo_improvements.md](docs/dev/stofs_tpxo_improvements.md) Phase 3.
 - **Re-evaluate `hydromt-sfincs` / `hydromt` patches**: 14 upstream bugs are documented
     in [docs/dev/hydromt_sfincs_issues.md](docs/dev/hydromt_sfincs_issues.md) and worked
@@ -246,6 +244,23 @@ is not configured separately — selecting `nwm_retro` already uses it.
     infrequent restarts to reduce storage and metadata pressure on long runs. The
     existing `run_param_overrides` keys would still take precedence so per-run tuning is
     unaffected.
+
+### Recently delivered
+
+- **Pure-Python tidal boundary conditions**: the `predict_tide` Fortran binary and the
+    bundled 8-constituent `pytides` path are gone, replaced by a
+    [pyTMD](https://pytmd.readthedocs.io/)-based predictor in
+    `src/coastal_calibration/data/tides.py` that reads the TPXO10 atlas directly and
+    supports any netCDF tidal model pyTMD knows about.
+- **SCHISM mesh subsetting and crosswalk generation**: `extract_mesh` / `split_mesh`,
+    plus the `prepare-schism-mesh`, `prepare-schism-manning` and
+    `prepare-schism-reaches` commands, with QGIS plugin support for drawing the subset
+    polygon and split line.
+- **Bandwidth-efficient STOFS retrieval**: only the needed time window of a cycle is
+    read over HTTP range requests instead of downloading the full ~12 GB file, with
+    publish-lag-aware cycle resolution and a coverage check on cached files.
+- **Great Lakes and Alaska domains**: a `greatlakes` domain with NOAA GLOFS boundary
+    forcing and low-water-datum gauge comparison, and Alaska domain support.
 
 ## Credits
 
