@@ -15,7 +15,7 @@
         <link rel="canonical" href="https://NGWPC.github.io/nwm-coastal/stable/dev/stofs_tpxo_improvements/">
       
       
-        <link rel="prev" href="../schism_sink_source_issue/">
+        <link rel="prev" href="../schism_source_sink_design/">
       
       
         <link rel="next" href="../../DESIGN/">
@@ -36,7 +36,7 @@
     
     
       
-        <title>STOFS/TPXO Improvements - NWM Coastal</title>
+        <title>STOFS Boundary Pipeline - NWM Coastal</title>
       
     
     
@@ -96,7 +96,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#stofs-boundary-condition-pipeline-analysis-and-improvement-plan" class="md-skip">
+        <a href="#stofs-boundary-pipeline-status-and-remaining-work" class="md-skip">
           Skip to content
         </a>
       
@@ -136,7 +136,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              STOFS/TPXO Improvements
+              STOFS Boundary Pipeline
             
           </span>
         </div>
@@ -345,7 +345,7 @@
   
     
   
-  Design
+  Design History
 
       </a>
     </li>
@@ -1312,14 +1312,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../schism_sink_source_issue/" class="md-nav__link">
+      <a href="../schism_source_sink_design/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    SCHISM Sink/Source Issue
+    SCHISM Source/Sink Design
   
 
     
@@ -1356,7 +1356,7 @@
   <span class="md-ellipsis">
     
   
-    STOFS/TPXO Improvements
+    STOFS Boundary Pipeline
   
 
     
@@ -1374,7 +1374,7 @@
   <span class="md-ellipsis">
     
   
-    STOFS/TPXO Improvements
+    STOFS Boundary Pipeline
   
 
     
@@ -1400,10 +1400,10 @@
     <ul class="md-nav__list" data-md-component="toc">
       
         <li class="md-nav__item">
-  <a href="#table-of-contents" class="md-nav__link">
+  <a href="#phase-1-subsumed-by-phase-2" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Table of contents
+        Phase 1 — subsumed by phase 2
       
     </span>
   </a>
@@ -1411,33 +1411,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#problem-statement" class="md-nav__link">
+  <a href="#phase-2-multi-cycle-stofs-and-the-continuity-problem" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Problem statement
+        Phase 2 — multi-cycle STOFS, and the continuity problem
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#current-implementation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Current implementation
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Current implementation">
+    <nav class="md-nav" aria-label="Phase 2 — multi-cycle STOFS, and the continuity problem">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#download-downloaderpy" class="md-nav__link">
+  <a href="#current-behavior" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Download (downloader.py)
+        Current behavior
       
     </span>
   </a>
@@ -1445,10 +1434,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#regridding-regrid_estofspy" class="md-nav__link">
+  <a href="#the-forecast-pipeline-already-spans-multiple-cycles" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Regridding (regrid_estofs.py)
+        The forecast pipeline already spans multiple cycles
       
     </span>
   </a>
@@ -1456,10 +1445,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#tpxo-fallback-schism_preppy-lines-907924" class="md-nav__link">
+  <a href="#what-that-costs" class="md-nav__link">
     <span class="md-ellipsis">
       
-        TPXO fallback (schism_prep.py, lines 907–924)
+        What that costs
       
     </span>
   </a>
@@ -1467,10 +1456,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#pytides-tidal-fill-_ocean_tidepy" class="md-nav__link">
+  <a href="#what-a-solution-needs" class="md-nav__link">
     <span class="md-ellipsis">
       
-        pytides tidal fill (_ocean_tide.py)
+        What a solution needs
       
     </span>
   </a>
@@ -1478,10 +1467,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#tpxo-boundary-path-make_tpxo_boundary" class="md-nav__link">
+  <a href="#schisms-own-ramp-parameters" class="md-nav__link">
     <span class="md-ellipsis">
       
-        TPXO boundary path (make_tpxo_boundary)
+        SCHISM's own ramp parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#download-side-changes-still-required" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Download-side changes still required
       
     </span>
   </a>
@@ -1494,10 +1494,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#root-cause-analysis" class="md-nav__link">
+  <a href="#phase-3-objective-met-a-download-side-crop-remains-open" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Root cause analysis
+        Phase 3 — objective met; a download-side crop remains open
       
     </span>
   </a>
@@ -1505,10 +1505,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#stofs-data-availability" class="md-nav__link">
+  <a href="#phase-4-delivered" class="md-nav__link">
     <span class="md-ellipsis">
       
-        STOFS data availability
+        Phase 4 — delivered
       
     </span>
   </a>
@@ -1516,124 +1516,13 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#issues-with-tpxo-tidal-prediction" class="md-nav__link">
+  <a href="#reference-stofs-data-availability" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Issues with TPXO tidal prediction
+        Reference: STOFS data availability
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Issues with TPXO tidal prediction">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#quality-limitations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Quality limitations
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#portability-problems" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Portability problems
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#suspected-bugs-in-the-otps-fortran-code" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Suspected bugs in the OTPS Fortran code
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#what-a-proper-python-replacement-needs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What a proper Python replacement needs
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#proposed-solution" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Proposed solution
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Proposed solution">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#phase-1-fix-the-tpxo-fallback-logic" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Phase 1: Fix the TPXO fallback logic
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#phase-2-multi-cycle-stofs-download-and-stitching" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Phase 2: Multi-cycle STOFS download and stitching
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#phase-3-spatial-subsetting-of-unstructured-stofs-grids" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Phase 3: Spatial subsetting of unstructured STOFS grids
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#phase-4-pure-python-tpxo-prediction-module" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Phase 4: Pure-Python TPXO prediction module
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -1667,7 +1556,7 @@
   <span class="md-ellipsis">
     
   
-    Design
+    Design History
   
 
     
@@ -1928,103 +1817,209 @@
   
 
 
-<h1 id="stofs-boundary-condition-pipeline-analysis-and-improvement-plan">STOFS Boundary Condition Pipeline: Analysis and Improvement Plan<a class="headerlink" href="#stofs-boundary-condition-pipeline-analysis-and-improvement-plan" title="Permanent link">#</a></h1>
+<h1 id="stofs-boundary-pipeline-status-and-remaining-work">STOFS boundary pipeline: status and remaining work<a class="headerlink" href="#stofs-boundary-pipeline-status-and-remaining-work" title="Permanent link">#</a></h1>
+<p>This note tracks the STOFS / tidal boundary pipeline. It was originally a four-phase
+improvement plan written in May 2026. Since then phase 4 has been delivered, phase 3's
+objective has been met, phase 1 turned out to be an aspect of phase 2 rather than a task
+of its own, and phase 2 turned out to be harder than described. This revision records
+where each stands and what is actually left.</p>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. STOFS-aware tidal fallback</td>
+<td>Subsumed by phase 2 — the condition is cycle availability</td>
+</tr>
+<tr>
+<td>2. Multi-cycle STOFS stitching</td>
+<td><strong>Open</strong>, and blocked on cycle-to-cycle continuity — see below</td>
+</tr>
+<tr>
+<td>3. Regional (spatial) STOFS subsetting</td>
+<td>Done at regrid time; a download-side crop remains unimplemented, low value</td>
+</tr>
+<tr>
+<td>4. Pure-Python tidal prediction</td>
+<td><strong>Delivered</strong> via pyTMD</td>
+</tr>
+</tbody>
+</table>
 <hr />
-<h2 id="table-of-contents">Table of contents<a class="headerlink" href="#table-of-contents" title="Permanent link">#</a></h2>
-<ol>
-<li><a href="#problem-statement">Problem statement</a></li>
-<li><a href="#current-implementation">Current implementation</a></li>
-<li><a href="#root-cause-analysis">Root cause analysis</a></li>
-<li><a href="#stofs-data-availability">STOFS data availability</a></li>
-<li><a href="#issues-with-tpxo-tidal-prediction">Issues with TPXO tidal prediction</a></li>
-<li><a href="#proposed-solution">Proposed solution</a></li>
-</ol>
+<h2 id="phase-1-subsumed-by-phase-2">Phase 1 — subsumed by phase 2<a class="headerlink" href="#phase-1-subsumed-by-phase-2" title="Permanent link">#</a></h2>
+<p>The tidal fill is what keeps a run longer than 180 h supplied once its single STOFS
+cycle runs out. <code>extend_schism_boundary</code> appends from <code>fill_from_hour=181</code>, reads the
+existing file's own <code>time_step</code> rather than assuming hourly, and writes only rows from
+that point on, so the STOFS hours already in <code>elev2D.th.nc</code> stay as they are.
+<code>make_stofs_boundary</code> (<code>schism/prep.py</code>) treats it as best-effort: a failure logs loudly
+and leaves the first 180 h of valid forcing in place rather than aborting, and a run
+past 180 h with no <code>paths.tidal_atlas_dir</code> configured gets a warning instead of a silent
+truncation.</p>
+<p>This phase was framed as making that fill conditional — fall back to tides only when
+STOFS genuinely does not cover the window. That condition turns out to be the same
+condition as phase 2. Hours past 180 are tidal-only because only one cycle is ever
+downloaded, so there is no further STOFS data available to prefer; the fill is not
+displacing anything. Once multiple cycles can be stitched, "STOFS where it exists, tides
+beyond it" falls out of the stitching logic rather than needing a check of its own, so
+it is tracked there.</p>
 <hr />
-<h2 id="problem-statement">Problem statement<a class="headerlink" href="#problem-statement" title="Permanent link">#</a></h2>
-<p>The boundary condition pipeline has three issues that affect simulation quality,
-portability, and scalability:</p>
-<ol>
-<li>
-<p><strong>Blind TPXO fallback for simulations &gt; 180 hours.</strong> When
-    <code>boundary.source == "stofs"</code> and the simulation exceeds 180 hours, the code
-    unconditionally replaces hours 181+ with tidal-only predictions. This degrades
-    quality for retrospective runs where STOFS data covers the full period; the
-    tidal-only fill loses storm surge, wind setup, and pressure effects that STOFS
-    captures.</p>
-</li>
-<li>
-<p><strong>Single-cycle download.</strong> The downloader fetches one STOFS forecast file (matching
-    the simulation start time) regardless of duration. Each STOFS file covers at most
-    180 hours. For longer simulations, additional STOFS cycles are needed but never
-    downloaded.</p>
-</li>
-<li>
-<p><strong>Fragile and inaccurate TPXO prediction stack.</strong> The tidal prediction path relies on
-    a compiled Fortran binary (<code>predict_tide</code>) invoked via subprocess, a bundled legacy
-    Python library (<code>pytides</code>) with only 8 constituents, and ad-hoc spatial
-    interpolation via <code>scipy.griddata</code> that ignores the native TPXO grid structure.
-    This is both a portability problem (binary dependency) and an accuracy problem.</p>
-</li>
-</ol>
-<hr />
-<h2 id="current-implementation">Current implementation<a class="headerlink" href="#current-implementation" title="Permanent link">#</a></h2>
-<h3 id="download-downloaderpy">Download (<code>downloader.py</code>)<a class="headerlink" href="#download-downloaderpy" title="Permanent link">#</a></h3>
-<p><code>_build_stofs_urls()</code> constructs a single URL based on the simulation start date and the
-nearest 6-hourly cycle:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>s3://noaa-gestofs-pds/stofs_2d_glo.{YYYYMMDD}/stofs_2d_glo.t{HH}z.fields.cwl.nc
-</span></code></pre></div>
-<p>Only one file is downloaded per simulation. The end date / duration is not considered.</p>
-<h3 id="regridding-regrid_estofspy">Regridding (<code>regrid_estofs.py</code>)<a class="headerlink" href="#regridding-regrid_estofspy" title="Permanent link">#</a></h3>
-<p><code>regrid_estofs</code> receives the single STOFS file, a cycle date/time, and <code>--length-hrs</code>.
-It extracts time steps starting at a fixed forecast offset (<code>FORECAST_START = 5</code>) and
-interpolates the unstructured STOFS grid onto the SCHISM open boundary nodes via ESMF.
-Output: <code>elev2D.th.nc</code>.</p>
-<p>If the requested duration exceeds the file's available time steps, the regridder
-produces output only for the hours present in the file (up to ~180 hours of forecast).</p>
-<h3 id="tpxo-fallback-schism_preppy-lines-907924">TPXO fallback (<code>schism_prep.py</code>, lines 907–924)<a class="headerlink" href="#tpxo-fallback-schism_preppy-lines-907924" title="Permanent link">#</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">raw_length</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">duration_hours</span><span class="p">))</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="k">if</span> <span class="n">raw_length</span> <span class="o">&gt;</span> <span class="mi">180</span><span class="p">:</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">generate_ocean_tide</span><span class="p">(</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>        <span class="n">hgrid_gr3</span><span class="o">=...</span><span class="p">,</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>        <span class="n">output_file</span><span class="o">=...</span><span class="p">,</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>        <span class="n">start_dt</span><span class="o">=...</span><span class="p">,</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>        <span class="n">duration_hours</span><span class="o">=</span><span class="n">raw_length</span><span class="p">,</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>        <span class="n">tidal_constants_dir</span><span class="o">=...</span><span class="p">,</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    <span class="p">)</span>
-</span></code></pre></div>
-<p>This unconditionally overwrites <code>elev2D.th.nc</code> from hour 181 onward with tidal-only
-predictions. There is no check for whether the simulation is retrospective (STOFS data
-exists for the full window) or prospective (a real-time forecast beyond the STOFS
-horizon).</p>
-<h3 id="pytides-tidal-fill-_ocean_tidepy"><code>pytides</code> tidal fill (<code>_ocean_tide.py</code>)<a class="headerlink" href="#pytides-tidal-fill-_ocean_tidepy" title="Permanent link">#</a></h3>
-<p><code>generate_ocean_tide()</code>:</p>
-<ol>
-<li>Reads 8 separate TPXO constituent grid files (<code>k1.nc</code> … <code>s2.nc</code>).</li>
-<li>Interpolates amplitude/phase to SCHISM boundary nodes via <code>scipy.griddata</code> (linear,
-    ignoring the native Arakawa C-grid staggering).</li>
-<li>Sums harmonics for 8 constituents using the bundled <code>pytides</code> library.</li>
-<li>Opens <code>elev2D.th.nc</code> in append mode and overwrites from index 181.</li>
-</ol>
-<h3 id="tpxo-boundary-path-make_tpxo_boundary">TPXO boundary path (<code>make_tpxo_boundary</code>)<a class="headerlink" href="#tpxo-boundary-path-make_tpxo_boundary" title="Permanent link">#</a></h3>
-<p>When <code>boundary.source == "tpxo"</code>, the code shells out to the Fortran <code>predict_tide</code>
-binary, then converts its text output to <code>elev2D.th.nc</code> via <code>otps_to_open_bnds()</code>. This
-path is functionally correct but carries a compiled binary dependency that complicates
-portability and CI.</p>
-<hr />
-<h2 id="root-cause-analysis">Root cause analysis<a class="headerlink" href="#root-cause-analysis" title="Permanent link">#</a></h2>
-<p>The 180-hour threshold originates from the <strong>NWM operational forecast pipeline on
-WCOSS/AWS</strong>. In that context:</p>
+<h2 id="phase-2-multi-cycle-stofs-and-the-continuity-problem">Phase 2 — multi-cycle STOFS, and the continuity problem<a class="headerlink" href="#phase-2-multi-cycle-stofs-and-the-continuity-problem" title="Permanent link">#</a></h2>
+<p>Still open, and the interesting part is not the stitching.</p>
+<h3 id="current-behavior">Current behavior<a class="headerlink" href="#current-behavior" title="Permanent link">#</a></h3>
+<p><code>_build_stofs_urls</code> constructs exactly one URL from the simulation start date's 6-hourly
+cycle, and <code>download_data</code> resolves and fetches exactly one cycle per invocation. The
+end date is not considered. Each STOFS cycle covers at most ~180 h, so a longer
+simulation gets STOFS for its first 180 h and a pyTMD tidal fill after that.</p>
+<h3 id="the-forecast-pipeline-already-spans-multiple-cycles">The forecast pipeline already spans multiple cycles<a class="headerlink" href="#the-forecast-pipeline-already-spans-multiple-cycles" title="Permanent link">#</a></h3>
+<p>A single <code>coastal-calibration run</code> uses one cycle — but the forecast orchestration
+invokes the CLI <strong>once per segment</strong>. <code>forecast_demo/bin/hotstart_coastal_models.sh</code>
+runs a standalone <code>spinup</code> segment; <code>forecast_demo/ecf_home/run_stofs_download_ana.ecf</code>
+and <code>run_stofs_download_sr.ecf</code> run the hourly <code>ana</code> and <code>sr</code> segments, each against its
+own generated <code>run.yaml</code>. Every one of those independently calls <code>resolve_stofs_cycle</code>
+for its own start time, and a spinup beginning ~21 h before the live cycle routinely
+lands in a different 6-hourly bucket than the <code>ana</code> segment it hands off to.</p>
+<p>Nothing joins those segments' <strong>forcing</strong>. Continuity across a segment boundary is
+supplied only by the model hot-starting from the previous segment's dynamical state
+(<code>paths.hot_start_file</code> for SCHISM, <code>rstfile</code> / <code>--sfincs-rst-file</code> for SFINCS); the
+boundary series simply restarts from whatever cycle the new segment resolved.</p>
+<h3 id="what-that-costs">What that costs<a class="headerlink" href="#what-that-costs" title="Permanent link">#</a></h3>
+<p><img alt="STOFS raw versus SFINCS boundary water level at stations 0001 and 0047. At the spinup-to-analysis handoff (dashed line) the t00z and t18z cycles disagree by roughly 5-8 cm at the same valid time, and the SFINCS boundary inherits the step." src="../images/stofs_cycle_seam.png" /></p>
+<p>In this example the t18z analysis cycle sits ~5–8 cm below the t00z spinup cycle at the
+same valid time, at both stations. The SFINCS boundary inherits that step, which enters
+the domain as a small wave.</p>
+<p>How much this matters depends entirely on how well the two cycles agree. When
+consecutive STOFS forecasts are close there is no issue and the handoff is invisible.
+When they differ substantially, the step propagates inward — and nothing about this is
+specific to SFINCS: the figure happens to show a SFINCS boundary, but SCHISM takes its
+boundary from the same cycles in the same way, so both coastal models are affected
+alike. We have seen this in forecast test cases.</p>
+<p>So this is <strong>a live forecast issue today</strong>, not only a hazard for some future &gt;180 h
+stitching feature. Any work here has to address both.</p>
+<h3 id="what-a-solution-needs">What a solution needs<a class="headerlink" href="#what-a-solution-needs" title="Permanent link">#</a></h3>
+<p>The naive approach this note previously recommended — "for each output time step, select
+the best available STOFS cycle, preferring the cycle whose forecast hour is closest to
+the analysis time" — is precisely what produces the jump. Treat it as retracted. Picking
+the most accurate value per timestep is not the same as picking a continuous series, and
+the boundary condition needs the latter.</p>
+<p>A workable design needs a continuity step before the stitched series is written.
+Candidates, none yet chosen:</p>
 <ul>
-<li>STOFS-2D-Global produces forecasts to exactly 180 hours (7.5 days), 4 cycles per day.</li>
-<li>NWM medium-range forecasts extend to 240 hours and extended-range to 720 hours.</li>
-<li>For the hours beyond the STOFS forecast horizon (181+), the only option was tidal-only
-    extrapolation.</li>
+<li><strong>Offset matching.</strong> Over the overlap between consecutive cycles, compute the mean
+    difference per boundary node and shift the incoming cycle onto the outgoing one.
+    Preserves shape, cheap, but accumulates drift across many seams.</li>
+<li><strong>Blending / tapering.</strong> Weight the two cycles across their overlap window so the
+    transition is continuous by construction. No discontinuity by design, at the cost of
+    a physically mixed segment.</li>
+<li><strong>Rejection with a threshold.</strong> Refuse a cycle whose overlap disagreement exceeds a
+    configured tolerance and fall back to extending the previous one. Simple, and
+    surfaces the problem instead of hiding it.</li>
 </ul>
-<p>This was correct for real-time operational use. The code was ported to this package
-without accounting for retrospective runs, where overlapping STOFS cycles can be
-stitched to cover any historical period.</p>
+<p>Whichever is chosen, it applies to the forecast segment handoff as much as to within-run
+stitching, and the two existing additive-offset hooks are the natural places to look for
+a seam: <code>correct_elevation</code> in <code>schism/prep.py</code> and the <code>forcing_to_mesh_offset_m</code> path
+in <code>schism/boundary.py</code> / <code>sfincs/stages.py</code>. Both today apply a <strong>static,
+config-supplied</strong> correction uniformly across one segment's series, so neither is a seam
+correction as written — but both already do the "add an offset to a water-level series
+before it is consumed" mechanics.</p>
+<h3 id="schisms-own-ramp-parameters">SCHISM's own ramp parameters<a class="headerlink" href="#schisms-own-ramp-parameters" title="Permanent link">#</a></h3>
+<p>For the forecast handoff specifically, SCHISM's <code>dramp</code> and <code>nramp_elev</code> look like the
+obvious candidates and are worth investigating before anything is built on our side.
+Thorough investigation and testing have not been done yet, so what follows is a starting
+point rather than a recommendation.</p>
+<p>With <code>nramp_elev=1</code> the solver blends the open-boundary elevation from the hotstart
+value onto the imposed forcing over <code>dramp</code> days, rather than applying the new forcing
+at full strength from the first step (<code>schism_step.F90</code>, elevation b.c. block; the ramp
+weight is a <code>tanh</code> over <code>dramp</code> and the blend target is the post-hotstart elevation
+field). That is the same idea as the blending option above, but inside the solver and
+limited to a segment start — it would not help a mid-run stitch.</p>
+<p>Note the failure mode if only half of this is applied: setting <code>dramp &gt; 0</code> on a
+hotstarted segment <em>without</em> <code>nramp_elev = 1</code> ramps the boundary up from zero rather
+than from the hotstart elevation, which would be a much larger artificial transient than
+the step it was meant to remove. Both keys can be passed through
+<code>model_config.run_param_overrides</code> — <code>gen_cycle_config.py</code> already uses
+<code>{"dramp": 0.25, "nramp_elev": 1}</code> as its documented example — so this can be tested on
+a forecast cycle without a code change.</p>
+<h3 id="download-side-changes-still-required">Download-side changes still required<a class="headerlink" href="#download-side-changes-still-required" title="Permanent link">#</a></h3>
+<ul>
+<li><code>_build_stofs_urls</code> accepts a start <em>and</em> end, and generates one URL per 6-hourly
+    cycle needed to cover the window.</li>
+<li>Only cycles not already cached are fetched; <code>_stofs_local_file_covers</code> extends to the
+    multi-file case.</li>
+<li><code>regrid_estofs</code> accepts multiple input files and produces one continuous
+    <code>elev2D.th.nc</code>, with the continuity step above applied at each seam.</li>
+</ul>
 <hr />
-<h2 id="stofs-data-availability">STOFS data availability<a class="headerlink" href="#stofs-data-availability" title="Permanent link">#</a></h2>
+<h2 id="phase-3-objective-met-a-download-side-crop-remains-open">Phase 3 — objective met; a download-side crop remains open<a class="headerlink" href="#phase-3-objective-met-a-download-side-crop-remains-open" title="Permanent link">#</a></h2>
+<p>The original concern was that each STOFS cycle is ~12 GB globally while a simulation
+needs a few hours of it. That is solved: <code>_download_stofs_time_subset</code> in
+<code>data/downloader.py</code> opens the remote file lazily over HTTP range requests and
+materializes only the <code>[start, end + 1h]</code> slice of <code>time</code> / <code>zeta</code>, plus the static mesh
+variables (<code>x</code>, <code>y</code>, <code>element</code>) that <code>regrid_estofs.py</code> and the SFINCS reader need. The
+full file is never downloaded.</p>
+<p>Two related fixes landed alongside it:</p>
+<ul>
+<li><code>resolve_stofs_cycle</code> walks back in 6-hour steps from the naive cycle until it finds
+    one actually published, so a "now" start time doesn't name a cycle that does not
+    exist yet.</li>
+<li><code>_stofs_local_file_covers</code> verifies an existing local file's real time coverage before
+    reusing it. <code>get_stofs_path</code> names files only by 6-hourly cycle, so a short-window
+    run and a long-window run sharing a cycle resolve to the same path; a bare existence
+    check let the narrower file satisfy the wider caller. This was confirmed live as the
+    cause of a short-range run losing all real boundary forcing after its first hour.</li>
+</ul>
+<p>Spatial cropping already happens, but <strong>at regrid time rather than at download time</strong>.
+<code>regrid_estofs</code> derives a bounding box from the destination open-boundary node
+coordinates and passes it to <code>build_unstructured_mesh</code>, which keeps only the STOFS nodes
+inside that box plus a 2° buffer (<code>bbox_node_indices</code> in <code>regridding/esmf_utils.py</code>).
+The reduction is logged as <code>STOFS source mesh: N/M nodes kept after bbox filter</code>. This
+is what keeps ESMF mesh construction tractable against the global grid.</p>
+<p>The SFINCS side does the same thing by a different route: <code>_load_geodataset_for_bnd</code>
+requests the catalog entry with <code>geom</code> set to the boundary points and a 50 km buffer, so
+only nearby source nodes are ever materialised before the IDW interpolation. Both
+consumers therefore see a regional subset; neither reads the global mesh into memory.</p>
+<p>What is <em>not</em> implemented is cropping before the bytes cross the network.
+<code>_download_stofs_time_subset</code> copies <code>x</code>, <code>y</code> and <code>element</code> whole and slices only <code>zeta</code>
+in time, so the local file still holds the global mesh for the hours it covers. Doing
+the crop upstream of the download would shrink the on-disk file and the regridder's
+input, but the transfer cost is already dominated by the time slice, so the remaining
+payoff is small — this is a low-priority idea rather than a plan.</p>
+<p>If it is ever revisited, note that the node-selection half already exists in
+<code>bbox_node_indices</code>; what a download-side crop additionally needs is the connectivity
+remap — keep only triangles with all three vertices inside, then renumber <code>element</code> to
+the new sequential node indices. <a href="https://github.com/ec-jrc/Thalassa">Thalassa</a>
+implements this pattern, but it is EUPL-1.2 (copyleft) and unmaintained for two years,
+so write an independent implementation rather than extracting its code.</p>
+<hr />
+<h2 id="phase-4-delivered">Phase 4 — delivered<a class="headerlink" href="#phase-4-delivered" title="Permanent link">#</a></h2>
+<p>Tidal prediction is pure Python. <code>src/coastal_calibration/data/tides.py</code> wraps
+<a href="https://pytmd.readthedocs.io/">pyTMD</a> and exposes three entry points:</p>
+<ul>
+<li><code>predict_tide_at_points</code> — elevations at arbitrary points over an arbitrary time
+    array; the SFINCS forcing stage calls this directly so it can manage its own
+    cadence.</li>
+<li><code>write_schism_boundary</code> — writes the canonical 4-D <code>elev2D.th.nc</code> at a caller-supplied
+    cadence.</li>
+<li><code>extend_schism_boundary</code> — appends a tidal-only fill to an existing <code>elev2D.th.nc</code>.</li>
+</ul>
+<p>This replaced the <code>predict_tide</code> Fortran binary, the bundled <code>pytides</code> library, the
+<code>scipy.griddata</code> interpolation and the text-file subprocess pipeline in one step. The
+following no longer exist: <code>tides/pytides/</code>, <code>tides/_ocean_tide.py</code>, <code>_otps.py</code>,
+<code>make_otps_input</code>, <code>otps_to_open_bnds</code>, and the separate <code>k1.nc</code> … <code>s2.nc</code> constituent
+files. pyTMD reads the TPXO10 atlas directly, and any netCDF model in
+<code>pyTMD.io.load_database()</code> with an elevation group works — TPXO9, FES2014, GOT, EOT —
+selected per run via <code>BoundaryConfig.tidal_model</code>.</p>
+<p>This was solved by adopting a maintained library rather than by writing the bespoke
+module the original plan specified. One consequence worth recording: that plan listed
+three <strong>suspected</strong> bugs in the OTPS Fortran nodal-correction code (an L2 radian
+conversion, an MS4 compound factor, a hardcoded M3 factor). Those were never confirmed —
+the investigation was made moot rather than completed. They are noted here only so
+nobody re-derives them believing there is an open action; there is not.</p>
+<hr />
+<h2 id="reference-stofs-data-availability">Reference: STOFS data availability<a class="headerlink" href="#reference-stofs-data-availability" title="Permanent link">#</a></h2>
 <table>
 <thead>
 <tr>
@@ -2039,7 +2034,7 @@ stitched to cover any historical period.</p>
 </tr>
 <tr>
 <td>Forecast horizon</td>
-<td>180 hours per cycle</td>
+<td>~180 hours per cycle</td>
 </tr>
 <tr>
 <td>Cycle frequency</td>
@@ -2055,206 +2050,17 @@ stitched to cover any historical period.</p>
 </tr>
 <tr>
 <td>File size</td>
-<td>~12 GB per cycle (global)</td>
+<td>~12 GB per cycle (global, full time range)</td>
 </tr>
 <tr>
 <td>Subsetting API</td>
-<td>None (no OPeNDAP/THREDDS endpoint for STOFS-2D-Global)</td>
+<td>None; HTTP range reads are used instead</td>
 </tr>
 </tbody>
 </table>
-<p>For any retrospective simulation starting after 2020-12-30, STOFS data exists for the
-entire period. A 240-hour simulation starting 2024-01-09T00Z can be covered by:</p>
-<ul>
-<li>Cycle 2024-01-09T00Z → hours 0–180</li>
-<li>Cycle 2024-01-09T06Z → hours 6–186 (overlap provides hours 180–186)</li>
-<li>Cycle 2024-01-09T12Z → hours 12–192 (provides hours 186–192)</li>
-<li>… and so on every 6 hours.</li>
-</ul>
-<hr />
-<h2 id="issues-with-tpxo-tidal-prediction">Issues with TPXO tidal prediction<a class="headerlink" href="#issues-with-tpxo-tidal-prediction" title="Permanent link">#</a></h2>
-<p>Even when the TPXO fallback is genuinely needed (prospective forecasts beyond the STOFS
-horizon), the current implementation has significant quality and portability problems:</p>
-<h3 id="quality-limitations">Quality limitations<a class="headerlink" href="#quality-limitations" title="Permanent link">#</a></h3>
-<ul>
-<li><strong>Only 8 tidal constituents</strong> (K1, K2, M2, N2, O1, P1, Q1, S2). The TPXO10 atlas
-    provides 32 constituents and 18 additional minor constituents can be inferred via
-    admittance methods. Using only 8 loses significant tidal energy, especially in
-    regions with strong shallow-water harmonics (M4, M6, MS4).</li>
-<li><strong>No minor constituent inference.</strong> The OTPS Fortran code and modern implementations
-    like <code>pyTMD</code> use Richard Ray's PERTH2 admittance method to infer 18 minor
-    constituents from the 8 major ones. The current <code>pytides</code> path does not do this.</li>
-<li><strong>Incorrect spatial interpolation.</strong> <code>scipy.griddata</code> with <code>method='linear'</code> treats
-    the TPXO data as scattered points. TPXO uses an Arakawa C-grid where elevation,
-    u-transport, and v-transport live on different staggered nodes. Proper bilinear
-    interpolation on the C-grid (with land masking and periodic longitude wrapping) is
-    required for correct results.</li>
-<li><strong>Node-by-node loop.</strong> The current code loops over each boundary node individually
-    (<code>for i in range(amp.shape[0])</code>) to create a <code>Tide</code> object and call <code>tide.at()</code>. A
-    vectorized implementation over all nodes would be significantly faster.</li>
-<li><strong>No solid Earth tide correction.</strong> The OTPS Fortran code applies a <code>BETA_SE</code> scaling
-    factor (~0.94–0.954) to remove first-order load tides. <code>pytides</code> does not.</li>
-</ul>
-<h3 id="portability-problems">Portability problems<a class="headerlink" href="#portability-problems" title="Permanent link">#</a></h3>
-<ul>
-<li><strong>Compiled Fortran binary dependency.</strong> The <code>predict_tide</code> binary must be compiled
-    from the OTPS source code (or provided via pixi). This complicates CI,
-    cross-platform builds, and container-less deployment.</li>
-<li><strong>Text file I/O pipeline.</strong> The current TPXO path writes a text input file
-    (<code>otps_lat_lon_time.txt</code>), invokes <code>predict_tide</code> via subprocess, parses its text
-    output (<code>otps_out.txt</code>), then converts to NetCDF. This is fragile and slow.</li>
-<li><strong>Separate constituent files.</strong> The <code>pytides</code> fallback path requires 8 separate TPXO
-    constituent files (<code>k1.nc</code> … <code>s2.nc</code>) in a specific directory, separate from the
-    atlas files used by <code>predict_tide</code>. This creates a confusing dual data requirement.</li>
-</ul>
-<h3 id="suspected-bugs-in-the-otps-fortran-code">Suspected bugs in the OTPS Fortran code<a class="headerlink" href="#suspected-bugs-in-the-otps-fortran-code" title="Permanent link">#</a></h3>
-<p>Preliminary review of the OTPS Fortran source (<code>subs.f90</code>, <code>arguments</code> subroutine,
-originally by Richard Ray / NASA GSFC) has identified three suspected bugs in the nodal
-correction factor computation that require systematic investigation and quantification:</p>
-<ol>
-<li>
-<p><strong>L2 nodal factor: possible missing radian conversion.</strong> The <code>sin(2p)</code> term in the L2
-    amplitude factor may omit the degree-to-radian conversion while the adjacent
-    <code>cos(2p*rad)</code> term applies it. L2 is absent from the TPXO10 atlas v2 set but would
-    affect non-atlas models.</p>
-</li>
-<li>
-<p><strong>MS4 nodal factor: possible wrong compound formula.</strong> MS4 is a compound of M2 and
-    S2, so its factor should be <code>f_M2 * f_S2</code>. The code appears to assign <code>f_M2^2</code> (the
-    M4/MN4 factor) instead. MS4 IS present in the TPXO10 atlas.</p>
-</li>
-<li>
-<p><strong>M3 nodal factor: possible hardcoded value.</strong> The M3 factor appears hardcoded to 1.0
-    rather than <code>f_M2^1.5</code>. Absent from the TPXO10 atlas v2 set.</p>
-</li>
-</ol>
-<p>These need to be confirmed by direct comparison of the Fortran output against an
-independent implementation (e.g., <code>pyTMD</code>) across the full 18.6-year nodal cycle and at
-stations spanning different tidal regimes. If confirmed, the errors would be systematic
-and oscillatory, scaling with tidal range, providing further motivation for replacing
-the Fortran binary with a validated pure-Python implementation where such bugs can be
-corrected.</p>
-<h3 id="what-a-proper-python-replacement-needs">What a proper Python replacement needs<a class="headerlink" href="#what-a-proper-python-replacement-needs" title="Permanent link">#</a></h3>
-<p>A pure-Python TPXO prediction module that:</p>
-<ol>
-<li>Reads the standard TPXO10 atlas NetCDF files directly (the same files <code>predict_tide</code>
-    uses).</li>
-<li>Implements proper Arakawa C-grid bilinear interpolation with land masking and
-    periodic longitude wrapping.</li>
-<li>Computes astronomical arguments and nodal corrections using the Cartwright &amp; Tayler
-    formulas, with any confirmed Fortran bugs corrected.</li>
-<li>Supports all 32 TPXO constituents.</li>
-<li>Infers 18 minor constituents via the PERTH2 admittance method.</li>
-<li>Applies solid Earth tide corrections.</li>
-<li>Vectorizes over all locations and times for performance.</li>
-<li>Returns NumPy arrays directly; no subprocess, no text parsing.</li>
-<li>Is validated against the Fortran OTPS binary and cross-validated against <code>pyTMD</code> for
-    numerical parity.</li>
-</ol>
-<hr />
-<h2 id="proposed-solution">Proposed solution<a class="headerlink" href="#proposed-solution" title="Permanent link">#</a></h2>
-<h3 id="phase-1-fix-the-tpxo-fallback-logic">Phase 1: Fix the TPXO fallback logic<a class="headerlink" href="#phase-1-fix-the-tpxo-fallback-logic" title="Permanent link">#</a></h3>
-<p>Replace the blind <code>&gt; 180</code> check with a data-availability test:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">sim_end</span> <span class="o">=</span> <span class="n">start_date</span> <span class="o">+</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">hours</span><span class="o">=</span><span class="nb">abs</span><span class="p">(</span><span class="n">duration_hours</span><span class="p">))</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">now</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="n">timezone</span><span class="o">.</span><span class="n">utc</span><span class="p">)</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="k">if</span> <span class="n">sim_end</span> <span class="o">&gt;</span> <span class="n">now</span> <span class="o">+</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">hours</span><span class="o">=</span><span class="mi">6</span><span class="p">):</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="c1"># Prospective: simulation extends into the future beyond latest</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="c1"># available STOFS cycle.  Fall back to TPXO for uncovered hours.</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">last_stofs_hour</span> <span class="o">=</span> <span class="o">...</span>  <span class="c1"># determine from downloaded data</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="n">generate_tidal_fill</span><span class="p">(</span><span class="n">start_hour</span><span class="o">=</span><span class="n">last_stofs_hour</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="k">else</span><span class="p">:</span>
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    <span class="c1"># Retrospective: STOFS covers the full window.  No TPXO needed.</span>
-</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>    <span class="k">pass</span>
-</span></code></pre></div>
-<p>This is a minimal, low-risk change that eliminates the quality degradation for all
-retrospective STOFS runs longer than 180 hours.</p>
-<h3 id="phase-2-multi-cycle-stofs-download-and-stitching">Phase 2: Multi-cycle STOFS download and stitching<a class="headerlink" href="#phase-2-multi-cycle-stofs-download-and-stitching" title="Permanent link">#</a></h3>
-<p>Extend the download and regridding pipeline to handle multiple STOFS cycles:</p>
-<p><strong>Download stage changes (<code>downloader.py</code>):</strong></p>
-<ul>
-<li><code>_build_stofs_urls()</code> accepts <code>start</code> and <code>end</code> date-times.</li>
-<li>Generates one URL per 6-hourly cycle needed to cover the full simulation window.</li>
-<li>Downloads only the cycles not already cached locally.</li>
-</ul>
-<p><strong>Regridding stage changes (<code>regrid_estofs.py</code>):</strong></p>
-<ul>
-<li>Accept multiple STOFS files as input.</li>
-<li>For each output time step, select the best available STOFS cycle (e.g., prefer the
-    cycle whose forecast hour is closest to the analysis time, earlier forecast hours
-    are more accurate).</li>
-<li>Produce a single continuous <code>elev2D.th.nc</code> spanning the full duration.</li>
-</ul>
-<h3 id="phase-3-spatial-subsetting-of-unstructured-stofs-grids">Phase 3: Spatial subsetting of unstructured STOFS grids<a class="headerlink" href="#phase-3-spatial-subsetting-of-unstructured-stofs-grids" title="Permanent link">#</a></h3>
-<p>Reduce download volume by cropping STOFS files to the model domain before regridding:</p>
-<p><strong>Approach:</strong></p>
-<ol>
-<li>Open each STOFS file lazily from S3 via <code>xarray</code> + <code>fsspec</code> (no full download).</li>
-<li>Normalize the ADCIRC-format STOFS variable/dimension names to a standard schema (node
-    coordinates, triangle connectivity).</li>
-<li>Crop to the SCHISM model's bounding box: select all nodes within the bounding box,
-    keep only triangles where all three vertices are inside, and remap the connectivity
-    array to reflect the new sequential node numbering.</li>
-<li>Materialize only the cropped subset to local disk.</li>
-</ol>
-<p>This could reduce per-cycle data from ~12 GB (global) to a few hundred MB (regional),
-making multi-cycle stitching practical even for extended-range simulations.</p>
-<p>The crop algorithm for unstructured triangular meshes is well-established; the
-<a href="https://github.com/ec-jrc/Thalassa">Thalassa</a> library (JRC, EUPL-1.2 license)
-implements exactly this pattern in its <code>crop()</code> function using NumPy boolean indexing
-and <code>numpy_indexed.remap()</code>. Since Thalassa has not been updated in two years and
-carries a copyleft (EUPL-1.2) license that would propagate to derivative works, we
-should implement an independent standalone crop module following the same algorithmic
-approach rather than extracting their code directly. The logic is straightforward:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>nodes_in_bbox = where(lon &gt;= xmin &amp; lon &lt;= xmax &amp; lat &gt;= ymin &amp; lat &lt;= ymax)
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>faces_in_bbox = where(all three vertex indices are in nodes_in_bbox)
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>remap vertex indices to new sequential numbering
-</span></code></pre></div>
-<p>This requires only <code>numpy</code> (and optionally <code>numpy_indexed</code> for the remap step, which can
-also be done with <code>np.searchsorted</code>).</p>
-<h3 id="phase-4-pure-python-tpxo-prediction-module">Phase 4: Pure-Python TPXO prediction module<a class="headerlink" href="#phase-4-pure-python-tpxo-prediction-module" title="Permanent link">#</a></h3>
-<p>Develop a Python module that replaces both the Fortran <code>predict_tide</code> binary and the
-bundled <code>pytides</code> library. This module would:</p>
-<ul>
-<li>Read the standard TPXO10 atlas NetCDF files directly.</li>
-<li>Implement Arakawa C-grid bilinear interpolation with land masking.</li>
-<li>Compute all 32 constituents + 18 inferred minor constituents.</li>
-<li>Apply solid Earth tide corrections.</li>
-<li>Return NumPy arrays directly (no subprocess, no text parsing).</li>
-<li>Be validated against the Fortran OTPS binary for numerical parity.</li>
-</ul>
-<p>This replaces three current components with one:</p>
-<table>
-<thead>
-<tr>
-<th>Current</th>
-<th>Replacement</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>predict_tide</code> (Fortran binary via subprocess)</td>
-<td>Pure-Python prediction function</td>
-</tr>
-<tr>
-<td><code>otps_to_open_bnds()</code> (text output parser)</td>
-<td>Direct NumPy array return</td>
-</tr>
-<tr>
-<td><code>generate_ocean_tide()</code> + <code>pytides</code> (8 constituents, <code>scipy.griddata</code>)</td>
-<td>Same function with 32 constituents, proper C-grid interpolation</td>
-</tr>
-</tbody>
-</table>
-<p>Once implemented, the following can be removed:</p>
-<ul>
-<li><code>src/coastal_calibration/tides/pytides/</code>: 4 files, ~680 lines.</li>
-<li><code>src/coastal_calibration/tides/_ocean_tide.py</code>: <code>pytides</code>-based tidal fill.</li>
-<li><code>predict_tide</code> binary dependency.</li>
-<li><code>_otps.py</code> (<code>make_otps_input</code>, <code>otps_to_open_bnds</code>): text I/O helpers.</li>
-<li>The separate TPXO constituent files (<code>k1.nc</code> … <code>s2.nc</code>): the module reads the atlas
-    directly.</li>
-</ul>
+<p>For any retrospective simulation starting after 2020-12-30, overlapping cycles exist to
+cover the entire period — the data is there, the pipeline just does not fetch more than
+one cycle.</p>
 
 
 
@@ -2303,7 +2109,7 @@ bundled <code>pytides</code> library. This module would:</p>
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../schism_sink_source_issue/" class="md-footer__link md-footer__link--prev" aria-label="Previous: SCHISM Sink/Source Issue">
+          <a href="../schism_source_sink_design/" class="md-footer__link md-footer__link--prev" aria-label="Previous: SCHISM Source/Sink Design">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -2313,20 +2119,20 @@ bundled <code>pytides</code> library. This module would:</p>
                 Previous
               </span>
               <div class="md-ellipsis">
-                SCHISM Sink/Source Issue
+                SCHISM Source/Sink Design
               </div>
             </div>
           </a>
         
         
           
-          <a href="../../DESIGN/" class="md-footer__link md-footer__link--next" aria-label="Next: Design">
+          <a href="../../DESIGN/" class="md-footer__link md-footer__link--next" aria-label="Next: Design History">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Design
+                Design History
               </div>
             </div>
             <div class="md-footer__button md-icon">

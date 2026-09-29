@@ -343,7 +343,7 @@
   
     
   
-  Design
+  Design History
 
       </a>
     </li>
@@ -733,6 +733,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Roadmap">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#recently-delivered" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recently delivered
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1564,14 +1581,14 @@
   
   
     <li class="md-nav__item">
-      <a href="dev/schism_sink_source_issue/" class="md-nav__link">
+      <a href="dev/schism_source_sink_design/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    SCHISM Sink/Source Issue
+    SCHISM Source/Sink Design
   
 
     
@@ -1599,7 +1616,7 @@
   <span class="md-ellipsis">
     
   
-    STOFS/TPXO Improvements
+    STOFS Boundary Pipeline
   
 
     
@@ -1634,7 +1651,7 @@
   <span class="md-ellipsis">
     
   
-    Design
+    Design History
   
 
     
@@ -2047,8 +2064,11 @@ dependencies including Python and compiling SFINCS and SCHISM from source.</p>
 </tr>
 </tbody>
 </table>
-<p>SCHISM reads <code>T2D</code>, <code>Q2D</code>, <code>PSFC</code>, <code>U2D</code>, and <code>V2D</code> when building <code>sflux</code> files; SFINCS
-maps <code>RAINRATE</code>, <code>T2D</code>, <code>U2D</code>/<code>V2D</code>, <code>SWDOWN</code>, and <code>LWDOWN</code> into its own forcing.</p>
+<p>SCHISM reads <code>RAINRATE</code> (precipitation), <code>T2D</code> (2 m air temperature), <code>Q2D</code> (2 m
+specific humidity), <code>PSFC</code> (surface pressure), and <code>U2D</code>/<code>V2D</code> (10 m eastward and
+northward wind) when preparing inputs. SFINCS uses <code>RAINRATE</code>, <code>U2D</code>/<code>V2D</code>, and <code>PSFC</code>.
+The remaining LDASIN fields are renamed into HydroMT conventions when the SFINCS data
+catalog is written, but no stage consumes them.</p>
 <p>The NWM Retrospective forcing is AORC-derived (verified for CONUS and Alaska), so AORC
 is not configured separately — selecting <code>nwm_retro</code> already uses it.</p>
 <p><strong>Domains</strong>: <code>atlgulf</code>, <code>pacific</code>, <code>hawaii</code>, <code>prvi</code>, <code>alaska</code>, <code>greatlakes</code></p>
@@ -2067,38 +2087,37 @@ is not configured separately — selecting <code>nwm_retro</code> already uses i
 <code>create_write</code></p>
 <h2 id="roadmap">Roadmap<a class="headerlink" href="#roadmap" title="Permanent link">#</a></h2>
 <ul>
-<li><strong>SCHISM model creation</strong>: integrate the existing SCHISM mesh subsetting capability
-    into the package, providing an automated create workflow for SCHISM similar to what
-    SFINCS already has. This will allow users to extract a regional subdomain from a
-    larger SCHISM mesh using the same QGIS plugin and API. When this lands, the
-    discharge source/sink generation step needs to use the upstream-crossing strategy
-    described in
-    <a href="dev/schism_sink_source_issue/">docs/dev/schism_sink_source_issue.md</a> rather
-    than the per-crossing classification used to build the current pre-built
-    Pacific/Hawaii meshes (which produces multiple spurious source/sink points along
-    each river inside the domain).</li>
-<li><strong>STOFS-aware TPXO fallback</strong>: the boundary pipeline currently overwrites STOFS data
-    with TPXO tidal predictions whenever the simulation exceeds 180 hours, which
-    silently loses storm surge / wind setup / pressure effects on retrospective runs
-    where STOFS data is available for the full window. Replace the unconditional
-    <code>&gt;180h → TPXO</code> switch in <code>make_stofs_boundary</code> with a data-availability check; only
-    fall back when STOFS doesn't cover the requested window (i.e. prospective forecasts
-    beyond the latest available cycle). Smaller, lower-risk fix that should land before
-    the larger multi-cycle/Python-TPXO work below. See
-    <a href="dev/stofs_tpxo_improvements/">docs/dev/stofs_tpxo_improvements.md</a> Phase 1.</li>
-<li><strong>Improved tidal boundary conditions</strong>: replace the current 8-constituent TPXO
-    implementation with a pure-Python module supporting all 32+ constituents and minor
-    constituent inference, removing the dependency on an external Fortran binary. See
-    <a href="dev/stofs_tpxo_improvements/">docs/dev/stofs_tpxo_improvements.md</a> Phase 4
-    for the detailed plan and the suspected nodal-correction bugs in the OTPS Fortran
-    code.</li>
+<li><strong>SCHISM model creation</strong>: the package can already subset an existing mesh
+    (<code>extract_mesh</code>, <code>split_mesh</code>) and generate the files a hand-assembled model is
+    missing (<code>prepare-schism-mesh</code>, <code>prepare-schism-manning</code>, <code>prepare-schism-reaches</code>).
+    What is missing is a config-driven <code>create</code> workflow for SCHISM equivalent to the
+    SFINCS one, building a domain from scratch rather than cutting one out. A
+    from-scratch workflow should place the domain boundary so that NWM flowpaths cross
+    it once, which avoids the source/sink pairs the contour-following NWMv3 meshes
+    produce; see
+    <a href="dev/schism_source_sink_design/">docs/dev/schism_source_sink_design.md</a>. The
+    existing crosswalk generation is correct for the meshes we run and does not change.</li>
 <li><strong>Multi-cycle STOFS stitching</strong>: download and stitch multiple STOFS forecast cycles to
-    cover simulations of any duration, eliminating the current 180-hour single-cycle
-    limit. See
+    cover simulations of any duration, removing the current 180-hour single-cycle limit.
+    This is not just a download change: consecutive STOFS cycles can disagree at the
+    same valid time, and where that difference is large the step propagates into both
+    coastal models as a small wave. The forecast pipeline already spans cycles today —
+    its spinup, analysis and short-range segments each resolve their own — so a
+    continuity step (offset matching, blending, or rejection above a tolerance) is a
+    prerequisite rather than a refinement. See
     <a href="dev/stofs_tpxo_improvements/">docs/dev/stofs_tpxo_improvements.md</a> Phase 2.</li>
-<li><strong>Regional STOFS subsetting</strong>: spatially subset the global STOFS output to the model
-    domain before download, reducing data transfer from ~12 GB per cycle to a few
-    hundred MB. See
+<li><strong>Great Lakes SFINCS sinks</strong>: a Great Lakes domain may contain a true outlet, such as
+    the Niagara or the St. Clair. SFINCS supports sinks, but this package has no way to
+    produce one: nothing derives an outflow point, and a hand-placed point has its
+    timeseries overwritten with positive streamflow because there is no sign handling in
+    the SFINCS discharge path. Needs both a way to mark a point as a sink and a signed
+    series carried through to the model.</li>
+<li><strong>Crop STOFS at download time</strong>: the regridder already subsets the global STOFS mesh
+    to the model region before interpolating, and only the needed time window is fetched
+    over HTTP range requests, so the original motivation — avoiding a ~12 GB download
+    per cycle — is handled. Cropping spatially <em>before</em> the download would further
+    shrink the on-disk file, but this is now a low-priority optimization rather than a
+    blocker. See
     <a href="dev/stofs_tpxo_improvements/">docs/dev/stofs_tpxo_improvements.md</a> Phase 3.</li>
 <li><strong>Re-evaluate <code>hydromt-sfincs</code> / <code>hydromt</code> patches</strong>: 14 upstream bugs are documented
     in <a href="dev/hydromt_sfincs_issues/">docs/dev/hydromt_sfincs_issues.md</a> and worked
@@ -2122,6 +2141,23 @@ is not configured separately — selecting <code>nwm_retro</code> already uses i
     infrequent restarts to reduce storage and metadata pressure on long runs. The
     existing <code>run_param_overrides</code> keys would still take precedence so per-run tuning is
     unaffected.</li>
+</ul>
+<h3 id="recently-delivered">Recently delivered<a class="headerlink" href="#recently-delivered" title="Permanent link">#</a></h3>
+<ul>
+<li><strong>Pure-Python tidal boundary conditions</strong>: the <code>predict_tide</code> Fortran binary and the
+    bundled 8-constituent <code>pytides</code> path are gone, replaced by a
+    <a href="https://pytmd.readthedocs.io/">pyTMD</a>-based predictor in
+    <code>src/coastal_calibration/data/tides.py</code> that reads the TPXO10 atlas directly and
+    supports any netCDF tidal model pyTMD knows about.</li>
+<li><strong>SCHISM mesh subsetting and crosswalk generation</strong>: <code>extract_mesh</code> / <code>split_mesh</code>,
+    plus the <code>prepare-schism-mesh</code>, <code>prepare-schism-manning</code> and
+    <code>prepare-schism-reaches</code> commands, with QGIS plugin support for drawing the subset
+    polygon and split line.</li>
+<li><strong>Bandwidth-efficient STOFS retrieval</strong>: only the needed time window of a cycle is
+    read over HTTP range requests instead of downloading the full ~12 GB file, with
+    publish-lag-aware cycle resolution and a coverage check on cached files.</li>
+<li><strong>Great Lakes and Alaska domains</strong>: a <code>greatlakes</code> domain with NOAA GLOFS boundary
+    forcing and low-water-datum gauge comparison, and Alaska domain support.</li>
 </ul>
 <h2 id="credits">Credits<a class="headerlink" href="#credits" title="Permanent link">#</a></h2>
 <ol>

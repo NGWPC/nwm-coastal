@@ -18,7 +18,7 @@
         <link rel="prev" href="../sfincs_compilation/">
       
       
-        <link rel="next" href="../schism_sink_source_issue/">
+        <link rel="next" href="../schism_source_sink_design/">
       
       
         
@@ -345,7 +345,7 @@
   
     
   
-  Design
+  Design History
 
       </a>
     </li>
@@ -1497,6 +1497,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#15-ngen-forecast-forcing-is-not-readable-as-a-hydromt-raster-dataset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15. NGEN forecast forcing is not readable as a hydromt raster dataset
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1513,14 +1524,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../schism_sink_source_issue/" class="md-nav__link">
+      <a href="../schism_source_sink_design/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    SCHISM Sink/Source Issue
+    SCHISM Source/Sink Design
   
 
     
@@ -1548,7 +1559,7 @@
   <span class="md-ellipsis">
     
   
-    STOFS/TPXO Improvements
+    STOFS Boundary Pipeline
   
 
     
@@ -1583,7 +1594,7 @@
   <span class="md-ellipsis">
     
   
-    Design
+    Design History
   
 
     
@@ -1934,7 +1945,7 @@ files every time step, slowed from ~7 minutes to an estimated <strong>15+ hours<
 <code>SfincsWind.create()</code> (line 684), and <code>SfincsPressure.create()</code> (line 581).</p>
 <p><strong>Current workaround</strong>:</p>
 <p>In our pipeline we bypass the upstream <code>component.create()</code> entirely via
-<code>_create_meteo_forcing()</code> (in <code>sfincs_build.py</code>), which clips the source data in its
+<code>_create_meteo_forcing()</code> (in <code>sfincs/stages.py</code>), which clips the source data in its
 <strong>native CRS</strong> before reprojecting, so the CONUS-scale grid is never allocated. The
 destination grid is also constrained to the model domain bounds. This replaces the
 earlier post-hoc <code>_clip_meteo_to_domain()</code> approach that still triggered the full CONUS
@@ -2100,7 +2111,7 @@ the Texas Gulf Coast domain, this can yield ~119,903 source stations, far more t
 <code>geodataset</code> to the boundary point locations (e.g. via IDW from the nearest source
 nodes) and write only those interpolated time-series, matching the <code>.bnd</code> point count.</p>
 <p><strong>Current workaround</strong>:</p>
-<p><code>SfincsForcingStage._create_geodataset_forcing()</code> in <code>sfincs_build.py</code> bypasses
+<p><code>SfincsForcingStage._create_geodataset_forcing()</code> in <code>sfincs/stages.py</code> bypasses
 <code>model.water_level.create(geodataset=...)</code> entirely. It reads the <code>.bnd</code> file, loads the
 <code>geodataset</code>, spatially interpolates to each boundary point using inverse-distance
 weighting (IDW) from the nearest source nodes, then injects the result via
@@ -2120,7 +2131,7 @@ missing variable causes a hard crash rather than a graceful fallback to zero.</p
 <p><code>hydromt-sfincs</code> should always write a <code>bzi</code> variable alongside <code>bzs</code>. If no
 infragravity data is available, it should be zero-filled with the same shape as <code>bzs</code>.</p>
 <p><strong>Current workaround</strong>:</p>
-<p><code>SfincsForcingStage._inject_water_level()</code> in <code>sfincs_build.py</code> manually adds a
+<p><code>SfincsForcingStage._inject_water_level()</code> in <code>sfincs/stages.py</code> manually adds a
 zero-filled <code>bzi</code> variable after calling <code>model.water_level.set()</code>:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">ds</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">water_level</span><span class="o">.</span><span class="n">data</span>
 </span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="k">if</span> <span class="s2">&quot;bzi&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">ds</span><span class="o">.</span><span class="n">data_vars</span><span class="p">:</span>
@@ -2146,7 +2157,7 @@ are added and either:</p>
     on active cells.</li>
 </ul>
 <p><strong>Current workaround</strong>:</p>
-<p><code>SfincsDischargeStage._filter_active_cells()</code> in <code>sfincs_build.py</code> uses
+<p><code>SfincsDischargeStage._filter_active_cells()</code> in <code>sfincs/stages.py</code> uses
 <code>scipy.spatial.cKDTree</code> to map each source point to its nearest quadtree face, checks
 the face mask value, and drops points on inactive cells. The names of dropped points are
 logged as a warning.</p>
@@ -2392,6 +2403,26 @@ replaces <code>make_index_cog</code> with a corrected version that fixes all thr
 the correct grid component, uses the saved <code>transform</code> variable, and adds a
 <code>pyproj.Transformer</code> to reproject DEM coordinates to the model CRS before calling
 <code>get_indices_at_points</code>.</p>
+<hr />
+<h2 id="15-ngen-forecast-forcing-is-not-readable-as-a-hydromt-raster-dataset">15. NGEN forecast forcing is not readable as a hydromt raster dataset<a class="headerlink" href="#15-ngen-forecast-forcing-is-not-readable-as-a-hydromt-raster-dataset" title="Permanent link">#</a></h2>
+<p><strong>Summary</strong>:</p>
+<p>Not an upstream bug, but a compatibility shim in the same file, recorded here so the
+inventory in <code>_hydromt_compat.py</code> matches this document.</p>
+<p>The ngen forecast forcing engine writes a single multi-timestep file whose datetime axis
+lives in a <code>Time</code> <em>variable</em> rather than a <code>time</code> coordinate, and whose projected <code>x</code> /
+<code>y</code> carry the same sub-metre float noise as NWM LDASIN. hydromt's raster reader needs a
+<code>time</code> dimension coordinate — <code>_create_meteo_forcing()</code> selects on <code>data.coords["time"]</code>
+— and a regular grid, so the file is rejected as an irregular dataset (the same class of
+failure as issue 6).</p>
+<p><strong>Current workaround</strong>:</p>
+<p><code>register_forecast_meteo_preprocessor()</code> in <code>_hydromt_compat.py</code> (called from
+<code>apply_all_patches()</code>) registers a <code>forecast_meteo_coords</code> preprocessor in hydromt's
+<code>PREPROCESSORS</code> registry. It promotes <code>Time</code> to the <code>time</code> dimension coordinate, rounds
+<code>x</code> / <code>y</code> to the nearest integer for grid regularity, and drops the leftover <code>Time</code> and
+<code>crs</code> variables. The CRS itself comes from the catalog entry, which reads it from the
+file's <code>crs</code> variable at catalog-generation time.</p>
+<p>This is selected per data-catalog entry, so it only applies to forecast forcing; NWM
+LDASIN continues to use <code>round_coords</code> from issue 6.</p>
 
 
 
@@ -2457,13 +2488,13 @@ the correct grid component, uses the saved <code>transform</code> variable, and 
         
         
           
-          <a href="../schism_sink_source_issue/" class="md-footer__link md-footer__link--next" aria-label="Next: SCHISM Sink/Source Issue">
+          <a href="../schism_source_sink_design/" class="md-footer__link md-footer__link--next" aria-label="Next: SCHISM Source/Sink Design">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                SCHISM Sink/Source Issue
+                SCHISM Source/Sink Design
               </div>
             </div>
             <div class="md-footer__button md-icon">

@@ -91,13 +91,14 @@ _DOCS_PREFIX = re.compile(r'((?:src="|]\())(docs/)')
 
 
 def on_page_markdown(markdown: str, page: Page, **_kwargs: object) -> str:
-    """Rewrite ``docs/`` image paths in README so they resolve in mkdocs.
+    """Rewrite ``docs/`` paths in root-level pages so they resolve in mkdocs.
 
     On GitHub, paths like ``docs/examples/images/foo.png`` are relative to
-    the repo root.  When the README is served as ``index.md`` inside the
-    docs directory, the ``docs/`` prefix must be stripped.
+    the repo root.  README and DESIGN are both served from the site root,
+    so the ``docs/`` prefix must be stripped for them to resolve there
+    while staying correct when the same file is read on GitHub.
     """
-    if page.file.abs_src_path == str(readme):
+    if page.file.abs_src_path in (str(readme), str(design)):
         markdown = _DOCS_PREFIX.sub(r"\1", markdown)
     return markdown
 
