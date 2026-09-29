@@ -1,112 +1,38 @@
 # STOFS boundary pipeline: status and remaining work
 
 This note tracks the STOFS / tidal boundary pipeline. It was originally a four-phase
-improvement plan written in May 2026; two of those phases have since been delivered, one
-was solved by different means, and the remaining one turned out to be harder than
-described. This revision records where each stands and what is actually left.
+improvement plan written in May 2026. Since then phase 4 has been delivered, phase 3's
+objective has been met, phase 1 turned out to be an aspect of phase 2 rather than a task
+of its own, and phase 2 turned out to be harder than described. This revision records
+where each stands and what is actually left.
 
 | Phase                                  | Status                                                                     |
 | -------------------------------------- | -------------------------------------------------------------------------- |
-| 1. STOFS-aware tidal fallback          | Premise was wrong; the real issue is folded into phase 2                   |
+| 1. STOFS-aware tidal fallback          | Subsumed by phase 2 — the condition is cycle availability                  |
 | 2. Multi-cycle STOFS stitching         | **Open**, and blocked on cycle-to-cycle continuity — see below             |
 | 3. Regional (spatial) STOFS subsetting | Done at regrid time; a download-side crop remains unimplemented, low value |
 | 4. Pure-Python tidal prediction        | **Delivered** via pyTMD                                                    |
 
 ______________________________________________________________________
 
-## Phase 4 — delivered
+## Phase 1 — subsumed by phase 2
 
-Tidal prediction is pure Python. `src/coastal_calibration/data/tides.py` wraps
-[pyTMD](https://pytmd.readthedocs.io/) and exposes three entry points:
+The tidal fill is what keeps a run longer than 180 h supplied once its single STOFS
+cycle runs out. `extend_schism_boundary` appends from `fill_from_hour=181`, reads the
+existing file's own `time_step` rather than assuming hourly, and writes only rows from
+that point on, so the STOFS hours already in `elev2D.th.nc` stay as they are.
+`make_stofs_boundary` (`schism/prep.py`) treats it as best-effort: a failure logs loudly
+and leaves the first 180 h of valid forcing in place rather than aborting, and a run
+past 180 h with no `paths.tidal_atlas_dir` configured gets a warning instead of a silent
+truncation.
 
-- `predict_tide_at_points` — elevations at arbitrary points over an arbitrary time
-    array; the SFINCS forcing stage calls this directly so it can manage its own
-    cadence.
-- `write_schism_boundary` — writes the canonical 4-D `elev2D.th.nc` at a caller-supplied
-    cadence.
-- `extend_schism_boundary` — appends a tidal-only fill to an existing `elev2D.th.nc`.
-
-This replaced the `predict_tide` Fortran binary, the bundled `pytides` library, the
-`scipy.griddata` interpolation and the text-file subprocess pipeline in one step. The
-following no longer exist: `tides/pytides/`, `tides/_ocean_tide.py`, `_otps.py`,
-`make_otps_input`, `otps_to_open_bnds`, and the separate `k1.nc` … `s2.nc` constituent
-files. pyTMD reads the TPXO10 atlas directly, and any netCDF model in
-`pyTMD.io.load_database()` with an elevation group works — TPXO9, FES2014, GOT, EOT —
-selected per run via `BoundaryConfig.tidal_model`.
-
-This was solved by adopting a maintained library rather than by writing the bespoke
-module the original plan specified. One consequence worth recording: that plan listed
-three **suspected** bugs in the OTPS Fortran nodal-correction code (an L2 radian
-conversion, an MS4 compound factor, a hardcoded M3 factor). Those were never confirmed —
-the investigation was made moot rather than completed. They are noted here only so
-nobody re-derives them believing there is an open action; there is not.
-
-## Phase 3 — objective met, by time subsetting rather than spatial cropping
-
-The original concern was that each STOFS cycle is ~12 GB globally while a simulation
-needs a few hours of it. That is solved: `_download_stofs_time_subset` in
-`data/downloader.py` opens the remote file lazily over HTTP range requests and
-materializes only the `[start, end + 1h]` slice of `time` / `zeta`, plus the static mesh
-variables (`x`, `y`, `element`) that `regrid_estofs.py` and the SFINCS reader need. The
-full file is never downloaded.
-
-Two related fixes landed alongside it:
-
-- `resolve_stofs_cycle` walks back in 6-hour steps from the naive cycle until it finds
-    one actually published, so a "now" start time doesn't name a cycle that does not
-    exist yet.
-- `_stofs_local_file_covers` verifies an existing local file's real time coverage before
-    reusing it. `get_stofs_path` names files only by 6-hourly cycle, so a short-window
-    run and a long-window run sharing a cycle resolve to the same path; a bare existence
-    check let the narrower file satisfy the wider caller. This was confirmed live as the
-    cause of a short-range run losing all real boundary forcing after its first hour.
-
-Spatial cropping already happens, but **at regrid time rather than at download time**.
-`regrid_estofs` derives a bounding box from the destination open-boundary node
-coordinates and passes it to `build_unstructured_mesh`, which keeps only the STOFS nodes
-inside that box plus a 2° buffer (`bbox_node_indices` in `regridding/esmf_utils.py`).
-The reduction is logged as `STOFS source mesh: N/M nodes kept after bbox filter`. This
-is what keeps ESMF mesh construction tractable against the global grid.
-
-The SFINCS side does the same thing by a different route: `_load_geodataset_for_bnd`
-requests the catalog entry with `geom` set to the boundary points and a 50 km buffer, so
-only nearby source nodes are ever materialised before the IDW interpolation. Both
-consumers therefore see a regional subset; neither reads the global mesh into memory.
-
-What is *not* implemented is cropping before the bytes cross the network.
-`_download_stofs_time_subset` copies `x`, `y` and `element` whole and slices only `zeta`
-in time, so the local file still holds the global mesh for the hours it covers. Doing
-the crop upstream of the download would shrink the on-disk file and the regridder's
-input, but the transfer cost is already dominated by the time slice, so the remaining
-payoff is small — this is a low-priority idea rather than a plan.
-
-If it is ever revisited, note that the node-selection half already exists in
-`bbox_node_indices`; what a download-side crop additionally needs is the connectivity
-remap — keep only triangles with all three vertices inside, then renumber `element` to
-the new sequential node indices. [Thalassa](https://github.com/ec-jrc/Thalassa)
-implements this pattern, but it is EUPL-1.2 (copyleft) and unmaintained for two years,
-so write an independent implementation rather than extracting its code.
-
-______________________________________________________________________
-
-## Phase 1 — the premise was wrong
-
-The original note claimed the pipeline "unconditionally overwrites `elev2D.th.nc` from
-hour 181 onward with tidal-only predictions", losing surge on retrospective runs where
-STOFS covers the full window.
-
-That is not what happens. `extend_schism_boundary` **appends**: it defaults to
-`fill_from_hour=181`, reads the existing file's own `time_step` rather than assuming
-hourly, and writes only rows from that point forward. Hours 0–180 of STOFS data are
-never touched. The call site in `make_stofs_boundary` (`schism/prep.py`) also treats the
-fill as best-effort — a failure logs loudly and leaves the first 180 h of valid forcing
-in place rather than aborting — and warns when a >180 h run has no
-`paths.tidal_atlas_dir` configured at all.
-
-What remains true is narrower: hours 181+ are tidal-only **because only one STOFS cycle
-is ever downloaded**, not because a check is missing. There is no surge data being
-discarded; there is surge data that was never fetched. That makes this an aspect of
-phase 2, not a separate task, and it is folded in below.
+This phase was framed as making that fill conditional — fall back to tides only when
+STOFS genuinely does not cover the window. That condition turns out to be the same
+condition as phase 2. Hours past 180 are tidal-only because only one cycle is ever
+downloaded, so there is no further STOFS data available to prefer; the fill is not
+displacing anything. Once multiple cycles can be stitched, "STOFS where it exists, tides
+beyond it" falls out of the stitching logic rather than needing a check of its own, so
+it is tracked there.
 
 ______________________________________________________________________
 
@@ -184,6 +110,83 @@ before it is consumed" mechanics.
     multi-file case.
 - `regrid_estofs` accepts multiple input files and produces one continuous
     `elev2D.th.nc`, with the continuity step above applied at each seam.
+
+______________________________________________________________________
+
+## Phase 3 — objective met; a download-side crop remains open
+
+The original concern was that each STOFS cycle is ~12 GB globally while a simulation
+needs a few hours of it. That is solved: `_download_stofs_time_subset` in
+`data/downloader.py` opens the remote file lazily over HTTP range requests and
+materializes only the `[start, end + 1h]` slice of `time` / `zeta`, plus the static mesh
+variables (`x`, `y`, `element`) that `regrid_estofs.py` and the SFINCS reader need. The
+full file is never downloaded.
+
+Two related fixes landed alongside it:
+
+- `resolve_stofs_cycle` walks back in 6-hour steps from the naive cycle until it finds
+    one actually published, so a "now" start time doesn't name a cycle that does not
+    exist yet.
+- `_stofs_local_file_covers` verifies an existing local file's real time coverage before
+    reusing it. `get_stofs_path` names files only by 6-hourly cycle, so a short-window
+    run and a long-window run sharing a cycle resolve to the same path; a bare existence
+    check let the narrower file satisfy the wider caller. This was confirmed live as the
+    cause of a short-range run losing all real boundary forcing after its first hour.
+
+Spatial cropping already happens, but **at regrid time rather than at download time**.
+`regrid_estofs` derives a bounding box from the destination open-boundary node
+coordinates and passes it to `build_unstructured_mesh`, which keeps only the STOFS nodes
+inside that box plus a 2° buffer (`bbox_node_indices` in `regridding/esmf_utils.py`).
+The reduction is logged as `STOFS source mesh: N/M nodes kept after bbox filter`. This
+is what keeps ESMF mesh construction tractable against the global grid.
+
+The SFINCS side does the same thing by a different route: `_load_geodataset_for_bnd`
+requests the catalog entry with `geom` set to the boundary points and a 50 km buffer, so
+only nearby source nodes are ever materialised before the IDW interpolation. Both
+consumers therefore see a regional subset; neither reads the global mesh into memory.
+
+What is *not* implemented is cropping before the bytes cross the network.
+`_download_stofs_time_subset` copies `x`, `y` and `element` whole and slices only `zeta`
+in time, so the local file still holds the global mesh for the hours it covers. Doing
+the crop upstream of the download would shrink the on-disk file and the regridder's
+input, but the transfer cost is already dominated by the time slice, so the remaining
+payoff is small — this is a low-priority idea rather than a plan.
+
+If it is ever revisited, note that the node-selection half already exists in
+`bbox_node_indices`; what a download-side crop additionally needs is the connectivity
+remap — keep only triangles with all three vertices inside, then renumber `element` to
+the new sequential node indices. [Thalassa](https://github.com/ec-jrc/Thalassa)
+implements this pattern, but it is EUPL-1.2 (copyleft) and unmaintained for two years,
+so write an independent implementation rather than extracting its code.
+
+______________________________________________________________________
+
+## Phase 4 — delivered
+
+Tidal prediction is pure Python. `src/coastal_calibration/data/tides.py` wraps
+[pyTMD](https://pytmd.readthedocs.io/) and exposes three entry points:
+
+- `predict_tide_at_points` — elevations at arbitrary points over an arbitrary time
+    array; the SFINCS forcing stage calls this directly so it can manage its own
+    cadence.
+- `write_schism_boundary` — writes the canonical 4-D `elev2D.th.nc` at a caller-supplied
+    cadence.
+- `extend_schism_boundary` — appends a tidal-only fill to an existing `elev2D.th.nc`.
+
+This replaced the `predict_tide` Fortran binary, the bundled `pytides` library, the
+`scipy.griddata` interpolation and the text-file subprocess pipeline in one step. The
+following no longer exist: `tides/pytides/`, `tides/_ocean_tide.py`, `_otps.py`,
+`make_otps_input`, `otps_to_open_bnds`, and the separate `k1.nc` … `s2.nc` constituent
+files. pyTMD reads the TPXO10 atlas directly, and any netCDF model in
+`pyTMD.io.load_database()` with an elevation group works — TPXO9, FES2014, GOT, EOT —
+selected per run via `BoundaryConfig.tidal_model`.
+
+This was solved by adopting a maintained library rather than by writing the bespoke
+module the original plan specified. One consequence worth recording: that plan listed
+three **suspected** bugs in the OTPS Fortran nodal-correction code (an L2 radian
+conversion, an MS4 compound factor, a hardcoded M3 factor). Those were never confirmed —
+the investigation was made moot rather than completed. They are noted here only so
+nobody re-derives them believing there is an open action; there is not.
 
 ______________________________________________________________________
 
